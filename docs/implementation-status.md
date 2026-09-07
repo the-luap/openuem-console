@@ -11,7 +11,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | --- | --- | --- |
 | NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; synthetic TLS/PostgreSQL tests | Production agent authorization/enrollment integration and downloads on 443; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple action capabilities and permission administration/history; existing sessions rechecked | Individual desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox and worker body/profile/task checks; real-broker/database tests and published library CI | Console issuance and production auth/disconnect services; bootstrap manifests, protected agent storage, renewal and release integration |
+| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect service and worker body/profile/task checks; real-broker/database tests and published library CI | Console issuance, worker service credentials and reference provisioning; bootstrap manifests, protected agent storage, renewal and release integration |
 | APP-01 | Baseline APNs certificate/key import | CSR/key storage; vendor signing integration; certificate-only import; renewal concurrency, account metadata, alerts and actual Apple issuance |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks | Physical iPhone/iPad and Safari acceptance; Windows/Mac download/installer flows |
@@ -115,8 +115,12 @@ library commit `2af211c88d57` also passed
 [GitHub CI](https://github.com/the-luap/openuem-nats/actions/runs/34170105505).
 Worker commit `6c7cc1f` pins this published dependency and passes standalone
 Linux/Windows builds, model race tests, and Linux execution of real-broker/body
-boundary tests. Its separate GitHub CI has been requested but has no recorded
-result here yet. See [desktop integration evidence](desktop-enrollment-plan.md).
+boundary tests. Its
+[GitHub CI passed](https://github.com/the-luap/openuem-worker/actions/runs/34170316983),
+including Linux race tests and both platform builds.
+[Console CI also passed](https://github.com/the-luap/openuem-console/actions/runs/34170372575)
+for commit `ffac98f`, covering the gateway, access controls, Apple protocol/portal,
+Windows deployment models and both platform builds. See [desktop integration evidence](desktop-enrollment-plan.md).
 
 ## Outstanding external acceptance inputs
 

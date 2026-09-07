@@ -36,7 +36,16 @@ revocation/session outbox. The combined real-broker/database test passes. The
 worker pins published library commit `2af211c88d57` using the Go module replacement
 `github.com/the-luap/openuem-nats v0.11.1-0.20260907232712-2af211c88d57`.
 [Library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34170105505)
-for that exact commit. Production service wiring and released-agent use remain open.
+for that exact commit. Later library commit `7462b7bd9e56` adds the bounded
+authorization service, durable disconnect batches and protected key-file loading.
+Its [CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34171176156),
+including native Windows ACL tests. The console pins that published commit.
+
+The console now includes the private `openuem-agent-auth` executable with separate
+authorization/revocation NKeys, verified TLS, loopback readiness and graceful
+shutdown. Its real PostgreSQL/TLS broker race test passes locally and covers active
+revocation and broker failure. See [service operations](agent-authorization-operations.md).
+Worker service credentials, production provisioning and released-agent use remain open.
 
 The console gateway now supports an optional exact native-agent WSS route with
 mutual TLS to the private broker, strict upgrade validation, bounded concurrent
@@ -50,8 +59,12 @@ It also fixes targeted profile queries that previously omitted organization/site
 limits. Its actual deployment-exclusion handler was tested through a real broker
 and isolated PostgreSQL schema. The test rejects forged replies, foreign body IDs
 and requests from a revoked but still connected device. Linux/Windows builds pass
-without the temporary local workspace; worker CI is pending separately. Startup
+without the temporary local workspace;
+[worker CI passed](https://github.com/the-luap/openuem-worker/actions/runs/34170316983)
+for this exact commit. Startup
 in both console and worker now preserves newer additive columns/indexes.
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34170372575)
+for commit `ffac98f`, including the gateway, access controls and guided Apple portal.
 
 ## Required boundaries
 
