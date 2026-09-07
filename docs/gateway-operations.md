@@ -1,7 +1,8 @@
 # Native HTTPS gateway
 
-The gateway implements the Apple/administrator portion of NET-01 and SEC-01.
-It is not yet the complete one-port distribution: agent WSS, bootstrap/downloads,
+The gateway implements Apple/administrator routing and an optional native-agent
+WSS route for NET-01 and SEC-01. It is not yet the complete one-port distribution:
+production broker/agent enrollment integration, bootstrap/downloads,
 Windows MDM routes, automated certificate provisioning, rate limits and a complete
 reference deployment remain open in [implementation status](implementation-status.md).
 
@@ -39,6 +40,8 @@ The current public allowlist contains only:
 - `POST /mdm/apple/enroll/<43-character invitation>` for confirmed claims/downloads
 - `PUT /mdm/apple/<canonical UUID>/checkin`
 - `PUT /mdm/apple/<canonical UUID>/connect`
+- `GET /agent-channel` only as a validated native WebSocket upgrade when an
+  explicit private agent backend is configured
 
 Everything else requires an explicitly configured administrator source network,
 including `/login`, `/auth`, `/admin`, `/tenant/...`, `/devices`, `/computers`,
@@ -118,12 +121,42 @@ rejects direct access when gateway mode is configured.
 Only HTTPS backends with normal server certificate verification are accepted.
 The gateway ignores outbound HTTP proxy environment variables for these internal
 connections. It imposes header/read/write/idle timeouts and shuts down gracefully
-on SIGINT/SIGTERM. Long-running agent WebSocket support is not yet implemented.
+on SIGINT/SIGTERM. Upgraded agent streams have their HTTP deadlines cleared and
+are tracked explicitly: shutdown closes them because ordinary HTTP server shutdown
+does not close hijacked connections.
 
 In direct mode, leave `OPENUEM_TRUSTED_GATEWAY_CERTIFICATES` unset. Apple and admin
 certificate login then require the actual end-client TLS certificate and cannot
 use a forwarded header. A missing, invalid, empty or expired **configured** trust
 bundle is a startup error, not a reason to fall back to direct mode.
+
+## Native agent WebSocket route
+
+Set `--agent-url https://nats.internal:8443` to enable the exact `/agent-channel`
+route. This value is a private HTTPS origin, without a path, query or credentials;
+the public agent endpoint is `wss://uem.example.org/agent-channel`. Leaving the
+option empty keeps the route disabled. `--agent-connection-limit` defaults to
+4096 and bounds concurrent upgrades and streams (accepted range: 1–65536).
+
+Only HTTP/1.1 GET with a valid WebSocket upgrade/key/version reaches this backend.
+Queries, request bodies, browser Origin, cookies, HTTP authorization and subprotocol
+headers are rejected. Browser applications are not supported on this native-agent
+route. Malformed requests do not fall through to an administrator backend. The
+backend still authenticates each device with individual NKey nonce proof; a
+successful WebSocket upgrade alone grants no NATS permissions.
+
+Configure the private NATS WebSocket listener to require the dedicated gateway
+TLS identity using its explicit leaf trust, without certificate-to-user mapping.
+The gateway's certificate must not grant an agent or worker account. Configure
+individual broker authorization and scoped subjects separately as described in
+[desktop enrollment](desktop-enrollment-plan.md). End-client certificate headers
+are removed for this route; they cannot replace end-to-end NKey possession proof.
+Do not point this route at the upstream shared-agent broker configuration.
+
+HTTP deadlines do not limit an upgraded stream. The broker must enforce its short
+authentication timeout and expiring authorization grants, while agents use protocol
+pings, private reply inboxes and reconnect only through the configured public path.
+The gateway does not perform broker identity lookup or certificate renewal itself.
 
 ## Rotation
 
@@ -161,9 +194,14 @@ missing/wrong gateway credentials, copied certificate headers, direct backend
 rejection, private administrator route checks, source-header spoofing, malformed
 paths, IPv4/IPv6 address decisions, OCSP serial/freshness checks and request-token
 CSRF through the common router. The PostgreSQL Apple integration runs enrollment
-and device check-in both directly and through the gateway.
+and device check-in both directly and through the gateway. A real NATS 2.14.6
+WebSocket test proves individual-key login and request/reply through frontend TLS
+and gateway mutual TLS, rejection of direct backend access, malformed/native route
+boundaries, connection capacity, survival beyond ordinary HTTP deadlines and
+closure of existing streams on gateway shutdown.
 
 These tests use synthetic device identities. They do not prove Safari's optional
 certificate-selection behavior, real APNs delivery, hardware management, an actual
-firewall's port exposure, agent WSS authorization or a production-scale deployment.
+firewall's port exposure, durable agent enrollment integration or a production-scale
+deployment.
 Record those independently in the roadmap's acceptance evidence.

@@ -20,24 +20,27 @@ import (
 )
 
 type Config struct {
-	PublicOrigin  string
-	AppleURL      string
-	ConsoleURL    string
-	AuthURL       string
-	AdminNetworks []netip.Prefix
-	BackendTLS    *tls.Config
+	PublicOrigin string
+	AppleURL     string
+	ConsoleURL   string
+	AuthURL      string
+	// AgentURL enables the exact native-agent WebSocket route to private NATS.
+	AgentURL             string
+	AgentConnectionLimit int
+	AdminNetworks        []netip.Prefix
+	BackendTLS           *tls.Config
 }
 
 func ParseOrigin(value string) (*url.URL, error) {
 	u, err := url.Parse(value)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Opaque != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
 		return nil, errors.New("an HTTPS origin without credentials, path, query or fragment is required")
 	}
 	u.Path = ""
 	return u, nil
 }
 
-func New(config Config) (http.Handler, error) {
+func New(config Config) (*Gateway, error) {
 	origin, err := ParseOrigin(config.PublicOrigin)
 	if err != nil {
 		return nil, err
@@ -54,8 +57,20 @@ func New(config Config) (http.Handler, error) {
 			return nil, errors.New("administrator networks must be explicit IPv4 or IPv6 prefixes, not the entire Internet")
 		}
 	}
-	proxies := make([]http.Handler, 3)
-	for i, address := range []string{config.AppleURL, config.ConsoleURL, config.AuthURL} {
+	limit := config.AgentConnectionLimit
+	if limit == 0 {
+		limit = 4096
+	}
+	if limit < 1 || limit > 65536 {
+		return nil, errors.New("agent connection limit must be between 1 and 65536")
+	}
+	g := &Gateway{connections: make(map[net.Conn]struct{}), slots: make(chan struct{}, limit)}
+	addresses := []string{config.AppleURL, config.ConsoleURL, config.AuthURL}
+	if config.AgentURL != "" {
+		addresses = append(addresses, config.AgentURL)
+	}
+	proxies := make([]http.Handler, len(addresses))
+	for i, address := range addresses {
 		upstream, err := ParseOrigin(address)
 		if err != nil {
 			return nil, err
@@ -82,6 +97,12 @@ func New(config Config) (http.Handler, error) {
 				r.Out.Header.Set("X-Forwarded-Host", origin.Host)
 				r.Out.Header.Set("X-Forwarded-Proto", "https")
 				clientidentity.Forward(r.Out, r.In)
+				if i == 3 {
+					// Broker identity is NKey nonce proof, never a forwarded HTTP
+					// credential or the gateway's own TLS client identity.
+					r.Out.Header.Del("Client-Cert")
+					r.Out.Header.Del("Client-Cert-Chain")
+				}
 			},
 			// Transport errors may contain enrollment URLs or other secrets.
 			ErrorLog: log.New(io.Discard, "", 0),
@@ -91,7 +112,7 @@ func New(config Config) (http.Handler, error) {
 			},
 		}
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	g.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Omit URL paths/tokens while preserving Origin on native form POSTs.
 		w.Header().Set("Referrer-Policy", "strict-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -105,6 +126,10 @@ func New(config Config) (http.Handler, error) {
 			proxies[0].ServeHTTP(w, r)
 			return
 		}
+		if config.AgentURL != "" && r.URL.Path == "/agent-channel" {
+			g.serveAgent(proxies[3], w, r)
+			return
+		}
 		if !allowedAdmin(r.RemoteAddr, networks) {
 			http.Error(w, "administrator access requires an approved network", http.StatusForbidden)
 			return
@@ -114,7 +139,8 @@ func New(config Config) (http.Handler, error) {
 		} else {
 			proxies[1].ServeHTTP(w, r)
 		}
-	}), nil
+	})
+	return g, nil
 }
 
 func canonicalPath(u *url.URL) bool {

@@ -37,6 +37,8 @@ func run() error {
 	apple := flag.String("apple-url", "", "Private Apple HTTPS origin")
 	console := flag.String("console-url", "", "Private console HTTPS origin")
 	auth := flag.String("auth-url", "", "Private certificate login HTTPS origin")
+	agent := flag.String("agent-url", "", "Optional private NATS WebSocket HTTPS origin")
+	agentLimit := flag.Int("agent-connection-limit", 4096, "Maximum simultaneous agent upgrades and streams")
 	admin := flag.String("admin-networks", "", "Comma-separated administrator source CIDRs (for example VPN networks)")
 	flag.Parse()
 	identity, err := tls.LoadX509KeyPair(*clientCertPath, *clientKeyPath)
@@ -61,12 +63,14 @@ func run() error {
 	}
 	handler, err := gateway.New(gateway.Config{
 		PublicOrigin: *origin, AppleURL: *apple, ConsoleURL: *console, AuthURL: *auth,
+		AgentURL: *agent, AgentConnectionLimit: *agentLimit,
 		AdminNetworks: networks,
 		BackendTLS:    &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{identity}, RootCAs: roots},
 	})
 	if err != nil {
 		return err
 	}
+	defer handler.Close()
 	server := &http.Server{
 		Addr: *listen, Handler: handler,
 		// TLS proves possession; backends validate the end-client issuer and
@@ -81,6 +85,7 @@ func run() error {
 	go func() {
 		defer close(done)
 		<-ctx.Done()
+		_ = handler.Close()
 		shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdown)

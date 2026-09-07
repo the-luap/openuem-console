@@ -9,9 +9,9 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 
 | Package | Current evidence | Remaining work |
 | --- | --- | --- |
-| NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; synthetic TLS/PostgreSQL tests | Authenticated agent WSS and downloads on 443; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
+| NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; synthetic TLS/PostgreSQL tests | Production agent authorization/enrollment integration and downloads on 443; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple action capabilities and permission administration/history; existing sessions rechecked | Individual desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Baseline individual Apple identity only | Limited desktop invitations; device-generated keys and individual CA issuance; NATS account/subject rights; bootstrap manifests, revocation and agent changes |
+| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, scoped subjects, WSS client and bounded broker auth callout tested in the related NATS repository, not yet integrated with the identity database or released agent | Limited desktop invitations and individual CA issuance; actual broker/worker enforcement; bootstrap manifests, revocation, protected agent storage and release integration |
 | APP-01 | Baseline APNs certificate/key import | CSR/key storage; vendor signing integration; certificate-only import; renewal concurrency, account metadata, alerts and actual Apple issuance |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks | Physical iPhone/iPad and Safari acceptance; Windows/Mac download/installer flows |
@@ -99,6 +99,14 @@ console/view/router race checks and Linux/Windows cross-builds. Its PostgreSQL s
 claims/downloads, encrypted restart recovery, expiry/revocation, HTTP form
 boundaries and completed device status. The opt-in live browser fixture runs
 against a separate schema and is never enabled by the normal CI test command.
+
+The optional native-agent WSS gateway and NATS dependency update (server 2.14.6,
+client 1.53.1) pass the combined race suite above and Linux/Windows cross-builds.
+The real-broker gateway test covers individual key proof through both TLS legs,
+direct-backend rejection, public route limits, concurrent stream capacity,
+continued traffic beyond HTTP deadlines and explicit stream closure at shutdown.
+The related NATS library has separate passing real-broker auth callout tests;
+the two components are not yet wired to a production identity database.
 
 ## Outstanding external acceptance inputs
 

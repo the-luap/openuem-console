@@ -175,7 +175,7 @@ func TestAdminNetworksDoNotTrustForwardedAddresses(t *testing.T) {
 }
 
 func TestGatewayConfigurationRejectsUnsafeOriginsAndTrust(t *testing.T) {
-	for _, origin := range []string{"http://example.test", "https://user:pass@example.test", "https://example.test/path", "https://example.test?", "https://example.test?next=bad", "https://example.test/#fragment", "//example.test"} {
+	for _, origin := range []string{"http://example.test", "https://user:pass@example.test", "https://example.test/path", "https://example.test/%2F", "https://example.test?", "https://example.test?next=bad", "https://example.test/#fragment", "//example.test"} {
 		if _, err := ParseOrigin(origin); err == nil {
 			t.Error("accepted", origin)
 		}
@@ -185,6 +185,20 @@ func TestGatewayConfigurationRejectsUnsafeOriginsAndTrust(t *testing.T) {
 	if _, err := New(config); err != nil {
 		t.Fatal(err)
 	}
+	for _, address := range []string{"http://broker.internal", "wss://broker.internal", "https://broker.internal/agent-channel", "https://broker.internal?token=secret"} {
+		config.AgentURL = address
+		if _, err := New(config); err == nil {
+			t.Fatal("unsafe agent backend accepted", address)
+		}
+	}
+	config.AgentURL = "https://broker.internal"
+	for _, limit := range []int{-1, 65537} {
+		config.AgentConnectionLimit = limit
+		if _, err := New(config); err == nil {
+			t.Fatal("invalid agent connection limit accepted")
+		}
+	}
+	config.AgentConnectionLimit = 0
 	config.BackendTLS.InsecureSkipVerify = true
 	if _, err := New(config); err == nil {
 		t.Fatal("insecure backend TLS accepted")
