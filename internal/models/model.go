@@ -12,7 +12,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	ent "github.com/open-uem/ent"
 	"github.com/open-uem/ent/agent"
-	"github.com/open-uem/ent/migrate"
 	"github.com/open-uem/ent/orgmetadata"
 	"github.com/open-uem/ent/profile"
 	"github.com/open-uem/ent/site"
@@ -48,9 +47,10 @@ func New(dbUrl string, driverName, domain string) (*Model, error) {
 	// TODO Automatic migrations only in non-stable versions
 	ctx := context.Background()
 	if os.Getenv("ENV") != "prod" {
-		if err := model.Client.Schema.Create(ctx,
-			migrate.WithDropIndex(true),
-			migrate.WithDropColumn(true)); err != nil {
+		// Startup must not remove columns or indexes owned by additive identity
+		// migrations or another component version in a rolling deployment.
+		if err := model.Client.Schema.Create(ctx); err != nil {
+			_ = db.Close()
 			return nil, err
 		}
 	}

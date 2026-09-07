@@ -2,8 +2,9 @@
 
 This is the active implementation design for ENR-01, the desktop portion of
 ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
-claim. The shared endpoint proof/subject library has been started; the server,
-broker, worker, agent, installer and deployment integration below remains open.
+claim. Shared proof, durable registry, broker authorization, gateway transport and
+worker request boundaries now have automated evidence. Console issuance, service
+credentials, native-agent storage, installers and production deployment remain open.
 
 ## Source baselines
 
@@ -18,8 +19,10 @@ Local related repositories were checked out from upstream into sibling directori
 | Docker deployment | `28ede14` | NATS/public ports and certificate-mounted components need the new reference gateway integration |
 
 The console remains on its native Apple feature branch. Related repositories use
-local `feature/individual-agent-enrollment` branches. No related repository fork,
-dependency version or remote CI result is implied by a local checkout.
+feature branches named `feature/individual-agent-enrollment`. The NATS library and
+worker are now forked at `the-luap/openuem-nats` and `the-luap/openuem-worker`; the
+agent, certificate manager and Docker repositories are still local upstream
+checkouts. Feature branches are implementation work, not signed releases.
 
 Local NATS library commit `0a8ad01` adds the shared endpoint-generated CSR/NKey
 proof, canonical device request parsing, private inbox validation and bounded
@@ -27,14 +30,28 @@ subject policy. Local commit `df18641` adds explicit WSS connections and bounded
 grants. Real NATS 2.14.6 / Go client 1.53.1 tests cover individual keys, private
 subjects/replies, pre-provisioned JetStream consumers, active-session kicks,
 certificate expiry and authorization outages. Its race tests and full library
-test/build suite pass. Production broker and application wiring remain open; the library is not yet used
-by the released agent or console.
+test/build suite pass. Commit `c33596f` adds the durable PostgreSQL registry,
+limited invitations, organization CA creation/import, scoped issuance and atomic
+revocation/session outbox. The combined real-broker/database test passes. The
+worker pins published library commit `2af211c88d57` using the Go module replacement
+`github.com/the-luap/openuem-nats v0.11.1-0.20260907232712-2af211c88d57`.
+[Library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34170105505)
+for that exact commit. Production service wiring and released-agent use remain open.
 
 The console gateway now supports an optional exact native-agent WSS route with
 mutual TLS to the private broker, strict upgrade validation, bounded concurrent
 streams and explicit stream shutdown. Real-broker tests cover TLS, routing,
 private replies and HTTP deadline survival. This is transport evidence; the
-persistent identity database and released agent are not integrated yet.
+production console and released agent are not integrated yet.
+
+Worker commit `6c7cc1f` adds opt-in versioned subscriptions, private reply validation,
+body/device/scope binding, current revocation checks and profile/task ownership.
+It also fixes targeted profile queries that previously omitted organization/site
+limits. Its actual deployment-exclusion handler was tested through a real broker
+and isolated PostgreSQL schema. The test rejects forged replies, foreign body IDs
+and requests from a revoked but still connected device. Linux/Windows builds pass
+without the temporary local workspace; worker CI is pending separately. Startup
+in both console and worker now preserves newer additive columns/indexes.
 
 ## Required boundaries
 
