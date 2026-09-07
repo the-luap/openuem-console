@@ -1,0 +1,54 @@
+name: Native Apple management
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'feature/**']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openuem_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: openuem_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U openuem_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APPLE_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - run: go tool templ generate
+      - name: Protocol, persistence, TLS, console routes and rendering
+        run: go test -race -count=1 ./internal/mdm/apple ./internal/controllers/webserver/handlers ./internal/views/mdm_views
+      - name: Existing Windows deployment models
+        run: go test -count=1 -run TestDeploymentTestSuite ./internal/models
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - run: go tool templ generate
+      - run: go build ./...
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: amd64
+          CGO_ENABLED: '0'

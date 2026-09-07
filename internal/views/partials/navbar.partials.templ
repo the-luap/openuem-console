@@ -8,6 +8,10 @@ import (
 templ NavBar(active string, commonInfo *CommonInfo) {
 	<nav id="navbar" hx-history="false" class="uk-flex uk-flex-between@s h-full flex-col items-center px-2 sm:py-5">
 		<div class="flex flex-col gap-4">
+			<a href={ templ.URL(GetNavigationUrl(commonInfo, "/devices")) } uk-tooltip="title: Devices — Windows & iOS; pos: right" aria-label="Devices — Windows and iOS" class={ "flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8", templ.KV("bg-primary text-primary-foreground", active == "devices"), templ.KV("text-muted-foreground hover:text-foreground", active != "devices") }>
+				<uk-icon icon="panels-top-left" custom-class="h-5 w-5"></uk-icon>
+				<span class="sr-only">Devices — Windows and iOS</span>
+			</a>
 			<a
 				href={ templ.URL(GetNavigationUrl(commonInfo, "/dashboard")) }
 				hx-get={ string(templ.URL(GetNavigationUrl(commonInfo, "/dashboard"))) }

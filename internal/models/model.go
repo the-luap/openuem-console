@@ -22,6 +22,9 @@ import (
 
 type Model struct {
 	Client *ent.Client
+	// DB is shared by the native Apple management domain and the upstream Ent
+	// client. Apple migrations are additive and do not alter desktop agent tables.
+	DB *sql.DB
 }
 
 func New(dbUrl string, driverName, domain string) (*Model, error) {
@@ -37,6 +40,7 @@ func New(dbUrl string, driverName, domain string) (*Model, error) {
 			return nil, fmt.Errorf("could not connect with Postgres database: %v", err)
 		}
 		model.Client = ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+		model.DB = db
 	default:
 		return nil, fmt.Errorf("unsupported DB driver")
 	}

@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -17,6 +18,8 @@ type WebServer struct {
 	Handler        *handlers.Handler
 	Server         *http.Server
 	SessionManager *sessions.SessionManager
+	AppleServer    *http.Server
+	AppleCancel    context.CancelFunc
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -43,6 +46,7 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 	// Create Handler and register its router
 	w.Handler = handlers.NewHandler(m, natsServers, s, ts, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey, reEnableCertAuth, reEnablePasswdAuth, authLogger)
 	w.Handler.Register(w.Router, registerRateLimit)
+	w.initApple(encryptionMasterKey)
 
 	// Add the session manager
 	w.SessionManager = s
@@ -51,6 +55,9 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 }
 
 func (w *WebServer) Serve(address, certFile, certKey string) error {
+	if err := w.startApple(certFile, certKey); err != nil {
+		return err
+	}
 	w.Server = &http.Server{
 		Addr:    address,
 		Handler: w.Router,
@@ -60,5 +67,14 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 }
 
 func (w *WebServer) Close() error {
+	if w.AppleCancel != nil {
+		w.AppleCancel()
+	}
+	if w.AppleServer != nil {
+		_ = w.AppleServer.Close()
+	}
+	if w.Server == nil {
+		return nil
+	}
 	return w.Server.Close()
 }

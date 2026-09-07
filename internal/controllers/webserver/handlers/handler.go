@@ -16,11 +16,14 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
 )
 
 type Handler struct {
-	Model *models.Model
+	Model           *models.Model
+	Apple           *apple.Store
+	AppleSetupError string
 
 	SessionManager       *sessions.SessionManager
 	JWTKey               string
