@@ -11,6 +11,17 @@ it must not depend on NanoMDM or operate as a separate management product.
 Fork: https://github.com/the-luap/openuem-console
 Branch: `feature/native-ios-management`
 
+## Expanded requirements — 2026-09-07
+
+The requested scope now also includes native macOS management, an in-app Apple
+CSR/push-certificate workflow, a secure reverse-proxy deployment using one public
+port with private administrator routes, simple agent/enrollment downloads, full
+German localization and UI/security remediation. The current implementation does
+not yet satisfy these additions. See the German
+[feature gap analysis and roadmap](fehlende-funktionen-und-roadmap.md) for verified
+findings, priorities and acceptance criteria. The checklist below records the
+earlier iOS/iPadOS implementation, not completion of the expanded scope.
+
 ## Implementation decisions
 
 - Preserve the upstream Windows agent, deployment workflows and database tables.
