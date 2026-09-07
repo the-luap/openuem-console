@@ -21,9 +21,12 @@ fork are still outstanding. Treat this branch as a pilot until those checks pass
 | Reliability | Durable PostgreSQL command queue, device deferrals, expiry, retry, encrypted command/profile data, transactional state changes |
 | Console | Existing login/2FA, organization/site selection, shared navigation, device details, setup, profile management and Windows deployment access |
 
-Organizations are data scopes, not independently authenticated customer portals.
-The fork inherits upstream console operator permissions; it does not introduce
-tenant-specific roles or a new RBAC system.
+Login and permissions are separate. Persisted roles restrict native Apple actions
+to an organization or site; viewer accounts cannot mutate profiles, certificates,
+enrollment or updates. Desktop management routes currently require a global server
+administrator. Read [access control](access-control.md) before upgrading: existing
+accounts need explicit assignments and only the selected bootstrap account receives
+initial server administration rights.
 
 ## Deployment prerequisites
 
@@ -49,12 +52,14 @@ files read-only and publish the Apple listener port. The supplied Dockerfile
 exposes 1325 but does not publish it or set the variables automatically. Start the
 image with the existing OpenUEM environment and `start` command.
 
-**TLS must terminate in OpenUEM's Apple listener.** It authenticates the exact
-device certificate presented during the TLS handshake. Use direct routing or a
-TCP/TLS pass-through load balancer. An HTTP reverse proxy that terminates TLS and
-forwards a certificate header is not supported; such headers are deliberately
-ignored. The configured public URL is the external origin, not an internal
-container hostname, and must have no path/query/user information.
+In direct mode, **TLS terminates in OpenUEM's Apple listener**, including through
+a TCP/TLS pass-through load balancer. Arbitrary certificate headers are ignored.
+The native HTTPS gateway additionally supports authenticated certificate forwarding
+with explicitly pinned gateway client certificates. In gateway mode, every backend
+requires that gateway identity and rejects direct connections. Follow the
+[gateway operations guide](gateway-operations.md); ordinary header forwarding
+without that trust configuration is not supported. The configured public URL is
+the external origin, without a path, query or user information.
 
 Allow outbound HTTPS to `api.push.apple.com` for APNs and
 `gdmf.apple.com/v2/pmv` for the release catalog. Devices must also be able to reach
@@ -94,20 +99,26 @@ Windows for deployment. Protocol and console handler tests can run on macOS.
 2. Open **Apple setup & enrollment** in the intended organization. Enter the
    organization name and public HTTPS origin, then upload the certificate and
    key as PEM files. The console validates the pair, validity period and MDM topic.
-3. Select a site and create an invitation for one device. Open its URL in Safari
-   on that iPhone/iPad. Install the downloaded profile in Settings → General →
-   VPN & Device Management.
-4. The URL expires after one hour and is consumed by its first download. If a
-   download/installation is abandoned, revoke that enrollment and create another
-   invitation. Link previewers and automated downloaders can consume the URL.
+3. Select a site and create an invitation for one device. Open its URL or scan its
+   QR code on that iPhone/iPad. The public page explains the organization and
+   installation steps before the owner confirms enrollment.
+4. The invitation expires after one hour. GET/HEAD previews do not consume it.
+   A confirmed browser claims it and has three attempts within ten minutes to
+   download the same profile. Install in Settings and return to check status.
+   If setup cannot finish, revoke that enrollment and create another invitation.
 5. Open the device from **All devices**. Successful token registration changes its
    status to Managed and queues device, app, profile and available-update queries.
 
 The invitation returns an individual PKCS#12 identity inside the enrollment
-profile over HTTPS. The private device key is not persisted in the database.
-The issued certificate is bound to the first enrolled device identity. Protect
+profile over HTTPS. A temporary retry copy is encrypted with both the browser
+secret and server master key, then cleared on first device contact, exhaustion,
+revocation or expiry cleanup. The issued certificate is bound to the first
+enrolled device identity. Protect
 the link and downloaded profile like credentials; the profile is not a reusable
 installation package for multiple devices.
+
+See [public enrollment operations](enrollment-portal.md) for cookie/claim lifetime,
+browser recovery, rate limits, encryption and current verification boundaries.
 
 Manual enrollment does not enable supervision. Prepare company-owned devices
 with Apple Configurator when the required restrictions need supervision. Apple

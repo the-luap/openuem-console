@@ -18,9 +18,12 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 type Handler struct {
+	Access          *access.Store
+	PublicOrigin    string
 	Model           *models.Model
 	Apple           *apple.Store
 	AppleSetupError string

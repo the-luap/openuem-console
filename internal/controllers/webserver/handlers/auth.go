@@ -34,6 +34,9 @@ func (h *Handler) Auth(c echo.Context) error {
 		}
 	}
 
+	if h.PublicOrigin != "" {
+		return c.Redirect(http.StatusFound, h.PublicOrigin+"/auth")
+	}
 	if h.ReverseProxyServer != "" && h.ReverseProxyAuthPort != "" {
 		return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/auth", h.ReverseProxyServer, h.ReverseProxyAuthPort))
 	} else {

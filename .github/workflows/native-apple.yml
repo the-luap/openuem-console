@@ -33,6 +33,8 @@ jobs:
       - run: go tool templ generate
       - name: Protocol, persistence, TLS, console routes and rendering
         run: go test -race -count=1 ./internal/mdm/apple ./internal/controllers/webserver/handlers ./internal/views/mdm_views
+      - name: Gateway identity, route isolation, certificate login and CSRF
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
       - name: Existing Windows deployment models
         run: go test -count=1 -run TestDeploymentTestSuite ./internal/models
   build:

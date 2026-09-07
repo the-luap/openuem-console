@@ -253,7 +253,11 @@ func identityProfile(c *Settings, id string, expires time.Time) ([]byte, string,
 // EnrollmentProfile atomically consumes an invitation and returns a unique
 // identity profile once. The private device key is never persisted on the server.
 func (s *Store) EnrollmentProfile(ctx context.Context, token string) ([]byte, error) {
-	if len(token) != 43 {
+	return s.issueEnrollmentProfile(ctx, token, "")
+}
+
+func (s *Store) issueEnrollmentProfile(ctx context.Context, token, browser string) ([]byte, error) {
+	if !validEnrollmentToken(token) || (browser != "" && !validEnrollmentToken(browser)) {
 		return nil, ErrNotFound
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -277,12 +281,35 @@ func (s *Store) EnrollmentProfile(ctx context.Context, token string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
+	if !time.Now().Before(c.PushExpiresAt) {
+		return nil, ErrConflict
+	}
 	data, fingerprint, err := identityProfile(c, id, expires)
 	if err != nil {
 		return nil, err
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET certificate_fingerprint=$1,invite_hash=NULL,status='authenticating' WHERE id=$2`, fingerprint, id)
 	if err != nil {
+		return nil, err
+	}
+	if browser != "" {
+		box, err := enrollmentRetryBox(browser)
+		if err != nil {
+			return nil, err
+		}
+		encrypted, err := box.seal(data, secretPurpose(tenant, id, "enrollment_retry"))
+		if err != nil {
+			return nil, err
+		}
+		encrypted, err = s.secrets.seal(encrypted, secretPurpose(tenant, id, "enrollment_retry"))
+		if err != nil {
+			return nil, err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_claims(device_id,invite_hash,browser_hash,profile) VALUES($1,$2,$3,$4)`, id, digest([]byte(token)), digest([]byte(browser)), encrypted); err != nil {
+			return nil, err
+		}
+	}
+	if err = audit(ctx, tx, tenant, "enrollment-browser", "apple.enrollment.claim", id); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(); err != nil {

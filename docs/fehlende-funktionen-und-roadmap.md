@@ -1,366 +1,550 @@
-# OpenUEM-Fork: Funktionslücken, Fleet-Abgleich und Ausbauplan
+# OpenUEM fork: feature gaps, Fleet comparison and implementation roadmap
 
-Stand: **7. September 2026**. Geprüfter Implementierungsstand: [`c19a58b`](https://github.com/the-luap/openuem-console/commit/c19a58ba5a54df0f548f8583d0a67cd3da72e30c).
+Baseline: **7 September 2026**, implementation commit
+[`c19a58b`](https://github.com/the-luap/openuem-console/commit/c19a58ba5a54df0f548f8583d0a67cd3da72e30c).
+This document preserves the expanded requirements and the findings at that
+baseline. It is not a statement that the proposed features already exist.
+[Implementation evidence](implementation-status.md) records subsequent changes
+and outstanding verification without changing the original scope.
 
-Dieses Dokument beschreibt den Istzustand und die noch erforderliche Arbeit. Es ist keine Zusage, dass die hier vorgeschlagenen Funktionen bereits implementiert sind. Grundlage sind der Quellcode des Forks, aktuelle Primärquellen und eine erneute Browserprüfung der laufenden lokalen Testinstanz. Echte Apple- und Windows-Geräte waren nicht angeschlossen.
+**Language requirement:** the user's subsequent instruction supersedes the
+original request for a German interface: documentation, source code, comments,
+new interface copy and installation instructions must be in English. Existing
+localization infrastructure must remain usable. German is used only in the
+conversation with the user. The historical filename remains stable for links.
 
-## 1. Die wichtigsten Antworten
+The baseline review examined the fork's source, primary sources and the running
+local test console in a browser. No physical Apple or Windows devices were
+connected. Automated protocol evidence must not be described as hardware acceptance.
 
-- **iPadOS ist bereits berücksichtigt.** Das neue Apple-Modul unterscheidet iPads anhand des Modells und unterstützt denselben Inventar-, Profil- und Update-Ablauf wie für iPhones. Eine gesonderte iPad-Abnahme sowie eigene Filter und geeignete Richtlinienvorlagen fehlen.
-- **macOS ist noch kein Bestandteil des nativen Apple-MDM-Moduls.** Der Check-in weist Mac-Modelle ab; der Update-Katalog verarbeitet nur die iOS-Gruppe. OpenUEM besitzt daneben bereits einen macOS-Agenten. Agent-Verwaltung und Apple-MDM müssen zu einem Gerät zusammengeführt werden.
-- **Ein CSR-Assistent in der App ist sinnvoll und fehlt.** Aktuell müssen Push-Zertifikat und privater Schlüssel hochgeladen werden. Für einen bei Apple verwendbaren MDM-Antrag genügt ein gewöhnlicher CSR nicht: Er benötigt eine MDM-Vendor-Signatur. Diesen Schritt müssen wir in den Ablauf einbauen. [Apple: MDM Vendor CSR Signing Certificate](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate)
-- **Du musst für Windows nicht zwingend selbst eine CA mit OpenSSL erstellen.** OpenUEM kann die interne CA bei der Installation erzeugen; eine bestehende Unternehmens-CA ist ebenfalls möglich. Der einfache Assistent dafür gehört zum gewünschten Ausbau. [OpenUEM: Zertifikate](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/05-certificates.md)
-- **Ein einziger öffentlich erreichbarer Eingangsport 443 ist ein realistisches Ziel, aber aktuell nicht als Gesamtlösung umgesetzt.** Apple-MDM, Windows-Agent, Downloads und Admin-Anmeldung benötigen ein zusammenhängendes Routing- und Authentifizierungskonzept. Ein Reverse-Proxy-Snippet allein genügt nicht.
-- **Die Admin-Oberfläche nur hinter Login anzubieten erfüllt deine Forderung nicht.** Von extern müssen Admin-Routen bereits am Zugangspunkt gesperrt sein; der Dienst muss zusätzlich Anmeldung, Rollen und Mandantenzugriff prüfen.
-- **Deutsch existiert im Upstream bereits.** Die neuen Apple-Seiten, Statusmeldungen und Teile der Navigation verwenden jedoch fest eingetragene englische Texte. Die bestehende Übersetzungsinfrastruktur muss vollständig genutzt und geprüft werden.
-- **Die UI benötigt Überarbeitung.** Sprachmischung, abweichende Bedienmuster und horizontaler Überlauf sind konkret reproduziert. Auch bestehende OpenUEM-Seiten haben auf kleinen Bildschirmen Fehler.
+## 1. Principal findings
 
-Codebelege: [Plattformerkennung](../internal/mdm/apple/types.go), [Check-in](../internal/mdm/apple/commands.go), [Apple-Katalog](../internal/mdm/apple/catalog.go), [Apple-Oberfläche](../internal/views/mdm_views/pages.templ), [vorhandene deutsche Übersetzung](../internal/views/locales/de.yaml).
+- **iPadOS is already represented.** Model detection distinguishes iPads and uses
+  the same inventory, profile and update implementation as iPhones. Dedicated
+  iPad acceptance, filters and appropriate policy templates are missing.
+- **Native macOS MDM is missing.** Check-in rejects Mac models and the release
+  catalog processes only the iOS group. The existing macOS agent and Apple MDM
+  must join into one device record and management experience.
+- **An in-app CSR wizard is required.** Uploading a push certificate and private
+  key is the baseline. An ordinary CSR alone cannot be submitted to Apple's MDM
+  push portal: an authorized MDM vendor must sign the request.
+  [Apple vendor signing requirements](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate)
+- **An internal CA is required, but manual OpenSSL administration is not.**
+  OpenUEM can create its CA during installation; an existing enterprise CA is
+  another option. Provide a straightforward setup wizard.
+  [OpenUEM certificates](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/05-certificates.md)
+- **One public inbound port, TCP 443, is the deployment target.** Apple MDM,
+  agent connections, downloads and administrator authentication need integrated
+  routing and authentication; a proxy snippet alone cannot meet the requirement.
+- **Login alone does not make administration private.** Deny external access to
+  administrator routes at the entry point and enforce sessions, roles and scope
+  again in the application.
+- **The UI requires consistent components and localization support.** The
+  baseline mixes languages and interaction patterns and has reproduced page
+  overflow, including on upstream pages. English is now the acceptance language.
 
-## 2. Status unserer Anforderungen
+Evidence: [platform detection](../internal/mdm/apple/types.go),
+[check-in](../internal/mdm/apple/commands.go), [catalog](../internal/mdm/apple/catalog.go),
+[Apple UI](../internal/views/mdm_views/pages.templ),
+[existing locale catalog](../internal/views/locales/de.yaml).
 
-**Vorhanden** bedeutet implementiert, nicht automatisch auf echten Geräten abgenommen. **Teilweise** bedeutet eine vorhandene Grundlage mit benannten Lücken. **Fehlt** bedeutet im untersuchten Implementierungspfad nicht umgesetzt. **Ungeprüft** bedeutet, dass der Nachweis fehlt und nicht durch eine Behauptung ersetzt werden darf.
+## 2. Requirement status at the baseline
 
-| Anforderung | Stand im Fork | Was fehlt |
+**Present** means implemented, not necessarily verified on hardware. **Partial**
+means there is a foundation with specific missing work. **Missing** means absent
+from the reviewed implementation path. **Unverified** means evidence is missing.
+
+| Requirement | Baseline | Required work |
 | --- | --- | --- |
-| Windows-Software installieren/deinstallieren | Vorhandene OpenUEM-Workflows | Echter Endpoint-Test; einfacher Paket-/Agent-Download; konsistente Statusführung mit Apple |
-| Windows-Inventar und installierte Software | Vorhandene Agent-Funktionen | Geräteabnahme; gemeinsame Filter, Exporte und Compliance-Ansicht |
-| Windows-Konfiguration | Agent-Aufgaben für u. a. Registry, MSI, PowerShell, Benutzer/Gruppen | Keine nachgewiesene native Windows-MDM-Strecke mit Enrollment/SyncML/CSP im Fork |
-| Windows-Update-Verwaltung | Sicherheits-/Updateinformationen vorhanden | Einheitliche Richtlinien für Fristen, Aufschub, Neustarts und überprüften Erfolg |
-| iPhone-Registrierung | Manueller Einmal-Link und `.mobileconfig` | Verständliche öffentliche Registrierungsseite, QR-Code, Wiederaufnahme, ADE |
-| iPad-Registrierung | Im selben Apple-Modul enthalten | Abnahme auf iPad; iPad-spezifische Richtlinien und Filter |
-| Apple-Hardware, OS/Build, Apps | Für iOS/iPadOS implementiert | Echte Geräteprüfung; Inventarumfang je Registrierungsart erklären; macOS ergänzen |
-| Apple-Konfigurationsprofile | Upload, einfache Editoren, Revisionen, Zuweisung, Entfernung, Inventarabgleich | Größerer Vorlagenkatalog, Zielgruppen, Konfliktprüfung, macOS-Unterstützung |
-| Apple-OS-Updates | Native DDM-Vorgabe mit Version/Build/Frist für iOS/iPadOS | macOS, Update-Ringe, Gruppen, aussagekräftige Fehler-/Fortschrittsansicht und Hardware-Abnahme |
-| macOS-Verwaltung | Upstream-Agent als Grundlage | Native MDM-Registrierung, Profile, DDM, Sicherheitsfunktionen; Agent/MDM zu einem Gerät verbinden |
-| Apple-Apps verteilen | Fehlt im neuen Modul | Apps & Books, Lizenzen, Installationsstatus, spätere Self-Service-Ansicht |
-| CSR direkt in OpenUEM erstellen | Fehlt | Schlüsselgenerierung, CSR, Vendor-Signatur, Import, Verlängerung, Ablaufwarnungen |
-| Deployment hinter Reverse Proxy | Upstream-Konsole unterstützt es grundsätzlich | Durchgängige Konfiguration für Apple-MDM, Agent-WSS, Download und einen externen Port |
-| Admin intern, Gerätezugriff öffentlich | Apple-Protokoll und Konsole schon getrennte Listener | Geprüfte externe Allowlist und interne Admin-Regeln; kein direkter Backend-Zugriff |
-| Windows-/Mac-Client per Link | Upstream-Installer existieren | In unserer Konsole erzeugter, sicherer, passend konfigurierter Installationslink |
-| Apple-Gerät per Link einrichten | Profil-Link existiert für iOS/iPadOS | Deutscher Ablauf mit Erklärungen und Status; macOS-Profil und optionales Agent-Paket |
-| Vollständig deutsche Bedienung | Upstream-Katalog vorhanden | Neue Seiten, Fehlertexte, Datumsformate, Installationshilfen und verbleibende Upstream-Lücken |
-| Einheitliche, responsive Oberfläche | Gemeinsames Layout vorhanden | Gleiche Komponenten, Aktionsmuster, Pagination, Statusdarstellung; konkrete Darstellungsfehler beheben |
-| Sicherheit und Betrieb | TLS, Apple-Geräteidentitäten, verschlüsselte Apple-Secrets, Sessions/2FA vorhanden | Proxy-Vertrauensgrenze, granulare Rechte, sichere Bootstrap-Verteilung, Rotation, Audits und Belastungs-/Angriffstests |
+| Windows software installation/removal | Existing workflows | Real endpoint acceptance; simple package/agent downloads; consistent status with Apple |
+| Windows inventory and installed software | Existing agent | Endpoint acceptance; common filters, exports and compliance |
+| Windows configuration | Agent tasks for Registry, MSI, PowerShell, users/groups | Native Windows enrollment, SyncML and CSP are not demonstrated |
+| Windows updates | Security/update information | Policies for deadlines, deferrals, restarts and verified results |
+| iPhone enrollment | One-use manual link and `.mobileconfig` | Public instructions, QR code, recovery and ADE |
+| iPad enrollment | Shared Apple implementation | Physical iPad acceptance; specific policies and filters |
+| Apple hardware, OS/build and apps | iOS/iPadOS implementation | Hardware acceptance; explain enrollment-dependent inventory; add macOS |
+| Apple configuration profiles | Upload, simple editors, revisions, assignment, removal and reconciliation | Template catalog, target groups, conflict checks and macOS |
+| Apple OS updates | DDM version/build/deadline policy for iOS/iPadOS | macOS, rings, groups, useful progress/errors and hardware tests |
+| macOS management | Upstream agent | Native enrollment, profiles, DDM, security and agent/MDM identity linkage |
+| Apple app distribution | Missing | Apps & Books, licenses, installation status and subsequent self-service |
+| In-app CSR | Missing | Key/CSR generation, vendor signature, certificate-only import, renewal and expiry alerts |
+| Reverse proxy deployment | Upstream console support | Complete Apple MDM, agent WSS and download routing on one external port |
+| Private administration/public devices | Separate Apple and console listeners | Verified external route allowlist, internal administration and blocked direct backends |
+| Windows/Mac client link | Upstream installers | Secure, correctly configured installation links generated by the console |
+| Apple device setup link | iOS/iPadOS profile link | Guided instructions/status; macOS profile and optional agent package |
+| Consistent English experience | Existing localization framework | New pages, validation, formatting, installation help and remaining upstream gaps |
+| Responsive unified UI | Common layout | Consistent components, actions, pagination/status; repair measured overflow |
+| Security and operations | TLS, device identities, encrypted Apple secrets, sessions/2FA | Proxy trust, granular access, safe bootstrap, rotation, audits, load and attack tests |
 
-Windows-Belege: [Softwareverteilung](../internal/controllers/webserver/handlers/deploy.go), [Profilaufgaben](../internal/controllers/webserver/handlers/profiles.go), [Sicherheitsansicht](../internal/controllers/webserver/handlers/security.go). Apple-Belege: [Modul](../internal/mdm/apple), [Integration](../internal/controllers/webserver/handlers/apple.go). Die vorhandenen Windows-Aufgaben sind nicht mit Microsofts nativem MDM-Protokoll gleichzusetzen. [Microsoft: MDM-Architektur](https://learn.microsoft.com/en-us/windows/client-management/mdm-overview), [Microsoft: HTTPS/SyncML und CSP](https://learn.microsoft.com/en-us/windows/client-management/windows-mdm-enterprise-settings)
+Evidence: [Windows deployment](../internal/controllers/webserver/handlers/deploy.go),
+[agent profiles/tasks](../internal/controllers/webserver/handlers/profiles.go),
+[security reporting](../internal/controllers/webserver/handlers/security.go),
+[Apple implementation](../internal/mdm/apple), [console integration](../internal/controllers/webserver/handlers/apple.go).
+Agent tasks are distinct from native Windows MDM.
+[Microsoft MDM architecture](https://learn.microsoft.com/en-us/windows/client-management/mdm-overview),
+[HTTPS, SyncML and CSP](https://learn.microsoft.com/en-us/windows/client-management/windows-mdm-enterprise-settings)
 
-## 3. Was Fleet zusätzlich abdeckt
+## 3. Fleet comparison and additional scope
 
-Verglichen wird das aktuelle Fleet-Angebot einschließlich Premium. **F** = laut Preisseite bereits im kostenlosen Angebot, **P** = Premium-Funktion. Das ist eine Angebotszuordnung, keine Garantie gleicher Funktionen auf jedem Betriebssystem. Ein in GitHub sichtbares Feature ist außerdem nicht automatisch Community-Code. Fleet trennt MIT-lizenzierte und kommerzielle Bestandteile; für eine Übernahme muss die jeweilige Datei geprüft werden. [Fleet-Preisseite](https://fleetdm.com/pricing), [Fleet-Repository und Lizenzhinweis](https://github.com/fleetdm/fleet)
+This is the recorded comparison with Fleet's offering, including Premium, at the
+baseline date. **F** denotes its free offering and **P** Premium. This does not
+promise identical coverage on every OS. Publicly visible source may still carry
+commercial licensing: inspect each file before reuse.
+[Fleet pricing](https://fleetdm.com/pricing), [source and licensing](https://github.com/fleetdm/fleet)
 
-| Fleet-Funktion | Angebot | Relevanz / Lücke in unserem Fork |
+| Fleet capability | Offering | Relevance/gap |
 | --- | --- | --- |
-| Plattformübergreifendes MDM | F | Unser Apple-Modul deckt nur iOS/iPadOS ab; Windows ist agentenbasiert, macOS-MDM fehlt |
-| Inventarsuche, Labels, Policies | F | Gemeinsame dynamische Zielgruppen und plattformübergreifende Richtlinien fehlen |
-| OS-Einstellungen | F | Apple-Vorlagen und native Windows-CSP-Abdeckung ausbauen |
-| DDM-Konfigurationsprofile | F | Unser DDM ist auf OS-Update-Vorgaben begrenzt; kein allgemeiner Deklarationskatalog |
-| Skriptausführung | F | Bei OpenUEM bereits als Desktop-Aufgaben vorhanden; gemeinsame Ausführungshistorie verbessern |
-| Berichte und Dashboards | F | Upstream-Berichte vorhanden; Apple-Daten und gemeinsame Compliance fehlen |
-| API, Webhooks, CLI, GitOps | F | Keine gleichwertige dokumentierte öffentliche Management-API/GitOps-Strecke für das neue Modul |
-| SSO | F | OIDC-Grundlage vorhanden; Zugriffskonzept, Rollen und Mandantenrechte vervollständigen |
-| Zero-Touch / MDM-Migration | P | Apple-ADE und native Windows-Enrollment-/Migrationsabläufe fehlen |
-| Account-basiertes Apple-BYOD | P | Fehlt; manuelle Geräteverwaltung ist kein User Enrollment |
-| IdP-Gruppen und Kontosynchronisierung | P | Keine durchgängige Benutzer-Geräte-Gruppenzuordnung |
-| Gezielte Gerätegruppen | P | Vorhandene Organisationen/Standorte/Tags nicht als vollständiger Ersatz bewerten |
-| Verschlüsselung erzwingen | P | BitLocker-/FileVault-Richtlinien mit Schlüsselhinterlegung fehlen als kompletter Ablauf |
-| Recovery Lock | P | macOS-Verwaltung und sichere Geheimnisablage/Rotation dafür fehlen |
-| OS-Updates erzwingen | P | iOS/iPadOS-Grundlage vorhanden; macOS und gleichwertige Windows-Steuerung fehlen |
-| Conditional Access | P | Keine gemeinsame verifizierte Gerätezustandsintegration |
-| Softwareverteilung | P | Windows-Grundlage vorhanden; einheitlicher Katalog und Apple-Verteilung fehlen |
-| Self-Service | P | Kein gemeinsamer Benutzerkatalog für freigegebene Software |
-| Automatische Behebung / Wartungsfenster | P | Keine gemeinsame Policy→Aktion→Nachweis-Kette |
-| Sperren und Löschen | P | Fehlen im nativen Apple-Modul; Windows-Unterstützung gesondert implementieren/prüfen |
-| Mandantenbetrieb und Gerätegruppenberichte | P | Organisationen vorhanden; Rechte-Isolation und gemeinsame Berichte nicht fertig |
-| Agent-Versionen / privates Update-Repository | P | Upstream-Agent-Updates vorhanden; kontrollierte eigene Release-/Rollback-Strecke prüfen |
-| MFA, Rollen, Audit-Protokoll | P | MFA existiert bereits; granulare Rechte und Apple-Audit-UI fehlen |
-| Zertifikatsverteilung / SCIM | P | Kein kompletter plattformübergreifender Zertifikats- und Benutzerlebenszyklus |
-| Schwachstellenbewertung / CISA KEV | P | Keine nachgewiesene Fleet-äquivalente Risiko- und Patchpriorisierung im untersuchten Fork |
+| Cross-platform MDM | F | Native iOS/iPadOS foundation; Windows agent; macOS MDM missing |
+| Inventory search, labels, policies | F | Common dynamic groups and cross-platform policies |
+| OS settings | F | Apple templates and native Windows CSP coverage |
+| DDM configuration profiles | F | General declaration catalog beyond OS updates |
+| Script execution | F | Existing desktop tasks; common execution history |
+| Reports/dashboards | F | Add Apple data and shared compliance to upstream reporting |
+| API, webhooks, CLI, GitOps | F | Documented public management API and desired-state workflow |
+| SSO | F | Complete OIDC access, roles and organization rights |
+| Zero-touch/MDM migration | P | Apple ADE and native Windows enrollment/migration |
+| Account-driven Apple BYOD | P | Real User Enrollment, distinct from manual Device Enrollment |
+| IdP groups/account synchronization | P | Consistent user-device-group associations |
+| Targeted device groups | P | Organizations/sites/tags alone are not equivalent |
+| Enforced encryption | P | Complete BitLocker/FileVault policies with recovery escrow |
+| Recovery Lock | P | macOS support plus secure secret storage and rotation |
+| Enforced OS updates | P | Extend Apple foundation to macOS and Windows |
+| Conditional Access | P | Integration based on verified device compliance |
+| Software distribution | P | Common catalog and Apple distribution alongside Windows |
+| Self-service | P | User catalog of approved applications |
+| Automated remediation/maintenance windows | P | Policy → action → evidence workflow |
+| Lock and wipe | P | Native Apple actions; implement/test Windows separately |
+| Multitenancy/group reporting | P | Isolated permissions and unified reports |
+| Agent versions/private update repository | P | Controlled releases, updates and rollback |
+| MFA, roles, audit log | P | MFA exists; granular authorization and Apple audit UI missing |
+| Certificate distribution/SCIM | P | Cross-platform certificate and user lifecycle |
+| Vulnerability assessment/CISA KEV | P | Verified risk and patch prioritization |
 
-Weitere Fleet-Funktionen sind Live-Abfragen mit osquery, Dateiintegritätsüberwachung, Dateiübernahme für Untersuchungen, benutzerdefinierte Protokollierung und YARA-/IoC-Prüfungen. Diese betreffen vor allem Desktop-Endpunkte; daraus folgt keine frei ausführbare Abfrage- oder Skriptfunktion auf iPhones/iPads. Unser Ausbau sollte diese Security-Analyse getrennt vom zunächst benötigten MDM planen. Die Preisseite kennzeichnet außerdem einzelne Bereiche wie „Application management“, „Binary authorization“ und „Asset discovery“ mit einem Ankündigungsstern; diese sind keine pauschal verfügbare Referenzfunktion. [Fleet-Preisseite](https://fleetdm.com/pricing), [Fleet: Inventar und osquery](https://github.com/fleetdm/fleet)
+Additional desktop security analysis includes live osquery queries, file integrity
+monitoring, collection of investigation files, custom logging and YARA/IoC checks.
+Plan this separately from core MDM; iPhones/iPads do not provide unrestricted
+query or script execution. The baseline pricing page marked application management,
+binary authorization and asset discovery as announcements, not universally
+available reference implementations. These remain later security-analysis work,
+not a reason to defer the initial profile/inventory/deployment workflows.
 
-Die konkreten Plattformunterschiede sind für die Planung wichtiger als die Häkchen der Preisseite:
+Relevant platform distinctions and references:
 
-- **Apple:** Fleet dokumentiert manuelle Registrierung und ADE für macOS/iOS/iPadOS sowie einen CSR-Download im Setup. Apps-&-Books-Anbindung ist zusätzlich vorgesehen. Bei uns fehlen ADE und macOS-MDM. [Fleet: Apple MDM](https://fleetdm.com/guides/apple-mdm-setup)
-- **Windows:** Fleet besitzt zusätzlich zum Agenten eine native MDM-Registrierung und Integration mit Entra/Autopilot. Unser bestehender Agent ist eine gute Basis für Softwareverteilung, ersetzt diesen Protokollumfang aber nicht. [Fleet: Windows MDM](https://fleetdm.com/guides/windows-mdm-setup)
-- **Updates:** Fleet bietet getrennte Apple-Plattformvorgaben und Windows-Fristen einschließlich Nachfrist; auf macOS auch eine hardwareabhängige neueste Version mit Zeitabstand zur Veröffentlichung. Unser Fork braucht insbesondere Gruppen/Ringe und macOS. [Fleet: OS-Updates](https://fleetdm.com/guides/enforce-os-updates)
-- **Software:** Fleet unterstützt eigene Pakete, Installations-/Deinstallationsabläufe, Apple-Store-Apps und Self-Service. Bei uns bestehen Windows-/Homebrew-Grundlagen, aber noch kein gemeinsamer Produktablauf. [Fleet: Pakete](https://fleetdm.com/guides/deploy-software-packages), [Store-Apps](https://fleetdm.com/guides/install-app-store-apps), [Self-Service](https://fleetdm.com/guides/software-self-service)
-- **Verschlüsselung:** Fleet verbindet FileVault/BitLocker-Steuerung mit Schlüsselhinterlegung und Überprüfung. Eine vorhandene BitLocker-Inventaranzeige in OpenUEM ist keine solche Verwaltung. iOS/iPadOS benötigen ein eigenes Sicherheitsmodell; FileVault ist eine Mac-Funktion. [Fleet: Verschlüsselung](https://fleetdm.com/guides/enforce-disk-encryption)
+- Apple: manual enrollment and ADE for macOS/iOS/iPadOS, CSR setup and Apps & Books.
+  [Apple MDM setup](https://fleetdm.com/guides/apple-mdm-setup)
+- Windows: native enrollment and Entra/Autopilot in addition to an agent.
+  [Windows MDM setup](https://fleetdm.com/guides/windows-mdm-setup)
+- Updates: platform-specific Apple policies, Windows deadlines/grace periods and
+  hardware-aware latest macOS release delays. [Update enforcement](https://fleetdm.com/guides/enforce-os-updates)
+- Software: custom packages, install/uninstall, Store apps and self-service.
+  [Packages](https://fleetdm.com/guides/deploy-software-packages),
+  [Store apps](https://fleetdm.com/guides/install-app-store-apps),
+  [self-service](https://fleetdm.com/guides/software-self-service)
+- Encryption: enforcement, escrow and verification. BitLocker inventory alone is
+  insufficient. FileVault applies to Macs; iOS/iPadOS need their own security model.
+  [Disk encryption](https://fleetdm.com/guides/enforce-disk-encryption)
 
-## 4. Ausbau je Plattform
+## 4. Platform work
 
-### iOS und iPadOS
+### iOS and iPadOS
 
-Die gemeinsame technische Grundlage ist richtig. iPadOS muss als eigenständige Plattform in Filter, Symbole, Berichte und Richtlinienziele aufgenommen werden, ohne den MDM-Server zu duplizieren.
+Retain the shared protocol server while representing iPadOS separately in filters,
+icons, reports and policy targets.
 
-Noch erforderlich:
+1. Show enrollment type and capability explicitly: manual Device Enrollment,
+   subsequent ADE and User Enrollment, supervised/unsupervised. Downloading a
+   manual profile does not enable supervision.
+2. Provide version/platform-aware templates for Wi-Fi, VPN, certificates,
+   passcodes, restrictions, web filtering and eligible kiosk/Single App Mode.
+   Simple passcode/Wi-Fi/restriction editors and generic upload are only a base.
+3. Target organizations, sites and dynamic groups; preview affected devices,
+   exclusions and conflicts; roll back revisions and explain device errors.
+4. Apply update policies to groups/rings, with a pilot before broad rollout,
+   deadlines, exceptions, progress and escalation. Keep active policy distinct
+   from installed target version.
+5. Renew device certificates automatically before their current one-year expiry,
+   preserving enrollment rather than requiring routine re-enrollment.
+6. Implement ADE/Apple Business integration, token renewal, assignment, Setup
+   Assistant and re-enrollment.
+7. Add real account-driven User Enrollment for later BYOD, with restricted
+   inventory and transparent separation of personal data.
+8. Subsequently add Apps & Books, license assignment, app updates and self-service.
+   Plan and test Shared iPad separately.
 
-- Registrierungsart und Verwaltungsfähigkeit ausdrücklich anzeigen: manuell, später ADE, später User Enrollment; zusätzlich beaufsichtigt/nicht beaufsichtigt. Ein manueller Profildownload macht ein Gerät nicht automatisch beaufsichtigt.
-- Profilvorlagen mit Version-/Plattformprüfung: WLAN, VPN, Zertifikate, Passcode, Einschränkungen, Webfilter sowie gegebenenfalls Kiosk-/Single-App-Betrieb. Aktuell gibt es einfache Passcode-/WLAN-/Restriktionseditoren und generischen Upload, keinen vollständigen Katalog.
-- Profile an Organisationen, Standorte und dynamische Gruppen binden; Vorschau der betroffenen Geräte, Ausschlüsse, Konflikte, Rücknahme auf eine frühere Revision und verständliche Fehlerursachen.
-- Updates als Richtlinie für Gruppen statt nur einzelne Geräte; Testgruppe vor breiter Freigabe; Fristen, Ausnahmen, Fortschritt und Eskalation. „Richtlinie aktiv“ und „Zielversion installiert“ bleiben getrennte Zustände.
-- Zertifikate automatisch erneuern. Die aktuelle Geräteidentität läuft nach einem Jahr ab; eine erneute Registrierung ist kein dauerhaft einfacher Betriebsablauf.
-- ADE/Apple-Business-Anbindung, Token-Verlängerung, Zuordnung, Setup-Assistent und Wiederregistrierung.
-- Für spätere BYOD-Nutzung: echter User-Enrollment-Ablauf, eingeschränkter Inventarumfang und transparente Trennung persönlicher Daten.
-- Optional danach: Apps & Books, Lizenzzuordnung, App-Updates, Self-Service; Shared-iPad-Szenarien gesondert planen und testen.
-
-Die installierten Apps können nur in dem Umfang angezeigt werden, den Apple für die jeweilige Registrierung meldet. Eine vollständige private App-Liste ist insbesondere bei User Enrollment nicht zu versprechen. [Fleet: Apple-BYOD und Inventargrenzen](https://fleetdm.com/guides/enroll-byod-ios-ipados-hosts), [Apple: Device-Management-Schemata](https://github.com/apple/device-management)
+Inventory can show only what Apple reports for the enrollment type. Do not promise
+all private apps, particularly with User Enrollment.
+[BYOD inventory limits](https://fleetdm.com/guides/enroll-byod-ios-ipados-hosts),
+[Apple device-management schemas](https://github.com/apple/device-management)
 
 ### macOS
 
-**macOS ist ein zusätzlicher Umsetzungsblock, keine bloße Umbenennung von iOS.** Der vorhandene Agent kann als Grundlage für Inventar, Skripte und Homebrew dienen. Die Upstream-Dokumentation beschreibt dafür Homebrew und teilweise Ansible sowie manuelle Konfigurations-/Zertifikatschritte. Das erfüllt den gewünschten einfachen Einstieg noch nicht. [OpenUEM: macOS-Agent](https://github.com/open-uem/openuem-docs/blob/main/docs/02-Installation/02-Agent/03-macos.md)
+macOS is an additional implementation block with its own capabilities. Existing
+agent inventory, scripts, Homebrew and Ansible are useful foundations. The current
+manual configuration/certificate steps do not meet simple onboarding.
+[Upstream macOS agent installation](https://github.com/open-uem/openuem-docs/blob/main/docs/02-Installation/02-Agent/03-macos.md)
 
-Erforderlich sind:
-
-1. Mac-Registrierung im nativen Modul zulassen, korrekt erkennen und mit eigenem Funktions-/Versionsmodell speichern. Die heutige Modellprüfung und reine iOS-Katalogauswertung müssen ersetzt werden.
-2. Apple-MDM und Agent anhand stabiler Hardwaremerkmale verknüpfen: ein Mac, eine Detailseite, zwei technische Verwaltungskanäle. Konflikte und erneute Registrierung dürfen keine Doppelgeräte erzeugen.
-3. macOS-Profile einschließlich geeigneter Kanal-/Benutzerzuordnung unterstützen; MDM-Profile von bestehenden Ansible-Aufgaben unterscheiden.
-4. DDM-Updates mit Mac-Katalog, Hardwarekompatibilität und erforderlichen Autorisierungs-/Bootstrap-Token-Abläufen umsetzen. OS-Mindestversionen aus Apples Schemata ableiten und testen.
-5. FileVault mit hinterlegtem und überprüftem Wiederherstellungsschlüssel; später Recovery Lock, lokale Admin-Konten/Passwortrotation und Platform SSO.
-6. Vorlagen für PPPC/TCC, System Extensions, Firewall, Gatekeeper und Zertifikate; keine pauschale Zusage, jede Benutzerfreigabe umgehen zu können.
-7. Signiertes und notarisiertes Agent-Paket, deutscher Installationsablauf, Installation über Link und automatische Konfiguration. Die aktuelle Upstream-Anleitung weist noch auf unsignierte Pakete hin; den konkreten Release-Build vor Übernahme separat prüfen.
-8. App-/Paketverteilung vereinheitlichen: vorhandenes Homebrew, eigene PKG-Pakete und später Apps & Books mit überprüfbaren Ergebnissen.
+1. Accept and correctly detect Mac enrollment in the native module, persist a
+   platform/version capability model and extend catalog processing beyond iOS.
+2. Link agent and MDM using stable hardware identifiers: one Mac/detail page, two
+   management channels. Handle conflicts and re-enrollment without duplicates.
+3. Support macOS profiles and appropriate device/user channels, clearly distinct
+   from existing Ansible tasks.
+4. Implement DDM updates using the Mac catalog, hardware compatibility and required
+   authorization/bootstrap-token workflows. Derive and test minimum OS versions
+   from Apple's schemas.
+5. Implement FileVault with escrowed and verified recovery keys; subsequently
+   Recovery Lock, local administrator accounts/password rotation and Platform SSO.
+6. Add PPPC/TCC, System Extensions, Firewall, Gatekeeper and certificate templates.
+   Do not claim that MDM can bypass every user approval.
+7. Produce a signed, notarized agent package, English link-based installation and
+   automatic configuration. Verify the actual release signature; the baseline
+   upstream instructions mention unsigned packages.
+8. Unify Homebrew, custom PKG packages and subsequent Apps & Books with verifiable
+   installation and removal results.
 
 ### Windows
 
-Die vorhandene Softwareverteilung weiterverwenden. Eine komplette neue Windows-MDM-Implementierung ist nicht nötig, nur um WinGet/MSI/PowerShell-Aufgaben auszurollen. Für Fleet-ähnliche native Windows-Verwaltung bleibt sie dagegen ein zusätzlicher Arbeitsblock.
+Preserve existing deployment. A new native MDM server is unnecessary merely to run
+WinGet/MSI/PowerShell tasks, but remains necessary for the requested native MDM depth.
 
-Prioritäten:
+1. Generate approved installation links with automatic organization/site placement
+   and individual identities; users must not gather certificate files manually.
+2. Provide one catalog for standard and custom packages: version, source,
+   architecture, parameters, detection rule, uninstallation, reboot and outcome.
+3. Distinguish pending, downloaded, installed, verified and failed; test offline
+   endpoints, retries and package replacements.
+4. Add update rings, deadlines, deferrals and restart communication. Reports alone
+   must not be presented as full patch management.
+5. Extend BitLocker inventory into enforcement and recovery-key escrow with
+   controlled retrieval; add useful Defender, Firewall and local-admin state.
+6. Implement native discovery/enrollment, certificate issuance, DMClient/SyncML,
+   CSP results, renewal and unenrollment. Entra/Autopilot are separate integrations
+   built on that path and need their own acceptance.
+7. Define supported versions, editions and architectures; identify Windows Server
+   and end-of-support systems separately.
 
-- Ein freigegebener Installationslink aus der Konsole, automatische Organisations-/Standortzuordnung und individuelle Geräteidentität; keine Zertifikatsdateien von Hand zusammensuchen.
-- Standardpakete und eigene Software in einem verständlichen Katalog: Version, Quelle, Architektur, Installationsparameter, Erkennungsregel, Deinstallation, Neustartbedarf und Ergebnis.
-- Ausstehend, heruntergeladen, installiert, überprüft und fehlgeschlagen klar unterscheiden; Offline-Geräte, Wiederholung und Paketwechsel testen.
-- Update-Richtlinien mit Ringen, Fristen, Aufschub und Neustartkommunikation. Existierende Updateberichte nicht als vollständige Patchsteuerung darstellen.
-- BitLocker-Status zu einer Verwaltungsfunktion mit Recovery-Key-Hinterlegung und kontrolliertem Zugriff ausbauen; Defender-/Firewall-Zustand und lokale Administratoren sinnvoll ergänzen.
-- Native Windows-MDM-Strecke bei Bedarf vollständig planen: Discovery/Enrollment, Zertifikatsausstellung, DMClient/SyncML, CSP-Ergebnisse, Erneuerung und Abmeldung. Entra/Autopilot sind darauf aufbauende Integrationen.
-- Unterstützte Windows-Versionen, Editionen und Architekturen festlegen; Serverbetrieb und auslaufende OS-Versionen separat kennzeichnen.
+The built-in MDM client and OpenUEM agent are different management channels. The
+agent remains useful for Win32 deployment and detailed management.
+[Microsoft MDM](https://learn.microsoft.com/en-us/windows/client-management/mdm-overview)
 
-Microsoft stellt für Windows einen eingebauten MDM-Client bereit. Er ist technisch vom OpenUEM-Agenten zu unterscheiden. Für Win32-Software und detaillierte Verwaltung bleibt der Agent nützlich. [Microsoft: MDM](https://learn.microsoft.com/en-us/windows/client-management/mdm-overview), [CSP-Referenz](https://learn.microsoft.com/en-us/windows/client-management/mdm/)
+## 5. Apple push certificate wizard
 
-## 5. Apple-Push-Zertifikat: gewünschter Assistent
+The baseline imports a certificate/key pair, validates matching key, MDM topic
+and validity, encrypts keys and prevents topic changes during renewal. Add:
 
-### Istzustand
+1. **Set up Apple management:** confirm organization and public device origin.
+2. **Create certificate request:** generate and encrypt the private key in the
+   instance; produce the public CSR. Never send the private key to a signer.
+3. **Obtain vendor signature:** support an authorized in-house Apple MDM vendor
+   credential or an authorized signing service. Establish its availability,
+   contract and operations. A community fork has no implicit access to Fleet's
+   signing infrastructure.
+4. **Download request for Apple:** provide an actual vendor-signed portal request,
+   open the Apple portal in a new tab and give English next-step instructions.
+5. **Upload Apple certificate:** require only the returned certificate, associate
+   it with the stored key, validate contents/expiry/topic and test connectivity.
+6. **Renew the existing certificate:** warn before expiry, record the responsible
+   Apple account as administrative metadata, guide selection of the existing portal
+   entry, prevent topic changes and preserve the working configuration until the
+   replacement passes validation.
 
-Die App verlangt heute zwei Dateien: Push-Zertifikat und passenden privaten Schlüssel. Sie prüft die Zusammengehörigkeit, das MDM-Topic und die Gültigkeit, verschlüsselt private Schlüssel und verhindert einen Topic-Wechsel bei der Erneuerung. CSR-Erstellung, Vendor-Signatur, geführte Verlängerung und Erinnerungen fehlen. [Code: Konfiguration](../internal/mdm/apple/enrollment.go), [Formular](../internal/views/mdm_views/pages.templ)
+A raw PKCS#10 CSR is not a completed MDM portal application. Only authorized
+administrators can manage requests/keys. Pending requests must have unique
+associations and revocation; concurrent renewals must never select the wrong key.
+Vendor private keys must never enter source control, installers or downloads.
+[Apple signing permission](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate),
+[Fleet setup/renewal](https://fleetdm.com/guides/apple-mdm-setup),
+[baseline configuration](../internal/mdm/apple/enrollment.go)
 
-### Sollablauf
+## 6. Certificate responsibilities
 
-1. **„Apple-Verwaltung einrichten“:** Organisation und öffentliche Geräteadresse bestätigen.
-2. **„Zertifikatsanfrage erstellen“:** Schlüssel sicher innerhalb der eigenen Instanz erzeugen und verschlüsselt speichern; öffentliche Anfrage erzeugen. Kein privater Schlüssel wird an einen Signierdienst übertragen.
-3. **Vendor-Signatur beschaffen:** entweder mit eigener von Apple freigeschalteter MDM-Vendor-Berechtigung oder über einen dafür berechtigten Signierdienst. Dessen Verfügbarkeit, Anforderungen und Betrieb müssen vor Implementierung geklärt werden. Eine Fleet-Signierinfrastruktur gehört nicht automatisch zu einem Community-Fork.
-4. **„Anfrage für Apple herunterladen“:** eine tatsächlich für das Push-Portal vorbereitete, signierte Anfrage liefern; Apple-Portal in einem neuen Tab öffnen und den nächsten Schritt auf Deutsch erklären.
-5. **„Apple-Zertifikat hochladen“:** Nutzer lädt nur das erhaltene Zertifikat hoch. Die App ordnet es dem gespeicherten Schlüssel zu, prüft Inhalt, Ablauf und Topic und führt einen verständlichen Verbindungstest aus.
-6. **Verlängern statt neu anlegen:** rechtzeitige Warnungen, verantwortlichen Apple-Account als Verwaltungsinformation speichern, passenden vorhandenen Portal-Eintrag erläutern und Topic-Wechsel verhindern. Alte funktionierende Konfiguration erst nach erfolgreicher Prüfung ersetzen.
-
-Ein **roher PKCS#10-CSR ist nicht der fertige MDM-Push-Portal-Antrag**. Apple beschreibt die erforderliche Vendor-Signierberechtigung ausdrücklich. Fleet zeigt den gewünschten kurzen Benutzerablauf bereits, verbirgt aber die dahinterliegende Signierintegration. [Apple: Signierberechtigung](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate), [Fleet: Setup und Verlängerung](https://fleetdm.com/guides/apple-mdm-setup)
-
-Zusätzliche Anforderungen: nur berechtigte Administratoren dürfen Schlüssel/Anfragen verwalten; offene Anfragen müssen eindeutig zugeordnet und widerrufbar sein; parallele Verlängerungen dürfen keine falsche Schlüsselzuordnung verursachen. Vendor-Schlüssel gehören niemals in Repository, Installer oder öffentliches Downloadpaket.
-
-## 6. Welche Zertifikate brauchen wir wirklich?
-
-| Zweck | Herkunft / Verwaltung | Was darf auf das Endgerät? |
+| Purpose | Issuance/management | Endpoint material |
 | --- | --- | --- |
-| Öffentliches HTTPS für `uem.example.org` | Öffentlich vertrauenswürdige CA, automatisierbar am Proxy | Öffentliche Zertifikatskette; kein Server-Schlüssel |
-| Interne OpenUEM-CA für Komponenten/Agenten | OpenUEM-Installation oder vorhandene Unternehmens-PKI | Öffentliches CA-Zertifikat, soweit für Vertrauensprüfung nötig; niemals `ca.key` |
-| Individuelle Windows-/Mac-Agent-Identität | Registrierung/CA-Worker; Ziel: automatisch pro Gerät | Nur die eigene Identität, geschützt im lokalen Schlüsselspeicher |
-| Apple-Geräteidentität | Im nativen Modul derzeit eigene CA pro Organisation und PKCS#12-Profil | Individuelle Identität; künftig bevorzugt geräteseitige Schlüsselgenerierung und Erneuerung |
-| Apple-MDM-Push-Zertifikat | Apple Push Certificates Portal nach signiertem Antrag | Nicht auf Geräte verteilen; Schlüssel bleibt beim MDM-Dienst |
-| Installer-Signatur | Code-Signing-Zertifikat für Windows bzw. Apple Developer ID | Signiertes Programm/Paket; niemals der Signierschlüssel |
+| Public HTTPS for `uem.example.org` | Public CA, automatable at gateway | Public chain only; no server key |
+| Internal component/agent CA | OpenUEM installation or enterprise PKI | Public CA as needed; never `ca.key` |
+| Individual Windows/Mac agent | Enrollment/CA worker; automatic per device | Own identity protected by local key storage |
+| Apple device identity | Baseline organization CA and PKCS#12 profile | Own identity; move toward device-generated keys and renewal |
+| Apple MDM push certificate | Apple portal after vendor-signed request | Never distribute; key stays on server |
+| Installer signature | Windows code signing or Apple Developer ID | Signed artifact only; never signing key |
 
-**Antwort auf die CA-Frage:** Die interne CA wird benötigt, aber ihre Erstellung kann automatisiert werden. Du musst nicht manuell eine CA pro Windows-Gerät anlegen. Ein öffentliches HTTPS-Zertifikat ersetzt nicht automatisch die interne Geräteidentität. Fleet beschreibt für sein natives Windows-MDM eine zusätzliche WSTEP-Identität; diese konkrete Fleet-Konfiguration ist nicht einfach auf unseren agentenbasierten OpenUEM-Pfad zu übertragen. [OpenUEM: interne PKI](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/05-certificates.md), [Fleet: Windows-Zertifikate](https://fleetdm.com/guides/windows-mdm-setup)
+Automate internal CA creation; there is no need for manual CA setup per device.
+Public HTTPS does not replace device authentication. Fleet's native Windows WSTEP
+identity is not a drop-in replacement for OpenUEM's agent credentials.
+[Internal PKI](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/05-certificates.md),
+[Windows MDM certificates](https://fleetdm.com/guides/windows-mdm-setup)
 
-Die Upstream-Windows-Anleitung verlangt derzeit `ca.cer`, `sftp.cer`, `agent.cer` und `agent.key` neben dem Installer oder als Installationsparameter. Diesen administrativen Bootstrap-Schritt dürfen wir nicht als öffentlichen Download mit einem dauerhaft gemeinsam verwendeten privaten Schlüssel anbieten. Für den einfachen Link ist ein begrenzter Einladungsnachweis mit anschließend individueller Identitätsausstellung erforderlich. [OpenUEM: Windows-Installation](https://github.com/open-uem/openuem-docs/blob/main/docs/02-Installation/02-Agent/01-windows.md)
+The baseline Windows instructions require `ca.cer`, `sftp.cer`, `agent.cer` and
+`agent.key` beside the installer or as parameters. Replace this administrative
+bootstrap with limited invitations and individual issuance; never publish a
+shared permanent private identity.
+[Windows installation](https://github.com/open-uem/openuem-docs/blob/main/docs/02-Installation/02-Agent/01-windows.md)
 
-## 7. Reverse Proxy, genau ein Eingangsport und gesperrte Admin-Routen
+## 7. One inbound port and private administration
 
-### Zielbild
+### Target architecture
 
-**Ein öffentlicher TCP-Port 443; mehrere interne Dienste bleiben erlaubt.** Nach außen werden nur die tatsächlich für Geräte notwendigen Routen freigegeben. Interner Admin-Zugriff kann über VPN, ein privates Netz oder einen gesondert abgesicherten Zugang erfolgen. Ein geheimer URL-Pfad ist keine Zugriffskontrolle.
+Publish **only TCP 443**. Multiple internal services are allowed. Explicitly allow
+only required device routes publicly. Administrators enter through VPN, a private
+network or another protected entry mechanism; a secret URL is not access control.
 
-Die folgende Pfadstruktur ist ein **Entwurf**, keine heute einsetzbare Proxy-Konfiguration:
-
-| Route / Dienst | Extern erreichbar? | Regel |
+| Route/service | Public? | Requirement |
 | --- | --- | --- |
-| `GET /enroll/<token>` | Ja | Neue öffentliche Hilfeseite; Öffnen allein verbraucht die Einladung nicht |
-| `POST /enroll/<token>/claim` | Ja | Neuer begrenzter Registrierungsschritt mit Replay-Schutz |
-| `GET /downloads/agent/...` | Ja | Neue freigegebene, signierte Installer; Konfiguration/Einladung getrennt absichern |
-| `GET /mdm/apple/enroll/<token>` | Ja | Bestehender Profildownload; Einmaligkeit/Linkscanner-Verhalten verbessern |
-| `PUT /mdm/apple/<id>/checkin` und `/connect` | Ja | Bestehende Apple-Protokollrouten; individuelle Geräteauthentifizierung zwingend |
-| `/agent-channel` mit WebSocket-Upgrade | Ja | Geplanter Agentenkanal; WSS-Basis vorhanden, Pfad/Authentifizierung/ACLs noch zu integrieren |
-| Künftige Windows-MDM-Protokollrouten | Erst nach Umsetzung | Nur die ausdrücklich implementierten Discovery-/Enrollment-/Management-Endpunkte |
-| OCSP/CRL, falls von ausgelieferten Identitäten benötigt | Gezielt | Nur erforderliche öffentliche Prüfrouten; Adressen und Erreichbarkeit testen |
-| Admin-Seiten, Login, Admin-API und zugehörige Callbacks | Nein, außerhalb freigegebener Netze | Netzwerk-/Proxy-Sperre plus App-Authentifizierung; nicht nur `/admin` sperren |
-| PostgreSQL, interne NATS-/Worker-Ports, Monitoring | Nein | Ausschließlich intern |
+| `GET /enroll/<token>` | Yes, when implemented | Instructions; GET cannot consume invitation |
+| `POST /enroll/<token>/claim` | Yes, when implemented | Limited claim with replay protection |
+| `GET /downloads/agent/...` | Yes, when implemented | Approved signed installers; secure separate configuration/invitation |
+| `GET /mdm/apple/enroll/<token>` | Baseline | Improve one-use/link-scanner behavior |
+| `PUT /mdm/apple/<id>/checkin` and `/connect` | Yes | Individual device authentication |
+| `/agent-channel` WebSocket upgrade | When implemented | Integrate WSS path, identity and subject/account ACLs |
+| Windows MDM protocol | After implementation | Explicit discovery/enrollment/management endpoints only |
+| OCSP/CRL | As required by issued identities | Specific required routes; test published addresses/reachability |
+| Admin pages, login, management API and callbacks | Approved networks only | Entry-point restriction plus application authentication/authorization |
+| PostgreSQL, internal NATS/workers, monitoring | No | Private network only |
 
 ```mermaid
 flowchart LR
-    Device[Windows, Mac, iPhone, iPad] -->|TCP 443| Edge[Reverse Proxy / Zugangspunkt]
-    Admin[Admin im freigegebenen Netz] -->|TCP 443| Edge
-    Edge -->|öffentliche Allowlist| Enrollment[Registrierung und Downloads]
-    Edge -->|Geräteidentität| Apple[Apple MDM]
-    Edge -->|WSS und Geräteberechtigung| Agent[Agentenkanal]
-    Edge -->|nur intern plus Anmeldung| Console[OpenUEM-Konsole]
-    Agent --> Internal[Interne Worker und Datenbank]
+    Devices[Windows, Mac, iPhone, iPad] -->|TCP 443| Gateway[HTTPS gateway]
+    Admin[Administrator on approved network] -->|TCP 443| Gateway
+    Gateway -->|Public allowlist| Enrollment[Enrollment and downloads]
+    Gateway -->|Device identity| Apple[Apple MDM]
+    Gateway -->|WSS and device authorization| Agent[Agent channel]
+    Gateway -->|Private access plus login| Console[OpenUEM console]
+    Agent --> Internal[Private workers and database]
     Apple --> Internal
     Console --> Internal
 ```
 
-### Apple: aktuelle technische Grenze
+### Apple identity through a proxy
 
-Unser Apple-Handler verlangt das tatsächliche TLS-Clientzertifikat in `r.TLS.PeerCertificates`. Er ignoriert absichtlich vom Client gelieferte Zertifikatsheader. **Wenn ein normaler HTTP-Reverse-Proxy TLS beendet und eine neue TLS-Verbindung zum Backend öffnet, verschwindet die Geräteidentität am Backend.** Einfach `proxy_pass` auf den Apple-Port zu setzen funktioniert deshalb nicht. [Code: Apple-Protokollserver](../internal/mdm/apple/http.go)
+At baseline, the Apple handler requires the actual TLS peer certificate and
+ignores certificate headers. Normal HTTP TLS termination loses this end-device
+identity. There are two architectural options:
 
-Zwei mögliche Umsetzungen:
+- Multiple hostnames on port 443 with SNI/TCP passthrough preserve end-to-end TLS,
+  but cannot inspect encrypted URL paths. This meets one port, not one hostname
+  with path routing.
+- One hostname with path routing requires a trusted TLS-terminating gateway,
+  authenticated backend connections, removed/overwritten client identity headers,
+  certificate/possession validation and blocked direct backend access. An arbitrary
+  `X-Client-Cert` header is insufficient. Test optional client-certificate browser
+  behavior in Safari and during enrollment.
 
-- **Mehrere Hostnamen auf demselben Port 443:** SNI-/TCP-Passthrough kann Apple-TLS bis zum MDM-Dienst erhalten; Admin-Zugang und Downloads verwenden andere Hostnamen. Vorteil: bestehende Apple-Authentifizierung bleibt erhalten. Grenze: Ein Passthrough-Proxy kann keine verschlüsselten URL-Pfade auswerten. Das ist eine Alternative für „ein Port“, keine Erfüllung von „ein Hostname mit Pfadrouting“.
-- **Ein Hostname mit Pfadrouting:** TLS am vertrauenswürdigen Gateway beenden und die geprüfte Geräteidentität sicher an das Backend vermitteln. Dafür brauchen wir eine ausdrücklich implementierte Vertrauensgrenze: nur authentifizierte Gateways, gesperrte Direktzugriffe, entfernte/überschriebene eingehende Identitätsheader, Zertifikats-/Besitzprüfung und Negativtests. Optionales Clientzertifikat auf derselben Domain kann Browserdialoge beeinflussen; mit Safari und Enrollment testen. Ein frei akzeptierter `X-Client-Cert`-Header wäre keine Lösung.
+The requested URL design uses the second option. Select and implement the gateway
+and secure identity transport together. [Baseline protocol server](../internal/mdm/apple/http.go)
 
-Für dein gewünschtes URL-Konzept ist die zweite Variante der passende Ausbau. Die konkrete Proxy-Software und ihr sicherer Identitätstransport müssen gemeinsam mit der Anwendung festgelegt werden.
+### Agent WSS
 
-### Windows/macOS-Agenten: vorhandenes WSS korrekt weiterverwenden
+Reuse the NATS library's existing WebSocket fallback and the agent's
+`WebSocketPort` configuration. Extend external origin/path configuration,
+reconnection and authorization before calling this a working single-port
+installation. Do not replace individual identities with a shared proxy identity.
+Preserve NATS accounts, subject permissions, individual login, rotation and
+revocation, or implement equivalent application authentication.
+[NATS library at the pinned commit](https://github.com/open-uem/nats/blob/98373a46adcf/connect.go),
+[agent configuration](https://github.com/open-uem/openuem-agent/blob/main/internal/agent/config.go),
+[NATS WebSocket guidance](https://docs.nats.io/learn/websocket/)
 
-Die im Fork verwendete OpenUEM-NATS-Bibliothek besitzt bereits einen WebSocket-Fallback. Auch der aktuelle Upstream-Agent liest `WebSocketPort`. Daher **keinen neuen Agententransport von Grund auf bauen**, bevor diese Grundlage genutzt wurde. Der Fallback setzt heute eine URL aus Host und Port zusammen; die gewünschte Pfadkonfiguration, Wiederverbindung, externe Adressen und Authentifizierung sind nicht als fertiges Ein-Port-Deployment nachgewiesen. [NATS-Bibliothek am verwendeten Commit](https://github.com/open-uem/nats/blob/98373a46adcf/connect.go), [Agent-Konfiguration](https://github.com/open-uem/openuem-agent/blob/main/internal/agent/config.go)
+Additional deployment requirements:
 
-WSS kann durch einen HTTP-Proxy laufen. **Auch hier darf TLS-Terminierung die bisherige Clientzertifikatsidentität nicht durch eine gemeinsame Proxy-Identität ersetzen.** NATS-Accounts/Subject-Rechte, individuelle Anmeldung und Zertifikatsrotation müssen erhalten bleiben oder kontrolliert durch eine gleichwertige Anwendungsauthentifizierung ersetzt werden. WebSocket-Unterstützung allein beweist das nicht. [NATS: WebSocket und Proxies](https://docs.nats.io/learn/websocket/)
+- Existing proxy examples sometimes use a separate authentication port and do not
+  solve this complete architecture. [Upstream proxy documentation](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/02-reverse-proxy.md)
+- Deny every non-allowlisted external route, including `/tenant/...`, `/computers`,
+  `/deploy`, `/profiles`, `/login` and aliases; blocking `/admin` alone is inadequate.
+- Serve approved packages, updates and required certificate status over HTTPS.
+  The existing authenticated `/download/:filename` is not a public agent portal.
+- Disable direct SFTP/VNC/remote access in a deployment without endpoint inbound
+  ports, or provide a deliberate reverse channel/VPN. WSS alone does not cover them.
+- Test canonical public URL, redirects, cookies, Origin/CSRF, upload limits,
+  WebSocket timeouts, IPv6 and proxy headers together.
+- One inbound server port does not eliminate outbound APNs, Apple, Microsoft and
+  package-service access. Device push commonly uses 5223 with 443 fallback; server
+  APNs requests use 443. [Apple push networking](https://support.apple.com/en-us/102266)
+- Automate public TLS using DNS-01 if opening port 80 is prohibited. Include the
+  actual certificate issuance/renewal mechanism in deployment configuration.
 
-Zusätzlich zu berücksichtigen:
-
-- Upstream-Proxybeispiele behandeln Konsole/Auth und verwenden teilweise einen separaten Auth-Port. Sie lösen das neue Gesamtziel noch nicht. [OpenUEM: Reverse Proxy](https://github.com/open-uem/openuem-docs/blob/main/docs/07-Advanced%20Topics/02-reverse-proxy.md)
-- Aktuelle Admin-Routen liegen auch unter `/tenant/...`, `/computers`, `/deploy`, `/profiles`, `/login` und weiteren Pfaden. Deshalb öffentliche Geräte-Routen erlauben und sonst von extern ablehnen; nicht nur `/admin` blockieren. [Routen](../internal/controllers/webserver/handlers/routes.go), [Apple-Admin-Routen](../internal/controllers/webserver/handlers/apple.go)
-- Paketdateien, Updates und gegebenenfalls Zertifikatsstatus müssen über zulässige HTTPS-Routen erreichbar sein. Der bestehende `/download/:filename`-Handler ist ein authentifizierter Verwaltungsdownload, kein fertiges öffentliches Agentenportal.
-- SFTP/VNC und direkte Remote-Zugriffe besitzen eigene Netzwerkannahmen. Sie sind nicht durch WSS automatisch abgedeckt. Für einen Betrieb ohne zusätzliche Eingangsports auf Endgeräten müssen diese Funktionen deaktiviert oder über einen gezielten Rückkanal/VPN umgesetzt werden.
-- Öffentliche Basis-URL, Weiterleitungen, Cookies, Origin-/CSRF-Prüfung, Uploadgrenzen, WebSocket-Zeitlimits, IPv6 und Proxy-Header zusammen testen.
-- Nur ein **eingehender Serverport** bedeutet nicht, dass Apple-Dienste entfallen. Server und Geräte benötigen ausgehende Verbindungen zu APNs sowie zu Apple-/Microsoft-/Paketdiensten. Apple nennt insbesondere 5223 für Geräte-Push-Verbindungen und 443 als Ausweichweg; unser Server sendet APNs-Anfragen über 443. [Apple: Push-Netzwerk](https://support.apple.com/en-us/102266)
-- Für automatische öffentliche TLS-Zertifikate kann DNS-01 die zusätzliche Freigabe von Port 80 vermeiden; das konkrete Verfahren ist Teil der Deployment-Konfiguration.
-
-## 8. Einfacher Download und verständliche Registrierung
+## 8. Guided enrollment and downloads
 
 ### Windows
 
-Gewünschter Ablauf: **Organisation/Standort auswählen → Installationslink erzeugen → Link auf Windows öffnen → signierten Installer starten → Administratorfreigabe → Gerät erscheint mit Registrierungsstatus.**
+**Choose organization/site → generate link → open on Windows → run signed
+installer → approve OS elevation → observe registration status.**
 
-Es fehlen ein öffentlicher Download-/Registrierungsdienst und eine passende Paket-/Konfigurationsstrecke. Der Installer darf nicht durch nachträgliches Einbetten von Daten seine Signatur verlieren. Geeignet sind ein unverändert signierter Installer mit signiertem Konfigurationsmanifest oder ein eigenständig signierter Bootstrapper. Architektur, erlaubte Version und Herkunft müssen geprüft werden. Einladungen bekommen Ablaufzeit, Widerruf und begrenzte Verwendung; Kopieren eines Links darf keine dauerhafte universelle Identität verteilen.
+Build the public download/enrollment service and installer/configuration workflow.
+Do not invalidate signatures by modifying signed installers. Use an unchanged
+signed installer with a signed configuration manifest, or a signed bootstrapper.
+Verify architecture, allowed version and source. Invitations need expiry,
+revocation and use limits; copying a link must not distribute a universal identity.
 
-Stille Installation weiterhin anbieten, aber hinter „Erweiterte Bereitstellung“ mit einem kopierbaren Befehl und ohne langfristige Geheimnisse in Befehlszeile, Prozessliste oder Logs. Standardnutzer benötigen bei einer Systeminstallation weiterhin die vom Betriebssystem geforderte Freigabe.
+Retain silent installation under **Advanced deployment** with a copyable command.
+Do not expose long-lived secrets in command lines, process lists or logs. System
+installation still requires the operating system's administrator approval.
 
 ### iPhone/iPad
 
-Kein Desktop-Agent erforderlich: **Link oder QR-Code → deutsche Informationsseite → Profil laden → Installation in den Einstellungen bestätigen → Registrierungsstatus sehen.** Der aktuelle Direktdownload ist die technische Grundlage, aber kein vollständiger Benutzerablauf. Keine Behauptung einer stillen manuellen Registrierung; für weitgehend automatische Firmengeräte-Einrichtung ist ADE vorgesehen.
+**Link or QR code → English instructions → download profile → confirm installation
+in Settings → observe enrollment status.** No desktop agent is required. Manual
+profile installation is not silent; use ADE for largely automated company setup.
 
-Ein GET durch Mail-/Linkscanner darf die eigentliche Einladung nicht unbemerkt verbrauchen. Fehler wie abgelaufener Link, bereits verwendet, ungeeignetes Gerät und fehlende Netzwerkverbindung müssen verständlich erklärt werden. Ein begrenzter Wiederholungsablauf ist gegen die Einmaligkeit und den Schutz der Geräteidentität abzuwägen.
+Mail/link scanners performing GET must not consume invitations. Explain expired,
+already-used, unsupported-device and network-error cases. Provide bounded retries
+without defeating one-use semantics or device identity protection.
 
 ### Mac
 
-Eine Seite erklärt getrennt und verständlich **Geräteverwaltung aktivieren** und **OpenUEM-Agent installieren**. Das Profil aktiviert native Apple-Funktionen; das signierte Agent-Paket ergänzt Softwareverteilung und Inventar. Beide melden sich anschließend als derselbe Mac in der Konsole. Bei ADE soll diese Einrichtung weitgehend im ersten Setup erfolgen.
+Explain **Enable device management** and **Install OpenUEM agent** as separate
+steps on one page. The profile enables native Apple management; the signed agent
+adds inventory/software deployment. Both must appear as one Mac in the console.
+ADE should perform these steps during initial setup where supported.
 
-## 9. Konkrete UI-Befunde und deutsche Übersetzung
+## 9. UI findings and language acceptance
 
-Browserprüfung am 07.09.2026: tatsächliche Docker-Konsole mit PostgreSQL/NATS und synthetischem Gerät; Desktopbreite 1440 px sowie mobile Breite 390 px. Kein statisches Mockup. Das Desktop-Setup wurde auch per Screenshot geprüft.
+The baseline browser review used the actual Docker console with PostgreSQL/NATS
+and a synthetic device at 1440 px and 390 px, not a static mockup. Desktop setup
+was also inspected visually.
 
-| Befund | Beleg / Auswirkung | Erforderliche Änderung |
+| Finding | Evidence/impact | Required change |
 | --- | --- | --- |
-| Deutsch/Englisch gemischt | Deutsche Organisationsauswahl und native Menüs, daneben „Apple setup & enrollment“, englische Formulare/Status | Alle neuen Texte in bestehende Locale-Dateien übernehmen; restliche Upstream-Lücken mitprüfen |
-| Navigationsmodell uneinheitlich | Separate Buttonleiste für Apple; „Windows profiles“ und „iOS profiles“ führen in unterschiedliche Bedienabläufe | Gemeinsame Navigation, Plattformfilter, einheitliche Aktionen und richtige aktive Zustände |
-| Tabellen-/Listenfunktionen unterschiedlich | Native Computeransicht hat Pagination/Sortierung/Exporte; neue Übersicht lädt und sortiert zusammengeführte Listen ohne gleichwertige Bedienung | Gemeinsame serverseitige Filter/Pagination; Exporte und Bulk-Aktionen konsistent |
-| Datum/Status nicht lokalisiert | `When()` formatiert fest in UTC; `StateLabel()` liefert Englisch | Lokalisierte Anzeige mit klarer Zeitzone; Apple-Updatefrist weiterhin ausdrücklich in Geräte-Ortszeit |
-| Setup ohne Führung | PEM-Dateien, privater Schlüssel und technische Serverparameter direkt im Hauptformular | CSR-Assistent, Gesundheitsprüfung und Details unter „Erweitert“ |
-| Technische Push-Fehler sichtbar | Geräteansicht zeigt im Test eine komplette APNs-URL mit Token und Verbindungsfehler | Kurze deutsche Ursache, nächste Aktion; sensible Teile redigieren, technische Details kontrolliert anbieten |
-| Update-Zusammenfassung unvollständig | Auswahl enthält Version/Build, Zusammenfassung zeigt nur Version/Frist | Gewählten Build ebenfalls anzeigen; Richtlinienaktivität und tatsächlichen OS-Stand klar trennen |
-| Mobile Überläufe | Siehe Messwerte unten | Header, Tabellen, lange Tokens/URLs, Formulare und Aktionsleisten überarbeiten |
+| Mixed language | Organization/native menus differ from Apple pages | Put new copy into the existing locale system; audit upstream gaps; English is now required |
+| Inconsistent navigation | Separate Apple button strip; different Windows/iOS profile flows | Shared navigation, platform filters, actions and active states |
+| Different table behavior | Native pagination/sort/export versus in-memory merged lists | Shared server-side filtering/pagination, exports and bulk actions |
+| Fixed dates/status | `When()` uses UTC; `StateLabel()` returns English literals | Locale-aware display with explicit zone; keep Apple deadlines device-local |
+| Unguided setup | PEM/key/server details in primary form | CSR wizard and health checks; technical details under Advanced |
+| Sensitive technical errors | Full APNs URL/token and transport error visible | Short actionable cause, redaction and controlled technical detail |
+| Incomplete update summary | Picker has version/build; summary lacks build | Show selected build and separate active policy from observed OS |
+| Mobile overflow | Measured below | Repair shell, headers, tables, tokens/URLs, forms and action bars |
 
-Gemessene Dokumentbreite bei **390 px Viewport**:
-
-| Seite | Dokumentbreite | Beobachtung |
+| Page at 390 px viewport | Document width | Observation |
 | --- | --- | --- |
-| Apple-Setup | 630 px | Überlauf außerhalb des eigentlichen Hauptformulars; gemeinsamen Seitenrahmen mitprüfen |
-| Gemeinsame Geräteübersicht | 630 px | Tabellen besitzen zusätzlich horizontales Scrollen; kein Ersatz für fehlerfreien Seitenrahmen |
-| Apple-Gerätedetails | 889 px | Zusätzlicher Überlauf in Detail-/Historienbereich |
-| Apple-Profile | 630 px | Aktions-/Revisionsbereich ragt zusätzlich über die nutzbare Breite |
-| Native Computeransicht | 649 px | Auch Upstream-Aktions-/Aktualisierungsleiste zu breit |
+| Apple setup | 630 px | Shared page shell also overflows |
+| Unified devices | 630 px | Table scrolling does not fix shell overflow |
+| Apple device details | 889 px | Detail/history adds overflow |
+| Apple profiles | 630 px | Actions/revisions extend beyond content |
+| Native computers | 649 px | Upstream action/refresh bar also too wide |
 
-Diese Messwerte belegen Darstellungsfehler, jedoch keine vollständige Prüfung aller Browser, Themes und Datensätze. Die Apple-Seiten verwenden bereits das gemeinsame Layout und vorhandene CSS-Klassen; es fehlt keine komplette Stylesheet-Einbindung. Die Aufgabe ist die konsequente Nutzung und Korrektur der gemeinsamen Komponenten.
+These measurements do not cover all browsers, themes or datasets. Apple pages
+already use the common layout/CSS. Correct and consistently reuse the components.
 
-Für Deutsch umzusetzen:
+Language/accessibility work:
 
-- Neue Schlüssel etwa unter `mdm.*`, `enrollment.*`, `certificates.*` und `updates.*` in `de.yaml` und `en.yaml`; keine zweite Übersetzungsbibliothek.
-- Backend-Validierungen, Toasts/Fehler, Status, Breadcrumbs, Tabellen, Leerzustände, Hilfetexte und öffentliche Registrierungsseiten einbeziehen.
-- Sprache optional im Nutzerprofil wählbar; Browser-`Accept-Language` als Vorgabe. Aktuell stammt die Auswahl aus dem Request-Header.
-- Einheitliche Begriffe, etwa „Geräte“, „Registrierung“, „Konfigurationsprofile“, „Auf Gerät überprüft“, „Aktualisierung erforderlich“ und „Zertifikat verlängern“.
-- Datums-/Zahlenformate, Pluralformen, Tastaturbedienung, Fokus, Kontrast, lange deutsche Texte und Bildschirmleser testen; keine Fachwörter nur durch andere unverständliche Fachwörter ersetzen.
-- Windows-/Mac-Installer und Installationsanleitungen in die Sprachabnahme aufnehmen. Der tatsächliche Installer-Sprachumfang muss am eingesetzten Release geprüft werden.
+1. Use keys such as `mdm.*`, `enrollment.*`, `certificates.*` and `updates.*` in the
+   existing locale catalogs; do not introduce another translation library.
+2. Cover backend validation, toasts/errors, states, breadcrumbs, tables, empty
+   states, help and public enrollment. Source and authored copy must be English.
+3. Allow optional language selection in the user profile, with browser language
+   as default; the baseline relies on `Accept-Language` alone.
+4. Use consistent terminology: Devices, Enrollment, Configuration profiles,
+   Verified on device, Update required and Renew certificate.
+5. Test dates/numbers/plurals, keyboard/focus, contrast, long translations and
+   screen readers. Avoid replacing jargon with equally obscure terminology.
+6. Include Windows/Mac installers and instructions in language acceptance; verify
+   the actual release's supported languages rather than assuming them.
 
-Code: [Locale-Einbindung](../internal/views/locales/locales.go), [Sprachauswahl](../internal/controllers/router/middleware/i18n.go), [Apple-Viewmodel](../internal/views/mdm_views/viewmodel.go), [native Computeransicht](../internal/views/computers_views/computers_views.templ).
+Evidence: [locales](../internal/views/locales/locales.go),
+[locale middleware](../internal/controllers/router/middleware/i18n.go),
+[Apple view models](../internal/views/mdm_views/viewmodel.go),
+[native computer view](../internal/views/computers_views/computers_views.templ).
 
-## 10. Sicherheitsbefunde und Freigabekriterien
+## 10. Security findings and release gates
 
-Dies ist ein gezielter Code-/Architekturreview, kein vollständiger Penetrationstest. Bestätigte Eigenschaften, konkrete Review-Befunde und noch zu testende Risiken werden getrennt behandelt.
+This was a targeted code/architecture review, not a complete penetration test.
+Preserve the existing individually bound Apple TLS identities, expiring one-use
+invitations, encrypted private keys/profiles, separate device routes, Apple form
+CSRF comparison, size limits, server-side organization/site queries, sessions,
+OIDC and 2FA.
 
-Bereits vorhanden: individuell gebundene Apple-Geräteidentitäten mit TLS-Besitznachweis, ablaufende Einmal-Einladungen, verschlüsselte private Apple-Schlüssel/Profile, getrennte öffentliche Protokollrouten, Apple-spezifischer CSRF-Vergleich, Upload-/Request-Limits und serverseitige Mandanten-/Standortfilter. Sessions, OIDC und 2FA existieren aus OpenUEM. Diese Grundlagen dürfen beim Proxy-/UX-Umbau nicht verloren gehen.
-
-| Priorität | Befund / offene Prüfung | Erforderlicher Nachweis |
+| Priority | Baseline finding or open question | Required evidence |
 | --- | --- | --- |
-| P0 | Apple-Geräteauthentifizierung wird durch gewöhnliche TLS-Terminierung unterbrochen | Gültiges Gerät funktioniert durch den gewählten Proxy; falsches Zertifikat, gespoofter Header, Replay und direkter Backend-Zugriff werden abgewiesen |
-| P0 | Bestehender Admin-Auth-Handler akzeptiert ersatzweise `Client-Cert`; dort ist keine Herkunftsprüfung des Headers zu sehen | Header ausschließlich von authentifiziertem Proxy akzeptieren oder Pfad entfernen; Netzwerkisolation und Negativtests. Ein öffentliches Zertifikat allein ist kein Besitznachweis |
-| P0 | `IsAuthenticated` prüft Session/2FA, aber keinen granularen Apple-Aktionszugriff | Serverrollen und Mandanten-/Standortrechte bei jeder Aktion; Lesezugriff darf keine Profile, Updates oder Zertifikate ändern |
-| P0 | Gewünschte öffentliche Installer dürfen keine gemeinsame dauerhafte Agentenidentität verteilen | Begrenzter Bootstrap, individuelle Schlüssel, begrenzte NATS-Rechte, Rotation und Widerruf |
-| P0 | Admin-Sperre ist bisher kein geprüftes Deployment-Merkmal | Von außen alle Admin-Routen einschließlich Alias-/Tenant-Routen gesperrt; über zugelassenen internen Zugang funktionsfähig |
-| P1 | Apple-Geräteidentität läuft nach einem Jahr ab; keine automatische Erneuerung | Erneuerung vor Ablauf ohne Verlust von Verwaltung, Zuordnung und Historie |
-| P1 | Globale CSRF-Konfiguration verwendet `TokenLookup: cookie:_csrf`; Apple hat zusätzlichen Formularvergleich | Übrige mutierende Routen mit echten Cross-Site-/Origin-Tests prüfen und wirksamen Request-Token-Abgleich vereinheitlichen; kein Exploitnachweis aus diesem Review ableiten |
-| P1 | Öffentlicher Apple-Handler besitzt Limits/Timeouts, aber keinen eigenen sichtbaren Rate-Limiter | Registrierungs-/DoS-Limits am Gateway und in der App; legitime Geräte, Retry und viele gleichzeitige Check-ins bleiben funktionsfähig |
-| P1 | Fehlertexte und Access-Logs können Geräte- oder Enrollment-Tokens enthalten | Redigierte Fehler/Logs, kein Referrer-Leak, `no-store`, kein öffentliches Caching oder Drittanbieter-Tracking auf Enrollment-Seiten |
-| P1 | Apple-Audit liegt in Datenbank; Viewer/Retention fehlen | Wer hat was für welche Geräte geändert, mit Ergebnis und Zeit; geschützter Export und definierte Aufbewahrung |
-| P1 | Schlüssel-/CA-Rotation und Wiederherstellung nicht als fertiger Ablauf nachgewiesen | Verschlüsselte Backups, getrennte Schlüsselaufbewahrung, Restore-Test und dokumentierte Rotation ohne Geräteverlust |
-| P1 | Paket-/Skriptverteilung hat hohe Rechte auf Endgeräten | Signatur-/Hashprüfung, kontrollierte Quellen, sichere URL-/Downloadverarbeitung, Rollen, Audit, begrenzte Ausführung und prüfbare Ergebnisse |
-| P1 | Bestehende Gesamt-Tests haben bekannte Upstream-SMTP-/User-Abweichungen | Vor Produktionsfreigabe bewerten/beheben; grüne Teil-CI nicht als vollständigen Sicherheitsnachweis verwenden |
+| P0 | Normal TLS termination loses Apple identity | Valid device works through chosen proxy; wrong certificate, spoofed header, replay and direct backend access fail |
+| P0 | Admin auth accepts `Client-Cert` without visible provenance check | Accept only authenticated gateway identity or remove fallback; isolation and negative tests; public certificate alone is not possession proof |
+| P0 | `IsAuthenticated` lacks granular Apple action rights | Server roles and organization/site permissions for every action; readers cannot change profiles, updates or certificates |
+| P0 | Public installer may distribute shared identity | Limited bootstrap, individual keys, bounded NATS rights, rotation and revocation |
+| P0 | Private administration not a tested deployment property | All external admin/alias/tenant routes denied; approved internal access works |
+| P1 | Device identity expires after one year | Automatic renewal without losing management, assignment or history |
+| P1 | Global CSRF lookup reads cookie; Apple adds form comparison | Real cross-site/Origin tests and request-token validation across mutations; baseline review alone is not an exploit demonstration |
+| P1 | No dedicated visible public Apple rate limiter | Gateway/application enrollment/DoS limits; legitimate retries and concurrent check-ins continue |
+| P1 | Errors/logs can include device/enrollment tokens | Redacted logs/errors, no referrer leaks, `no-store`, no public caching or third-party enrollment tracking |
+| P1 | Audit exists only in database | Actor/action/target/result/time viewer, protected export and defined retention |
+| P1 | Rotation/restore not demonstrated | Encrypted backups, separately stored keys, restore tests and rotation without device loss |
+| P1 | Endpoint package/script execution is privileged | Signature/hash checks, approved sources, safe URLs/downloads, roles/audit, bounded execution and verified results |
+| P1 | Known upstream SMTP/user test failures | Resolve/evaluate before production; passing partial CI is not full security acceptance |
 
-Belege: [Apple-HTTP/TLS](../internal/mdm/apple/http.go), [Apple-Identität](../internal/mdm/apple/enrollment.go), [Apple-Admin-Schutz](../internal/controllers/webserver/handlers/apple.go), [Session/2FA](../internal/controllers/webserver/handlers/routes.go), [Admin-Zertifikatsheader](../internal/controllers/authserver/handlers/auth.go), [globales Routing/CSRF](../internal/controllers/router/router.go), [bekannte Testgrenzen](native-ios-operations.md).
+Evidence: [Apple TLS](../internal/mdm/apple/http.go),
+[identities](../internal/mdm/apple/enrollment.go),
+[Apple admin routes](../internal/controllers/webserver/handlers/apple.go),
+[session/2FA](../internal/controllers/webserver/handlers/routes.go),
+[certificate login](../internal/controllers/authserver/handlers/auth.go),
+[global routing/CSRF](../internal/controllers/router/router.go),
+[known test limitations](native-ios-operations.md).
 
-Zusätzliche Abnahmefälle: fremde Mandanten-IDs, doppelte Kommandos, widerrufene/abgelaufene Zertifikate, manipulierte Profile, zu große Dateien, nicht verfügbare Katalogziele, lange Offline-Zeiten, Prozessneustarts und parallele Änderungen. Sicherheitskritische Aktionen brauchen eine verständliche Bestätigung mit Ziel und Auswirkung. Inventarzugriffe und spätere Recovery-Key-Abfragen müssen protokolliert werden.
+Also test foreign organization IDs, duplicate commands, expired/revoked certificates,
+manipulated profiles, oversized files, unavailable catalog targets, long offline
+periods, process restarts and concurrent changes. Sensitive actions require clear
+confirmation of target and impact. Audit inventory access and recovery-key retrieval.
 
-## 11. Priorisierter Umsetzungsplan
+## 11. Prioritized implementation plan
 
-**P0:** Voraussetzung für die sichere gewünschte Bereitstellung. **P1:** erforderlicher Funktions-/Bedienumfang. **P2:** Ausbau zur Fleet-ähnlichen Tiefe. Die Reihenfolge bedeutet nicht, dass P2 bereits zugesagt oder implementiert ist.
+P0 is required for safe deployment; P1 covers the required platform/operational
+experience; P2 adds the requested depth. Priority orders the work and does not
+remove P2 from the user's instruction to implement the entire plan.
 
-| ID | Priorität | Arbeitspaket | Fertig, wenn … |
+| ID | Priority | Work package | Completion evidence |
 | --- | --- | --- | --- |
-| NET-01 | P0 | Ein-Port-Architektur und Proxy-Vertrauen | Eine dokumentierte Referenzinstallation nur 443 veröffentlicht; Geräte funktionieren, Admin ist von extern gesperrt |
-| SEC-01 | P0 | Admin-/Geräteauthentifizierung und Rollen | Proxy-Header-Spoofing, Direktzugriff und unzulässige Aktionen scheitern in Integrationstests |
-| ENR-01 | P0 | Sicherer Bootstrap für Agenten | Einladungslink erzeugt genau berechtigte individuelle Identitäten; kein universeller privater Schlüssel im Download |
-| APP-01 | P1 | CSR-/Push-Zertifikatsassistent | Anfrage in der App erzeugen, Vendor-Signatur erhalten, bei Apple verwenden, nur Zertifikat importieren und erfolgreich verlängern |
-| UX-01 | P1 | Deutsche Sprache und gemeinsame Komponenten | Kernabläufe vollständig deutsch; responsive Desktop-/Tablet-/Mobilabnahme ohne Seitenüberlauf |
-| ENR-02 | P1 | Öffentliches Registrierungs-/Downloadportal | Windows, Mac, iPhone und iPad haben verständliche Link-Abläufe mit Status, Ablauf/Widerruf und sicheren Wiederholungen |
-| MAC-01 | P1 | macOS-MDM und Geräteverknüpfung | Ein echter Mac erscheint einmal mit MDM/Agent-Status, Inventar und funktionierendem Profillebenszyklus |
-| MAC-02 | P1 | macOS-Updates und Sicherheitsgrundlagen | DDM-Update auf echter Hardware; FileVault-Grundablauf und erforderliche Token-Verwaltung nachgewiesen |
-| IOS-01 | P1 | iPad-Abnahme, Profil-/Update-UX | iPhone und iPad getrennt getestet; verständliche Richtlinien und verifizierte Resultate |
-| WIN-01 | P1 | Windows-Deployment vervollständigen | Standard- und eigenes Paket per Konsole installieren/deinstallieren; Offline-/Neustart-/Fehlerfälle korrekt |
-| PKI-01 | P1 | Erneuerung, Backup, Ablaufwarnungen | Bestehende Geräte bleiben nach Zertifikatswechsel und Wiederherstellung verwaltbar |
-| OPS-01 | P1 | Eigene Release-/Installationsstrecke | Versionierte, signierte Artefakte, sichere Updates, Monitoring und nachvollziehbare Betriebsanleitung |
-| APP-02 | P2 | ADE/Apple Business und Gruppen/Ringe | Automatisches Setup und gruppenweise Richtlinien inklusive Wiederregistrierung funktionieren |
-| WIN-02 | P2 | Native Windows-MDM-/CSP-Strecke | Enrollment, Richtlinien, Updates, Zertifikatsrenewal und Abmeldung funktionieren; Entra/Autopilot separat geprüft |
-| SEC-02 | P2 | Erweiterte Compliance/Sicherheit | Recovery-Keys, zusätzliche Richtlinien, Schwachstellenpriorisierung und Audit-Export vereinheitlicht |
-| API-01 | P2 | Öffentliche API, Webhooks, GitOps | Derselbe gewünschte Zustand kann per UI und versionierter API beschrieben und überprüft werden |
-| SW-01 | P2 | Apple-Apps und Self-Service | Apps & Books/Lizenzen sowie ausgewählte eigene Pakete mit Status-/Update-Lebenszyklus; iOS-Apps bleiben nachrangig |
+| NET-01 | P0 | One-port architecture and proxy trust | Documented reference installation exposes only 443; devices work; external administration is denied |
+| SEC-01 | P0 | Admin/device authentication and roles | Integration tests reject header spoofing, direct access and unauthorized actions |
+| ENR-01 | P0 | Secure agent bootstrap | Invitation issues exactly authorized individual identities; no universal private key in downloads |
+| APP-01 | P1 | CSR/push-certificate wizard | In-app request, vendor signature, Apple portal issuance, certificate-only import and successful renewal |
+| UX-01 | P1 | English experience and shared components | Core workflows in English; responsive desktop/tablet/mobile acceptance without page overflow |
+| ENR-02 | P1 | Public enrollment/download portal | Clear Windows/Mac/iPhone/iPad link flows, status, expiry/revocation and safe retry |
+| MAC-01 | P1 | macOS MDM and device linkage | One real Mac with agent/MDM state, inventory and working profile lifecycle |
+| MAC-02 | P1 | macOS updates/security foundations | Hardware DDM update; FileVault and required token workflows demonstrated |
+| IOS-01 | P1 | iPad acceptance and profile/update UX | Separate iPhone/iPad tests, understandable policies and verified outcomes |
+| WIN-01 | P1 | Complete Windows deployment | Install/remove standard and custom packages; correct offline/restart/failure results |
+| PKI-01 | P1 | Renewal, backup and expiry warnings | Existing devices remain managed after certificate replacement and restore |
+| OPS-01 | P1 | Own release/installation pipeline | Versioned signed artifacts, secure updates, monitoring and reproducible operations guide |
+| APP-02 | P2 | ADE/Apple Business and groups/rings | Automated setup, group policies and re-enrollment work |
+| WIN-02 | P2 | Native Windows MDM/CSP | Enrollment, policies, updates, renewal and unenrollment; separate Entra/Autopilot evidence |
+| SEC-02 | P2 | Extended compliance/security | Unified recovery keys, additional policies, vulnerability prioritization and audit export |
+| API-01 | P2 | Public API, webhooks and GitOps | Same desired state expressible and verifiable through UI and versioned API |
+| SW-01 | P2 | Apple apps and self-service | Apps & Books/licenses and approved custom packages with status/update lifecycle; iOS apps remain lower priority |
 
-**Betroffene Repositories:** Der aktuelle Fork betrifft die Konsole. Agent-Bootstrap, Installer, Agent-Updates, NATS-/Worker-Konfiguration und PKI liegen teilweise in weiteren OpenUEM-Repositories. Für eine komplette eigene Distribution müssen passende Änderungen dort ebenfalls versioniert werden; sie lassen sich nicht zuverlässig nur durch neue Console-Seiten ersetzen. Relevante Projekte: [Agent](https://github.com/open-uem/openuem-agent), [Worker](https://github.com/open-uem/openuem-worker), [NATS-Bibliothek](https://github.com/open-uem/nats), [Cert-Manager](https://github.com/open-uem/openuem-cert-manager), [Docker-Deployment](https://github.com/open-uem/openuem-docker), [Agent-Updater](https://github.com/open-uem/openuem-agent-updater).
+**Repositories:** this fork is the console. Complete distribution changes must
+also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
+deployment repositories. Console pages alone cannot replace these changes.
+[Agent](https://github.com/open-uem/openuem-agent),
+[Worker](https://github.com/open-uem/openuem-worker),
+[NATS](https://github.com/open-uem/nats),
+[Cert Manager](https://github.com/open-uem/openuem-cert-manager),
+[Docker deployment](https://github.com/open-uem/openuem-docker),
+[Agent Updater](https://github.com/open-uem/openuem-agent-updater).
 
-## 12. Abnahme und aktueller Lieferstatus
+## 12. Acceptance and delivery status
 
-Die bisherige Implementierung mit nativer iOS/iPadOS-Verwaltung liegt im [Draft-PR #1](https://github.com/the-luap/openuem-console/pull/1). Die [CI für den geprüften Commit](https://github.com/the-luap/openuem-console/actions/runs/34159905065) ist erfolgreich. Sie deckt Protokoll-/Datenbank-/TLS-/UI-Tests, Race-Prüfungen, Windows-Deployment-Modelle und Linux-/Windows-Builds ab. Sie prüft weder ein echtes iPhone/iPad noch einen Mac oder eine Windows-Installation hinter dem gewünschten Proxy.
+The baseline native iOS/iPadOS implementation is in
+[draft PR #1](https://github.com/the-luap/openuem-console/pull/1).
+[Its recorded CI run](https://github.com/the-luap/openuem-console/actions/runs/34159905065)
+passed protocol/database/TLS/UI tests, race checks, Windows deployment models and
+Linux/Windows builds. This does not verify actual Apple/Windows devices behind
+the requested gateway, nor does it verify later changes.
 
-Für das **nun erweiterte Ziel** reicht die frühere Aussage „es fehlt nur noch die Geräteabnahme“ nicht mehr: macOS-MDM, CSR-Assistent, sicheres Ein-Port-Deployment, einfacher Agenten-Bootstrap, deutsche UI und die aufgeführten Sicherheits-/Bedienungsarbeiten fehlen zusätzlich.
+The expanded scope includes macOS MDM, CSR wizard, secure one-port deployment,
+agent bootstrap, English UI and all listed security/usability work. The previous
+claim that only hardware acceptance remained does not describe this scope.
 
-Verbindliche Endabnahme:
+Final acceptance requires evidence for every item:
 
-- [ ] Eine frische Installation ist ohne manuell zusammengesuchte Zertifikatsdateien verständlich einrichtbar.
-- [ ] Nur TCP 443 ist von außen zur Installation erreichbar; alle erforderlichen Gerätefunktionen arbeiten darüber.
-- [ ] Admin-Oberfläche und Admin-API sind extern gesperrt und intern mit korrekten Rollen verwendbar.
-- [ ] CSR-Assistent und Apple-Zertifikatsverlängerung funktionieren mit echtem Apple-Zertifikat.
-- [ ] Windows-Agent lässt sich per Link installieren, individuell registrieren und aktualisieren.
-- [ ] Echte Windows-Software wird installiert, überprüft und deinstalliert.
-- [ ] iPhone und iPad registrieren sich per Link; Inventar und Profilrevision/-entfernung stimmen.
-- [ ] Ein Mac besitzt eine gemeinsame Agent-/MDM-Ansicht mit funktionierenden Profilen und OS-Inventar.
-- [ ] OS-Update-Vorgaben werden auf geeigneter echter Apple-Hardware einschließlich Neustart überprüft.
-- [ ] Zertifikatserneuerung und Backup-Wiederherstellung erhalten vorhandene Registrierungen.
-- [ ] Alle Kernabläufe sind deutsch, verständlich, mit Tastatur bedienbar und auf 390/768/1440 px sinnvoll nutzbar.
-- [ ] Sicherheits-Negativtests und Betrieb unter Offline-/Neustart-/Parallelitätsbedingungen bestehen.
+- [ ] Fresh installation is understandable without manually gathering certificate files.
+- [ ] Only inbound TCP 443 is public; every required device feature works through it.
+- [ ] Admin UI/API are denied externally and work internally with correct roles.
+- [ ] CSR wizard and renewal work with an actual Apple push certificate.
+- [ ] Windows agent installs by link, registers individually and updates.
+- [ ] Real Windows software is installed, verified and removed.
+- [ ] iPhone and iPad enroll by link; inventory/profile revisions/removal agree with devices.
+- [ ] A Mac has one agent/MDM view with working profiles and OS inventory.
+- [ ] Apple OS update policies are verified on eligible hardware, including reboot.
+- [ ] Certificate renewal and backup restoration preserve existing enrollments.
+- [ ] Core workflows are understandable English, keyboard accessible and usable at 390/768/1440 px.
+- [ ] Security negative tests and offline/restart/concurrency operation pass.
 
-Android bleibt ausdrücklich außerhalb des gewünschten Umfangs. iOS/iPadOS-App-Verteilung und weitergehende Fleet-Security-Analyse sind nachrangige Ausbaustufen, keine Voraussetzung für die zuerst geforderten Profil-, Inventar- und Softwareverteilungsabläufe.
+Android is explicitly out of scope. iOS/iPadOS app distribution and advanced
+Fleet-style security analysis are later work, not prerequisites for starting the
+initial profile, inventory and software-deployment workflows. They are not silently
+removed from the expanded plan.

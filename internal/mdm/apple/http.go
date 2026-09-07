@@ -10,37 +10,32 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"howett.net/plist"
 )
 
-// ProtocolHandler has no administrator endpoints or session cookies. Run it on
-// the public MDM TLS listener; the authenticated console mounts its own UI/API.
+// ProtocolHandler has no administrator endpoints. Its enrollment browser cookie
+// cannot authenticate device protocol or console requests.
 func (s *Store) ProtocolHandler(logger *slog.Logger) http.Handler {
+	return s.ProtocolHandlerWithIdentity(logger, clientidentity.Policy{})
+}
+
+func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity clientidentity.Policy) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	portalLimits := newEnrollmentLimiter()
+	return identity.Protect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin")
 		path := strings.TrimPrefix(r.URL.Path, "/mdm/apple/")
 		if path == r.URL.Path {
 			http.NotFound(w, r)
 			return
 		}
 		if strings.HasPrefix(path, "enroll/") {
-			if r.Method != http.MethodGet {
-				w.Header().Set("Allow", "GET")
-				http.Error(w, "method not allowed", 405)
-				return
-			}
-			data, err := s.EnrollmentProfile(r.Context(), strings.TrimPrefix(path, "enroll/"))
-			if err != nil {
-				protocolError(w, err, logger)
-				return
-			}
-			w.Header().Set("Content-Type", "application/x-apple-aspen-config")
-			w.Header().Set("Content-Disposition", `attachment; filename="OpenUEM.mobileconfig"`)
-			_, _ = w.Write(data)
+			s.enrollmentPage(w, r, strings.TrimPrefix(path, "enroll/"), portalLimits, identity)
 			return
 		}
 		if r.Method != http.MethodPut {
@@ -61,13 +56,12 @@ func (s *Store) ProtocolHandler(logger *slog.Logger) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		// Never trust a client-supplied forwarded certificate header. TLS must
-		// terminate here (a TCP/TLS passthrough proxy is also supported).
-		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		cert, err := identity.Certificate(r)
+		if err != nil {
 			http.Error(w, "device certificate required", 401)
 			return
 		}
-		d, err := s.AuthenticateCertificate(r.Context(), parts[0], r.TLS.PeerCertificates[0])
+		d, err := s.AuthenticateCertificate(r.Context(), parts[0], cert)
 		if err != nil {
 			protocolError(w, err, logger)
 			return
@@ -108,7 +102,7 @@ func (s *Store) ProtocolHandler(logger *slog.Logger) http.Handler {
 			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 			_, _ = w.Write(response)
 		}
-	})
+	}))
 }
 
 func protocolError(w http.ResponseWriter, err error, logger *slog.Logger) {
@@ -128,5 +122,11 @@ func protocolError(w http.ResponseWriter, err error, logger *slog.Logger) {
 }
 
 func (s *Store) ProtocolServer(address string, logger *slog.Logger) *http.Server {
-	return &http.Server{Addr: address, Handler: s.ProtocolHandler(logger), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: tls.RequestClientCert}, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 45 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 << 10}
+	return s.ProtocolServerWithIdentity(address, logger, clientidentity.Policy{})
+}
+
+func (s *Store) ProtocolServerWithIdentity(address string, logger *slog.Logger, identity clientidentity.Policy) *http.Server {
+	config := &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: tls.RequestClientCert}
+	identity.ConfigureTLS(config)
+	return &http.Server{Addr: address, Handler: s.ProtocolHandlerWithIdentity(logger, identity), TLSConfig: config, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 45 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 << 10}
 }

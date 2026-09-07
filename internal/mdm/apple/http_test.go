@@ -5,16 +5,21 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/open-uem/openuem-console/internal/gateway"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"howett.net/plist"
 	"software.sslmate.com/src/go-pkcs12"
 )
@@ -53,8 +58,13 @@ func TestCatalogTrustsAppleRootWithoutDisablingTLSVerification(t *testing.T) {
 }
 
 func TestPublicProtocolRequiresIssuedIdentityOverTLS(t *testing.T) {
+	t.Run("direct", func(t *testing.T) { testPublicProtocolIdentity(t, false) })
+	t.Run("gateway", func(t *testing.T) { testPublicProtocolIdentity(t, true) })
+}
+
+func testPublicProtocolIdentity(t *testing.T, proxied bool) {
 	s := testStore(t)
-	testSettings(t, s, 1)
+	settings := testSettings(t, s, 1)
 	ctx := context.Background()
 	invite, err := s.Invite(ctx, Scope{TenantID: 1, SiteID: 1}, "HTTP test", "admin")
 	if err != nil {
@@ -65,17 +75,66 @@ func TestPublicProtocolRequiresIssuedIdentityOverTLS(t *testing.T) {
 	server.TLS = &tls.Config{ClientAuth: tls.RequestClientCert, MinVersion: tls.VersionTLS12}
 	server.StartTLS()
 	defer server.Close()
+	if proxied {
+		// A separately pinned TLS identity authenticates the gateway hop. It is not
+		// an enrolled device and cannot substitute for a device identity.
+		profileData, _, err := identityProfile(settings, "test-gateway", time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var gatewayProfile map[string]any
+		if _, err = plist.Unmarshal(profileData, &gatewayProfile); err != nil {
+			t.Fatal(err)
+		}
+		identity := gatewayProfile["PayloadContent"].([]any)[0].(map[string]any)
+		key, cert, _, err := pkcs12.DecodeChain(identity["PayloadContent"].([]byte), identity["Password"].(string))
+		if err != nil {
+			t.Fatal(err)
+		}
+		policy, err := clientidentity.FromPEM(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		backend := httptest.NewUnstartedServer(s.ProtocolHandlerWithIdentity(logger, policy))
+		backend.TLS = &tls.Config{}
+		policy.ConfigureTLS(backend.TLS)
+		backend.StartTLS()
+		defer backend.Close()
+		frontend := httptest.NewUnstartedServer(nil)
+		roots := x509.NewCertPool()
+		roots.AddCert(backend.Certificate())
+		handler, err := gateway.New(gateway.Config{PublicOrigin: "https://" + frontend.Listener.Addr().String(), AppleURL: backend.URL, ConsoleURL: backend.URL, AuthURL: backend.URL, AdminNetworks: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, BackendTLS: &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		frontend.Config.Handler = handler
+		frontend.TLS = &tls.Config{ClientAuth: tls.RequestClientCert}
+		frontend.StartTLS()
+		defer frontend.Close()
+		server = frontend
+		response, err := backend.Client().Get(backend.URL + "/mdm/apple/enroll/" + strings.Repeat("a", 43))
+		if response != nil {
+			response.Body.Close()
+		}
+		if err == nil {
+			t.Fatal("direct backend enrollment bypassed gateway")
+		}
+	}
 	client := server.Client()
 	token := invite.URL[strings.LastIndex(invite.URL, "/")+1:]
-	response, err := client.Get(server.URL + "/mdm/apple/enroll/" + token)
-	if err != nil {
+	if _, err = s.db.Exec(`UPDATE mdm_apple_settings SET public_url=$1 WHERE tenant_id=1`, server.URL); err != nil {
 		t.Fatal(err)
 	}
-	body, err := io.ReadAll(response.Body)
-	response.Body.Close()
-	if err != nil {
-		t.Fatal(err)
+	address := server.URL + "/mdm/apple/enroll/" + token
+	form := portalStart(t, client, address)
+	response := portalPost(t, client, address, server.URL, form)
+	portalRead(t, response)
+	if response.StatusCode != 303 {
+		t.Fatal("enrollment claim failed", response.StatusCode)
 	}
+	form.Set("action", "download")
+	response = portalPost(t, client, address, server.URL, form)
+	body := portalRead(t, response)
 	if response.StatusCode != 200 {
 		t.Fatal("enrollment failed", response.StatusCode, string(body))
 	}
@@ -98,6 +157,7 @@ func TestPublicProtocolRequiresIssuedIdentityOverTLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	request.Header.Set("X-SSL-Client-Cert", "forged certificate")
+	request.Header.Set("Client-Cert", ":"+base64.StdEncoding.EncodeToString(cert.Raw)+":")
 	response, err = client.Do(request)
 	if err != nil {
 		t.Fatal(err)
@@ -123,14 +183,34 @@ func TestPublicProtocolRequiresIssuedIdentityOverTLS(t *testing.T) {
 	if response.StatusCode != 200 {
 		t.Fatal("valid TLS identity rejected", response.StatusCode)
 	}
-	response, err = client.Get(server.URL + "/mdm/apple/enroll/" + token)
+	response = portalPost(t, client, address, server.URL, form)
+	portalRead(t, response)
+	if response.StatusCode != 409 {
+		t.Fatal("profile could be downloaded after device check-in", response.StatusCode)
+	}
+	message = map[string]any{"MessageType": "TokenUpdate", "UDID": "http-test-udid", "Topic": "com.apple.mgmt.test", "Token": []byte("test-token"), "PushMagic": "test-magic"}
+	payload, err = plist.Marshal(message, plist.XMLFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, _ = http.NewRequest(http.MethodPut, server.URL+"/mdm/apple/"+invite.DeviceID+"/checkin", bytes.NewReader(payload))
+	response, err = authenticated.Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != 404 {
-		t.Fatal("one-time profile could be downloaded again")
+	if response.StatusCode != 200 {
+		t.Fatal("device registration failed", response.StatusCode)
 	}
+	response, err = client.Get(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = portalRead(t, response)
+	if response.StatusCode != 200 || !bytes.Contains(body, []byte("Enrollment complete")) || bytes.Contains(body, []byte("type=\"submit\"")) {
+		t.Fatal("browser did not observe completed enrollment", response.StatusCode)
+	}
+	savePortalArtifact(t, "enrolled", body)
 }
 
 func TestAPNsRequestAndErrorSemantics(t *testing.T) {

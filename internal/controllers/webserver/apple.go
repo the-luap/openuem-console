@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
 func (w *WebServer) initApple(masterKey string) {
@@ -47,11 +48,15 @@ func (w *WebServer) startApple(certFile, keyFile string) error {
 	if err != nil {
 		return err
 	}
+	identity, err := clientidentity.FromEnvironment()
+	if err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
-	w.AppleServer = w.Handler.Apple.ProtocolServer(address, slog.Default())
+	w.AppleServer = w.Handler.Apple.ProtocolServerWithIdentity(address, slog.Default(), identity)
 	w.AppleServer.TLSConfig.Certificates = []tls.Certificate{certificate}
 	ctx, cancel := context.WithCancel(context.Background())
 	w.AppleCancel = cancel

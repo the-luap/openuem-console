@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -11,8 +12,12 @@ import (
 templ Navigation(info *partials.CommonInfo) {
 	<div class="flex flex-wrap gap-4 my-4">
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/devices")) }>All devices</a>
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/deploy")) }>Windows software deployment</a>
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) }>Windows profiles</a>
+		if info.Principal.IsAdministrator() {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/deploy")) }>Windows software deployment</a>
+		}
+		if info.Principal.IsAdministrator() {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) }>Windows profiles</a>
+		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>iOS profiles</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup")) }>Apple setup & enrollment</a>
 	</div>
@@ -47,7 +52,20 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 							<thead><tr><th>Device</th><th>Platform / OS</th><th>Model</th><th>Serial number</th><th>Management</th><th>Last contact</th></tr></thead>
 							<tbody>
 								for _,d:=range rows {
-									<tr><td><a class="underline font-medium" href={ templ.URL(d.URL) }>{ Show(d.Name) }</a></td><td>{ d.Platform }<br/><span class="uk-text-muted">{ Show(d.OSVersion) }</span></td><td>{ Show(d.Model) }</td><td>{ Show(d.Serial) }</td><td>{ StateLabel(d.Status) }</td><td>{ When(d.LastSeen) }</td></tr>
+									<tr>
+										<td>
+											if d.URL!="" {
+												<a class="underline font-medium" href={ templ.URL(d.URL) }>{ Show(d.Name) }</a>
+											} else {
+												{ Show(d.Name) }
+											}
+										</td>
+										<td>{ d.Platform }<br/><span class="uk-text-muted">{ Show(d.OSVersion) }</span></td>
+										<td>{ Show(d.Model) }</td>
+										<td>{ Show(d.Serial) }</td>
+										<td>{ StateLabel(d.Status) }</td>
+										<td>{ When(d.LastSeen) }</td>
+									</tr>
 								}
 							</tbody>
 						</table>
@@ -84,37 +102,41 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 					if settings!=nil {
 						<dl class="uk-description-list"><dt>Push topic</dt><dd>{ settings.Topic }</dd><dt>Certificate expires</dt><dd>{ settings.PushExpiresAt.Format("2006-01-02") }</dd><dt>Public management URL</dt><dd>{ settings.PublicURL }</dd></dl>
 					}
-					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
-						@CSRF(info)
-						<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
-						<label>Public HTTPS management URL<input class="uk-input" type="url" name="public_url" required placeholder="https://mdm.example.com" value={ settingURL(settings) }/></label>
-						<label>APNs certificate (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
-						<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
-						<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
-						<button class="uk-button uk-button-primary" type="submit">Save Apple credentials</button>
-					</form>
+					if info.Can(access.ManageCertificates) {
+						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
+							@CSRF(info)
+							<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
+							<label>Public HTTPS management URL<input class="uk-input" type="url" name="public_url" required placeholder="https://mdm.example.com" value={ settingURL(settings) }/></label>
+							<label>APNs certificate (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
+							<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
+							<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
+							<button class="uk-button uk-button-primary" type="submit">Save Apple credentials</button>
+						</form>
+					}
 				</div>
 			</section>
 			if settings!=nil {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">Enroll an iPhone or iPad</h2><p>Create a single-use link for a company device. Each device receives its own management identity.</p></div>
 					<div class="uk-card-body">
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/enroll") } class="grid gap-4">
-							@CSRF(info)
-							<label>Device label<input class="uk-input" name="name" required maxlength="255" placeholder="Sales iPhone"/></label>
-							if info.SiteID=="-1" {
-								<label>
-									Site
-									<select class="uk-select" name="site_id" required>
-										<option value="">Select a site</option>
-										for _,site:=range info.Sites {
-											<option value={ Number(site.ID) }>{ site.Description }</option>
-										}
-									</select>
-								</label>
-							}
-							<button class="uk-button uk-button-primary" type="submit">Create enrollment invitation</button>
-						</form>
+						if info.Can(access.EnrollDevices) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/enroll") } class="grid gap-4">
+								@CSRF(info)
+								<label>Device label<input class="uk-input" name="name" required maxlength="255" placeholder="Sales iPhone"/></label>
+								if info.SiteID=="-1" {
+									<label>
+										Site
+										<select class="uk-select" name="site_id" required>
+											<option value="">Select a site</option>
+											for _,site:=range info.Sites {
+												<option value={ Number(site.ID) }>{ site.Description }</option>
+											}
+										</select>
+									</label>
+								}
+								<button class="uk-button uk-button-primary" type="submit">Create enrollment invitation</button>
+							</form>
+						}
 						<p class="uk-text-muted mt-4">Manual enrollment does not make an iPhone supervised. Prepare company devices with Apple Configurator when supervision is needed. Personal User Enrollment is a different enrollment method.</p>
 					</div>
 				</section>
@@ -143,10 +165,13 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h1 class="uk-card-title">Enrollment invitation ready</h1></div>
 				<div class="uk-card-body grid gap-4">
-					<p>Open this link in Safari on the intended iPhone or iPad. Download the profile, then install it from Settings → General → VPN & Device Management.</p>
+					<p>Open this link or scan the QR code on the intended iPhone or iPad. Safari will show the enrollment instructions before asking the owner to continue.</p>
 					<label>Single-use enrollment URL<input class="uk-input" readonly value={ invite.URL } aria-label="Enrollment URL"/></label>
+					if code := EnrollmentQR(invite.URL); code != "" {
+						<img src={ code } alt="Scan to open the private enrollment invitation" width="256" height="256" class="max-w-full"/>
+					}
 					<p>{ "Expires: "+invite.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
-					<p>This link contains access to the device's enrollment identity. Share it only with the intended device owner. It can be downloaded once.</p>
+					<p>Share this link and QR code only with the intended device owner. Opening the page does not use the invitation. One browser can claim it; that browser then has up to three attempts within ten minutes to download the same profile.</p>
 					<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+invite.DeviceID)) }>View enrollment status</a>
 				</div>
 			</section>
@@ -194,20 +219,24 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						<dd>{ detail.Device.CertificateExpiresAt.Format("2006-01-02") }</dd>
 					</dl>
 					if detail.Device.Status=="enrolled" {
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/refresh") } class="mt-4">
-							@CSRF(info)
-							<button class="uk-button uk-button-primary" type="submit">Refresh device, apps & profiles</button>
-						</form>
+						if info.Can(access.RefreshDevices) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/refresh") } class="mt-4">
+								@CSRF(info)
+								<button class="uk-button uk-button-primary" type="submit">Refresh device, apps & profiles</button>
+							</form>
+						}
 					}
 					if detail.Device.Status!="revoked" && detail.Device.Status!="unenrolled" {
 						<details class="mt-6">
 							<summary class="font-medium cursor-pointer">Cancel enrollment or revoke server access</summary>
-							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/revoke") } class="grid gap-4 mt-4">
-								@CSRF(info)
-								<p>This disables the invitation and device identity immediately. It stops management but leaves the MDM profile and device data in place. Remove the profile on the device before enrolling it again.</p>
-								<label><input type="checkbox" name="confirm_revoke" value="yes" required/> I understand this enrollment will lose server access.</label>
-								<button class="uk-button uk-button-danger" type="submit">Revoke enrollment access</button>
-							</form>
+							if info.Can(access.RevokeDevices) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/revoke") } class="grid gap-4 mt-4">
+									@CSRF(info)
+									<p>This disables the invitation and device identity immediately. It stops management but leaves the MDM profile and device data in place. Remove the profile on the device before enrolling it again.</p>
+									<label><input type="checkbox" name="confirm_revoke" value="yes" required/> I understand this enrollment will lose server access.</label>
+									<button class="uk-button uk-button-danger" type="submit">Revoke enrollment access</button>
+								</form>
+							}
 						</details>
 					}
 				</div>
@@ -224,31 +253,35 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						}
 					}
 					if detail.Device.Status=="enrolled" {
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">
-							@CSRF(info)
-							<label>
-								Target OS release and build
-								<select class="uk-select" name="target_release" required>
-									<option value="">Select an available Apple release</option>
-									for _,release:=range detail.Releases {
-										<option value={ release.Version+"/"+release.Build } selected?={ release.Version==policyVersion(detail.Policy) && release.Build==policyBuild(detail.Policy) }>{ release.Version+" · "+release.Build }</option>
-									}
-								</select>
-							</label>
-							<p class="uk-text-muted">{ "Apple release catalog checked: "+When(detail.CatalogAt) }</p>
-							if len(detail.Releases)==0 {
-								<p role="status">No current releases are available for this device. Refresh its inventory and check the Apple catalog connection before setting a policy.</p>
-							}
-							<label>Installation deadline (device local time)<input class="uk-input" type="datetime-local" name="deadline" required value={ policyDeadline(detail.Policy) }/></label>
-							<label>Update information URL (optional)<input class="uk-input" type="url" name="details_url" placeholder="https://" value={ policyURL(detail.Policy) }/></label>
-							<p class="uk-text-muted">The target must be an Apple release available for this model. Offline devices and devices with insufficient battery cannot install immediately. Compliance is confirmed from fresh OS inventory.</p>
-							<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 }>Enforce update policy</button>
-						</form>
-						if detail.Policy!=nil {
-							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="mt-4">
+						if info.Can(access.ManageUpdates) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">
 								@CSRF(info)
-								<input type="hidden" name="remove" value="true"/><button class="uk-button uk-button-default" type="submit">Remove update policy</button>
+								<label>
+									Target OS release and build
+									<select class="uk-select" name="target_release" required>
+										<option value="">Select an available Apple release</option>
+										for _,release:=range detail.Releases {
+											<option value={ release.Version + "/" + release.Build } selected?={ release.Version==policyVersion(detail.Policy) && release.Build==policyBuild(detail.Policy) }>{ release.Version+" · "+release.Build }</option>
+										}
+									</select>
+								</label>
+								<p class="uk-text-muted">{ "Apple release catalog checked: "+When(detail.CatalogAt) }</p>
+								if len(detail.Releases)==0 {
+									<p role="status">No current releases are available for this device. Refresh its inventory and check the Apple catalog connection before setting a policy.</p>
+								}
+								<label>Installation deadline (device local time)<input class="uk-input" type="datetime-local" name="deadline" required value={ policyDeadline(detail.Policy) }/></label>
+								<label>Update information URL (optional)<input class="uk-input" type="url" name="details_url" placeholder="https://" value={ policyURL(detail.Policy) }/></label>
+								<p class="uk-text-muted">The target must be an Apple release available for this model. Offline devices and devices with insufficient battery cannot install immediately. Compliance is confirmed from fresh OS inventory.</p>
+								<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 }>Enforce update policy</button>
 							</form>
+						}
+						if detail.Policy!=nil {
+							if info.Can(access.ManageUpdates) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="mt-4">
+									@CSRF(info)
+									<input type="hidden" name="remove" value="true"/><button class="uk-button uk-button-default" type="submit">Remove update policy</button>
+								</form>
+							}
 						}
 					}
 				</div>
@@ -267,10 +300,12 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ StateLabel(a.Status) }<br/>{ a.Error }</td>
 									<td>
 										if detail.Device.Status=="enrolled" {
-											<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+a.ProfileID+"/assign") }>
-												@CSRF(info)
-												<input type="hidden" name="device_id" value={ detail.Device.ID }/><button class="uk-button uk-button-default" name="desired" value="installed" type="submit">Apply again</button><button class="uk-button uk-button-default" name="desired" value="removed" type="submit">Remove</button>
-											</form>
+											if info.Can(access.AssignProfiles) {
+												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+a.ProfileID+"/assign") }>
+													@CSRF(info)
+													<input type="hidden" name="device_id" value={ detail.Device.ID }/><button class="uk-button uk-button-default" name="desired" value="installed" type="submit">Apply again</button><button class="uk-button uk-button-default" name="desired" value="removed" type="submit">Remove</button>
+												</form>
+											}
 										}
 									</td>
 								</tr>
@@ -286,7 +321,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 							<li>{ Show(p.Name)+" · "+p.Identifier }</li>
 						}
 					</ul>
-					<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Manage & assign profiles</a>
+					<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Configuration profiles</a>
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
@@ -331,10 +366,12 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>
 										{ cmd.Error }
 										if detail.Device.Status=="enrolled" && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
-											<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
-												@CSRF(info)
-												<button class="uk-button uk-button-default" type="submit">Retry</button>
-											</form>
+											if info.Can(access.AssignProfiles) {
+												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
+													@CSRF(info)
+													<button class="uk-button uk-button-default" type="submit">Retry</button>
+												</form>
+											}
 										}
 									</td>
 								</tr>
@@ -381,43 +418,53 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 				<p>Manage configuration profiles, deploy revisions and verify what each device has installed.</p>
 				@Navigation(info)
 			</div>
-			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">Create or upload a profile</h2></div>
-				<div class="uk-card-body">
-					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4">
-						@CSRF(info)
-						<input type="hidden" name="editor" value="upload"/>
-						<label>Configuration profile (.mobileconfig, up to 2 MiB)<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label><button class="uk-button uk-button-primary" type="submit">Upload profile</button>
-					</form>
-					<details class="mt-6">
-						<summary class="font-medium cursor-pointer">Create a passcode policy</summary>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
-							@CSRF(info)
-							<input type="hidden" name="editor" value="passcode"/><label>Name<input class="uk-input" name="name" required placeholder="Company passcode"/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.passcode"/></label><label>Minimum length<input class="uk-input" type="number" name="min_length" min="4" max="16" value="6" required/></label><label><input type="checkbox" name="alphanumeric"/> Require letters and numbers</label><button class="uk-button uk-button-primary" type="submit">Create passcode profile</button>
-						</form>
-					</details>
-					<details class="mt-6">
-						<summary class="font-medium cursor-pointer">Create a Wi-Fi profile</summary>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
-							@CSRF(info)
-							<input type="hidden" name="editor" value="wifi"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.wifi"/></label><label>SSID<input class="uk-input" name="ssid" maxlength="32" required/></label><label>Security<select class="uk-select" name="wifi_security"><option value="WPA2">WPA2 Personal</option><option value="WPA3">WPA3 Personal</option><option value="WPA">WPA Personal</option><option value="None">Open network</option></select></label><label>Password<input class="uk-input" type="password" name="wifi_password" autocomplete="new-password"/></label><button class="uk-button uk-button-primary" type="submit">Create Wi-Fi profile</button>
-						</form>
-					</details>
-					<details class="mt-6">
-						<summary class="font-medium cursor-pointer">Create device restrictions</summary>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
-							@CSRF(info)
-							<input type="hidden" name="editor" value="restrictions"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.restrictions"/></label>
-							@RestrictionField("allowCamera", "Camera")
-							@RestrictionField("allowScreenShot", "Screenshots")
-							@RestrictionField("allowCloudBackup", "iCloud backup")
-							@RestrictionField("allowAppInstallation", "App installation")
-							@RestrictionField("allowAirDrop", "AirDrop")
-							<p class="uk-text-muted">Some restrictions require supervision. Device errors and profile verification remain visible in the device detail view.</p><button class="uk-button uk-button-primary" type="submit">Create restrictions profile</button>
-						</form>
-					</details>
-				</div>
-			</section>
+			if info.Can(access.ManageProfiles) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">Create or upload a profile</h2></div>
+					<div class="uk-card-body">
+						if info.Can(access.ManageProfiles) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4">
+								@CSRF(info)
+								<input type="hidden" name="editor" value="upload"/>
+								<label>Configuration profile (.mobileconfig, up to 2 MiB)<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label><button class="uk-button uk-button-primary" type="submit">Upload profile</button>
+							</form>
+						}
+						<details class="mt-6">
+							<summary class="font-medium cursor-pointer">Create a passcode policy</summary>
+							if info.Can(access.ManageProfiles) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+									@CSRF(info)
+									<input type="hidden" name="editor" value="passcode"/><label>Name<input class="uk-input" name="name" required placeholder="Company passcode"/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.passcode"/></label><label>Minimum length<input class="uk-input" type="number" name="min_length" min="4" max="16" value="6" required/></label><label><input type="checkbox" name="alphanumeric"/> Require letters and numbers</label><button class="uk-button uk-button-primary" type="submit">Create passcode profile</button>
+								</form>
+							}
+						</details>
+						<details class="mt-6">
+							<summary class="font-medium cursor-pointer">Create a Wi-Fi profile</summary>
+							if info.Can(access.ManageProfiles) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+									@CSRF(info)
+									<input type="hidden" name="editor" value="wifi"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.wifi"/></label><label>SSID<input class="uk-input" name="ssid" maxlength="32" required/></label><label>Security<select class="uk-select" name="wifi_security"><option value="WPA2">WPA2 Personal</option><option value="WPA3">WPA3 Personal</option><option value="WPA">WPA Personal</option><option value="None">Open network</option></select></label><label>Password<input class="uk-input" type="password" name="wifi_password" autocomplete="new-password"/></label><button class="uk-button uk-button-primary" type="submit">Create Wi-Fi profile</button>
+								</form>
+							}
+						</details>
+						<details class="mt-6">
+							<summary class="font-medium cursor-pointer">Create device restrictions</summary>
+							if info.Can(access.ManageProfiles) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+									@CSRF(info)
+									<input type="hidden" name="editor" value="restrictions"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.restrictions"/></label>
+									@RestrictionField("allowCamera", "Camera")
+									@RestrictionField("allowScreenShot", "Screenshots")
+									@RestrictionField("allowCloudBackup", "iCloud backup")
+									@RestrictionField("allowAppInstallation", "App installation")
+									@RestrictionField("allowAirDrop", "AirDrop")
+									<p class="uk-text-muted">Some restrictions require supervision. Device errors and profile verification remain visible in the device detail view.</p><button class="uk-button uk-button-primary" type="submit">Create restrictions profile</button>
+								</form>
+							}
+						</details>
+					</div>
+				</section>
+			}
 			for _,p:=range profiles {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ p.Name }</h2><p>{ p.Identifier+" · Revision "+Number(p.Revision) }</p></div>
@@ -428,33 +475,41 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 								<code class="mr-2">{ kind }</code>
 							}
 						</p>
-						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/download")) }>Download current profile</a>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/assign") } class="grid gap-4">
-							@CSRF(info)
-							<label>
-								Target devices
-								<select class="uk-select" name="device_id" multiple required size="5">
-									for _,d:=range devices {
-										if d.Status=="enrolled" {
-											<option value={ d.ID }>{ Show(d.Name)+" · "+d.Platform()+" "+d.OSVersion }</option>
+						if info.Can(access.ManageProfiles) {
+							<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/download")) }>Download current profile</a>
+						}
+						if info.Can(access.AssignProfiles) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/assign") } class="grid gap-4">
+								@CSRF(info)
+								<label>
+									Target devices
+									<select class="uk-select" name="device_id" multiple required size="5">
+										for _,d:=range devices {
+											if d.Status=="enrolled" {
+												<option value={ d.ID }>{ Show(d.Name)+" · "+d.Platform()+" "+d.OSVersion }</option>
+											}
 										}
-									}
-								</select>
-							</label>
-							<div class="flex gap-4"><button class="uk-button uk-button-primary" type="submit" name="desired" value="installed">Apply profile</button><button class="uk-button uk-button-default" type="submit" name="desired" value="removed">Remove from selected devices</button></div>
-						</form>
+									</select>
+								</label>
+								<div class="flex gap-4"><button class="uk-button uk-button-primary" type="submit" name="desired" value="installed">Apply profile</button><button class="uk-button uk-button-default" type="submit" name="desired" value="removed">Remove from selected devices</button></div>
+							</form>
+						}
 						<details>
 							<summary class="cursor-pointer">Upload a new revision</summary>
-							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4 mt-4">
-								@CSRF(info)
-								<input type="hidden" name="editor" value="upload"/><input type="hidden" name="profile_id" value={ p.ID }/><input type="hidden" name="revision" value={ Number(p.Revision) }/><label>Replacement profile<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label>
-								<p>The identifier must stay the same. Saving queues the new revision for every device assigned this profile.</p><button class="uk-button uk-button-primary" type="submit">Save and deploy revision</button>
-							</form>
+							if info.Can(access.ManageProfiles) {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4 mt-4">
+									@CSRF(info)
+									<input type="hidden" name="editor" value="upload"/><input type="hidden" name="profile_id" value={ p.ID }/><input type="hidden" name="revision" value={ Number(p.Revision) }/><label>Replacement profile<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label>
+									<p>The identifier must stay the same. Saving queues the new revision for every device assigned this profile.</p><button class="uk-button uk-button-primary" type="submit">Save and deploy revision</button>
+								</form>
+							}
 						</details>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/delete") }>
-							@CSRF(info)
-							<button class="uk-button uk-button-default" type="submit">Delete unassigned profile</button>
-						</form>
+						if info.Can(access.ManageProfiles) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/delete") }>
+								@CSRF(info)
+								<button class="uk-button uk-button-default" type="submit">Delete unassigned profile</button>
+							</form>
+						}
 					</div>
 				</section>
 			}

@@ -15,9 +15,9 @@ Branch: `feature/native-ios-management`
 
 The requested scope now also includes native macOS management, an in-app Apple
 CSR/push-certificate workflow, a secure reverse-proxy deployment using one public
-port with private administrator routes, simple agent/enrollment downloads, full
-German localization and UI/security remediation. The current implementation does
-not yet satisfy these additions. See the German
+port with private administrator routes, simple agent/enrollment downloads, a consistent
+English interface and UI/security remediation. The current implementation does
+not yet satisfy these additions. See the English
 [feature gap analysis and roadmap](fehlende-funktionen-und-roadmap.md) for verified
 findings, priorities and acceptance criteria. The checklist below records the
 earlier iOS/iPadOS implementation, not completion of the expanded scope.
@@ -110,4 +110,7 @@ complete while requirements remain unverified.
   builds share a version. Avoided duplicate inventory immediately after enrollment.
 - Remaining release gate: the real-hardware acceptance
   checklist in `native-ios-operations.md`. Manual enrollment is implemented;
-  ADE/ABM, SCEP, identity renewal, iOS app deployment and granular RBAC are not.
+  ADE/ABM, SCEP, identity renewal and iOS app deployment are not. Subsequent
+  [expanded roadmap work](implementation-status.md) adds persisted roles and
+  scoped native Apple permissions; the original implementation record above
+  predates those changes.

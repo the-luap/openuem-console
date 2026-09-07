@@ -33,6 +33,9 @@ func (s *Store) RevokeEnrollment(ctx context.Context, scope Scope, id, actor str
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.enrollment.revoke", id); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_enrollment_claims SET profile=NULL WHERE device_id=$1`, id); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

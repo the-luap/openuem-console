@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/mdm_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -79,6 +80,9 @@ func (h *Handler) appleInfo(c echo.Context) (*partials.CommonInfo, apple.Scope, 
 	if requested := c.Param("site"); requested != "" && requested != info.SiteID {
 		return nil, apple.Scope{}, echo.NewHTTPError(404, "Site not found")
 	}
+	if err := h.requireApplePermission(c, access.Scope{TenantID: tenant, SiteID: site}); err != nil {
+		return nil, apple.Scope{}, err
+	}
 	return info, apple.Scope{TenantID: tenant, SiteID: site}, nil
 }
 
@@ -116,6 +120,7 @@ func appleRedirect(c echo.Context, info *partials.CommonInfo, path string) error
 }
 
 func renderApple(c echo.Context, component templ.Component) error {
+	c.Response().Header().Set("Referrer-Policy", "strict-origin")
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	c.Response().Header().Set("Cache-Control", "no-store")
 	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
@@ -152,7 +157,11 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 				name = d.Hostname
 			}
 			seen := d.LastContact
-			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: name, Platform: d.OS, OSVersion: d.Version, Serial: d.Serial, Model: d.Model, Status: "agent", LastSeen: &seen, URL: partials.GetNavigationUrl(info, "/computers/"+d.ID)})
+			deviceURL := ""
+			if info.Principal.IsAdministrator() {
+				deviceURL = partials.GetNavigationUrl(info, "/computers/"+d.ID)
+			}
+			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: name, Platform: d.OS, OSVersion: d.Version, Serial: d.Serial, Model: d.Model, Status: "agent", LastSeen: &seen, URL: deviceURL})
 		}
 	}
 	if h.Apple != nil && platform != "windows" {
@@ -172,6 +181,11 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 	}
 	rows = filtered
 	sort.Slice(rows, func(i, j int) bool { return strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name) })
+	if h.Apple != nil {
+		if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "inventory.list", "devices"); err != nil {
+			return err
+		}
+	}
 	return renderApple(c, mdm_views.Devices(c, info, rows, platform, search, h.AppleSetupError))
 }
 
@@ -242,15 +256,21 @@ func (h *Handler) AppleInvite(c echo.Context) error {
 	if err = h.appleReady(); err != nil {
 		return err
 	}
-	if scope.SiteID == 0 {
+	if scope.SiteID == 0 || c.FormValue("site_id") != "" {
 		site, err := strconv.Atoi(c.FormValue("site_id"))
 		if err != nil {
 			return appleFailure(errors.New("select a site"))
+		}
+		if c.Param("site") != "" && site != scope.SiteID {
+			return echo.NewHTTPError(403, "Enrollment site does not match the selected scope")
 		}
 		if _, err = h.Model.GetSiteById(scope.TenantID, site); err != nil {
 			return appleFailure(apple.ErrNotFound)
 		}
 		scope.SiteID = site
+	}
+	if err := h.requireApplePermission(c, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
+		return err
 	}
 	invite, err := h.Apple.Invite(c.Request().Context(), scope, c.FormValue("name"), h.appleActor(c))
 	if err != nil {
@@ -303,6 +323,9 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 	detail.CatalogAt = fetched
 	if fetched != nil && time.Since(*fetched) < 48*time.Hour {
 		detail.Releases = catalog.Releases(d.Model, time.Now())
+	}
+	if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "inventory.read", id); err != nil {
+		return err
 	}
 	return renderApple(c, mdm_views.DeviceDetails(c, info, detail))
 }
@@ -428,6 +451,9 @@ func (h *Handler) AppleDownloadProfile(c echo.Context) error {
 		return appleFailure(err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
+	if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "profile.download", id); err != nil {
+		return err
+	}
 	c.Response().Header().Set("Content-Disposition", `attachment; filename="profile.mobileconfig"`)
 	return c.Blob(200, "application/x-apple-aspen-config", p.Payload)
 }

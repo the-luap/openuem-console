@@ -1,0 +1,144 @@
+package handlers
+
+import (
+	"errors"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/security/access"
+)
+
+const accessContextKey = "openuem.access.principal"
+
+func (h *Handler) currentPrincipal(c echo.Context) (access.Principal, error) {
+	if p, ok := c.Get(accessContextKey).(access.Principal); ok {
+		return p, nil
+	}
+	if h.Access == nil {
+		return access.Principal{}, echo.NewHTTPError(http.StatusServiceUnavailable, "Access control is not initialized")
+	}
+	uid := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
+	p, err := h.Access.Principal(c.Request().Context(), uid)
+	if err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return p, echo.NewHTTPError(http.StatusForbidden, "Access is not assigned to this account")
+		}
+		return p, echo.NewHTTPError(http.StatusServiceUnavailable, "Unable to verify access permissions")
+	}
+	c.Set(accessContextKey, p)
+	return p, nil
+}
+
+func appleRoute(path string) string {
+	path = strings.TrimPrefix(path, "/tenant/:tenant/site/:site")
+	return strings.TrimPrefix(path, "/tenant/:tenant")
+}
+
+// appleCapability is explicit: new routes do not inherit mutation authority
+// merely because they share a prefix or use GET instead of POST.
+func appleCapability(method, path string) (access.Capability, bool) {
+	route := appleRoute(path)
+	if method == http.MethodGet {
+		switch route {
+		case "/devices", "/ios", "/ios/setup", "/ios/:id":
+			return access.ReadDevices, true
+		case "/ios/configurations":
+			return access.ReadProfiles, true
+		case "/ios/configurations/:id/download":
+			return access.ManageProfiles, true
+		}
+	}
+	if method == http.MethodPost {
+		switch route {
+		case "/ios/setup":
+			return access.ManageCertificates, true
+		case "/ios/enroll":
+			return access.EnrollDevices, true
+		case "/ios/configurations", "/ios/configurations/:id/delete":
+			return access.ManageProfiles, true
+		case "/ios/configurations/:id/assign":
+			return access.AssignProfiles, true
+		case "/ios/:id/refresh":
+			return access.RefreshDevices, true
+		case "/ios/:id/revoke":
+			return access.RevokeDevices, true
+		case "/ios/:id/update":
+			return access.ManageUpdates, true
+		// A retry can redeliver a previously authorized configuration or update.
+		case "/ios/:id/commands/:command/retry":
+			return access.AssignProfiles, true
+		}
+	}
+	return "", false
+}
+
+func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc) error {
+	p, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if p.IsAdministrator() {
+		return next(c)
+	}
+	route := appleRoute(c.Path())
+	if c.Request().Method == http.MethodGet && (route == "" || route == "/" || route == "/dashboard") {
+		prefix := ""
+		if tenant := c.Param("tenant"); tenant != "" {
+			prefix = "/tenant/" + url.PathEscape(tenant)
+		}
+		if site := c.Param("site"); site != "" {
+			prefix += "/site/" + url.PathEscape(site)
+		}
+		return c.Redirect(http.StatusSeeOther, prefix+"/devices")
+	}
+	if _, ok := appleCapability(c.Request().Method, c.Path()); ok {
+		// appleInfo resolves the selected organization/site and checks the action
+		// before any domain call. No legacy resource handler is implicitly admitted.
+		return next(c)
+	}
+	if c.Path() == "/myaccount" && c.Request().Method == http.MethodGet {
+		return next(c)
+	}
+	if c.Request().Method == http.MethodPost {
+		switch c.Path() {
+		case "/myaccount/info", "/myaccount/password", "/myaccount/enable2fa", "/myaccount/disable2fa", "/myaccount/register2fa":
+			return next(c)
+		}
+	}
+	return echo.NewHTTPError(http.StatusForbidden, "This action requires a server administrator")
+}
+
+func permissionScope(tenant, site string) access.Scope {
+	tenantID, _ := strconv.Atoi(tenant)
+	siteID, _ := strconv.Atoi(site)
+	if tenantID < 0 {
+		tenantID = 0
+	}
+	if siteID < 0 {
+		siteID = 0
+	}
+	return access.Scope{TenantID: tenantID, SiteID: siteID}
+}
+
+func (h *Handler) requireApplePermission(c echo.Context, scope access.Scope) error {
+	p, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	capability, ok := appleCapability(c.Request().Method, c.Path())
+	if !ok {
+		return echo.NewHTTPError(http.StatusForbidden, "Action is not authorized")
+	}
+	// Profile contents and APNs configuration affect an entire organization.
+	// A site URL cannot reduce their authorization scope.
+	if capability == access.ManageProfiles || capability == access.ManageCertificates {
+		scope.SiteID = 0
+	}
+	if !p.Can(capability, scope) {
+		return echo.NewHTTPError(http.StatusForbidden, "Permission denied for this organization or site")
+	}
+	return nil
+}

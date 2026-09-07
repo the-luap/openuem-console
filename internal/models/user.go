@@ -12,6 +12,7 @@ import (
 	"github.com/alexedwards/argon2id"
 	ent "github.com/open-uem/ent"
 	"github.com/open-uem/ent/recoverycode"
+	"github.com/open-uem/ent/sessions"
 	"github.com/open-uem/ent/user"
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/views/admin_views"
@@ -374,16 +375,39 @@ func (m *Model) CreateDefaultAdminPassword(reset bool) error {
 		password += string(allChars[randNumber.Int64()])
 	}
 
-	// if a reset of the openuem user has been requested, delete the openuem user
-	if reset {
-		if err := m.Client.User.DeleteOneID("openuem").Exec(context.Background()); err != nil {
-			return err
-		}
-	}
-
 	exist, err := m.Client.User.Query().Where(user.ID("openuem")).Exist(context.Background())
 	if err != nil {
 		return err
+	}
+
+	// Reset credentials in place: deleting the account would discard its
+	// permissions and could remove the installation's last administrator.
+
+	if exist && reset {
+		ctx := context.Background()
+		hash, err := argon2id.CreateHash(password, argon2id.DefaultParams)
+		if err != nil {
+			return err
+		}
+		tx, err := m.Client.Tx(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if err = tx.User.UpdateOneID("openuem").SetRegister(openuem_nats.REGISTER_FORCE_PASSWORD_CHANGE).SetPasswd(true).SetHash(hash).SetUse2fa(false).SetTotpSecret("").SetTotpSecretConfirmed(false).Exec(ctx); err != nil {
+			return err
+		}
+		if _, err = tx.Sessions.Delete().Where(sessions.HasOwnerWith(user.ID("openuem"))).Exec(ctx); err != nil {
+			return err
+		}
+		if _, err = tx.RecoveryCode.Delete().Where(recoverycode.HasUserWith(user.ID("openuem"))).Exec(ctx); err != nil {
+			return err
+		}
+		if err = tx.Commit(); err != nil {
+			return err
+		}
+		log.Printf("[INFO]: the reset password for the openuem user account is: %s", password)
+		return nil
 	}
 
 	// if openuem user doesn't exist create it

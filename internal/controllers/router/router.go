@@ -51,13 +51,7 @@ func New(s *sessions.SessionManager, server, port, maxUploadSize string) *echo.E
 	}))
 
 	// Add CSRF middleware
-	e.Use(mw.CSRFWithConfig(mw.CSRFConfig{
-		TokenLookup:    "cookie:_csrf",
-		CookiePath:     "/",
-		CookieSecure:   true,
-		CookieHTTPOnly: true,
-		CookieSameSite: http.SameSiteStrictMode,
-	}))
+	e.Use(middleware.CSRF())
 
 	// Add sessions middleware
 	e.Use(session.LoadAndSave(s.Manager))
@@ -120,8 +114,12 @@ func staticAssets(e *echo.Echo, cwd string) string {
 }
 
 func customHTTPErrorHandler(err error, c echo.Context) {
+	if c.Response().Committed {
+		return
+	}
 	if he, ok := err.(*echo.HTTPError); ok {
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
+		c.Response().WriteHeader(he.Code)
 		switch he.Code {
 		case http.StatusNotFound:
 			if err := views.ErrorPage("404", "Page Not Found").Render(c.Request().Context(), c.Response().Writer); err != nil {
@@ -130,16 +128,16 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		case http.StatusInternalServerError:
 			message := "Internal server error"
 			if he.Message != nil {
-				message = he.Message.(string)
+				message = fmt.Sprint(he.Message)
 			}
 
-			if err := views.ErrorPage("503", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
+			if err := views.ErrorPage("500", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
 		case http.StatusUnauthorized:
 			message := "Unauthorized Access"
 			if he.Message != nil {
-				message = he.Message.(string)
+				message = fmt.Sprint(he.Message)
 			}
 
 			if err := views.ErrorPage("401", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
@@ -153,7 +151,7 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		case http.StatusForbidden:
 			message := "Forbidden"
 			if he.Message != nil {
-				message = he.Message.(string)
+				message = fmt.Sprint(he.Message)
 			}
 
 			if err := views.ErrorPage("403", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
@@ -174,5 +172,8 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		}
 	} else {
 		c.Logger().Error(err)
+		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
+		c.Response().WriteHeader(http.StatusInternalServerError)
+		_ = views.ErrorPage("500", "Internal server error").Render(c.Request().Context(), c.Response().Writer)
 	}
 }

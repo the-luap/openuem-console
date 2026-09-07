@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"golang.org/x/mod/semver"
 	"slices"
 	"strconv"
@@ -20,6 +21,7 @@ type Breadcrumb struct {
 }
 
 type CommonInfo struct {
+	Principal          access.Principal
 	SM                 *sessions.SessionManager
 	CurrentVersion     string
 	LatestVersion      string
@@ -40,9 +42,32 @@ type CommonInfo struct {
 	IsTurnstileEnabled bool
 }
 
+func (info *CommonInfo) Can(capability access.Capability) bool {
+	tenant, _ := strconv.Atoi(info.TenantID)
+	site, _ := strconv.Atoi(info.SiteID)
+	if tenant < 0 {
+		tenant = 0
+	}
+	if site < 0 {
+		site = 0
+	}
+	if capability == access.ManageProfiles || capability == access.ManageCertificates {
+		site = 0
+	}
+	return info.Principal.Can(capability, access.Scope{TenantID: tenant, SiteID: site})
+}
+
+func (info *CommonInfo) AllSitesAllowed() bool {
+	tenant, _ := strconv.Atoi(info.TenantID)
+	if tenant < 0 {
+		tenant = 0
+	}
+	return info.Principal.Can(access.ReadDevices, access.Scope{TenantID: tenant})
+}
+
 templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
-	<header class="sticky top-0 z-30 flex justify-between w-full h-14 items-center border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-		<nav id="header" class="flex">
+	<header class="sticky top-0 z-30 flex flex-wrap justify-between gap-3 w-full h-auto items-center border-b bg-background px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:px-6">
+		<nav id="header" class="flex min-w-0 max-w-full">
 			<ul class="uk-breadcrumb" aria-label="Breadcrumb">
 				<li class="uk-text-muted uk-text-bold">OpenUEM</li>
 				for _,bc := range breadcrumbs {
@@ -64,7 +89,7 @@ templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
 				}
 			</ul>
 		</nav>
-		<div class="flex items-center gap-4">
+		<div id="console-header-controls" class="flex min-w-0 max-w-full flex-wrap items-center gap-4">
 			<form class="flex items-center gap-2">
 				<span class="uk-text-muted">
 					<uk-icon
@@ -78,7 +103,7 @@ templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
 						uk-cloack
 					></uk-icon>
 				</span>
-				<select class="w-48 uk-select border-green-700" title={ i18n.T(ctx, "Organization") } name="tenant" _="on change set window.location to my.value">
+				<select class="w-48 uk-select border-green-700" title={ i18n.T(ctx, "Organization") } aria-label={ i18n.T(ctx, "Organization") } name="tenant" _="on change set window.location to my.value">
 					if commonInfo.IsAdmin {
 						<option
 							class="!align-middle"
@@ -126,17 +151,19 @@ templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
 						<span class="uk-text-muted">
 							<uk-icon hx-history="false" icon="building" custom-class="h-6 w-6" uk-cloack></uk-icon>
 						</span>
-						<select class="w-48 uk-select border-green-700" title={ i18n.T(ctx, "Site.one") } name="site" _="on change set window.location to my.value">
-							<option
-								if commonInfo.IsProfile {
-									value={ string(templ.URL(fmt.Sprintf("/tenant/%s/profiles", commonInfo.TenantID))) }
-								} else {
-									value={ GetSiteSelectorUrl(c, commonInfo, -1) }
-								}
-								selected?={ commonInfo.SiteID ==  "-1" }
-							>
-								{ i18n.T(ctx,"AllSites") }
-							</option>
+						<select class="w-48 uk-select border-green-700" title={ i18n.T(ctx, "Site.one") } aria-label={ i18n.T(ctx, "Site.one") } name="site" _="on change set window.location to my.value">
+							if commonInfo.AllSitesAllowed() {
+								<option
+									if commonInfo.IsProfile {
+										value={ string(templ.URL(fmt.Sprintf("/tenant/%s/profiles", commonInfo.TenantID))) }
+									} else {
+										value={ GetSiteSelectorUrl(c, commonInfo, -1) }
+									}
+									selected?={ commonInfo.SiteID ==  "-1" }
+								>
+									{ i18n.T(ctx,"AllSites") }
+								</option>
+							}
 							for _, s := range commonInfo.Sites {
 								<option
 									if commonInfo.IsProfile {

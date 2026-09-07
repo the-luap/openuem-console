@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -353,23 +352,7 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(err.Error(), true))
 	}
 
-	u := ""
-	if h.ReverseProxyServer != "" {
-		referer, err := url.Parse(c.Request().Referer())
-		if err != nil {
-			log.Printf("[ERROR]: could not parse referer, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(err.Error(), true))
-		}
-
-		if referer.Port() == "" {
-			u = fmt.Sprintf("https://%s/tenant/%d/site/%d/dashboard", referer.Hostname(), myTenant.ID, mySite.ID)
-		} else {
-			u = fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", referer.Hostname(), referer.Port(), myTenant.ID, mySite.ID)
-		}
-
-	} else {
-		u = fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", h.ServerName, h.ConsolePort, myTenant.ID, mySite.ID)
-	}
+	u := fmt.Sprintf("%s/tenant/%d/site/%d/dashboard", h.consoleOrigin(), myTenant.ID, mySite.ID)
 
 	return RenderLoginPartial(c, login_views.ShowRecoveryCodes(strings.Join(codes, "\n"), u))
 }
@@ -581,22 +564,7 @@ func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
 		}
 	}
 
-	if h.ReverseProxyServer != "" {
-		referer, err := url.Parse(c.Request().Referer())
-		if err != nil {
-			log.Printf("[ERROR]: could not parse referer, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(err.Error(), true))
-		}
-
-		if referer.Port() == "" {
-			return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s/tenant/%d/site/%d/dashboard", referer.Hostname(), myTenant.ID, mySite.ID))
-		} else {
-			return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", referer.Hostname(), referer.Port(), myTenant.ID, mySite.ID))
-		}
-
-	} else {
-		return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", h.ServerName, h.ConsolePort, myTenant.ID, mySite.ID))
-	}
+	return c.Redirect(http.StatusFound, fmt.Sprintf("%s/tenant/%d/site/%d/dashboard", h.consoleOrigin(), myTenant.ID, mySite.ID))
 }
 
 func generateRecoveryCode() (string, error) {
@@ -899,4 +867,15 @@ func generateForgotCode() (string, error) {
 	}
 
 	return fmt.Sprintf("%s", randomCode.String()[0:6]), nil
+}
+
+// consoleOrigin uses trusted configuration, never request headers or a Referer.
+func (h *Handler) consoleOrigin() string {
+	if h.PublicOrigin != "" {
+		return h.PublicOrigin
+	}
+	if h.ReverseProxyServer != "" {
+		return "https://" + h.ReverseProxyServer
+	}
+	return fmt.Sprintf("https://%s:%s", h.ServerName, h.ConsolePort)
 }

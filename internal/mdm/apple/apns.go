@@ -137,7 +137,7 @@ func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
 		if err := s.RefreshCatalog(work); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Error("Apple software catalog refresh failed", "error", err)
 		}
-		for _, task := range []func(context.Context) error{s.expireCommands, s.ScheduleInventory, s.ReconcileUpdateAvailability} {
+		for _, task := range []func(context.Context) error{s.CleanupEnrollmentClaims, s.expireCommands, s.ScheduleInventory, s.ReconcileUpdateAvailability} {
 			if err := task(work); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Error("Apple management maintenance failed", "error", err)
 			}

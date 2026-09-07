@@ -518,8 +518,11 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
+		if h.PublicOrigin != "" {
+			return c.Redirect(http.StatusFound, fmt.Sprintf("%s/tenant/%d/site/%d/dashboard", h.PublicOrigin, myTenant.ID, mySite.ID))
+		}
 		if h.ReverseProxyServer != "" {
-			return h.Dashboard(c)
+			return c.Redirect(http.StatusSeeOther, "/devices")
 		} else {
 			return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", h.ServerName, h.ConsolePort, myTenant.ID, mySite.ID))
 		}

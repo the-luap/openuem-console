@@ -10,6 +10,7 @@ require (
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/ali-assar/NATS-Leader-Election v1.0.0
 	github.com/biter777/countries v1.7.5
+	github.com/boombuler/barcode v1.1.0
 	github.com/canidam/echo-scs-session v1.0.0
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/dimmerz92/go-lucide-icons v1.15.0
@@ -66,7 +67,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmatcuk/doublestar v1.3.4 // indirect
-	github.com/boombuler/barcode v1.1.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect

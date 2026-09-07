@@ -1,0 +1,128 @@
+package access_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+type SiteOption struct {
+	ID, TenantID int
+	Name         string
+}
+
+func scopeLabel(g access.Grant) string {
+	if g.TenantID == 0 {
+		return "All organizations and server administration"
+	}
+	if g.SiteID == 0 {
+		return fmt.Sprintf("Organization %d · All sites", g.TenantID)
+	}
+	return fmt.Sprintf("Organization %d · Site %d", g.TenantID, g.SiteID)
+}
+
+func roleLabel(role access.Role) string {
+	switch role {
+	case access.Administrator:
+		return "Server administrator"
+	case access.TenantAdmin:
+		return "Organization administrator"
+	case access.Operator:
+		return "Operator"
+	case access.Viewer:
+		return "Viewer"
+	}
+	return string(role)
+}
+
+templ PermissionFields(info *partials.CommonInfo, target access.Principal) {
+	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+	<input type="hidden" name="user_id" value={ target.UserID }/>
+	<input type="hidden" name="revision" value={ strconv.Itoa(target.Revision) }/>
+}
+
+templ Permissions(c echo.Context, info *partials.CommonInfo, target access.Principal, name string, sites []SiteOption) {
+	@layout.Base("admin", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Access permissions", Url: "/admin/access"}}, info)
+		<main class="grid min-w-0 flex-1 gap-6 p-4 sm:px-6">
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h1 class="uk-card-title">Access permissions</h1><p>Assign the actions and organizations a user can access. Changes take effect on their next request.</p></div>
+				<div class="uk-card-body grid gap-4">
+					<div class="flex flex-wrap gap-4"><a class="underline" href="/admin/users">Users</a><a class="underline" href="/admin/access/audit">Permission change history</a></div>
+					<form method="get" action="/admin/access" class="flex flex-wrap items-end gap-3">
+						<label>User ID<input class="uk-input" name="user_id" value={ target.UserID } required/></label><button class="uk-button uk-button-primary" type="submit">Open user</button>
+					</form>
+					<h2 class="text-xl font-semibold break-all">{ name+" · "+target.UserID }</h2>
+					<p class="uk-text-muted">Removing permissions does not delete the account. A user needs an explicit role before accessing managed devices. At least one server administrator must remain.</p>
+					if len(target.Grants)==0 {
+						<p role="status">No management permissions are assigned to this account.</p>
+					}
+					for _,grant:=range target.Grants {
+						<div class="grid gap-3 rounded-lg border p-4">
+							<p class="font-medium">{ roleLabel(grant.Role) }</p>
+							<p>{ scopeLabel(grant) }</p>
+							<form method="post" action="/admin/access" class="grid gap-3">
+								@PermissionFields(info, target)
+								<input type="hidden" name="action" value="revoke"/><input type="hidden" name="tenant_id" value={ strconv.Itoa(grant.TenantID) }/><input type="hidden" name="site_id" value={ strconv.Itoa(grant.SiteID) }/>
+								<label><input type="checkbox" name="confirm" value="yes" required/>{ " Remove this permission from "+target.UserID+"." }</label>
+								<button class="uk-button uk-button-danger" type="submit">Remove permission</button>
+							</form>
+						</div>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">Add or replace a permission</h2><p>Saving replaces the role for the selected scope. Other assignments remain unchanged. Organization-wide grants also cover all their sites; site grants do not subtract permissions.</p></div>
+				<form method="post" action="/admin/access" class="uk-card-body grid gap-4">
+					@PermissionFields(info, target)
+					<input type="hidden" name="action" value="grant"/>
+					<label>Role<select class="uk-select" name="role" required><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="organization_admin">Organization administrator</option><option value="administrator">Server administrator</option></select></label>
+					<label>
+						Organization
+						<select class="uk-select" name="tenant_id" required>
+							<option value="" selected disabled>Select an organization</option>
+							<option value="0">Global — server administrators only</option>
+							for _,tenant:=range info.Tenants {
+								<option value={ strconv.Itoa(tenant.ID) }>{ tenant.Description+" · "+strconv.Itoa(tenant.ID) }</option>
+							}
+						</select>
+					</label>
+					<label>
+						Site
+						<select class="uk-select" name="site_id" required>
+							<option value="0">All sites in the organization</option>
+							for _,site:=range sites {
+								<option value={ strconv.Itoa(site.ID) }>{ fmt.Sprintf("%s · Site %d · Organization %d",site.Name,site.ID,site.TenantID) }</option>
+							}
+						</select>
+					</label>
+					<ul class="uk-list uk-list-divider"><li>Viewers can read device inventory and Apple profile metadata.</li><li>Operators can also enroll and refresh Apple devices, assign existing Apple profiles and manage Apple update policies in their scope.</li><li>Organization administrators can additionally manage Apple certificates and profile contents, and revoke Apple enrollment throughout their organization.</li><li>Server administrators manage the installation, desktop actions, all organizations and user permissions.</li></ul>
+					<label><input type="checkbox" name="confirm" value="yes" required/>{ " Apply the selected access to "+target.UserID+"." }</label>
+					<button type="submit" class="uk-button uk-button-primary">Save permission</button>
+				</form>
+			</section>
+		</main>
+	}
+}
+
+templ Audit(c echo.Context, info *partials.CommonInfo, events []access.AuditEvent) {
+	@layout.Base("admin", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Access permissions", Url: "/admin/access"}, {Title: "Permission change history", Url: "/admin/access/audit"}}, info)
+		<main class="grid min-w-0 flex-1 gap-4 p-4 sm:px-6">
+			<h1 class="text-2xl font-semibold">Permission change history</h1>
+			<p>Each successful change records its actor, user, previous permissions and resulting permissions. Times are shown in UTC.</p>
+			for _,event:=range events {
+				<article class="uk-card uk-card-default"><div class="uk-card-body grid gap-3"><h2 class="font-semibold break-all">{ event.Actor+" → "+event.Subject }</h2><p>{ event.Action+" · "+event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") }</p><details><summary>Permission details</summary><p>Before</p><pre class="whitespace-pre-wrap break-all">{ string(event.Before) }</pre><p>After</p><pre class="whitespace-pre-wrap break-all">{ string(event.After) }</pre></details></div></article>
+			}
+			if len(events)==0 {
+				<p>No permission changes in this page.</p>
+			}
+			if len(events)==100 {
+				<a class="underline" href={ templ.URL(fmt.Sprintf("/admin/access/audit?before=%d", events[len(events)-1].ID)) }>Older changes</a>
+			}
+		</main>
+	}
+}

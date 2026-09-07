@@ -13,6 +13,7 @@ import (
 
 func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	h.RegisterApple(e)
+	h.RegisterAccess(e)
 	e.GET("/", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site", h.Dashboard, h.IsAuthenticated)
@@ -115,7 +116,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/admin/tenants/:tenant", h.DeleteTenant, h.IsAuthenticated)
 
 	e.GET("/admin/sessions", func(c echo.Context) error { successMessage := ""; return h.ListSessions(c, successMessage) }, h.IsAuthenticated)
-	e.GET("/admin/sessions/:token/delete", h.SessionDelete)
+	e.GET("/admin/sessions/:token/delete", h.SessionDelete, h.IsAuthenticated)
 	e.DELETE("/admin/sessions/:token", h.SessionConfirmDelete, h.IsAuthenticated)
 	e.GET("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
 	e.POST("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
@@ -420,9 +421,9 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
-	e.GET("/profiles/task-types", h.ProfileTaskTypes)
-	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes)
-	e.GET("/profiles/task-definition", h.ProfileTaskDefinition)
+	e.GET("/profiles/task-types", h.ProfileTaskTypes, h.IsAuthenticated)
+	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes, h.IsAuthenticated)
+	e.GET("/profiles/task-definition", h.ProfileTaskDefinition, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
@@ -684,6 +685,6 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		return next(c)
+		return h.authorizeConsoleRequest(c, next)
 	}
 }

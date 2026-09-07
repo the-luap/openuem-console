@@ -17,6 +17,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -36,7 +37,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}
 	sm.Put(ctx, "uid", "preview-admin")
 	sm.Put(ctx, "username", "Preview administrator")
-	info := &partials.CommonInfo{SM: &sessions.SessionManager{Manager: sm}, TenantID: "1", SiteID: "-1", ProfileSiteID: "1", CSRFToken: "test-csrf-token", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Example organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
+	info := &partials.CommonInfo{Principal: access.Principal{UserID: "preview-admin", Grants: []access.Grant{{Role: access.Administrator}}}, SM: &sessions.SessionManager{Manager: sm}, TenantID: "1", SiteID: "-1", ProfileSiteID: "1", CSRFToken: "test-csrf-token", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Example organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 	req := httptest.NewRequest("GET", "/tenant/1/devices", nil).WithContext(ctx)
 	c := echo.New().NewContext(req, httptest.NewRecorder())
 	now := time.Now().UTC()

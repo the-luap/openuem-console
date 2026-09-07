@@ -213,6 +213,10 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	if err = audit(ctx, tx, current.TenantID, "device:"+current.ID, "apple.checkin."+kind, current.ID); err != nil {
 		return err
 	}
+	// The device has demonstrated possession. Browser retries must now stop.
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_enrollment_claims SET profile=NULL WHERE device_id=$1`, current.ID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

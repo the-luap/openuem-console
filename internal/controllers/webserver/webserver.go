@@ -2,8 +2,11 @@ package webserver
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/labstack/echo/v4"
@@ -11,6 +14,8 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
 type WebServer struct {
@@ -55,14 +60,37 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 }
 
 func (w *WebServer) Serve(address, certFile, certKey string) error {
+	permissions, err := access.NewStore(w.Handler.Model.DB)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err = permissions.Migrate(ctx); err != nil {
+		return err
+	}
+	initialAdmin := os.Getenv("OPENUEM_BOOTSTRAP_ADMIN")
+	if initialAdmin == "" {
+		initialAdmin = "openuem"
+	}
+	if err = permissions.Bootstrap(ctx, initialAdmin); err != nil {
+		return err
+	}
+	w.Handler.Access = permissions
+	identity, err := clientidentity.FromEnvironment()
+	if err != nil {
+		return err
+	}
 	if err := w.startApple(certFile, certKey); err != nil {
 		return err
 	}
 	w.Server = &http.Server{
-		Addr:    address,
-		Handler: w.Router,
+		Addr:      address,
+		Handler:   identity.Protect(w.Router),
+		TLSConfig: &tls.Config{},
 	}
 
+	identity.ConfigureTLS(w.Server.TLSConfig)
 	return w.Server.ListenAndServeTLS(certFile, certKey)
 }
 
