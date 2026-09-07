@@ -4,17 +4,53 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"howett.net/plist"
 	"software.sslmate.com/src/go-pkcs12"
 )
+
+func TestCatalogTrustsAppleRootWithoutDisablingTLSVerification(t *testing.T) {
+	client, err := catalogClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdleConnections()
+	root, err := x509.ParseCertificate(appleCatalogRootDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest(root.Raw) != "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024" {
+		t.Fatal("unexpected catalog trust anchor; review the official Apple PKI source")
+	}
+	transport := client.Transport.(*http.Transport)
+	if _, err = root.Verify(x509.VerifyOptions{Roots: transport.TLSClientConfig.RootCAs, CurrentTime: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)}); err != nil {
+		t.Fatal("Apple catalog root is not trusted", err)
+	}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("catalog client accepted an unrelated self-signed server")
+	}))
+	server.Config.ErrorLog = slog.NewLogLogger(slog.NewTextHandler(io.Discard, nil), slog.LevelError)
+	server.StartTLS()
+	defer server.Close()
+	response, err := client.Get(server.URL)
+	if response != nil {
+		response.Body.Close()
+	}
+	var verificationError *tls.CertificateVerificationError
+	if !errors.As(err, &verificationError) {
+		t.Fatal("catalog client did not reject untrusted TLS", err)
+	}
+}
 
 func TestPublicProtocolRequiresIssuedIdentityOverTLS(t *testing.T) {
 	s := testStore(t)

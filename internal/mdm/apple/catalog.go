@@ -102,7 +102,11 @@ func (s *Store) RefreshCatalog(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("unexpected Apple catalog redirect") }}
+	client, err := catalogClient()
+	if err != nil {
+		return err
+	}
+	defer client.CloseIdleConnections()
 	res, fetchErr := client.Do(req)
 	var data []byte
 	if fetchErr == nil {

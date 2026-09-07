@@ -43,14 +43,14 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	d := &apple.Device{ID: "10000000-0000-0000-0000-000000000001", Name: "Sales iPhone", Model: "iPhone16,1", OSVersion: "18.6.2", BuildVersion: "22G100", SerialNumber: "EXAMPLE123", Supervised: true, Status: "enrolled", InventoryAt: &now, LastSeen: &now, AppsAt: &now, ProfilesAt: &now, CertificateExpiresAt: now.AddDate(1, 0, 0), PushStatus: "accepted", Apps: []apple.Application{{Identifier: "com.example.app", Name: "Example app", Version: "42", ShortVersion: "1.2"}}}
 	p := apple.Profile{ID: "20000000-0000-0000-0000-000000000001", Name: "Company Wi-Fi", Identifier: "eu.example.wifi", Revision: 2, PayloadTypes: []string{"com.apple.wifi.managed"}}
 	policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
-	detail := Detail{Device: d, Profiles: []apple.Profile{p}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 2, Desired: "installed", Status: "verified"}}, Policy: policy, Compliance: "update_required", CatalogAt: &now, Releases: []apple.OSRelease{{Version: "18.7.1", Build: "22H100"}}}
+	detail := Detail{Device: d, Profiles: []apple.Profile{p}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 2, Desired: "installed", Status: "verified"}}, Policy: policy, Compliance: "update_required", CatalogAt: &now, Releases: []apple.OSRelease{{Version: "18.7.1", Build: "22H100"}, {Version: "18.7.1", Build: "22H6100"}}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
 		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "iOS profiles"}},
-		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", "18.7.1"}},
+		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`}},
 		{"profiles", Profiles(c, info, []apple.Profile{p}, []apple.Device{*d}), []string{"Create a Wi-Fi profile", "Save and deploy revision", "Company Wi-Fi", "test-csrf-token"}},
 		{"setup", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", Topic: "com.apple.mgmt.example", PushExpiresAt: now.AddDate(1, 0, 0)}, "", "", true), []string{"Create enrollment invitation", "push_certificate", "push_key", "test-csrf-token"}},
 	}

@@ -139,8 +139,11 @@ apps iOS reports for this enrollment; this is not unrestricted filesystem access
 ## OS update policies
 
 The update form offers Apple releases for the device's reported hardware model.
-Set a target version, optional exact build, and deadline in the **device's local
+Select the exact version/build pair and a deadline in the **device's local
 time**, with no UTC offset. The server rejects downgrades and unavailable releases.
+The catalog client includes Apple's official Root CA because some Linux system
+trust stores do not contain the root used by GDMF. Normal TLS chain, hostname and
+validity checks remain enabled; this trust addition is scoped to the catalog.
 The release catalog is requested at most daily; a snapshot older than 48 hours
 cannot authorize a new policy. If Apple withdraws a target, the declaration is
 withdrawn and the console marks the policy unavailable for administrator review.
@@ -203,7 +206,16 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
 Without the test database variable, PostgreSQL and device TLS integration tests
 skip. The added GitHub workflow supplies PostgreSQL so these tests run in CI.
 Browser-rendering fixtures are synthetic data; they do not establish device
-compatibility. The full upstream models suite has known SMTP/user expectation
+compatibility. A separate local runtime check also exercised the actual Docker
+console with PostgreSQL and NATS, authenticated browser forms, mutual-TLS
+enrollment, profile revision/removal verification, queued work across a server
+restart, and DDM compliance transitions using a protocol simulator. The live Apple
+release catalog was fetched successfully with TLS verification enabled. This
+check used fixture device credentials with outbound APNs blocked; real push
+delivery, device installation behavior and Windows agent execution remain subject
+to the hardware checklist below.
+
+The full upstream models suite has known SMTP/user expectation
 failures reproduced at unmodified upstream commit
 `5604db7e4b4ac0fef5f95aad0ef279722966bd9d`:
 `TestUpdateSMTPSettings`, `TestAddOIDCUser`, and `TestConfirmEmail`.

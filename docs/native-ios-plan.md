@@ -43,6 +43,8 @@ Branch: `feature/native-ios-management`
 - [x] Protocol, security, PostgreSQL and UI tests; upstream build/regression checks.
 - [x] Protocol simulation against PostgreSQL, TLS client identity test and rendered
       browser fixtures (synthetic data).
+- [x] Full console process with PostgreSQL/NATS, authenticated browser workflows,
+      native HTTPS protocol simulation, restart recovery and live Apple catalog.
 - [ ] Real-device acceptance with APNs certificates, reachable HTTPS and managed
       iOS/iPadOS and Windows hardware.
 - [x] Commit and push the implementation to the user's fork.
@@ -71,13 +73,30 @@ complete while requirements remain unverified.
   credentials/profiles, enrollment and revocation, inventory, profile revisions,
   DDM update policies and Apple catalog reconciliation. Integrated shared console
   routes, views and organization/site protections. Added an operator guide and CI.
-- Verification: 13 native Apple tests; console PostgreSQL route/CSRF tests; four
+- Verification: 14 native Apple tests; console PostgreSQL route/CSRF tests; four
   rendered UI fixtures; Go race detector passed. Linux and Windows cross-builds
   passed. Docker image built and CLI smoke test passed. Existing Windows deployment
   model tests passed. Full upstream model-suite SMTP/user failures were reproduced
   on an unchanged upstream checkout and are documented in the operator guide.
 - Implementation pushed as `c0a710e` to `feature/native-ios-management` in the
   user's fork. GitHub CI run: https://github.com/the-luap/openuem-console/actions/runs/34157924980
-- Remaining release gates: CI result and the real-hardware acceptance
+- Initial GitHub CI passed, including PostgreSQL/race tests, Windows deployment
+  model regression tests and Linux/Windows builds.
+- Full runtime verification: started the actual Docker console with isolated
+  PostgreSQL and NATS, logged in through the browser, configured test enrollment,
+  enrolled a protocol simulator through mutual TLS, and observed OS/build and app
+  inventory. Created and assigned a profile in the UI, revised it, restarted the
+  console with work queued, and verified revision delivery and subsequent removal
+  against reported profile inventory. An update declaration became active while
+  compliance remained Update required; fresh simulated target OS/build inventory
+  then changed compliance to Up to date. The existing Windows deployment page
+  remained reachable through the same authenticated console. These results do
+  not establish physical-device acceptance; APNs was intentionally blocked for
+  the fixture certificate and token.
+- Runtime fixes: trusted Apple's official public root specifically for catalog
+  HTTPS after reproducing a Linux certificate-chain failure; confirmed a live
+  catalog fetch. Made the selected release/build pair unambiguous when multiple
+  builds share a version. Avoided duplicate inventory immediately after enrollment.
+- Remaining release gate: the real-hardware acceptance
   checklist in `native-ios-operations.md`. Manual enrollment is implemented;
   ADE/ABM, SCEP, identity renewal, iOS app deployment and granular RBAC are not.

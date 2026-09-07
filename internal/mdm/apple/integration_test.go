@@ -333,10 +333,19 @@ func TestMaintenanceAndEnrollmentRevocation(t *testing.T) {
 	if err := s.ScheduleInventory(ctx); err != nil {
 		t.Fatal(err)
 	}
+	var count int
+	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_commands WHERE device_id=$1 AND status='queued'`, d.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatal("enrollment inventory was immediately duplicated", count, err)
+	}
+	if _, err := s.db.Exec(`UPDATE mdm_apple_devices SET next_inventory_at=now()-interval '1 minute' WHERE id=$1`, d.ID); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.ScheduleInventory(ctx); err != nil {
 		t.Fatal(err)
 	}
-	var count int
+	if err := s.ScheduleInventory(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_commands WHERE device_id=$1 AND status='queued'`, d.ID).Scan(&count); err != nil || count != 4 {
 		t.Fatal("scheduled inventory missing or duplicated", count, err)
 	}

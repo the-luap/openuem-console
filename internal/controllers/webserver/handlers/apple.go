@@ -502,11 +502,15 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 	}
 	var policy *apple.UpdatePolicy
 	if c.FormValue("remove") != "true" {
+		version, build, selected := strings.Cut(c.FormValue("target_release"), "/")
+		if !selected || version == "" || build == "" {
+			return echo.NewHTTPError(400, "Select an available Apple release and build")
+		}
 		deadline := c.FormValue("deadline")
 		if len(deadline) == 16 {
 			deadline += ":00"
 		}
-		policy = &apple.UpdatePolicy{TargetVersion: c.FormValue("target_version"), TargetBuild: c.FormValue("target_build"), Deadline: deadline, DetailsURL: c.FormValue("details_url")}
+		policy = &apple.UpdatePolicy{TargetVersion: version, TargetBuild: build, Deadline: deadline, DetailsURL: c.FormValue("details_url")}
 	}
 	if err = h.Apple.SetUpdatePolicy(c.Request().Context(), scope, []string{id}, policy, h.appleActor(c)); err != nil {
 		return appleFailure(err)

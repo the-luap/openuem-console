@@ -185,6 +185,11 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 			if err = s.queueInventory(ctx, tx, current); err != nil {
 				return err
 			}
+			// The enrollment batch already refreshes inventory. Avoid another
+			// identical batch on the first background sweep after it completes.
+			if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET next_inventory_at=now()+interval '6 hours' WHERE id=$1`, current.ID); err != nil {
+				return err
+			}
 		}
 	case "CheckOut":
 		if current.UDID == "" {
