@@ -45,7 +45,7 @@ Branch: `feature/native-ios-management`
       browser fixtures (synthetic data).
 - [ ] Real-device acceptance with APNs certificates, reachable HTTPS and managed
       iOS/iPadOS and Windows hardware.
-- [ ] Commit and push the implementation to the user's fork.
+- [x] Commit and push the implementation to the user's fork.
 
 ## External acceptance requirements
 
@@ -76,6 +76,8 @@ complete while requirements remain unverified.
   passed. Docker image built and CLI smoke test passed. Existing Windows deployment
   model tests passed. Full upstream model-suite SMTP/user failures were reproduced
   on an unchanged upstream checkout and are documented in the operator guide.
-- Remaining release gates: final push/CI result and the real-hardware acceptance
+- Implementation pushed as `c0a710e` to `feature/native-ios-management` in the
+  user's fork. GitHub CI run: https://github.com/the-luap/openuem-console/actions/runs/34157924980
+- Remaining release gates: CI result and the real-hardware acceptance
   checklist in `native-ios-operations.md`. Manual enrollment is implemented;
   ADE/ABM, SCEP, identity renewal, iOS app deployment and granular RBAC are not.
