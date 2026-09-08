@@ -2,7 +2,7 @@
 
 The Mac device page can stage FileVault activation, receive encrypted personal
 recovery keys and audit administrator retrieval. This is part of MAC-02, not its
-completion: automatic key validation against the volume, recovery-key rotation,
+completion: console integration of key validation against the volume, recovery-key rotation,
 escrow certificate rotation and physical Mac acceptance remain open.
 
 ## Policy lifecycle
@@ -36,13 +36,42 @@ verifies its absence, then removes and verifies absence of the escrow profile.
 It does not decrypt the disk or delete any stored recovery material. Checkout
 and administrator revocation also retain encrypted recovery history.
 
-## Recovery and access
+## Recovery state
 
 An already encrypted Mac may not provide a new personal key merely because an
 escrow profile was installed. It may require key rotation; this implementation
 does not yet initiate rotation. The console keeps encryption, installed policy,
 key escrow and key validation as separate states. Keys remain **Not yet validated
-against the Mac volume** until independent validation is implemented.
+against the Mac volume** until console task authorization and signed-result
+reconciliation are connected to the agent validation transport described below.
+
+## Agent validation transport
+
+Shared protocol `f9b56160e167`, worker `c9961c4` and agent `e446530` implement
+private recovery validation transport. The console uses the same shared version,
+applies registry migration 004 during desktop startup and generates the new
+individual `recovery` RPC permission. No durable command stream filters change.
+Update the console/authorization service and broker configuration first, then
+the worker and agent; reconnect agents to obtain current broker permissions.
+
+The Mac keeps a separate X25519 recipient in its protected System keychain,
+registers it using a signed challenge, and accepts only HPKE ciphertext bound to
+its identity, scope, signing certificate, recipient epoch, native enrollment,
+recovery-key version, task ID and expiry. The worker cannot read the recovery key.
+The root agent checks the key using bounded, read-only `fdesetup validaterecovery`
+with plist standard input and returns an RSA-signed outcome and nonce. Plaintext
+is cleared before sending; lost acknowledgments retry the signed receipt only.
+The worker commits that receipt and its audit record together, scrubs terminal
+ciphertext and periodically erases stale tasks even for offline agents.
+
+The console does not yet create these tasks or mark escrowed keys verified from
+their receipts. That next step must transactionally authorize security management,
+recheck the current canonical native/agent association and key version, and verify
+the signed result against the still-current certificate and recipient. Late,
+foreign, revoked or superseded results must not validate the current key. Native
+recovery-key rotation and physical volume acceptance remain separate open work.
+
+## Recovery access
 
 `devices.security.manage` and `devices.recovery.retrieve` are separate
 capabilities, currently granted to organization and server administrators.

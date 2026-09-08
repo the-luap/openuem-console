@@ -401,5 +401,9 @@ code work, and synthetic tests do not satisfy hardware gates.
   activation, preserves encrypted recovery history across profile removal and
   revocation, and exposes separately authorized, audited POST retrieval. The
   bounded CMS decoder supports Apple BER/DER and legacy decryption without
-  changing SCEP. Key validation against the volume, rotation and physical
-  recovery acceptance remain open; MAC-02 and the full roadmap remain incomplete.
+  changing SCEP. The shared library, worker and agent now implement encrypted
+  validation delivery, a protected X25519 recipient, bounded read-only local
+  validation and signed, idempotent receipts. Console migration/authorization uses
+  that shared version. Console task authorization and receipt reconciliation,
+  rotation and physical recovery acceptance remain open; MAC-02 and the full
+  roadmap remain incomplete.
