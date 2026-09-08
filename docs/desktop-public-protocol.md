@@ -197,18 +197,26 @@ The public server/gateway implementation at console commit `0268458` passed
 The subsequent shared client at library commit `d6129ce9fe9b` passed
 [Linux and native Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
 `TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway` uses that
-published client against the actual private handler, two TLS legs and PostgreSQL
+client implementation against the actual private handler, two TLS legs and PostgreSQL
 registry. It verifies current release binding, certificate/key/origin validation,
 one-identity recovery after reconstructing the client and withdrawal rejection.
 It also uses the published native client to fetch origin keys and configuration,
-verifies the independently signed configuration and
-checks the selected package through the real public TLS gateway. Separate tests
+verifies the independently signed configuration and streams the selected package
+through the native download method and real public TLS gateway. Separate tests
 cover GET/HEAD without invitation use, disabled signing, key-role reuse, protected
 key-file parsing, revoked invitations and withdrawn releases.
 Shared-library `c3688fa59622` adds these bounded bootstrap GET methods and the
 strict origin-key document parser; its [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34189077681).
 The initial server signer/routes at console `b8a810f` passed
 [console CI](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
+Console `3593d4b` adds the protected signer provisioning command, with
+[passing Linux and native Windows checks](https://github.com/the-luap/openuem-console/actions/runs/34189388894).
+The current library pin `126bca15f12f` adds bounded installer streaming, exact
+size/hash verification and expiry checks before and after transfer. Its
+[Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
+The shared download method accepts only the configured origin/release/target and
+does not follow redirects or automatically retry. Failed streams remain untrusted
+staging data; actual native signatures and installation still need verification.
 Its keys are retained in test memory. The related agent's separate native storage
 suite now covers DPAPI and isolated Keychain recovery after a lost HTTPS response;
 see [desktop integration evidence](desktop-enrollment-plan.md).

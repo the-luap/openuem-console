@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -97,16 +98,9 @@ func TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway(t *testi
 	if err != nil || verified.Config().TenantID != 3 || verified.Config().SiteID != 4 {
 		t.Fatal("live signed configuration did not bind the expected scope", err)
 	}
-	httpsClient := publicServer.Client()
-	httpsClient.Timeout = 5 * time.Second
-	packageResponse, err := httpsClient.Get(verified.DownloadURL())
-	if err != nil {
-		t.Fatal("could not download the configured package")
-	}
-	err = verified.VerifyPackage(packageResponse.Body)
-	packageResponse.Body.Close()
-	if err != nil || packageResponse.StatusCode != 200 {
-		t.Fatal("configured package did not match its separately signed release", err)
+	var packageBytes bytes.Buffer
+	if err := verified.DownloadPackage(ctx, client, &packageBytes); err != nil || !bytes.Equal(packageBytes.Bytes(), f.content) {
+		t.Fatal("native download did not return the configured release bytes", err)
 	}
 	keys, err := enrollment.GenerateKeys()
 	if err != nil {

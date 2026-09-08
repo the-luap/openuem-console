@@ -38,7 +38,7 @@ the table's package summaries do not remove any detail from the roadmap.
 - Shared library client `d6129ce9fe9b` verifies HTTPS, bounds requests/responses,
   rejects redirects and binds issued certificate purpose, key, device and WSS
   origin. [Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
-  The console pins that published version and exercises client reconstruction,
+  The console exercises that client implementation with reconstruction,
   same-key recovery and withdrawal through its real TLS gateway/handler/registry.
   That console integration retains test keys in memory; the native persistence
   evidence below separately covers DPAPI and Keychain recovery.
@@ -64,9 +64,14 @@ the table's package summaries do not remove any detail from the roadmap.
   public key/configuration routes; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
   Library `c3688fa59622` adds bounded native HTTPS GET methods and strict origin-key
   parsing, with [passing Linux/Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34189077681).
-  The console pins that version and exercises those methods through its live TLS
-  gateway/registry fixture. Its bootstrap-key CLI provisions or validates a private
-  signer without overwriting existing state. Native installation and origin
+  The current pin `126bca15f12f` also streams verified installer bytes with a
+  separate 15-minute bound and expiry checks before/after transfer;
+  [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
+  The console exercises all these methods through its live TLS gateway/registry
+  fixture. Console `3593d4b` adds the bootstrap-key CLI, which provisions or
+  validates a private signer without overwriting existing state;
+  [Linux/native Windows CI passed](https://github.com/the-luap/openuem-console/actions/runs/34189388894).
+  Native installation and origin
   authorization remain open.
 
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
