@@ -526,3 +526,53 @@ func TestRecoveryLockReadinessChangesAndDeliveryRollback(t *testing.T) {
 	}
 	requireRecoveryLockWire(t, f.connect(t, "Idle", "", nil), "SetRecoveryLock")
 }
+
+func TestRecoveryLockBackgroundExpiryPreservesUncertainRemovalUntilLateReceipt(t *testing.T) {
+	f := newRecoveryLockFixture(t)
+	key := f.establish(t)
+	f.request(t, "remove", key, nil)
+	check := f.connect(t, "Idle", "", nil)
+	set := f.connect(t, "Acknowledged", check.ID, map[string]any{"PasswordVerified": true})
+	requireRecoveryLockWire(t, set, "SetRecoveryLock")
+	if _, err := f.s.db.Exec(`UPDATE mdm_apple_commands SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, set.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.db.Exec(`UPDATE mdm_apple_recovery_lock_attempts SET next_check_at=clock_timestamp()-interval '1 second' WHERE device_id=$1`, f.d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.expireCommands(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.ReconcileRecoveryLocks(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	r := f.state(t)
+	if r.Attempt.Status != "uncertain" || r.Attempt.Error != "awaiting_removal_result" || r.CurrentKeyID != key || r.Evidence == "removal_acknowledged" {
+		t.Fatal("background expiry invented removal evidence")
+	}
+	if f.connect(t, "Acknowledged", set.ID, nil) != nil {
+		t.Fatal("late removal acknowledgment produced another mutation")
+	}
+	r = f.state(t)
+	if r.Attempt.Status != "removed" || r.CurrentKeyID != "" || r.Evidence != "removal_acknowledged" {
+		t.Fatal("late removal acknowledgment not reconciled")
+	}
+}
+
+func TestRecoveryLockRejectedCurrentPasswordCannotAuthorizeChange(t *testing.T) {
+	f := newRecoveryLockFixture(t)
+	key := f.establish(t)
+	f.request(t, "rotate", key, nil)
+	check := f.connect(t, "Idle", "", nil)
+	if f.connect(t, "Acknowledged", check.ID, map[string]any{"PasswordVerified": false}) != nil {
+		t.Fatal("rejected current password authorized a change")
+	}
+	r := f.state(t)
+	if r.Attempt.Status != "failed" || r.Evidence != "unknown" || r.CurrentKeyID != key {
+		t.Fatal("rejected current password lost retained history or claimed current verification")
+	}
+	var count int
+	if err := f.s.db.QueryRow(`SELECT count(*) FROM mdm_apple_recovery_lock_commands WHERE attempt_id=$1 AND purpose='set'`, r.Attempt.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatal("failed preflight created mutation", err)
+	}
+}

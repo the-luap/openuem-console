@@ -67,9 +67,13 @@ the table's package summaries do not remove any detail from the roadmap.
   Delivery consumes each mutation once; distinct candidate verification and
   explicit stopping evidence govern uncertain results. Superseded or expired
   preflight responses cannot authorize another change. Local protocol, handler,
-  rendered-view checks and vet pass; PostgreSQL and browser validation for this
-  workflow are pending in this change. Physical recoveryOS/password acceptance
-  and the broader MAC-02 package remain open.
+  rendered-view checks and vet pass. Thirty browser cases cover ten states at
+  390/768/1440 px, keyboard confirmation and protected POST forms, with no
+  horizontal overflow. PostgreSQL-backed native protocol, console routes and
+  rendering pass with the race detector in
+  [CI](https://github.com/the-luap/openuem-console/actions/runs/34292333350),
+  alongside Linux/Windows builds and native Windows cryptographic checks.
+  Physical recoveryOS/password acceptance and the broader MAC-02 package remain open.
 
 - [Mac firewall profiles](macos-firewall.md) add a System-scope editor with
   explicit firewall settings and bounded app rules. The editor and uploaded
