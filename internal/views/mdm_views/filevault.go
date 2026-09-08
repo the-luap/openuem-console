@@ -97,3 +97,39 @@ func FileVaultValidationState(v *apple.FileVault) string {
 		return "Verification cancelled because the device or agent connection changed"
 	}
 }
+
+func FileVaultRotationPending(v *apple.FileVault) bool {
+	return v != nil && v.Rotation != nil && (v.Rotation.Status == "queued" || v.Rotation.Status == "uncertain")
+}
+
+func FileVaultRotationState(v *apple.FileVault) string {
+	if v == nil || v.Rotation == nil {
+		return "No rotation requested"
+	}
+	switch v.Rotation.Status {
+	case "queued":
+		return "Waiting for the Mac to replace its recovery key"
+	case "rotated":
+		return "New recovery key stored and validated on " + When(v.Rotation.CompletedAt)
+	case "unverified":
+		return "New recovery key stored; validate it against the Mac volume"
+	case "uncertain":
+		return "The result is uncertain. Refresh security inventory, then validate the latest stored key once the agent finishes recovery. Another rotation remains blocked."
+	case "resolved":
+		return "Current recovery key independently validated; the uncertain attempt is resolved"
+	case "invalid":
+		return "The previous key did not unlock the volume. Rotation did not start. Refresh escrow and validate the current key."
+	case "unavailable":
+		return "The Mac could not start rotation. Check agent connectivity and validate the current key before retrying."
+	case "unsupported":
+		return "Rotation requires the current root Mac agent"
+	case "expired":
+		return "The request expired before delivery to the Mac"
+	case "superseded":
+		return "Returned key retained in history; a newer recovery observation remains current"
+	case "rejected":
+		return "The rotation response could not be authenticated. Recovery evidence is retained for investigation."
+	default:
+		return "Rotation cancelled because device authority, association or escrow policy changed"
+	}
+}

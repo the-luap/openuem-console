@@ -134,8 +134,8 @@ func exerciseFileVaultValidation(t *testing.T, h *Handler, ctx context.Context, 
 	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_filevault_validations WHERE device_id=$1`, device).Scan(&count); err != nil || count != 1 {
 		t.Fatal("duplicate form submission created tasks", err)
 	}
-	for _, outcome := range []string{"valid", "invalid"} {
-		if outcome == "invalid" {
+	for index, outcome := range []string{"valid", "invalid", "valid"} {
+		if index > 0 {
 			if rec = request("organization-admin", "POST", verify, nil); rec.Code != 303 {
 				t.Fatal("revalidation failed", rec.Code)
 			}
@@ -175,4 +175,5 @@ func exerciseFileVaultValidation(t *testing.T, h *Handler, ctx context.Context, 
 		}
 		artifact("filevault-validation-"+outcome, rec)
 	}
+	exerciseFileVaultRotation(t, h, ctx, scope, device, keyID, base, canonical, sibling, access, identity, recipient, private, cert, keys, request, artifact)
 }

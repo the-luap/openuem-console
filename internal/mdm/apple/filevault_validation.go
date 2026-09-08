@@ -31,6 +31,7 @@ type FileVaultValidation struct {
 type fileVaultExpectation struct {
 	Context                     enrollment.RecoveryContext
 	EntityID, NonceHash, Status string
+	RotationID, Actor           string
 	CreatedAt, ExpiresAt        time.Time
 }
 
@@ -238,10 +239,24 @@ func (s *Store) requestFileVaultValidation(ctx context.Context, scope Scope, dev
 	if err != nil {
 		return err
 	}
-	if err = registryAccess.QueueRecoveryTask(ctx, tx, *envelope, nonceHash); err != nil {
+	var rotationID string
+	err = tx.QueryRowContext(ctx, `SELECT id FROM mdm_apple_filevault_rotations WHERE device_id=$1 AND status='uncertain'`, d.ID).Scan(&rotationID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if rotationID != "" {
+		rotation, loadErr := loadFileVaultRotation(ctx, tx, d, rotationID)
+		if loadErr != nil || rotation.EntityID != entity {
+			return ErrFileVault
+		}
+		err = registryAccess.QueueRotationValidation(ctx, tx, rotation.Context, *envelope, nonceHash)
+	} else {
+		err = registryAccess.QueueRecoveryTask(ctx, tx, *envelope, nonceHash)
+	}
+	if err != nil {
 		return ErrFileVault
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_filevault_validations(id,tenant_id,site_id,device_id,key_id,entity_id,agent_id,recipient_id,certificate_hash,nonce_hash,actor,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, c.TaskID, d.TenantID, d.SiteID, d.ID, key, entity, r.Identity.AgentID, r.ID, r.Identity.CertificateHash, nonceHash, actor, expires)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_filevault_validations(id,tenant_id,site_id,device_id,key_id,entity_id,agent_id,recipient_id,certificate_hash,nonce_hash,actor,expires_at,rotation_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,'')::uuid)`, c.TaskID, d.TenantID, d.SiteID, d.ID, key, entity, r.Identity.AgentID, r.ID, r.Identity.CertificateHash, nonceHash, actor, expires, rotationID)
 	if err != nil {
 		return err
 	}
@@ -274,7 +289,7 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 	var e fileVaultExpectation
 	c := &e.Context
 	c.Version = enrollment.RecoveryVersion
-	err := tx.QueryRowContext(ctx, `SELECT id,tenant_id,site_id,device_id,key_id,entity_id,agent_id,recipient_id,certificate_hash,nonce_hash,status,created_at,expires_at FROM mdm_apple_filevault_validations WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, d.ID).Scan(&c.TaskID, &c.Identity.TenantID, &c.Identity.SiteID, &c.NativeID, &c.KeyID, &e.EntityID, &c.Identity.AgentID, &c.RecipientID, &c.Identity.CertificateHash, &e.NonceHash, &e.Status, &e.CreatedAt, &e.ExpiresAt)
+	err := tx.QueryRowContext(ctx, `SELECT id,tenant_id,site_id,device_id,key_id,entity_id,agent_id,recipient_id,certificate_hash,nonce_hash,status,created_at,expires_at,COALESCE(rotation_id::text,''),actor FROM mdm_apple_filevault_validations WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, d.ID).Scan(&c.TaskID, &c.Identity.TenantID, &c.Identity.SiteID, &c.NativeID, &c.KeyID, &e.EntityID, &c.Identity.AgentID, &c.RecipientID, &c.Identity.CertificateHash, &e.NonceHash, &e.Status, &e.CreatedAt, &e.ExpiresAt, &e.RotationID, &e.Actor)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -343,6 +358,22 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 	if receipt.Outcome == "valid" {
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_keys SET verified_at=GREATEST(verified_at,$2) WHERE id=$1 AND tenant_id=$3 AND device_id=$4`, c.KeyID, *completed, d.TenantID, d.ID); err != nil {
 			return err
+		}
+		if e.RotationID != "" {
+			rotation, err := loadFileVaultRotation(ctx, tx, d, e.RotationID)
+			if err != nil || rotation.Status != "uncertain" || rotation.EntityID != e.EntityID {
+				return ErrFileVault
+			}
+			registryAccess, err := registry.NewAccessStore(s.db)
+			if err != nil {
+				return err
+			}
+			if err = registryAccess.ResolveRotation(ctx, tx, rotation.Context, *c, e.NonceHash, e.Actor); err != nil {
+				return ErrFileVault
+			}
+			if err = s.finishFileVaultRotation(ctx, tx, d, rotation, "resolved", c.KeyID, *completed, true); err != nil {
+				return err
+			}
 		}
 	}
 	return s.finishFileVaultValidation(ctx, tx, e, receipt.Outcome, *completed)

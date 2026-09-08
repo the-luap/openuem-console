@@ -35,6 +35,8 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 				<dd>
 					{ FileVaultValidationState(detail.FileVault) }
 				</dd>
+				<dt>Recovery key rotation</dt>
+				<dd>{ FileVaultRotationState(detail.FileVault) }</dd>
 			</dl>
 			if detail.FileVault!=nil {
 				if detail.FileVault.Error!="" {
@@ -47,6 +49,18 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 			<p>OpenUEM installs and confirms the recovery escrow profile before requesting FileVault activation. The Mac user completes deferred activation at login or logout, with up to three login deferrals, and is shown their recovery key.</p>
 			<p>Already encrypted Macs may need a recovery key rotation before they report a key for this escrow destination. A stored key is not proof that it unlocks the volume.</p>
 			if info.Can(access.ManageDeviceSecurity) && detail.FileVault!=nil && detail.FileVault.KeyID!="" && detail.Device.Status=="enrolled" {
+				if detail.FileVault.RotationReady && !FileVaultRotationPending(detail.FileVault) {
+					<details>
+						<summary>Replace the current recovery key</summary>
+						<p class="mt-4">The linked Mac agent validates the current key, replaces it, and returns the new key to encrypted escrow. Previous keys remain in history. The request expires within five minutes; an uncertain result blocks another rotation until the current key is independently validated.</p>
+						<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/filevault/keys/"+detail.FileVault.KeyID+"/rotate") }>
+							@CSRF(info)
+							<button class="uk-button uk-button-default" type="submit">Rotate current recovery key</button>
+						</form>
+					</details>
+				} else if !FileVaultRotationPending(detail.FileVault) {
+					<p class="uk-text-muted">Rotation requires a recently validated current key, confirmed escrow profiles and fresh Mac security, profile and hardware reports.</p>
+				}
 				if detail.FileVault.Validation==nil || detail.FileVault.Validation.Status!="queued" {
 					if detail.FileVault.ValidationReady {
 						<form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/filevault/keys/"+detail.FileVault.KeyID+"/verify") }>
@@ -71,7 +85,7 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 						</form>
 					}
 				}
-				if detail.FileVault!=nil && detail.FileVault.Phase!="removed" {
+				if detail.FileVault!=nil && detail.FileVault.Phase!="removed" && !FileVaultRotationPending(detail.FileVault) {
 					<details>
 						<summary>Remove FileVault management profiles</summary>
 						<p class="mt-4">This removes the activation and escrow profiles. Disk encryption remains enabled and stored recovery keys are retained.</p>

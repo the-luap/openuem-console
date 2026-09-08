@@ -1,9 +1,9 @@
 # FileVault profiles and recovery escrow
 
 The Mac device page can stage FileVault activation, receive encrypted personal
-recovery keys, validate them through the linked Mac agent and audit administrator
-retrieval. This is part of MAC-02, not its completion: recovery-key rotation,
-escrow certificate rotation and physical Mac acceptance remain open.
+recovery keys, validate and rotate them through the linked Mac agent, and audit
+administrator retrieval. Escrow certificate rotation, broader Mac security
+workflows and physical Mac acceptance remain open under MAC-02.
 
 ## Policy lifecycle
 
@@ -39,8 +39,10 @@ and administrator revocation also retain encrypted recovery history.
 ## Recovery state
 
 An already encrypted Mac may not provide a new personal key merely because an
-escrow profile was installed. It may require key rotation; this implementation
-does not yet initiate rotation. The console keeps encryption, installed policy,
+escrow profile was installed. It may require key rotation. Agent rotation requires
+an already escrowed, independently validated current key; initial key recovery
+for a Mac without that material still needs a separate assisted workflow. The
+console keeps encryption, installed policy,
 key escrow and key validation as separate states. Keys remain **Not yet validated
 against the Mac volume** until the linked Mac agent returns an authenticated
 successful check and the console accepts that result.
@@ -60,10 +62,10 @@ successful timestamp remains historical evidence in recovery-key history.
 
 ## Agent validation transport
 
-Shared protocol `f9b56160e167`, worker `c9961c4` and agent `e446530` implement
-private recovery validation transport. The console uses the same shared version,
-applies registry migration 004 during desktop startup and generates the new
-individual `recovery` RPC permission. No durable command stream filters change.
+Shared protocol `2e8eb22e1208`, worker `ba586d5` and agent `50b7e14` implement
+private recovery validation and rotation transport. The console applies registry
+migrations 004–006 during desktop startup and generates the individual `recovery`
+and `rotation` RPC permissions. No durable command stream filters change.
 Update the console/authorization service and broker configuration first, then
 the worker and agent; reconnect agents to obtain current broker permissions.
 
@@ -95,8 +97,64 @@ The recorded validation time is the original result time, not the later processi
 time. Historical keys and previous successful timestamps are never discarded by
 a failed check. Native-only deployments remain usable without agent tables.
 
-This is an authenticated OS report, not hardware attestation. Recovery-key
-rotation, escrow-certificate rotation and physical volume acceptance remain open.
+This is an authenticated OS report, not hardware attestation. Escrow-certificate
+rotation and physical volume acceptance remain open.
+
+## Controlled recovery-key rotation
+
+On an eligible Mac, expand **Replace the current recovery key** and select
+**Rotate current recovery key**. This scoped, CSRF-protected POST requires
+`devices.security.manage`, a successful current-key validation within 24 hours,
+current security and hardware reports, and both exact managed FileVault profiles
+confirmed after the policy became active. A later negative validation prevents
+rotation until another successful check. The key version in the form must still
+be current. The agent uses macOS 10.14 or later PRK authentication on APFS.
+
+Native migration 017 stores independent console expectations and an encrypted
+per-attempt X25519 return key. The old PRK is HPKE-encrypted for the agent's
+protected recipient; a returned candidate is independently HPKE-encrypted for
+the console. The worker can decrypt neither direction. The console reserves
+certificate lifetime beyond the five-minute task deadline, and its permission,
+current-key, escrow and channel checks remain locked through the queue/audit commit.
+Concurrent duplicate submissions reuse the same queued attempt.
+
+The root Mac agent holds a private OS lease, durably records one immutable intent,
+validates the old key, and invokes a bounded `fdesetup changerecovery` with plist
+stdin. Keys never become command arguments, log output or temporary plaintext
+files. It retains a returned candidate even after timeout or a process error,
+validates the candidate when possible, then signs, encrypts and durably saves its
+receipt before sending. Restart or lost acknowledgment cannot repeat the mutation.
+The two-minute certificate reserve leaves time for signing and durable publication.
+
+The console independently checks the original context, nonce, certificate,
+recipient, native association and pre-expiry delivery before decrypting a receipt.
+A late authentic receipt can still preserve a changed key after task expiry.
+`rotated` stores the new key and its volume-validation timestamp; `unverified`
+stores the candidate and requests an independent check. A key already received
+through native MDM is reused. A newer unrelated native observation remains current,
+while the returned candidate is retained in history. An older queued SecurityInfo
+request cannot replace a newly accepted rotation result. Escrow changes and native
+or agent channel/hardware changes cancel unresolved delivery through database
+triggers, including writes by older replicas.
+
+`uncertain` means an admitted attempt has no trustworthy returned key. It blocks
+another mutation and profile removal. Refresh security inventory to obtain native
+escrow, then validate the latest stored key. The registry admits this read-only
+recovery check only after the agent's immutable signed uncertainty receipt proves
+that leased execution ended; deadline expiry alone is insufficient. Only the
+explicitly selected subsequent `valid` proof, independently accepted by the
+console against its current key and association, resolves the attempt. Invalid,
+unavailable or replaced proofs keep rotation blocked. Resolution retains the
+original receipt, proof and permanently consumed ordinal.
+
+Native escrow must already be active because a process can die between the OS key
+change and local receipt persistence. These systems cannot form one atomic commit.
+Authority changes retain encrypted recovery evidence but prohibit accepting it
+under a replacement channel. No automatic retry, reenrollment, key deletion or
+disk decryption is used to resolve uncertainty. There are at most 128 immutable
+attempts per individual identity. If recovery history fills after queueing, the
+console retains the encrypted receipt and return key, reports the history limit
+and blocks another request instead of discarding the candidate.
 
 ## Recovery access
 
@@ -152,3 +210,16 @@ states. Browser checks cover six rendered states at 390, 768 and 1440 pixels,
 including keyboard submission and history expansion. No test invokes the host's
 FileVault command. These tests do not establish interoperability or recovery on a
 physical Mac.
+
+Rotation tests exercise encrypted queueing, recent evidence, current-key selection,
+concurrent submissions, native/agent invalidation, candidate deduplication, newer
+native escrow, late receipts, full-history retention, signature/context tampering,
+audit rollback and explicit uncertainty resolution. HTTP and rendered-view tests cover role and CSRF boundaries, pending
+controls, successful escrow and separately audited old/new key retrieval. All
+device command execution remains synthetic; physical rotation and recovery are
+required acceptance work.
+
+Rotation browser checks cover eight states at 390, 768 and 1440 pixels, including
+keyboard disclosure/submission, CSRF-bearing POST forms, blocked pending controls
+and horizontal overflow. Form submission is intercepted by the isolated preview;
+no browser test sends an action to a managed Mac.

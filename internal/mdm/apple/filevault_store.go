@@ -17,6 +17,8 @@ import (
 // FileVault contains lifecycle metadata only. Neither CMS envelopes nor
 // decrypted keys are part of device inventory, command history or this model.
 type FileVault struct {
+	Rotation        *FileVaultRotation   `json:"rotation,omitempty"`
+	RotationReady   bool                 `json:"rotation_ready"`
 	Validation      *FileVaultValidation `json:"validation,omitempty"`
 	ValidationReady bool                 `json:"validation_ready"`
 	DeviceID        string               `json:"device_id"`
@@ -78,6 +80,9 @@ func (s *Store) FileVault(ctx context.Context, scope Scope, id string) (*FileVau
 	if err == nil {
 		err = s.fileVaultValidationMetadata(ctx, d, v)
 	}
+	if err == nil {
+		err = s.fileVaultRotationMetadata(ctx, d, v)
+	}
 	return v, err
 }
 
@@ -130,6 +135,13 @@ func (s *Store) setFileVault(ctx context.Context, scope Scope, id, desired, acto
 	d, err := lockFileVaultDevice(ctx, tx, scope, id)
 	if err != nil {
 		return err
+	}
+	var rotating bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_filevault_rotations WHERE device_id=$1 AND status IN ('queued','uncertain'))`, d.ID).Scan(&rotating); err != nil {
+		return err
+	}
+	if rotating {
+		return ErrFileVault
 	}
 	if desired == "enabled" {
 		if reason := d.FileVaultReason(time.Now()); reason != "" {
@@ -463,25 +475,15 @@ func (s *Store) ingestFileVaultRecovery(ctx context.Context, tx *sql.Tx, d *Devi
 			return err
 		}
 	}
-	var count int
-	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_filevault_keys WHERE device_id=$1`, d.ID).Scan(&count); err != nil {
-		return err
-	}
-	if count >= 128 {
+	id, err := s.retainFileVaultCandidate(ctx, tx, d, escrow, key, false, time.Now(), "escrow")
+	if errors.Is(err, errRotationHistoryFull) {
 		return fail("recovery_history_full")
 	}
-	id := uuid.NewString()
-	encrypted, err := s.secrets.seal(key, secretPurpose(d.TenantID, d.ID+"/"+id, "filevault_recovery_key"))
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_filevault_keys(id,tenant_id,device_id,escrow_id,recovery_key) VALUES($1,$2,$3,$4,$5)`, id, d.TenantID, d.ID, escrow, encrypted); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_policies SET current_key_id=$2,recovery_error='',recovery_requested_at=$3 WHERE device_id=$1`, d.ID, id, requested); err != nil {
-		return err
-	}
-	return audit(ctx, tx, d.TenantID, "device:"+d.ID, "apple.filevault.key.escrow", id)
+	_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_policies SET current_key_id=$2,recovery_error='',recovery_requested_at=$3 WHERE device_id=$1`, d.ID, id, requested)
+	return err
 }
 
 func (s *Store) fileVaultEscrowKey(ctx context.Context, tx *sql.Tx, d *Device, id string) (*x509.Certificate, *rsa.PrivateKey, error) {

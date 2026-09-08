@@ -15,6 +15,9 @@ import (
 //go:embed maclink_migrations/001_mac_devices.sql
 var macLinkSchema string
 
+//go:embed maclink_migrations/002_rotation_invalidation.sql
+var macRotationInvalidationSchema string
+
 // MigrateMacLinks is deliberately separate from native MDM migrations: Apple
 // installations without an agent registry remain fully usable.
 func (s *Store) MigrateMacLinks(ctx context.Context) error {
@@ -38,6 +41,17 @@ func (s *Store) MigrateMacLinks(ctx context.Context) error {
 			return err
 		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_migrations(name) VALUES('maclink_migrations/001_mac_devices.sql')`); err != nil {
+			return err
+		}
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_migrations WHERE name='maclink_migrations/002_rotation_invalidation.sql')`).Scan(&applied); err != nil {
+		return err
+	}
+	if !applied {
+		if _, err = tx.ExecContext(ctx, macRotationInvalidationSchema); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_migrations(name) VALUES('maclink_migrations/002_rotation_invalidation.sql')`); err != nil {
 			return err
 		}
 	}

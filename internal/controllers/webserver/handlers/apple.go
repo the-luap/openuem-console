@@ -58,6 +58,7 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/filevault", h.AppleFileVault)
 		g.POST("/ios/:id/filevault/keys/:key/reveal", h.AppleFileVaultKey)
 		g.POST("/ios/:id/filevault/keys/:key/verify", h.AppleFileVaultValidate)
+		g.POST("/ios/:id/filevault/keys/:key/rotate", h.AppleFileVaultRotate)
 		g.POST("/ios/:id/commands/:command/retry", h.AppleRetryCommand)
 	}
 }

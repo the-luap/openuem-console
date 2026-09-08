@@ -100,11 +100,24 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		d.FileVault = &v
 		return d
 	}
+	rotationDetail := func(status string) Detail {
+		d := validationDetail("valid")
+		d.FileVault.Rotation = &apple.FileVaultRotation{ID: "e0000000-0000-4000-8000-000000000004", Status: status, CreatedAt: now, CompletedAt: &now}
+		d.FileVault.RotationReady = status == "rotated" || status == "resolved"
+		d.FileVault.ValidationReady = status != "queued"
+		return d
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"mac-filevault-rotation-ready", DeviceDetails(c, info, rotationDetail("rotated")), []string{"New recovery key stored and validated", "Rotate current recovery key", "/rotate"}},
+		{"mac-filevault-rotation-queued", DeviceDetails(c, info, rotationDetail("queued")), []string{"Waiting for the Mac to replace its recovery key"}},
+		{"mac-filevault-rotation-uncertain", DeviceDetails(c, info, rotationDetail("uncertain")), []string{"Another rotation remains blocked", "Validate current recovery key"}},
+		{"mac-filevault-rotation-unverified", DeviceDetails(c, info, rotationDetail("unverified")), []string{"New recovery key stored; validate it"}},
+		{"mac-filevault-rotation-resolved", DeviceDetails(c, info, rotationDetail("resolved")), []string{"uncertain attempt is resolved", "Rotate current recovery key"}},
+		{"mac-filevault-rotation-reader", DeviceDetails(c, &reader, rotationDetail("rotated")), []string{"New recovery key stored and validated"}},
 		{"mac-filevault", DeviceDetails(c, info, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume", "Retrieve recovery key", "Disk encryption remains enabled", "Validate current recovery key"}},
 		{"mac-filevault-validation-queued", DeviceDetails(c, info, validationDetail("queued")), []string{"Waiting for the Mac to validate the current key"}},
 		{"mac-filevault-validation-valid", DeviceDetails(c, info, validationDetail("valid")), []string{"Validated on", "Validate current recovery key"}},

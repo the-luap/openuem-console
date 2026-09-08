@@ -22,6 +22,7 @@ func TestFileVaultRoutesRequireDedicatedCapabilities(t *testing.T) {
 		"/ios/:id/filevault":                  access.ManageDeviceSecurity,
 		"/ios/:id/filevault/keys/:key/reveal": access.RetrieveRecoveryKeys,
 		"/ios/:id/filevault/keys/:key/verify": access.ManageDeviceSecurity,
+		"/ios/:id/filevault/keys/:key/rotate": access.ManageDeviceSecurity,
 	} {
 		for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 			if got, ok := appleCapability("POST", prefix+path); !ok || got != want {
@@ -49,7 +50,7 @@ func exerciseAppleFileVault(t *testing.T, h *Handler, ctx context.Context, tenan
 	base := fmt.Sprintf("/tenant/%d/site/%d/ios/%s", tenant, site, invite.DeviceID)
 	keyID := uuid.NewString()
 	for _, user := range []string{"scoped-viewer", "scoped-operator"} {
-		for _, suffix := range []string{"/filevault", "/filevault/keys/" + keyID + "/reveal", "/filevault/keys/" + keyID + "/verify"} {
+		for _, suffix := range []string{"/filevault", "/filevault/keys/" + keyID + "/reveal", "/filevault/keys/" + keyID + "/verify", "/filevault/keys/" + keyID + "/rotate"} {
 			if rec := request(user, "POST", base+suffix, url.Values{"desired": {"enabled"}}); rec.Code != 403 {
 				t.Fatal("unauthorized FileVault mutation", user, rec.Code)
 			}
