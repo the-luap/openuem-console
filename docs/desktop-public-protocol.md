@@ -90,7 +90,10 @@ pinned release keys. It does not authenticate an embedded configuration signer,
 organization or origin. Native clients must independently authorize the expected
 server origin, verify HTTPS without redirecting credentials, verify the release
 signature/checkpoint/package and verify the operating system's native code
-signature. No complete native bootstrap client is claimed by this server work.
+signature. The shared `enrollment.NewHTTPClient` now performs the bounded HTTPS
+claim and validates the returned identity against the local CSR key and expected
+origin. It does not provide native key storage, package/bootstrap validation or
+installation by itself.
 
 ## Downloads, browser boundaries and capacity
 
@@ -143,6 +146,16 @@ Two TLS legs verify anonymous/foreign direct-backend rejection, forwarding-heade
 replacement, optional-broker routing and denied public administrator aliases.
 A streaming gateway test crosses a short ordinary HTTP deadline and verifies that
 gateway closure cancels the private download.
+
+The public server/gateway implementation at console commit `0268458` passed
+[console CI](https://github.com/the-luap/openuem-console/actions/runs/34181569389).
+The subsequent shared client at library commit `d6129ce9fe9b` passed
+[Linux and native Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
+`TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway` uses that
+published client against the actual private handler, two TLS legs and PostgreSQL
+registry. It verifies current release binding, certificate/key/origin validation,
+one-identity recovery after reconstructing the client and withdrawal rejection.
+Its keys are retained in test memory; native disk/keystore recovery remains open.
 
 ```sh
 AGENT_ENROLLMENT_TEST_DATABASE_URL='<isolated PostgreSQL test DSN>' \

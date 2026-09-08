@@ -35,6 +35,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Shared library client `d6129ce9fe9b` verifies HTTPS, bounds requests/responses,
+  rejects redirects and binds issued certificate purpose, key, device and WSS
+  origin. [Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
+  The console pins that published version and exercises client reconstruction,
+  same-key recovery and withdrawal through its real TLS gateway/handler/registry.
+  Test keys are retained in memory; native protected persistence remains open.
+
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata, strict endpoint-key claims and approved
   package downloads through the exact gateway allowlist. Real PostgreSQL/TLS race

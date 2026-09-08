@@ -18,6 +18,14 @@ shutdown. PostgreSQL/TLS race tests cover scanner safety, strict claims, retries
 revocation, changed files, source-header trust and public administrator denial.
 This does not complete native bootstrap configuration or installer execution.
 
+Library commit `d6129ce9fe9b` adds a bounded HTTPS claim client and strict returned
+certificate/key/device/origin validation, with generic errors and no redirects,
+cookies or environment proxy. Its
+[Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
+The console pins the published version and tests that exact client through its
+real gateway/private protocol and PostgreSQL release-bound issuer, including
+same-key recovery and release withdrawal. Native protected storage is still pending.
+
 Local related repositories were checked out from upstream into sibling directories:
 
 | Component | Baseline commit | Relevant finding |
