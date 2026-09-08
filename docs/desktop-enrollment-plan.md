@@ -6,7 +6,7 @@ claim. Shared proof, durable registry, broker authorization, gateway transport a
 worker request boundaries, service runtimes, scoped console administration and
 the public HTTPS claim/download protocol now have automated evidence. Protected
 Windows/macOS storage and durable HTTPS claim recovery also pass native CI. New
-console installation invitations, native runtime/bootstrap integration, installers
+console installation invitations, signed bootstrap integration, installers
 and production deployment wiring remain open.
 
 ## Source baselines
@@ -37,8 +37,17 @@ simulate a committed issuance with a lost HTTPS/HTTP2 response, then recover it
 using the same protected keys. Corruption, competing writers, partial failures and
 shutdown are covered. [All three platform CI jobs passed](https://github.com/the-luap/openuem-agent/actions/runs/34185479070),
 including full agent builds. See [native identity storage](https://github.com/the-luap/openuem-agent/blob/f5a373122a24ab826c9bc8e94852ca30ec6fa2fa/docs/individual-identity-storage.md).
-The package is not yet selected by the legacy service runtime; independent signed
-bootstrap authorization, installer integration and renewal remain open.
+Agent commit `1345f54` adds opt-in service selection before legacy credential reads,
+protected scope assignment, WSS/NKey connections, all existing scoped worker
+requests, read-only fixed-consumer access and joined transport shutdown. Actual
+`SendReport` and prepared-consumer tests use a real TLS WebSocket broker with device
+permissions; [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34186649018).
+It pins shared-library `2503532eb824`, whose read-only consumer helper also has
+[passing broker/database and Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34185830066).
+See [runtime configuration and limits](https://github.com/the-luap/openuem-agent/blob/1345f54bd894d4ac0804c31e450b2bcab19103d8/docs/individual-agent-runtime.md).
+Independent signed bootstrap authorization, installer integration, renewal,
+signed updater commands, inherited handler execution bounds and reference
+console/deployment wiring remain open.
 
 Local related repositories were checked out from upstream into sibling directories:
 

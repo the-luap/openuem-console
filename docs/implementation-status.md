@@ -49,8 +49,11 @@ the table's package summaries do not remove any detail from the roadmap.
   explicit noninteractive file keychain. Tests cover a lost issuance response with
   both native backends, corrupt state, concurrent publication and shutdown.
   [Windows, macOS and Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34185479070),
-  including full agent builds. Native bootstrap authorization, legacy runtime
-  integration, signing, renewal and installed-device acceptance remain open.
+  including full agent builds. Agent `1345f54` adds opt-in runtime selection,
+  protected scope, scoped WSS reports/profile requests, read-only prepared-consumer
+  access and joined transport shutdown. Its [three-platform CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34186649018).
+  Native bootstrap authorization, signing, renewal, complete command execution
+  bounds and installed-device acceptance remain open.
 
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata, strict endpoint-key claims and approved
