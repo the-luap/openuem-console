@@ -8,7 +8,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -19,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
@@ -44,11 +42,8 @@ func TestPublicSignedConfigurationIsReadOnlyScopedAndBoundToTheApprovedRelease(t
 			}
 			continue
 		}
-		var document bootstrapKeyDocument
-		if err := json.Unmarshal(data, &document); err != nil {
-			t.Fatal(err)
-		}
-		if document.Schema != 1 || document.Origin != "https://uem.example.test" || len(document.Keys) != 1 || document.Keys[0].KeyID != artifacts.KeyID(public) || document.Keys[0].PublicKey != base64.RawStdEncoding.EncodeToString(public) {
+		keys, err := bootstrap.ParseOriginKeys(data, "https://uem.example.test")
+		if err != nil || len(keys) != 1 || !bytes.Equal(keys[0], public) {
 			t.Fatal("public key document changed origin or signing identity")
 		}
 	}

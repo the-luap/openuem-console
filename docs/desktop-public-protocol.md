@@ -51,8 +51,28 @@ To enable signed configuration downloads, also set
 PEM file. Provision it for the console service account using the platform's private
 file permissions. This dedicated server key must differ from every trusted release
 key; it is not an organization CA key. Invalid or reused keys prevent startup.
-Without this optional setting, the two bootstrap routes return 404. Key generation,
-distribution and rotation are currently operator-managed.
+Without this optional setting, the two bootstrap routes return 404.
+
+Build `go build -o openuem-bootstrap-key ./cmd/openuem-bootstrap-key`, then run
+the tool as the actual console service account, with an absolute private directory
+under an administrator-controlled parent:
+
+```sh
+openuem-bootstrap-key -directory /srv/openuem/bootstrap
+```
+
+It creates `bootstrap-signing-key.pem` using the operating system's secure random
+source and private file permissions. Configure
+`OPENUEM_AGENT_BOOTSTRAP_KEY_FILE=/srv/openuem/bootstrap/bootstrap-signing-key.pem`.
+The output contains only its public key fingerprint and whether it was created.
+Repeating the command validates and retains the same key. It never replaces an
+existing file, repairs permissions or removes a key when output fails. An
+interrupted write can leave a protected incomplete file: initialization rejects
+that file, requiring operator investigation. Concurrent initialization may require
+a retry after the winning writer finishes. Keep parent directories protected
+against replacement. On Windows, initialize under the console service identity;
+credentials owned by a different installer account do not satisfy its owner policy.
+Distribution, backup and rotation remain operator-managed.
 
 ## Exact routes and responses
 
@@ -113,7 +133,10 @@ HTTPS without redirecting credentials, verify the release
 signature/checkpoint/package and verify the operating system's native code
 signature. The shared `enrollment.NewHTTPClient` now performs the bounded HTTPS
 claim and validates the returned identity against the local CSR key and expected
-origin. It does not provide native key storage, package/bootstrap validation or
+origin. Its `BootstrapKeys` and `Configuration` methods fetch only their exact
+GET routes with 8 KiB and 96 KiB limits; use `bootstrap.ParseOriginKeys` and
+`bootstrap.Verify` before accepting downloaded configuration. It does not provide
+native key storage, package/bootstrap validation or
 installation by itself.
 
 ## Downloads, browser boundaries and capacity
@@ -177,10 +200,15 @@ The subsequent shared client at library commit `d6129ce9fe9b` passed
 published client against the actual private handler, two TLS legs and PostgreSQL
 registry. It verifies current release binding, certificate/key/origin validation,
 one-identity recovery after reconstructing the client and withdrawal rejection.
-It also fetches origin keys, verifies the independently signed configuration and
+It also uses the published native client to fetch origin keys and configuration,
+verifies the independently signed configuration and
 checks the selected package through the real public TLS gateway. Separate tests
 cover GET/HEAD without invitation use, disabled signing, key-role reuse, protected
 key-file parsing, revoked invitations and withdrawn releases.
+Shared-library `c3688fa59622` adds these bounded bootstrap GET methods and the
+strict origin-key document parser; its [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34189077681).
+The initial server signer/routes at console `b8a810f` passed
+[console CI](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
 Its keys are retained in test memory. The related agent's separate native storage
 suite now covers DPAPI and isolated Keychain recovery after a lost HTTPS response;
 see [desktop integration evidence](desktop-enrollment-plan.md).

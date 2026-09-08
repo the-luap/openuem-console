@@ -6,14 +6,12 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/asn1"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
 	"time"
 
-	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/keyfile"
 )
@@ -65,24 +63,18 @@ func validBootstrapKey(key ed25519.PrivateKey) bool {
 	return subtle.ConstantTimeCompare(derived, key) == 1
 }
 
-type bootstrapKeyDocument struct {
-	Schema int                  `json:"schema"`
-	Origin string               `json:"origin"`
-	Keys   []bootstrapPublicKey `json:"keys"`
-}
-
-type bootstrapPublicKey struct {
-	KeyID     string `json:"key_id"`
-	PublicKey string `json:"public_key"`
-}
-
 func (h *PublicHandler) bootstrapKeys(w http.ResponseWriter, r *http.Request) {
 	if len(h.bootstrapKey) == 0 {
 		http.NotFound(w, r)
 		return
 	}
 	public := h.bootstrapKey.Public().(ed25519.PublicKey)
-	publicJSON(w, r, bootstrapKeyDocument{Schema: bootstrap.Schema, Origin: h.origin, Keys: []bootstrapPublicKey{{KeyID: artifacts.KeyID(public), PublicKey: base64.RawStdEncoding.EncodeToString(public)}}})
+	data, err := bootstrap.MarshalOriginKeys(h.origin, []ed25519.PublicKey{public})
+	if err != nil {
+		publicFailure(w, ErrBootstrapConfiguration)
+		return
+	}
+	publicJSON(w, r, json.RawMessage(data))
 }
 
 func (h *PublicHandler) configuration(w http.ResponseWriter, r *http.Request, token string) {

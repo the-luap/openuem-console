@@ -60,8 +60,14 @@ the table's package summaries do not remove any detail from the roadmap.
   Agent `e65091e` durably binds verified scope and release sequence before claims,
   rejects rollback and checks configuration expiry before identity publication.
   [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34187759140).
-  The console adds a protected dedicated configuration signer and read-only public
-  key/configuration routes. Native installation and origin authorization remain open.
+  Console `b8a810f` adds a protected dedicated configuration signer and read-only
+  public key/configuration routes; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
+  Library `c3688fa59622` adds bounded native HTTPS GET methods and strict origin-key
+  parsing, with [passing Linux/Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34189077681).
+  The console pins that version and exercises those methods through its live TLS
+  gateway/registry fixture. Its bootstrap-key CLI provisions or validates a private
+  signer without overwriting existing state. Native installation and origin
+  authorization remain open.
 
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata/configuration/key documents, strict endpoint-key claims and approved
@@ -110,12 +116,13 @@ the table's package summaries do not remove any detail from the roadmap.
 - [Installer release admission](agent-release-operations.md): explicit public-key
   trust, signed immutable metadata, all-target file verification, transactional
   sequence/digest checkpoint, concurrent approval protection, withdrawal and
-  database-independent candidate inspection. Native signing and public download
-  integration are still separate unfinished work.
+  database-independent candidate inspection. Public downloads now use this catalog;
+  native signing and installer execution remain unfinished.
 - Installer invitation/claim store methods now bind the exact approved release,
   target, origin and expiry in transactions. PostgreSQL lock-observation tests
   verify issuance/withdrawal ordering and rollback of related state. The public
-  handler, invitation UI and bootstrap consumer are not wired to these methods yet.
+  handler now uses those methods. The invitation UI and native bootstrap activation
+  remain open.
 
 ## Verification record
 
