@@ -11,7 +11,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | --- | --- | --- |
 | NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/configuration/key/claim/download routes with pinned private TLS and bounded streaming; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked | Legacy desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows activation and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS activation, signed installer distribution, binding migration/updates, renewal and release integration |
+| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows activation, macOS app bundle assembly and authenticated local readiness, and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS activation, signed installer distribution, binding migration/updates, renewal and release integration |
 | APP-01 | Baseline APNs certificate/key import | CSR/key storage; vendor signing integration; certificate-only import; renewal concurrency, account metadata, alerts and actual Apple issuance |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS service activation and finished Windows/Mac installer flows |
@@ -148,6 +148,29 @@ the table's package summaries do not remove any detail from the roadmap.
   native builds. Fixture services construct the actual individual agent but do
   not start inventory or host management. Local Windows ARM64 cross-build also
   passed; physical ARM64 acceptance remains outstanding.
+
+- Agent `5327ffd` adds [macOS app bundle assembly](https://github.com/the-luap/openuem-agent/blob/5327ffdbd2dfc04487aa724c5c9127302b6430de/docs/macos-app-bundle.md)
+  with sealed app/daemon metadata, a fixed external identity location, exclusive
+  publication and an explicit macOS 13.0 deployment baseline. The builder rejects
+  incompatible Mach-O targets and newer binary minimum versions. Native tests
+  verify an ad-hoc resource seal, including rejection after daemon plist changes;
+  the build-only check packages the actual CGo agent without running or installing
+  it. [All three CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34204893519).
+  Assembly does not provide Developer ID signing, notarization or distribution.
+
+- Agent `d9f6f40` adds [authenticated local macOS readiness](https://github.com/the-luap/openuem-agent/blob/d9f6f40966ae3b5518013f3a8958ff9b1833d423/docs/macos-local-readiness.md)
+  for individually enrolled agents bound to their executable. A private root-only
+  Unix endpoint signs a fresh challenge tied to the native peer PID, device/scope,
+  admitted image and certificate expiry. Readiness follows scheduler startup;
+  shutdown joins admitted requests before releasing identity keys. Native tests
+  cover peer credentials, actual crash/restart recovery, foreign file/socket
+  preservation, slow clients, cancellation and held signing work. Local native
+  race tests and the full production build pass. [Windows, macOS and Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34207785970),
+  including the isolated socket fixtures under root, native production builds and
+  actual-agent bundle assembly. This proof describes local
+  initialization, including an offline reconnect schedule, not inventory delivery.
+  `SMAppService` registration/approval integration, signed end-user installers,
+  binding migration/updates and physical Mac acceptance remain open.
 
 - `internal/security/clientidentity`: explicit gateway leaf pins, direct TLS mode,
   strict RFC 9440 decoding, backend enforcement and header replacement.
