@@ -231,7 +231,7 @@ func (s *Store) RevokePushRequest(ctx context.Context, tenant int, id, actor str
 
 // ImportPushCertificate uses the selected request's key, never the newest key.
 // Validation, settings replacement, request consumption and audit are atomic.
-// This performs local validation; it does not claim APNs connectivity or issuance.
+// This verifies the Apple issuer chain locally; it does not test APNs connectivity.
 func (s *Store) ImportPushCertificate(ctx context.Context, tenant int, id string, certificate []byte, actor string) error {
 	if err := certificateOnlyPEM(certificate); err != nil {
 		return err
@@ -263,7 +263,7 @@ func (s *Store) ImportPushCertificate(ctx context.Context, tenant int, id string
 	}
 	defer clear(key)
 	c := Settings{TenantID: tenant, Organization: r.Organization, PublicURL: r.PublicURL, AppleAccount: r.AppleAccount, PushKey: key, PushCertificate: certificate}
-	if err = validatePushSettings(&c); err != nil {
+	if err = s.validatePushSettings(&c); err != nil {
 		return err
 	}
 	if r.ExpectedTopic != "" && r.ExpectedTopic != c.Topic {

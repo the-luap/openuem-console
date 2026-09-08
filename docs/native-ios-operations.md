@@ -105,7 +105,9 @@ Windows for deployment. Protocol and console handler tests can run on macOS.
    [Apple's vendor certificate instructions](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate).
 2. Open **Apple setup & enrollment** in the intended organization. Enter the
    organization name and public HTTPS origin, then upload the certificate and
-   key as PEM files. The console validates the pair, validity period and MDM topic.
+   key as PEM files, or use the certificate-only request workflow above. Both
+   paths verify the Apple issuer chain, production/client usage, matching key,
+   validity period and MDM topic. See [validation limits and trust maintenance](apple-push-certificate-validation.md).
 3. Select a site and create an invitation for one device. Open its URL or scan its
    QR code on that iPhone/iPad. The public page explains the organization and
    installation steps before the owner confirms enrollment.

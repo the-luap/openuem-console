@@ -107,6 +107,7 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 					if canManage {
 						@PushRequests(info, settings, requests, vendorConfigured)
 						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
+							<p>Import verifies the Apple certificate chain, production push usage, matching private key, validity dates and MDM topic. APNs connectivity and certificate revocation are not checked.</p>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
 							@CSRF(info)
 							<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>

@@ -61,6 +61,7 @@ func testStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.pushTrust = testPushTrust(t)
 	// Minimal upstream scope tables; the console integration test separately
 	// exercises migrations against the real Ent schema.
 	if _, err = db.Exec(`CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT NOT NULL REFERENCES tenants(id)); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(1,1),(2,2)`); err != nil {
@@ -89,8 +90,9 @@ func testSettings(t *testing.T, s *Store, tenant int) *Settings {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cert := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Test APNs", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: "com.apple.mgmt.test"}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature}
-	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
+	cert := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "Test APNs", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: "com.apple.mgmt.test"}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, ExtraExtensions: testProductionPushExtensions()}
+	issuer, issuerKey := testPushCA(t)
+	der, err := x509.CreateCertificate(rand.Reader, cert, issuer, &key.PublicKey, issuerKey)
 	if err != nil {
 		t.Fatal(err)
 	}

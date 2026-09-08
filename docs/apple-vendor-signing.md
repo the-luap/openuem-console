@@ -147,7 +147,7 @@ at 390, 768 and 1440 pixels in light and dark mode with no horizontal overflow.
 Actual vendor permission, agreement and operational availability must still be
 established for the deployment. No vendor credential was provisioned, no signing
 service was contacted, and no Apple certificate was issued during implementation.
-Automatic service transport, revocation checking for vendor certificates, Apple
-issuer-chain validation of the final push certificate, APNs connectivity before
-activation, complete renewal reminders and actual issuance/renewal continuity
+The final push import now has [offline Apple chain validation](apple-push-certificate-validation.md).
+Automatic service transport, certificate revocation checking, APNs connectivity
+before activation, complete renewal reminders and actual issuance/renewal continuity
 remain open APP-01 work.

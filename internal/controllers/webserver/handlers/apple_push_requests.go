@@ -11,6 +11,9 @@ import (
 // Database and cryptographic errors may carry implementation details. New push
 // request routes return fixed messages instead of displaying underlying errors.
 func applePushRequestFailure(err error) error {
+	if errors.Is(err, apple.ErrPushCertificate) {
+		return echo.NewHTTPError(http.StatusBadRequest, apple.ErrPushCertificate.Error())
+	}
 	if errors.Is(err, apple.ErrVendorNotConfigured) {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, apple.ErrVendorNotConfigured.Error())
 	}

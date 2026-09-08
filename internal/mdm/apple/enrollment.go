@@ -49,15 +49,27 @@ func generateCA(organization string) ([]byte, []byte, error) {
 }
 
 func PushTopic(cert *x509.Certificate) string {
+	if cert == nil {
+		return ""
+	}
 	uid := asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}
+	var topic string
+	count := 0
 	for _, name := range cert.Subject.Names {
 		if name.Type.Equal(uid) {
-			if topic, ok := name.Value.(string); ok && strings.HasPrefix(topic, "com.apple.mgmt.") {
-				return topic
-			}
+			count++
+			topic, _ = name.Value.(string)
 		}
 	}
-	return ""
+	if count != 1 || !strings.HasPrefix(topic, "com.apple.mgmt.") || len(topic) <= len("com.apple.mgmt.") || len(topic) > 255 {
+		return ""
+	}
+	for _, c := range topic {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-') {
+			return ""
+		}
+	}
+	return topic
 }
 
 func validatePushOrganization(c *Settings) error {
@@ -75,10 +87,15 @@ func validatePushOrganization(c *Settings) error {
 	return nil
 }
 
-func validatePushSettings(c *Settings) error {
+func (s *Store) validatePushSettings(c *Settings) error {
 	if err := validatePushOrganization(c); err != nil {
 		return err
 	}
+	verified, err := s.pushTrust.verify(c.PushCertificate, time.Now())
+	if err != nil {
+		return err
+	}
+	c.PushCertificate = verified
 	pair, err := tls.X509KeyPair(c.PushCertificate, c.PushKey)
 	if err != nil {
 		return errors.New("invalid APNs certificate/key pair")
@@ -101,7 +118,7 @@ func validatePushSettings(c *Settings) error {
 // Configure creates or renews APNs credentials without changing an existing
 // topic or enrollment CA. A successful replacement supersedes pending requests.
 func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
-	if err := validatePushSettings(&c); err != nil {
+	if err := s.validatePushSettings(&c); err != nil {
 		return err
 	}
 	// Serializing setup also prevents concurrent initializations from creating
@@ -152,6 +169,10 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 		if err != nil {
 			return err
 		}
+	}
+	// CA generation and lock waits can outlast a credential's remaining validity.
+	if _, err = s.pushTrust.verify(c.PushCertificate, time.Now()); err != nil {
+		return err
 	}
 	pushKey, err := s.secrets.seal(c.PushKey, secretPurpose(c.TenantID, "settings", "push_key"))
 	if err != nil {

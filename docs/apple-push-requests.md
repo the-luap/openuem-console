@@ -7,10 +7,11 @@ PEM certificate without uploading or downloading the private key.
 
 This is partial APP-01 implementation. [Authorized vendor signing](apple-vendor-signing.md)
 now supports offline vendor infrastructure, signed-response verification and
-complete portal-request download. Automatic signing-service transport, Apple
-issuer-chain validation of the final push certificate and a pre-activation APNs
-connectivity test are not implemented. Local import checks do not prove that
-Apple issued or accepts a certificate. Actual Apple issuance and renewal remain
+complete portal-request download. Both import paths now perform
+[offline Apple issuer-chain validation](apple-push-certificate-validation.md).
+Automatic signing-service transport and a pre-activation APNs connectivity test
+are not implemented. Offline chain validation does not check revocation or
+prove current APNs acceptance. Actual Apple issuance and renewal remain
 acceptance requirements. The console explicitly describes the available checks.
 
 ## Administrator workflow
@@ -36,8 +37,9 @@ acceptance requirements. The console explicitly describes the available checks.
    different entry changes the topic and cannot replace an existing enrollment.
 5. Upload the certificate Apple returns to the **same request** in OpenUEM. Upload
    certificates only, in PEM format, up to 64 KiB and eight certificates. No key
-   upload is needed. Import checks the selected stored key, current validity and
-   an MDM topic; renewal must preserve the existing topic. A successful local
+   upload is needed. Import checks the Apple issuer chain, explicit client
+   authentication and production push usage, selected stored key, current validity
+   and an unambiguous MDM topic; renewal must preserve the existing topic. A successful local
    import immediately replaces active push credentials. Because a connectivity
    test is still absent, this workflow does not satisfy the full APP-01 activation
    gate and must not be described as a fully verified Apple setup wizard.
@@ -88,16 +90,20 @@ PostgreSQL race tests cover public CSR signature verification, encrypted-key
 association, cross-organization isolation, wrong-request certificates, expired
 certificates and requests, topic changes, revocation, pending limits, concurrent
 renewals, legacy import invalidation, CA preservation and rollback after a failed
-final audit insert. Console integration uses the actual router, Ent schema,
-permissions, CSRF middleware, public CSR download and certificate-only multipart
-upload. The certificate issuers in these tests are synthetic local fixtures.
+final audit insert. These package tests inject synthetic roots only through
+unexported test fixtures and exercise the production verifier. Fresh production
+constructors reject those issuers through both import paths. Console integration
+uses the actual router, Ent schema, permissions, CSRF middleware, public CSR
+download and rejection of untrusted certificate-only multipart uploads. Other
+console workflows use explicitly seeded existing settings in the disposable
+database, not a successful synthetic certificate upload.
 The rendered setup fixture was also checked in headless Chrome at 390, 768 and
 1440 pixels in light and dark mode. All six views had no horizontal overflow;
 the required confirmation checkbox blocked submission until selected. This is
 rendering and browser-form evidence, not a live Apple portal or issuance test.
 
 Remaining APP-01 work includes deployment-specific vendor permission and
-operational ownership; automatic signing-service transport; trusted Apple
-certificate-chain checks for the final push certificate and a meaningful APNs
-connection test before activation; full guided error recovery and renewal reminders; and actual Apple
+operational ownership; automatic signing-service transport; Apple
+certificate revocation checks and a meaningful APNs connection test before
+activation; full guided error recovery and renewal reminders; and actual Apple
 issuance/renewal with enrolled-device continuity. The full roadmap stays open.

@@ -3,14 +3,19 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"math/big"
 	"mime/multipart"
 	"net/http/httptest"
@@ -153,7 +158,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cert := &x509.Certificate{SerialNumber: big.NewInt(123), Subject: pkix.Name{CommonName: "Test APNs", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: "com.apple.mgmt.console-test"}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature}
+	cert := &x509.Certificate{SerialNumber: big.NewInt(123), Subject: pkix.Name{CommonName: "Test APNs", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: "com.apple.mgmt.console-test"}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, ExtraExtensions: []pkix.Extension{{Id: asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 6, 3, 2}, Value: []byte{5, 0}}}}
 	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
 	if err != nil {
 		t.Fatal(err)
@@ -182,12 +187,25 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec = request("POST", base+"/ios/setup", writer.FormDataContentType(), body.Bytes())
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "credentials saved") {
-		t.Fatal("setup form failed", rec.Code, rec.Body.String())
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), apple.ErrPushCertificate.Error()) || strings.Contains(rec.Body.String(), "credentials saved") {
+		t.Fatal("setup accepted an untrusted certificate", rec.Code, rec.Body.String())
 	}
 	if strings.Contains(rec.Body.String(), "BEGIN PRIVATE KEY") {
 		t.Fatal("private key leaked in setup response")
 	}
+	if _, err = store.SettingsMetadata(ctx, tenant.ID); !errors.Is(err, apple.ErrNotFound) {
+		t.Fatal("rejected upload configured management", err)
+	}
+	// Seed an existing installation in this disposable schema to exercise the
+	// remaining routes. This does not add synthetic trust to the production store
+	// or claim a successful Apple certificate upload. The secret encoding is built
+	// independently from the documented AES-GCM storage format.
+	ca := &x509.Certificate{SerialNumber: big.NewInt(124), Subject: pkix.Name{CommonName: "Synthetic console enrollment CA"}, NotBefore: cert.NotBefore, NotAfter: cert.NotAfter, IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedExistingAppleSettings(t, m.DB, apple.Settings{TenantID: tenant.ID, PublicURL: "https://mdm.example.test", Organization: "Example organization", Topic: "com.apple.mgmt.console-test", PushExpiresAt: cert.NotAfter, PushCertificate: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), PushKey: pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), CACertificate: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}), CAKey: pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})})
 	form := url.Values{"csrf": {"console-test-token"}, "name": {"Sales iPhone"}, "site_id": {strconv.Itoa(site.ID)}}
 	rec = request("POST", base+"/ios/enroll", "application/x-www-form-urlencoded", []byte(form.Encode()))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Enrollment invitation ready") {
@@ -238,4 +256,30 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	}
 	exerciseConsolePermissions(t, h, e, ctx, tenant.ID, site.ID, profiles[0].ID)
 	exerciseDesktopConsolePermissions(t, h, e, ctx, tenant.ID, site.ID)
+}
+
+// seedExistingAppleSettings represents existing credentials only inside a disposable
+// test schema. Production imports still reject synthetic certificates.
+func seedExistingAppleSettings(t *testing.T, db *sql.DB, c apple.Settings) {
+	t.Helper()
+	secretKey := sha256.Sum256([]byte("openuem/apple/secrets/v1\x00" + strings.Repeat("k", 32)))
+	blockCipher, err := aes.NewCipher(secretKey[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(blockCipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seal := func(field string, value []byte) []byte {
+		nonce := make([]byte, aead.NonceSize())
+		if _, err := rand.Read(nonce); err != nil {
+			t.Fatal(err)
+		}
+		return aead.Seal(nonce, nonce, value, []byte(fmt.Sprintf("%d/settings/%s", c.TenantID, field)))
+	}
+	_, err = db.Exec(`INSERT INTO mdm_apple_settings(tenant_id,public_url,organization,topic,push_expires_at,push_certificate,push_key,ca_certificate,ca_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, c.TenantID, c.PublicURL, c.Organization, c.Topic, c.PushExpiresAt, c.PushCertificate, seal("push_key", c.PushKey), c.CACertificate, seal("ca_key", c.CAKey))
+	if err != nil {
+		t.Fatal(err)
+	}
 }

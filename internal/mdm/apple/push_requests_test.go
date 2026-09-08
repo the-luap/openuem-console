@@ -3,8 +3,6 @@ package apple
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -47,12 +45,9 @@ func issueTestPushCertificate(t *testing.T, s *Store, tenant int, id, topic stri
 	if request.Subject.Organization[0] != "Request organization" || !strings.Contains(request.Subject.CommonName, id) {
 		t.Fatal("CSR lost request association")
 	}
-	issuer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Synthetic push certificate", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: topic}}}, NotBefore: time.Now().Add(-2 * time.Hour), NotAfter: expires, KeyUsage: x509.KeyUsageDigitalSignature}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, request.PublicKey, issuer)
+	issuer, issuerKey := testPushCA(t)
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Synthetic push certificate", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: topic}}}, NotBefore: time.Now().Add(-2 * time.Hour), NotAfter: expires, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, ExtraExtensions: testProductionPushExtensions()}
+	der, err := x509.CreateCertificate(rand.Reader, template, issuer, request.PublicKey, issuerKey)
 	if err != nil {
 		t.Fatal(err)
 	}

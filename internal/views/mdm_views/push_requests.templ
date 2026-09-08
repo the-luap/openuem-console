@@ -62,7 +62,7 @@ templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests
 					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup/requests/"+r.ID+"/certificate") } enctype="multipart/form-data" class="grid gap-3">
 						@CSRF(info)
 						<label>Apple-issued certificate for this request (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
-						<p class="uk-text-muted">Import checks the stored key, validity dates and MDM topic locally. It replaces the active certificate and supersedes other pending requests. An APNs connection test is not yet available.</p>
+						<p class="uk-text-muted">Import verifies the Apple certificate chain, production push usage, stored key, validity dates and MDM topic. It replaces the active certificate and supersedes other pending requests. An APNs connection test is not yet available.</p>
 						<button class="uk-button uk-button-primary" type="submit">Import certificate for this request</button>
 					</form>
 				}

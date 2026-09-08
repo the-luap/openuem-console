@@ -144,7 +144,7 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 			t.Fatal(err)
 		}
 		// Synthetic local key/topic fixture; no Apple issuance or APNs claim.
-		certificate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Synthetic route certificate", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: requests[0].ExpectedTopic}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature}
+		certificate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Synthetic route certificate", ExtraNames: []pkix.AttributeTypeAndValue{{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 1}, Value: requests[0].ExpectedTopic}}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, ExtraExtensions: []pkix.Extension{{Id: asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 6, 3, 2}, Value: []byte{5, 0}}}}
 		der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, csr.PublicKey, issuer)
 		if err != nil {
 			t.Fatal(err)
@@ -165,11 +165,11 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 			t.Fatal(err)
 		}
 		rec = request("organization-admin", "POST", path+"/certificate", writer.FormDataContentType(), body.Bytes())
-		if rec.Code != 303 {
-			t.Fatal("certificate-only import failed", rec.Code, rec.Body.String())
+		if rec.Code != 400 || !strings.Contains(rec.Body.String(), apple.ErrPushCertificate.Error()) {
+			t.Fatal("certificate-only import accepted an untrusted issuer", rec.Code, rec.Body.String())
 		}
-		if rec := request("organization-admin", "GET", path+"/csr", "", nil); rec.Code != 409 {
-			t.Fatal("consumed request still downloadable", rec.Code)
+		if rec := request("organization-admin", "GET", path+"/csr", "", nil); rec.Code != 200 {
+			t.Fatal("failed validation consumed request", rec.Code)
 		}
 		if rec := request("scoped-viewer", "GET", base+"/ios/setup", "", nil); rec.Code != 200 || strings.Contains(rec.Body.String(), "private-account") {
 			t.Fatal("active account metadata leaked to viewer", rec.Code)

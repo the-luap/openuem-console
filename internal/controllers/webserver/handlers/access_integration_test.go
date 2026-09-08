@@ -61,9 +61,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	otherSettings := *settings
 	otherSettings.TenantID = otherTenant.ID
 	otherSettings.Organization = "Private organization"
-	if err = h.Apple.Configure(ctx, otherSettings, adminID); err != nil {
-		t.Fatal(err)
-	}
+	seedExistingAppleSettings(t, h.Model.DB, otherSettings)
 	devices := []*apple.Invitation{}
 	for _, entry := range []struct {
 		tenant, site int

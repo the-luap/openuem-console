@@ -11,8 +11,8 @@ import (
 )
 
 // Apple's software catalog uses an Apple PKI chain which is not present in all
-// OS trust stores. The catalog client and vendor envelope verifier explicitly
-// opt into this root; it is never installed in the OS trust store.
+// OS trust stores. The catalog client, vendor envelope verifier and offline push
+// import verifier opt into this root; it is never installed in the OS trust store.
 // Source and fingerprint are recorded in certs/README.md.
 //
 //go:embed certs/AppleIncRootCertificate.cer
