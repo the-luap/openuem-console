@@ -131,6 +131,13 @@ func (s *Store) requestFileVaultRotation(ctx context.Context, scope Scope, devic
 	if expires.Before(now.Add(time.Minute)) {
 		return ErrFileVault
 	}
+	// Native escrow is the recovery path if the process dies after changing
+	// the volume key. Confirm its retained private key and certificate are
+	// usable before admitting a mutation, not only that its profile exists.
+	escrowCertificate, escrowPrivate, err := s.fileVaultEscrowKey(ctx, tx, d, escrow)
+	if err != nil || escrowPrivate.Validate() != nil || !escrowPrivate.PublicKey.Equal(escrowCertificate.PublicKey) || now.Before(escrowCertificate.NotBefore) || expires.Add(enrollment.RotationReceiptGrace).After(escrowCertificate.NotAfter) {
+		return ErrFileVault
+	}
 	reply, err := enrollment.NewRecoveryRecipientKey()
 	if err != nil {
 		return ErrFileVault

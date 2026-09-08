@@ -108,7 +108,9 @@ On an eligible Mac, expand **Replace the current recovery key** and select
 current security and hardware reports, and both exact managed FileVault profiles
 confirmed after the policy became active. A later negative validation prevents
 rotation until another successful check. The key version in the form must still
-be current. The agent uses macOS 10.14 or later PRK authentication on APFS.
+be current. The retained native escrow private key must open successfully, match
+its certificate, and remain valid through the execution and receipt reserve.
+The agent uses macOS 10.14 or later PRK authentication on APFS.
 
 Native migration 017 stores independent console expectations and an encrypted
 per-attempt X25519 return key. The old PRK is HPKE-encrypted for the agent's

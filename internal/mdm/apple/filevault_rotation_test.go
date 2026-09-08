@@ -3,6 +3,8 @@ package apple
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -116,6 +118,8 @@ func TestFileVaultRotationQueueRequiresCurrentEvidenceAndAtomicAuthorization(t *
 		{"stale profiles", `UPDATE mdm_apple_devices SET profiles_at=clock_timestamp()-interval '25 hours'`},
 		{"missing profiles", `UPDATE mdm_apple_devices SET installed_profiles='[]'`},
 		{"inactive escrow", `UPDATE mdm_apple_filevault_policies SET phase='removed',desired='removed'`},
+		{"unreadable escrow private key", `UPDATE mdm_apple_filevault_escrow SET private_key='\x01'`},
+		{"unreadable escrow certificate", `UPDATE mdm_apple_filevault_escrow SET certificate='\x01'`},
 		{"missing recipient", `DELETE FROM uem_agent_recovery_recipients`},
 		{"short agent lifetime", `UPDATE uem_agent_identities SET certificate_expires_at=clock_timestamp()+interval '2 minutes'`},
 		{"short native lifetime", `UPDATE mdm_apple_devices SET certificate_expires_at=clock_timestamp()+interval '2 minutes'`},
@@ -148,5 +152,59 @@ func TestFileVaultRotationQueueRequiresCurrentEvidenceAndAtomicAuthorization(t *
 	}
 	if err := f.s.requestFileVaultRotation(t.Context(), Scope{TenantID: f.scope.TenantID + 1}, f.d.ID, f.keyID, "admin", nil); !errors.Is(err, ErrNotFound) {
 		t.Fatal("foreign scope accepted", err)
+	}
+}
+
+func TestFileVaultRotationQueueRequiresUsableNativeEscrowKeyPair(t *testing.T) {
+	for _, mode := range []string{"mismatched", "expired"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFileVaultRotationFixture(t)
+			var id string
+			if err := f.s.db.QueryRow(`SELECT escrow_id FROM mdm_apple_filevault_policies WHERE device_id=$1`, f.d.ID).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "mismatched" {
+				_, private, err := newFileVaultCertificate(uuid.NewString())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer clear(private)
+				sealed, err := f.s.secrets.seal(private, secretPurpose(f.d.TenantID, f.d.ID+"/"+id, "filevault_private_key"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = f.s.db.Exec(`UPDATE mdm_apple_filevault_escrow SET private_key=$2 WHERE id=$1`, id, sealed); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				tx, err := f.s.db.BeginTx(t.Context(), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback()
+				certificate, private, err := f.s.fileVaultEscrowKey(t.Context(), tx, f.d, id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				certificate.NotAfter = time.Now().Add(-time.Minute)
+				der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, &private.PublicKey, private)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = tx.Exec(`UPDATE mdm_apple_filevault_escrow SET certificate=$2 WHERE id=$1`, id, der); err != nil {
+					t.Fatal(err)
+				}
+				if err = tx.Commit(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := f.s.requestFileVaultRotation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil); err == nil {
+				t.Fatal("unusable native escrow admitted a mutation")
+			}
+			var clean bool
+			if err := f.s.db.QueryRow(`SELECT NOT EXISTS(SELECT 1 FROM uem_agent_rotation_tasks) AND NOT EXISTS(SELECT 1 FROM mdm_apple_filevault_rotations)`).Scan(&clean); err != nil || !clean {
+				t.Fatal("unusable escrow consumed a rotation attempt", err)
+			}
+		})
 	}
 }
