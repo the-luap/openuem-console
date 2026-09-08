@@ -106,6 +106,9 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 					}
 					if canManage {
 						@PushRequests(info, settings, requests, vendorConfigured)
+						if settings!=nil {
+							@PushReminderHistory(settings.PushReminders)
+						}
 						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
 							<p>Import verifies the Apple certificate chain, production push usage, matching private key, validity dates and MDM topic, then checks a fresh APNs connection before replacing active credentials. The connection check can take up to 10 seconds and sends no device command.</p>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">

@@ -150,5 +150,8 @@ service was contacted, and no Apple certificate was issued during implementation
 The final push import now has [offline Apple chain validation](apple-push-certificate-validation.md).
 A [fresh APNs connection check](apple-apns-connection-check.md) is required before
 activation. Automatic service transport, independent certificate revocation
-checking, deployment acceptance, complete renewal reminders and actual issuance/renewal continuity
+checking, deployment acceptance and actual issuance/renewal continuity
 remain open APP-01 work.
+
+[Persistent expiry reminders](apple-push-expiry-reminders.md) now provide scoped
+administrator email delivery, retries and history independently of vendor signing.

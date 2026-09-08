@@ -108,5 +108,10 @@ rendering and browser-form evidence, not a live Apple portal or issuance test.
 Remaining APP-01 work includes deployment-specific vendor permission and
 operational ownership; automatic signing-service transport; Apple
 certificate revocation checks and deployment acceptance of the APNs connection
-check; full guided error recovery and renewal reminders; and actual Apple
+check; full guided error recovery; and actual Apple
 issuance/renewal with enrolled-device continuity. The full roadmap stays open.
+
+[Persistent expiry reminders](apple-push-expiry-reminders.md) now email eligible
+certificate administrators, retain retry/history state and stop stale pending
+deliveries after renewal. Deployment SMTP/inbox acceptance remains separate from
+the automated loopback evidence.

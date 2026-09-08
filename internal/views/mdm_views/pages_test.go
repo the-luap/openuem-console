@@ -41,6 +41,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	req := httptest.NewRequest("GET", "/tenant/1/devices", nil).WithContext(ctx)
 	c := echo.New().NewContext(req, httptest.NewRecorder())
 	now := time.Now().UTC()
+	reminders := []apple.PushReminderSummary{{Fingerprint: strings.Repeat("d", 64), Stage: 7, CreatedAt: now, ExpiresAt: now.Add(6 * 24 * time.Hour), Pending: 2, Failed: 1, Sent: 1, NextAttemptAt: &now}, {Fingerprint: strings.Repeat("e", 64), Stage: 30, CreatedAt: now.Add(-24 * time.Hour), ExpiresAt: now.Add(6 * 24 * time.Hour), ResolvedAt: &now, Sent: 2, Cancelled: 1}}
 	vendorExpires := now.Add(24 * time.Hour)
 	d := &apple.Device{ID: "10000000-0000-0000-0000-000000000001", Name: "Sales iPhone", Model: "iPhone16,1", OSVersion: "18.6.2", BuildVersion: "22G100", SerialNumber: "EXAMPLE123", Supervised: true, Status: "enrolled", InventoryAt: &now, LastSeen: &now, AppsAt: &now, ProfilesAt: &now, CertificateExpiresAt: now.AddDate(1, 0, 0), PushStatus: "accepted", Apps: []apple.Application{{Identifier: "com.example.app", Name: "Example app", Version: "42", ShortVersion: "1.2"}}}
 	p := apple.Profile{ID: "20000000-0000-0000-0000-000000000001", Name: "Company Wi-Fi", Identifier: "eu.example.wifi", Revision: 2, PayloadTypes: []string{"com.apple.wifi.managed"}}
@@ -90,10 +91,25 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}
 	b.Reset()
 	privateFingerprint := strings.Repeat("c", 64)
-	if err = Setup(c, info, &apple.Settings{Organization: "Example organization", Topic: "com.apple.mgmt.example", PushCheckedAt: &now, PushFingerprint: privateFingerprint}, nil, false, true, "", "", true).Render(ctx, &b); err != nil {
+	if err = Setup(c, info, &apple.Settings{Organization: "Example organization", Topic: "com.apple.mgmt.example", PushCheckedAt: &now, PushFingerprint: privateFingerprint, PushReminders: reminders}, nil, false, true, "", "", true).Render(ctx, &b); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(b.String(), privateFingerprint) || strings.Contains(b.String(), "APNs connection checked (UTC)") {
+	if strings.Contains(b.String(), privateFingerprint) || strings.Contains(b.String(), "APNs connection checked (UTC)") || strings.Contains(b.String(), reminders[0].Fingerprint) {
 		t.Fatal("connection metadata visible without certificate authority")
+	}
+	b.Reset()
+	if err = Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.Add(6 * 24 * time.Hour), PushReminders: reminders}, nil, true, false, "", "", true).Render(ctx, &b); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"Within 7 days", "Deliveries awaiting retry: 1", "Accepted by SMTP: 1", reminders[0].Fingerprint, "No eligible recipient"} {
+		present := strings.Contains(b.String(), value)
+		if (value == "No eligible recipient" && present) || (value != "No eligible recipient" && !present) {
+			t.Errorf("incorrect reminder presentation for %q", value)
+		}
+	}
+	if dir := os.Getenv("APPLE_MDM_UI_ARTIFACTS"); dir != "" {
+		if err = os.WriteFile(filepath.Join(dir, "reminders.html"), b.Bytes(), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

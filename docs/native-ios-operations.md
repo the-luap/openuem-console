@@ -37,6 +37,11 @@ request downloads. Both credential import paths require a
 Deployment vendor authority and actual Apple issuance/renewal acceptance remain
 open; see these guides for checks and renewal behavior.
 
+[Push certificate expiry reminders](apple-push-expiry-reminders.md) run in the
+console independently of the public listener and NATS. Configure organization
+SMTP settings and active, verified certificate administrators before relying on
+email warnings. Apple setup shows the latest delivery history and retry state.
+
 ## Deployment prerequisites
 
 Start from a working OpenUEM installation. Existing PostgreSQL, NATS, workers,
@@ -239,10 +244,11 @@ check used fixture device credentials with outbound APNs blocked; real push
 delivery, device installation behavior and Windows agent execution remain subject
 to the hardware checklist below.
 
-The full upstream models suite has known SMTP/user expectation
-failures reproduced at unmodified upstream commit
+An earlier comparison reproduced SMTP/user expectation failures at unmodified upstream commit
 `5604db7e4b4ac0fef5f95aad0ef279722966bd9d`:
 `TestUpdateSMTPSettings`, `TestAddOIDCUser`, and `TestConfirmEmail`.
+The SMTP settings regression is now fixed and `TestSMTPTestSuite` passes; this
+does not claim that the unrelated upstream user expectations have been resolved.
 
 Before a production rollout, record these checks on actual managed hardware:
 

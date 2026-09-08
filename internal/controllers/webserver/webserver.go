@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -28,6 +29,9 @@ type WebServer struct {
 	AppleCancel    context.CancelFunc
 	DesktopServer  *http.Server
 	desktopPublic  *desktop.PublicHandler
+	reminderMu     sync.Mutex
+	reminderCancel context.CancelFunc
+	reminderDone   chan struct{}
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -81,6 +85,8 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	w.Handler.Access = permissions
+	w.startAppleReminders()
+	defer w.stopAppleReminders()
 	identity, err := clientidentity.FromEnvironment()
 	if err != nil {
 		return err
@@ -103,6 +109,7 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 }
 
 func (w *WebServer) Close() error {
+	w.stopAppleReminders()
 	w.stopDesktop()
 	if w.AppleCancel != nil {
 		w.AppleCancel()

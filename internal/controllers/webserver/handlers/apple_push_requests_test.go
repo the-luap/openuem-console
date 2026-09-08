@@ -38,6 +38,10 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 			return rec
 		}
 		form := url.Values{"csrf": {"console-test-token"}, "organization": {"Request route test"}, "public_url": {"https://mdm.example.test"}, "apple_account": {`owner+<script>private-account</script>@example.test`}}
+		reminderFingerprint := strings.Repeat("c", 64)
+		if _, err := h.Model.DB.Exec(`INSERT INTO mdm_apple_push_reminders(id,tenant_id,fingerprint,expires_at,stage) VALUES('90000000-0000-0000-0000-000000000001',$1,$2,now(),0)`, tenant, reminderFingerprint); err != nil {
+			t.Fatal(err)
+		}
 		post := func(user, path string) *httptest.ResponseRecorder {
 			return request(user, "POST", path, "application/x-www-form-urlencoded", []byte(form.Encode()))
 		}
@@ -75,13 +79,16 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 				}
 			}
 			rec := request(user, "GET", base+"/ios/setup", "", nil)
-			if rec.Code != 200 || strings.Contains(rec.Body.String(), id) || strings.Contains(rec.Body.String(), "private-account") {
+			if rec.Code != 200 || strings.Contains(rec.Body.String(), id) || strings.Contains(rec.Body.String(), "private-account") || strings.Contains(rec.Body.String(), reminderFingerprint) || strings.Contains(rec.Body.String(), "Certificate expiry reminders") {
 				t.Fatal("request metadata visible without certificate authority", rec.Code)
 			}
 		}
 		rec := request("organization-admin", "GET", base+"/ios/setup", "", nil)
-		if rec.Code != 200 || !strings.Contains(rec.Body.String(), id) || strings.Contains(rec.Body.String(), "<script>private-account</script>") || !strings.Contains(rec.Body.String(), "&lt;script&gt;") {
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), id) || strings.Contains(rec.Body.String(), "<script>private-account</script>") || !strings.Contains(rec.Body.String(), "&lt;script&gt;") || !strings.Contains(rec.Body.String(), reminderFingerprint) || !strings.Contains(rec.Body.String(), "No eligible recipient") {
 			t.Fatal("unsafe or missing request metadata", rec.Code)
+		}
+		if rec := request("apple-console-admin", "GET", fmt.Sprintf("/tenant/%d/ios/setup", otherTenant), "", nil); rec.Code != 200 || strings.Contains(rec.Body.String(), reminderFingerprint) {
+			t.Fatal("reminder history crossed selected organization", rec.Code)
 		}
 		if rec := request("organization-admin", "GET", path+"/portal", "", nil); rec.Code != 503 {
 			t.Fatal("unconfigured vendor download did not fail closed", rec.Code)

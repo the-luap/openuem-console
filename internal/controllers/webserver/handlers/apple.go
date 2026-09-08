@@ -242,6 +242,12 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		if settings != nil {
+			settings.PushReminders, err = h.Apple.PushReminderHistory(c.Request().Context(), scope.TenantID)
+			if err != nil {
+				return err
+			}
+		}
 	} else if settings != nil {
 		settings.AppleAccount = ""
 		settings.PushCheckedAt = nil
