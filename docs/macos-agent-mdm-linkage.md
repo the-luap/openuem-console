@@ -8,7 +8,7 @@ are not implemented yet. Existing agent and native MDM records remain separate.
 
 ## Implemented evidence path
 
-The console pins shared protocol `4e6e26103fd9`. Desktop initialization runs
+The console pins shared protocol `249bb9d5e690`. Desktop initialization runs
 registry migration 003, which creates `uem_agent_hardware` with a composite
 organization/site/identity foreign key. The broker authorization service includes
 the device-scoped `hardware` operation. Ordinary inventory JSON is unchanged.
