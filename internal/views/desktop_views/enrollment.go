@@ -2,8 +2,10 @@ package desktop_views
 
 import (
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/desktop"
 )
@@ -13,6 +15,38 @@ type EnrollmentData struct {
 	Authority                              *registry.Authority
 	Invitations                            desktop.Page[desktop.InvitationRow]
 	Identities                             desktop.Page[desktop.IdentityRow]
+	InvitationSetup, FormError             string
+	ReleaseDigest, ReleaseVersion          string
+	ReleaseExpires                         time.Time
+	Targets                                []artifacts.Artifact
+	InvitationForm                         InvitationForm
+	Created                                *desktop.InstallerInvitation
+}
+
+type InvitationForm struct {
+	Target         string
+	MaxUses, Hours int
+}
+
+func targetLabel(platform, architecture string) string {
+	if platform == "macos" {
+		if architecture == "arm64" {
+			return "Mac — Apple silicon"
+		}
+		return "Mac — Intel"
+	}
+	if architecture == "arm64" {
+		return "Windows — ARM64"
+	}
+	return "Windows — x64"
+}
+
+func invitationToken(invitation *desktop.InstallerInvitation) string {
+	if invitation == nil {
+		return ""
+	}
+	_, token, _ := strings.Cut(invitation.URL, "/enroll/desktop/")
+	return token
 }
 
 func invitationState(row desktop.InvitationRow) string {

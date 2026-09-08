@@ -97,6 +97,7 @@ func (w *WebServer) startDesktop(certFile, keyFile string) error {
 	server := public.Server(address)
 	server.TLSConfig.Certificates = []tls.Certificate{certificate}
 	w.DesktopServer, w.desktopPublic, w.Handler.DesktopCatalog = server, public, catalog
+	w.Handler.DesktopBootstrapReady = len(bootstrapKey) != 0
 	ready = true
 	go func() {
 		defer listener.Close()

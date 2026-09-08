@@ -11,7 +11,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | --- | --- | --- |
 | NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/configuration/key/claim/download routes with pinned private TLS and bounded streaming; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked | Legacy desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, metadata and revocation; approved-release-bound public HTTPS claims and scanner-safe metadata; Windows DPAPI/macOS Keychain storage, durable claim recovery, verified bootstrap scope/checkpoints and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | New console installation invitations and reference installation wiring; native bootstrap activation, signed installer distribution, renewal and release integration |
+| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims and scanner-safe metadata; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Public installation portal and reference installation wiring; native service activation, signed installer distribution, renewal and release integration |
 | APP-01 | Baseline APNs certificate/key import | CSR/key storage; vendor signing integration; certificate-only import; renewal concurrency, account metadata, alerts and actual Apple issuance |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; desktop metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; Windows/Mac installation page, native bootstrap activation and installer flows |
@@ -100,6 +100,16 @@ the table's package summaries do not remove any detail from the roadmap.
   backend denial, release withdrawal, file mutation, ranged downloads, database
   contention and shutdown. [Protocol operations](desktop-public-protocol.md) records
   bounds and remaining native bootstrap/installer work.
+
+- The [desktop console invitation form](desktop-console-invitations.md) now creates
+  scoped release-bound invitations after explicit confirmation. It offers only
+  installed-agent-compatible targets, handles single-site navigation and rejects
+  stale releases, duplicated fields, foreign scope/origin input, invalid limits,
+  missing signers and changed packages. Real PostgreSQL/router tests verify atomic
+  audit and one-time token exposure. A disposable browser session exercised native
+  form submission and token-free list navigation at mobile/tablet/desktop widths;
+  light/dark rendering was inspected. Finished public installation and activation
+  remain outstanding.
 
 - `internal/security/clientidentity`: explicit gateway leaf pins, direct TLS mode,
   strict RFC 9440 decoding, backend enforcement and header replacement.

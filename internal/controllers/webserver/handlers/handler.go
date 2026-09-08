@@ -23,14 +23,15 @@ import (
 )
 
 type Handler struct {
-	Access            *access.Store
-	PublicOrigin      string
-	Model             *models.Model
-	Apple             *apple.Store
-	AppleSetupError   string
-	Desktop           *desktop.Store
-	DesktopCatalog    *desktop.Catalog
-	DesktopSetupError string
+	Access                *access.Store
+	PublicOrigin          string
+	Model                 *models.Model
+	Apple                 *apple.Store
+	AppleSetupError       string
+	Desktop               *desktop.Store
+	DesktopCatalog        *desktop.Catalog
+	DesktopBootstrapReady bool
+	DesktopSetupError     string
 
 	SessionManager       *sessions.SessionManager
 	JWTKey               string

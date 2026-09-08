@@ -5,11 +5,19 @@ ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptan
 claim. Shared proof, durable registry, broker authorization, gateway transport and
 worker request boundaries, service runtimes, scoped console administration and
 the public HTTPS claim/download protocol now have automated evidence. Protected
-Windows/macOS storage and durable HTTPS claim recovery also pass native CI. New
-console installation invitations, native bootstrap activation, installers
+Windows/macOS storage and durable HTTPS claim recovery also pass native CI. The
+console now creates scoped release-bound invitations for the native enrollment
+command. The public installation portal, native service activation, installers
 and production deployment wiring remain open.
 
 ## Source baselines
+
+The [console invitation form](desktop-console-invitations.md) requires a specific
+authorized site, compatible approved release, configured bootstrap signer and
+explicit confirmation. It rejects stale releases and ambiguous/foreign settings,
+commits the invitation/release/audit atomically and reveals its token only in the
+initial result. PostgreSQL/router tests and a disposable real-browser flow cover
+creation, scope, CSRF, defaults, one-time display and responsive rendering.
 
 The [desktop public protocol](desktop-public-protocol.md) now binds HTTP claims to
 the current approved release, serves read-only invitation metadata and verifies

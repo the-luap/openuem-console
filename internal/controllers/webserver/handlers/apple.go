@@ -46,7 +46,11 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if c.Request().Method == http.MethodPost {
-			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, 4<<20)
+			limit := int64(4 << 20)
+			if appleRoute(c.Path()) == "/desktop/invitations" {
+				limit = 8192
+			}
+			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
 			expected, _ := c.Get("csrf").(string)
 			if expected == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(c.FormValue("csrf"))) != 1 {
 				return echo.NewHTTPError(http.StatusForbidden, "Invalid CSRF token")

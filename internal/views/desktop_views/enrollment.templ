@@ -44,9 +44,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 					}
 				</div>
 			</section>
-			<section class="uk-card uk-card-default min-w-0"><div class="uk-card-header"><h2 class="uk-card-title">Installation links</h2></div><div class="uk-card-body"><p>Signed agent packages must be configured before new installation links are available.</p><p class="uk-text-muted mt-2">Creating an identity does not confirm that an agent has been installed or has reported inventory.</p></div></section>
+			@InvitationCreation(info, data)
 			<section class="uk-card uk-card-default min-w-0">
-				<div class="uk-card-header"><h2 class="uk-card-title">Enrollment invitations</h2><p>Invitation links are shown only when created. Revoking a link stops new enrollment; existing device identities remain managed.</p></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">Enrollment invitations</h2><p>Invitation tokens are shown only when created. Revoking an invitation stops new enrollment; existing device identities remain managed.</p></div>
 				<div class="uk-card-body min-w-0">
 					<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Enrollment invitations table">
 						<table class="uk-table uk-table-divider min-w-[48rem]">
@@ -127,4 +127,60 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 			</section>
 		</main>
 	}
+}
+
+templ InvitationCreation(info *partials.CommonInfo, data EnrollmentData) {
+	<section class="uk-card uk-card-default min-w-0" aria-labelledby="desktop-invitation-title">
+		<div class="uk-card-header"><h2 id="desktop-invitation-title" class="uk-card-title">New enrollment invitation</h2><p>Authorize individual Windows or Mac enrollment into the selected organization and site.</p></div>
+		<div class="uk-card-body grid min-w-0 gap-4">
+			if data.FormError!="" {
+				<p role="alert" class="uk-alert uk-alert-danger">{ data.FormError }</p>
+			}
+			if data.Created!=nil {
+				<div role="status" class="uk-alert uk-alert-success">Invitation created. Copy its token now; it will not be shown again.</div>
+				<dl class="uk-description-list"><dt>Computer type</dt><dd>{ targetLabel(data.Created.Platform, data.Created.Architecture) }</dd><dt>Organization / site IDs</dt><dd>{ fmt.Sprintf("%d / %d",data.Created.TenantID,data.Created.SiteID) }</dd><dt>Approved agent</dt><dd>{ data.Created.Version }</dd><dt>Maximum computers</dt><dd>{ fmt.Sprint(data.Created.MaxUses) }</dd><dt>Expires</dt><dd>{ data.Created.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</dd></dl>
+				<label class="grid min-w-0 gap-2">Invitation token<textarea id="desktop-invitation-token" class="uk-textarea w-full min-w-0 font-mono" readonly rows="2" spellcheck="false" autocomplete="off">{ invitationToken(data.Created) }</textarea></label>
+				<p>Use this token with the installed, signed agent's <code>enroll</code> command. An administrator must place it in a private invitation file and authorize the server address and organization/site IDs. Share it only with the intended installer or administrator.</p>
+				<p class="uk-text-muted">This prepares enrollment for the native command. Guided installation and automatic service activation are not available from this page yet. An invitation or saved identity does not confirm that a computer is online.</p>
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info,"/desktop/enrollment")) }>Return to invitations</a>
+			} else if !info.Can(access.EnrollDevices) {
+				<p>You have read-only access to enrollment invitations in this view.</p>
+			} else if data.Authority==nil {
+				<p>Set up the organization identity before creating an invitation.</p>
+			} else if info.SiteID=="-1" || info.SiteID=="0" || info.SiteID=="" {
+				<p>Choose the site that should manage the enrolled computers.</p>
+				<div class="flex flex-wrap gap-2">
+					for _,site:=range info.Sites {
+						<a class="uk-button uk-button-default" href={ templ.URL(fmt.Sprintf("/tenant/%s/site/%d/desktop/enrollment",info.TenantID,site.ID)) }>{ site.Description }</a>
+					}
+				</div>
+			} else if data.InvitationSetup!="" {
+				<p role="status">{ data.InvitationSetup }</p>
+			} else {
+				<p>Approved agent: <strong>{ data.ReleaseVersion }</strong>. Invitations expire no later than { data.ReleaseExpires.UTC().Format("2006-01-02 15:04 UTC") }.</p>
+				<form method="post" action={ partials.GetNavigationUrl(info,"/desktop/invitations") } class="grid min-w-0 gap-4">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="release_digest" value={ data.ReleaseDigest }/>
+					<label class="grid gap-2">Computer type<select name="target" class="uk-select w-full min-w-0" required>
+						<option value="">Choose a computer type</option>
+						for _,target:=range data.Targets {
+							<option value={ target.Platform+"/"+target.Architecture } selected?={ data.InvitationForm.Target==target.Platform+"/"+target.Architecture }>{ targetLabel(target.Platform,target.Architecture) }</option>
+						}
+					</select></label>
+					<div class="grid min-w-0 gap-4 sm:grid-cols-2">
+						<label class="grid gap-2">Maximum computers<input class="uk-input w-full min-w-0" type="number" name="max_uses" min="1" max="1000" value={ fmt.Sprint(data.InvitationForm.MaxUses) } required/></label>
+						<label class="grid gap-2">Valid for<select name="hours" class="uk-select w-full min-w-0" required>
+							<option value="1" selected?={ data.InvitationForm.Hours==1 }>Up to 1 hour</option>
+							<option value="4" selected?={ data.InvitationForm.Hours==4 }>Up to 4 hours</option>
+							<option value="24" selected?={ data.InvitationForm.Hours==24 }>Up to 1 day</option>
+							<option value="72" selected?={ data.InvitationForm.Hours==72 }>Up to 3 days</option>
+							<option value="168" selected?={ data.InvitationForm.Hours==168 }>Up to 7 days</option>
+						</select></label>
+					</div>
+					<label class="flex items-start gap-2"><input class="mt-1 shrink-0" type="checkbox" name="confirm_create" value="yes" required/><span>I authorize enrollment into organization { info.TenantID } / site { info.SiteID }. Each computer will receive its own protected identity.</span></label>
+					<button class="uk-button uk-button-primary" type="submit">Create invitation</button>
+				</form>
+			}
+		</div>
+	</section>
 }

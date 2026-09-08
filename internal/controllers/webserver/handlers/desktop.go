@@ -24,6 +24,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/desktop/setup":
 			return access.ManageCertificates, true
+		case "/desktop/invitations":
+			return access.EnrollDevices, true
 		case "/desktop/invitations/:id/revoke":
 			return access.EnrollDevices, true
 		case "/desktop/identities/:id/revoke":
@@ -38,6 +40,7 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 		g := e.Group(prefix, h.IsAuthenticated, h.AppleCSRF)
 		g.GET("/desktop/enrollment", h.DesktopEnrollment)
 		g.POST("/desktop/setup", h.DesktopAuthority)
+		g.POST("/desktop/invitations", h.DesktopCreateInvitation)
 		g.POST("/desktop/invitations/:id/revoke", h.DesktopRevokeInvitation)
 		g.POST("/desktop/identities/:id/revoke", h.DesktopRevokeIdentity)
 	}
@@ -101,7 +104,16 @@ func (h *Handler) DesktopEnrollment(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	data := desktop_views.EnrollmentData{SetupError: h.DesktopSetupError, PublicOrigin: h.PublicOrigin}
+	data, err := h.desktopEnrollmentData(c, info, scope)
+	if err != nil {
+		return err
+	}
+	return renderApple(c, desktop_views.Enrollment(c, info, data))
+}
+
+func (h *Handler) desktopEnrollmentData(c echo.Context, info *partials.CommonInfo, scope registry.Scope) (desktop_views.EnrollmentData, error) {
+	var err error
+	data := desktop_views.EnrollmentData{SetupError: h.DesktopSetupError, PublicOrigin: h.PublicOrigin, InvitationForm: desktop_views.InvitationForm{MaxUses: 1, Hours: 24}}
 	for _, tenant := range info.Tenants {
 		if strconv.Itoa(tenant.ID) == info.TenantID {
 			data.Organization = tenant.Description
@@ -111,20 +123,39 @@ func (h *Handler) DesktopEnrollment(c echo.Context) error {
 		actor := h.appleActor(c)
 		data.Authority, err = h.Desktop.Authority(c.Request().Context(), scope, actor)
 		if err != nil && !errors.Is(err, registry.ErrNotFound) {
-			return desktopFailure(err)
+			return data, desktopFailure(err)
 		}
 		data.Invitations, err = h.Desktop.Invitations(c.Request().Context(), scope, actor, c.QueryParam("invitations_before"), 25)
 		if err != nil {
-			return desktopFailure(err)
+			return data, desktopFailure(err)
 		}
 		data.Identities, err = h.Desktop.Identities(c.Request().Context(), scope, actor, c.QueryParam("identities_before"), 25)
 		if err != nil {
-			return desktopFailure(err)
+			return data, desktopFailure(err)
 		}
 	} else if data.SetupError == "" {
 		data.SetupError = "Desktop enrollment is not available. Contact a server administrator."
 	}
-	return renderApple(c, desktop_views.Enrollment(c, info, data))
+	data.InvitationSetup = "A server administrator must configure approved agent packages and signed enrollment configurations before creating invitations."
+	if h.DesktopCatalog != nil && h.DesktopBootstrapReady {
+		release, releaseErr := h.DesktopCatalog.Current(c.Request().Context())
+		if releaseErr == nil {
+			data.ReleaseDigest, data.ReleaseVersion, data.ReleaseExpires = release.Digest(), release.Manifest().Version, release.Manifest().ExpiresAt
+			for _, artifact := range release.Manifest().Artifacts {
+				if artifact.AgentSize > 0 && artifact.AgentSHA256 != "" {
+					data.Targets = append(data.Targets, artifact)
+				}
+			}
+			if len(data.Targets) != 0 {
+				data.InvitationSetup = ""
+			} else {
+				data.InvitationSetup = "The approved release does not support verified native enrollment. A server administrator must approve a compatible release."
+			}
+		} else {
+			data.InvitationSetup = "No current approved agent release is available. A server administrator must check the release catalog."
+		}
+	}
+	return data, nil
 }
 
 func (h *Handler) DesktopAuthority(c echo.Context) error {

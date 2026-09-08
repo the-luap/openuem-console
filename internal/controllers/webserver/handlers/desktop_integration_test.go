@@ -272,6 +272,7 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 			t.Fatal("revocation did not persist identity and command cleanup atomically", err)
 		}
 	})
+	exerciseDesktopInvitationCreation(t, h, ctx, tenantID, siteID, sibling.ID, request, writeArtifact)
 	runDesktopBrowserFixture(t, h, ctx)
 }
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,15 +57,24 @@ func runDesktopBrowserFixture(t *testing.T, h *Handler, ctx context.Context) {
 	}
 	e.Static("/assets", assets)
 	h.Register(e, 3)
-	server := httptest.NewTLSServer(e)
 	previous := h.PublicOrigin
-	h.PublicOrigin = server.URL
+	var server *httptest.Server
+	if os.Getenv("OPENUEM_DESKTOP_BROWSER_HTTP") == "1" {
+		// A separate loopback-only browser fixture avoids changing browser or
+		// system certificate trust. Its public enrollment origin stays HTTPS;
+		// production gateway/claim TLS is exercised by the protocol tests.
+		server = httptest.NewServer(e)
+	} else {
+		server = httptest.NewTLSServer(e)
+		h.PublicOrigin = server.URL
+	}
 	defer func() {
 		// Stop and join HTTP handlers before restoring shared configuration.
 		server.Close()
 		h.PublicOrigin = previous
 	}()
-	if err = os.WriteFile(path, []byte(server.URL+"/tenant/"+strconv.Itoa(tenant.ID)+"/desktop/enrollment"), 0600); err != nil {
+	url := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
+	if err = os.WriteFile(path, []byte(url+"/tenant/"+strconv.Itoa(tenant.ID)+"/desktop/enrollment"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Remove(path); _ = os.Remove(path + ".stop") }()
