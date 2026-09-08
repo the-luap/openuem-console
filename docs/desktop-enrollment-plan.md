@@ -4,9 +4,10 @@ This is the active implementation design for ENR-01, the desktop portion of
 ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
 claim. Shared proof, durable registry, broker authorization, gateway transport and
 worker request boundaries, service runtimes, scoped console administration and
-the public HTTPS claim/download protocol now have automated evidence. New console
-installation invitations, native-agent storage,
-installers and production deployment wiring remain open.
+the public HTTPS claim/download protocol now have automated evidence. Protected
+Windows/macOS storage and durable HTTPS claim recovery also pass native CI. New
+console installation invitations, native runtime/bootstrap integration, installers
+and production deployment wiring remain open.
 
 ## Source baselines
 
@@ -24,7 +25,20 @@ cookies or environment proxy. Its
 [Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
 The console pins the published version and tests that exact client through its
 real gateway/private protocol and PostgreSQL release-bound issuer, including
-same-key recovery and release withdrawal. Native protected storage is still pending.
+same-key recovery and release withdrawal.
+
+Agent commit `bc13982` adds a root System-keychain backend with explicit application
+ACLs, noninteractive access and isolated temporary-keychain tests. It complements
+the Windows DPAPI backend, whose private System/Administrators records work across
+an elevated installer and an actual Local System service. Agent commit `f5a3731`
+adds immutable pending keys before HTTP, exact bootstrap retry binding and a
+validated completed identity bound to those keys. Native Windows/macOS tests
+simulate a committed issuance with a lost HTTPS/HTTP2 response, then recover it
+using the same protected keys. Corruption, competing writers, partial failures and
+shutdown are covered. [All three platform CI jobs passed](https://github.com/the-luap/openuem-agent/actions/runs/34185479070),
+including full agent builds. See [native identity storage](https://github.com/the-luap/openuem-agent/blob/f5a373122a24ab826c9bc8e94852ca30ec6fa2fa/docs/individual-identity-storage.md).
+The package is not yet selected by the legacy service runtime; independent signed
+bootstrap authorization, installer integration and renewal remain open.
 
 Local related repositories were checked out from upstream into sibling directories:
 
@@ -37,10 +51,10 @@ Local related repositories were checked out from upstream into sibling directori
 | Docker deployment | `28ede14` | NATS/public ports and certificate-mounted components need the new reference gateway integration |
 
 The console remains on its native Apple feature branch. Related repositories use
-feature branches named `feature/individual-agent-enrollment`. The NATS library and
-worker and certificate manager are now forked under `the-luap`; the
-agent and Docker repositories are still local upstream
-checkouts. Feature branches are implementation work, not signed releases.
+feature branches named `feature/individual-agent-enrollment`. The NATS library,
+worker, certificate manager and agent are now forked under `the-luap`; Docker
+remains a local upstream checkout. Feature branches are implementation work, not
+signed releases.
 
 Local NATS library commit `0a8ad01` adds the shared endpoint-generated CSR/NKey
 proof, canonical device request parsing, private inbox validation and bounded
@@ -137,7 +151,7 @@ The console pins this version and uses those transactions for exact installer
 release binding and canonical-origin checks. PostgreSQL tests observe actual lock
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
-New console invitations, signed bootstrap configuration, endpoint storage/bootstrap
+New console invitations, signed bootstrap configuration, endpoint runtime/bootstrap
 and reference deployment wiring remain open.
 
 ## Required boundaries

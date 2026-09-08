@@ -69,8 +69,9 @@ command provisioning. It does not infer online status from unused timestamps.
 
 The current page does not create new installation links. Approved release binding
 and the [private/public HTTP protocol](desktop-public-protocol.md) are implemented.
-The Windows/Mac installation page, endpoint key storage and signed bootstrap
-integration are still in progress. Existing invitations created through the
+Protected endpoint storage and durable claim recovery now pass native agent tests.
+The Windows/Mac installation page, runtime and signed bootstrap integration are
+still in progress. Existing invitations created through the
 shared registry can be reviewed and revoked. Legacy desktop administration routes
 retain their separate server-administrator boundary.
 

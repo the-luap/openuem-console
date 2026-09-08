@@ -11,7 +11,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | --- | --- | --- |
 | NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/claim/download routes with pinned private TLS and bounded streaming; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked | Legacy desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, metadata and revocation; approved-release-bound public HTTPS claims and scanner-safe metadata; real-broker/database tests and passing related-repository CI | New console installation invitations and reference installation wiring; signed artifacts, bootstrap manifests, protected agent storage, renewal and release integration |
+| ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, metadata and revocation; approved-release-bound public HTTPS claims and scanner-safe metadata; Windows DPAPI/macOS Keychain storage and durable claim recovery; real-broker/database tests and passing related-repository CI | New console installation invitations and reference installation wiring; signed artifacts, bootstrap manifests, native agent runtime, renewal and release integration |
 | APP-01 | Baseline APNs certificate/key import | CSR/key storage; vendor signing integration; certificate-only import; renewal concurrency, account metadata, alerts and actual Apple issuance |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; desktop metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; Windows/Mac installation page, signed bootstrap and native installer flows |
@@ -40,7 +40,17 @@ the table's package summaries do not remove any detail from the roadmap.
   origin. [Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
   The console pins that published version and exercises client reconstruction,
   same-key recovery and withdrawal through its real TLS gateway/handler/registry.
-  Test keys are retained in memory; native protected persistence remains open.
+  That console integration retains test keys in memory; the native persistence
+  evidence below separately covers DPAPI and Keychain recovery.
+
+- Agent `f5a3731` durably stores pending keys before the first HTTPS claim, binds
+  retries to the original bootstrap and only returns a validated committed
+  identity. Windows DPAPI protects System/Administrators records; macOS uses an
+  explicit noninteractive file keychain. Tests cover a lost issuance response with
+  both native backends, corrupt state, concurrent publication and shutdown.
+  [Windows, macOS and Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34185479070),
+  including full agent builds. Native bootstrap authorization, legacy runtime
+  integration, signing, renewal and installed-device acceptance remain open.
 
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata, strict endpoint-key claims and approved

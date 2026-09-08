@@ -155,7 +155,9 @@ The subsequent shared client at library commit `d6129ce9fe9b` passed
 published client against the actual private handler, two TLS legs and PostgreSQL
 registry. It verifies current release binding, certificate/key/origin validation,
 one-identity recovery after reconstructing the client and withdrawal rejection.
-Its keys are retained in test memory; native disk/keystore recovery remains open.
+Its keys are retained in test memory. The related agent's separate native storage
+suite now covers DPAPI and isolated Keychain recovery after a lost HTTPS response;
+see [desktop integration evidence](desktop-enrollment-plan.md).
 
 ```sh
 AGENT_ENROLLMENT_TEST_DATABASE_URL='<isolated PostgreSQL test DSN>' \
@@ -165,5 +167,5 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
 ```
 
 These are server-side protocol and build checks. Signed installer execution,
-Windows/macOS protected key storage, user-facing consent and physical endpoint
+native runtime/bootstrap integration, user-facing consent and physical endpoint
 acceptance remain separate implementation and verification work.
