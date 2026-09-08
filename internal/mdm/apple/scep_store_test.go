@@ -31,14 +31,25 @@ func testSCEPProfile(t *testing.T, profile []byte) map[string]any {
 		t.Fatal(err)
 	}
 	payloads := root["PayloadContent"].([]any)
-	identity := payloads[0].(map[string]any)
+	if len(payloads) != 3 {
+		t.Fatal("enrollment requires CA trust, SCEP identity and MDM payloads")
+	}
+	trust := payloads[0].(map[string]any)
+	if trust["PayloadType"] != "com.apple.security.root" {
+		t.Fatal("enrollment CA trust missing before SCEP")
+	}
+	ca, err := x509.ParseCertificate(trust["PayloadContent"].([]byte))
+	if err != nil || !ca.IsCA || ca.CheckSignatureFrom(ca) != nil {
+		t.Fatal("enrollment contains an invalid trust anchor", err)
+	}
+	identity := payloads[1].(map[string]any)
 	if identity["PayloadType"] != "com.apple.security.scep" {
 		t.Fatal("enrollment must generate its key on the device")
 	}
 	if _, exists := identity["Password"]; exists {
 		t.Fatal("PKCS#12 password in SCEP identity")
 	}
-	mdm := payloads[1].(map[string]any)
+	mdm := payloads[2].(map[string]any)
 	if mdm["IdentityCertificateUUID"] != identity["PayloadUUID"] {
 		t.Fatal("MDM identity is not linked to SCEP")
 	}
@@ -156,6 +167,13 @@ func testSCEPEnrollHTTP(t *testing.T, client *http.Client, deviceID string, prof
 	}
 	if ca == nil || ra == nil || ra.CheckSignatureFrom(ca) != nil {
 		t.Fatal("invalid CA/RA chain")
+	}
+	var root map[string]any
+	if _, err = plist.Unmarshal(profile, &root); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(root["PayloadContent"].([]any)[0].(map[string]any)["PayloadContent"].([]byte), ca.Raw) {
+		t.Fatal("SCEP discovery does not match the profile's trust anchor")
 	}
 	f, csr := testSCEPDeviceRequest(t, deviceID, content["Challenge"].(string), ca, ra)
 	response, err := client.Post(address+"?operation=PKIOperation", "application/x-pki-message", bytes.NewReader(testSCEPWire(t, f, csr, scepWireOptions{})))

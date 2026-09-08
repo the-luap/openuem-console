@@ -67,6 +67,13 @@ authority bound to its enrollment. Settings, APNs renewals and browser claims
 retain their existing organization serialization. CA/master-key rotation and
 authority history retention are not automated by this change.
 
+The enrollment profile also includes the organization's public CA certificate in
+a `com.apple.security.root` payload before SCEP. This supplies the trust anchor
+for the issued RA/device certificates, as described in Apple's
+[profile-service guidance](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/iPhoneOTAConfiguration/profile-service/profile-service.html).
+It does not contain the CA key. The HTTPS test compares GetCACert with this exact
+embedded certificate.
+
 The URL must use a device-trusted HTTPS origin. TLS authenticates CA discovery and
 capabilities. The implementation does not put SHA-256 into Apple's legacy
 `CAFingerprint` field: Apple's [deployment guide](https://support.apple.com/guide/deployment/dep495a6d79/web)

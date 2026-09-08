@@ -120,15 +120,26 @@ func scepEnrollmentProfile(c *Settings, deviceID, challenge string) ([]byte, err
 	if err := validatePushOrganization(c); err != nil {
 		return nil, err
 	}
+	caBlock, _ := pem.Decode(c.CACertificate)
+	if caBlock == nil {
+		return nil, errSCEPAuthority
+	}
+	ca, err := x509.ParseCertificate(caBlock.Bytes)
+	if err != nil || !ca.IsCA {
+		return nil, errSCEPAuthority
+	}
 	prefix := "eu.openuem.enrollment." + deviceID
 	identityID := uuid.NewString()
+	// The device also needs the issuing CA in its trust anchors for SCEP. This
+	// public certificate is installed with the enrollment; it contains no key.
+	trust := map[string]any{"PayloadType": "com.apple.security.root", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".ca", "PayloadUUID": uuid.NewString(), "PayloadDisplayName": "OpenUEM enrollment authority", "PayloadContent": ca.Raw}
 	// HTTPS authenticates GetCACert and capabilities. Apple's documented legacy
 	// fingerprint field supports SHA-1/MD5; do not invent a SHA-256 interpretation
 	// or weaken CMS signatures to support those hashes.
 	content := map[string]any{"URL": c.PublicURL + "/mdm/apple/" + deviceID + "/scep", "Challenge": challenge, "Key Type": "RSA", "Keysize": 2048, "Key Usage": 5, "KeyIsExtractable": false, "AllowAllAppsAccess": false, "Subject": []any{[]any{[]any{"CN", deviceID}}}}
 	identity := map[string]any{"PayloadType": "com.apple.security.scep", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".identity", "PayloadUUID": identityID, "PayloadDisplayName": "OpenUEM device identity", "PayloadContent": content}
 	mdm := map[string]any{"PayloadType": "com.apple.mdm", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".mdm", "PayloadUUID": uuid.NewString(), "PayloadDisplayName": "OpenUEM management", "IdentityCertificateUUID": identityID, "Topic": c.Topic, "ServerURL": c.PublicURL + "/mdm/apple/" + deviceID + "/connect", "CheckInURL": c.PublicURL + "/mdm/apple/" + deviceID + "/checkin", "CheckOutWhenRemoved": true, "SignMessage": false, "AccessRights": 1 | 2 | 16 | 256 | 512 | 1024 | 2048 | 4096}
-	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{identity, mdm}}
+	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{trust, identity, mdm}}
 	return plist.Marshal(profile, plist.XMLFormat)
 }
 
