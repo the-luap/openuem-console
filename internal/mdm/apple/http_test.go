@@ -138,15 +138,7 @@ func testPublicProtocolIdentity(t *testing.T, proxied bool) {
 	if response.StatusCode != 200 {
 		t.Fatal("enrollment failed", response.StatusCode, string(body))
 	}
-	var profile map[string]any
-	if _, err = plist.Unmarshal(body, &profile); err != nil {
-		t.Fatal(err)
-	}
-	identity := profile["PayloadContent"].([]any)[0].(map[string]any)
-	key, cert, _, err := pkcs12.DecodeChain(identity["PayloadContent"].([]byte), identity["Password"].(string))
-	if err != nil {
-		t.Fatal(err)
-	}
+	key, cert := testSCEPEnrollHTTP(t, client, invite.DeviceID, body)
 	message := map[string]any{"MessageType": "Authenticate", "UDID": "http-test-udid", "Topic": "com.apple.mgmt.test", "ProductName": "iPhone16,1", "OSVersion": "18.6"}
 	payload, err := plist.Marshal(message, plist.XMLFormat)
 	if err != nil {

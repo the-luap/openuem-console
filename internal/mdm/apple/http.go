@@ -25,6 +25,7 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 		logger = slog.Default()
 	}
 	portalLimits := newEnrollmentLimiter()
+	scepLimits := newEnrollmentLimiter()
 	return identity.Protect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -36,6 +37,16 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 		}
 		if strings.HasPrefix(path, "enroll/") {
 			s.enrollmentPage(w, r, strings.TrimPrefix(path, "enroll/"), portalLimits, identity)
+			return
+		}
+		scepParts := strings.Split(path, "/")
+		if len(scepParts) == 2 && scepParts[1] == "scep" {
+			id, err := uuid.Parse(scepParts[0])
+			if err != nil || id.String() != scepParts[0] {
+				http.NotFound(w, r)
+				return
+			}
+			s.scepHTTP(w, r, scepParts[0], scepLimits, identity)
 			return
 		}
 		if r.Method != http.MethodPut {

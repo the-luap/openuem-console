@@ -29,16 +29,16 @@ Mac installation/download flows remain separate expanded-roadmap work.
 
 ## Claims, retries and revocation
 
-Invitations expire after one hour. A successful claim issues one individual
-certificate and binds the retry/status record to the browser's random 256-bit
+Invitations expire after one hour. A successful claim authorizes one individual
+SCEP identity and binds the retry/status record to the browser's random 256-bit
 secret. The secret is held in a Secure, HttpOnly, host-only, SameSite Strict cookie.
 Only its hash is stored in the database. Repeating a claim from the same browser
 is idempotent; another browser receives an already-used state without organization,
 inventory, identifiers or credentials.
 
 The claiming browser has **three download attempts within ten minutes**, always
-returning the same profile and certificate. Attempts count when the server starts
-returning the file, including interrupted transfers. The device row and claim are
+returning the same profile and SCEP authorization. Attempts count when the server
+starts returning the file, including interrupted transfers. The device row and claim are
 locked during download, so concurrent requests cannot exceed the limit. A process
 restart does not reset the claim, counter or expiry.
 
@@ -62,7 +62,9 @@ certificate immediately; it does not erase the device or remove its local profil
 Only the existing `/mdm/apple/enroll/<token>` path accepts the portal's GET, HEAD
 and POST methods. The [gateway](gateway-operations.md) allows those exact routes.
 No administrator session, inventory API or general static asset route becomes
-public. PUT check-in/connect still requires the issued certificate over TLS.
+public. The separate [SCEP endpoint](apple-scep-enrollment.md) accepts GET/POST
+for the claimed device before its first check-in. PUT check-in/connect still
+requires the issued certificate over TLS.
 
 Form mutations require the configured HTTPS origin, browser cookie, per-invitation
 request token and compatible Fetch Metadata. Query-string tokens, duplicate CSRF
@@ -101,8 +103,8 @@ restart, concurrent download limits, expiry/revocation, first-check-in terminati
 and registered-device status. The full HTTPS flow passes both directly and through
 the pinned gateway. Existing inventory/profile/update tests continue to pass.
 
-On 8 September 2026 local time, a live Chromium browser exercised the actual TLS
-handler and isolated PostgreSQL schema. It submitted native forms, downloaded
+Before the SCEP change, on 8 September 2026 local time, a live Chromium browser
+exercised the actual TLS handler and isolated PostgreSQL schema. It submitted native forms, downloaded
 three byte-identical profiles, observed download exhaustion and denied a separate
 browser. The request's Referrer contained only the HTTPS origin. Styles passed
 CSP without console errors; the first keyboard focus was the device selector.

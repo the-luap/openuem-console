@@ -217,7 +217,11 @@ func appleDeviceRoute(r *http.Request) bool {
 		}
 		return true
 	}
-	if r.Method != http.MethodPut || (parts[4] != "checkin" && parts[4] != "connect") {
+	if parts[4] == "scep" {
+		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			return false
+		}
+	} else if r.Method != http.MethodPut || (parts[4] != "checkin" && parts[4] != "connect") {
 		return false
 	}
 	id, err := uuid.Parse(parts[3])

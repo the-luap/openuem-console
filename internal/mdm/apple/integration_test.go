@@ -20,7 +20,6 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"howett.net/plist"
-	"software.sslmate.com/src/go-pkcs12"
 )
 
 func testStore(t *testing.T) *Store {
@@ -129,15 +128,7 @@ func testEnroll(t *testing.T, s *Store, scope Scope, name string, existingUDID .
 	if _, err = s.EnrollmentProfile(ctx, token); !errors.Is(err, ErrNotFound) {
 		t.Fatal("invitation reused", err)
 	}
-	var root map[string]any
-	if _, err = plist.Unmarshal(profile, &root); err != nil {
-		t.Fatal(err)
-	}
-	identity := root["PayloadContent"].([]any)[0].(map[string]any)
-	_, cert, _, err := pkcs12.DecodeChain(identity["PayloadContent"].([]byte), identity["Password"].(string))
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, cert := testSCEPEnrollProfile(t, s, invite.DeviceID, profile)
 	d, err := s.AuthenticateCertificate(ctx, invite.DeviceID, cert)
 	if err != nil {
 		t.Fatal(err)

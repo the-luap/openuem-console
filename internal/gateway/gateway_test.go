@@ -101,6 +101,12 @@ func TestGatewayRoutesOverMutualTLS(t *testing.T) {
 				{"DELETE", "/mdm/apple/enroll/" + strings.Repeat("a", 43), false, 0},
 				{"POST", "/mdm/apple/enroll/" + strings.Repeat("a", 43) + "/admin", false, 0},
 				{"PUT", checkin, true, 200},
+				{"GET", "/mdm/apple/10000000-0000-0000-0000-000000000001/scep?operation=GetCACert", true, 200},
+				{"POST", "/mdm/apple/10000000-0000-0000-0000-000000000001/scep?operation=PKIOperation", true, 200},
+				{"PUT", "/mdm/apple/10000000-0000-0000-0000-000000000001/scep", false, 0},
+				{"HEAD", "/mdm/apple/10000000-0000-0000-0000-000000000001/scep", false, 0},
+				{"GET", "/mdm/apple/invalid/scep", false, 0},
+				{"GET", "/mdm/apple/10000000-0000-0000-0000-000000000001/scep/admin", false, 0},
 				{"GET", checkin, false, 0}, {"PUT", "/mdm/apple/invalid/checkin", false, 0}, {"GET", "/mdm/apple/admin", false, 0}, {"GET", "/enroll/unknown", false, 0}, {"GET", "/agent-channel", false, 0},
 				{"GET", "/mdm/apple/enroll/../../admin", false, 400}, {"GET", "/mdm/apple/%2e%2e/admin", false, 400}, {"GET", "//admin", false, 400}, {"GET", "/mdm%2fapple/enroll/" + strings.Repeat("a", 43), false, 400},
 			}

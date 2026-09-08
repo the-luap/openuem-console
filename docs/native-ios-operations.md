@@ -13,7 +13,7 @@ fork are still outstanding. Treat this branch as a pilot until those checks pass
 
 | Area | Implemented behavior |
 | --- | --- |
-| Enrollment | Per-organization APNs settings, one-hour single-use invitations, individual device certificate, checkout and server-access revocation |
+| Enrollment | Per-organization APNs settings, one-hour single-use invitations, device-generated SCEP identity, checkout and server-access revocation |
 | Inventory | OS version/build, model, serial, supervision, last contact, installed apps and configuration profiles |
 | Refresh | On enrollment, manually, and every six hours; separate observation timestamps |
 | Profiles | Unsigned XML/binary `.mobileconfig` upload; passcode, personal Wi-Fi and restriction builders; revisions; bulk assignment/removal; result verification |
@@ -127,9 +127,12 @@ Windows for deployment. Protocol and console handler tests can run on macOS.
 5. Open the device from **All devices**. Successful token registration changes its
    status to Managed and queues device, app, profile and available-update queries.
 
-The invitation returns an individual PKCS#12 identity inside the enrollment
-profile over HTTPS. A temporary retry copy is encrypted with both the browser
-secret and server master key, then cleared on first device contact, exhaustion,
+The invitation returns a profile with an individual, one-time SCEP authorization
+over HTTPS. During installation the device generates its own key and obtains a
+client certificate. See [SCEP enrollment](apple-scep-enrollment.md) for authorization,
+protocol limits and acceptance boundaries. A temporary retry copy is encrypted
+with both the browser secret and server master key, then cleared on first device
+contact, exhaustion,
 revocation or expiry cleanup. The issued certificate is bound to the first
 enrolled device identity. Protect
 the link and downloaded profile like credentials; the profile is not a reusable
@@ -197,9 +200,9 @@ topic, then upload the renewed pair through Setup. A different topic is rejected
 to avoid stranding devices. The enrollment CA remains unchanged. Changing the
 public origin is also rejected while active enrollments use it.
 
-Device identities currently last one year. Their expiry appears in device
-details. Automatic identity renewal and SCEP are not implemented; plan removal
-and fresh enrollment before expiry. Export/restore the whole database and retain
+Device identities last up to one year, capped at CA expiry. Their expiry appears
+in device details. New enrollments use SCEP, but automatic identity renewal is not
+implemented; plan removal and fresh enrollment before expiry. Export/restore the whole database and retain
 the original encryption master key in a separate secure backup. Changing that key
 without re-encryption makes stored Apple keys and commands unreadable; there is
 no key-rotation workflow yet.

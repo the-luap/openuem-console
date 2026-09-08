@@ -84,8 +84,8 @@ func (s *Store) EnrollmentStatus(ctx context.Context, token, browser string) (*E
 	return result, nil
 }
 
-// ClaimEnrollment issues one individual identity. Duplicate submissions from the
-// same browser are idempotent; another browser cannot take over or read the key.
+// ClaimEnrollment authorizes one SCEP identity. Duplicate submissions from the
+// same browser are idempotent; another browser cannot read the enrollment secret.
 func (s *Store) ClaimEnrollment(ctx context.Context, token, browser string) error {
 	if !validEnrollmentToken(browser) {
 		return ErrUnauthorized

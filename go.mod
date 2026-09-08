@@ -43,6 +43,8 @@ require (
 	github.com/pkg/sftp v1.13.10
 	github.com/pquerna/otp v1.5.0
 	github.com/sethvargo/go-password v0.3.1
+	github.com/smallstep/pkcs7 v0.2.1
+	github.com/smallstep/scep v0.0.0-20260331191114-261f960a40d1
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/wneessen/go-mail v0.7.2

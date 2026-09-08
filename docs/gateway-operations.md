@@ -41,6 +41,7 @@ The current public allowlist contains only:
 - `POST /mdm/apple/enroll/<43-character invitation>` for confirmed claims/downloads
 - `PUT /mdm/apple/<canonical UUID>/checkin`
 - `PUT /mdm/apple/<canonical UUID>/connect`
+- `GET` and `POST /mdm/apple/<canonical UUID>/scep` for [initial SCEP enrollment](apple-scep-enrollment.md)
 - `GET /agent-channel` only as a validated native WebSocket upgrade when an
   explicit private agent backend is configured
 - `GET` and `HEAD /enroll/desktop/<canonical token>/metadata`, and
