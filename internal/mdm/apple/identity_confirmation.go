@@ -96,7 +96,7 @@ func (s *Store) acknowledgeRetiredIdentity(ctx context.Context, tx *sql.Tx, d *D
 	if stringValue(message, "CommandUUID") != id {
 		return ErrUnauthorized
 	}
-	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='acknowledged',completed_at=COALESCE(completed_at,clock_timestamp()),error='' WHERE id=$1 AND device_id=$2 AND status IN ('sent','not_now','verified','acknowledged')`, id, d.ID)
+	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='acknowledged',completed_at=COALESCE(completed_at,clock_timestamp()),error='' WHERE id=$1 AND device_id=$2 AND status IN ('sent','not_now','verified')`, id, d.ID)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,17 @@ func (s *Store) acknowledgeRetiredIdentity(ctx context.Context, tx *sql.Tx, d *D
 		return err
 	}
 	if n != 1 {
-		return ErrUnauthorized
+		var acknowledged bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 AND status='acknowledged')`, id, d.ID).Scan(&acknowledged); err != nil {
+			return err
+		}
+		if !acknowledged {
+			return ErrUnauthorized
+		}
+		return tx.Commit()
+	}
+	if err = audit(ctx, tx, d.TenantID, "device:"+d.ID, "apple.command.acknowledged", id); err != nil {
+		return err
 	}
 	// The retired certificate never receives another command or changes device
 	// inventory, push data, declarations, checkout, or another command's result.
@@ -127,7 +137,11 @@ func (s *Store) finishIdentityRenewal(ctx context.Context, tx *sql.Tx, d *Device
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET identity_renewal_error=$2,next_identity_renewal_at=clock_timestamp()+interval '6 hours' WHERE id=$1`, d.ID, code); err != nil {
 		return err
 	}
-	return audit(ctx, tx, d.TenantID, "identity-renewal-service", "apple.identity.renewal."+state, id)
+	result := "failure"
+	if state == "cancelled" {
+		result = "cancelled"
+	}
+	return auditOutcome(ctx, tx, d.TenantID, "identity-renewal-service", "apple.identity.renewal."+state, id, result)
 }
 
 func (s *Store) cancelDeviceRenewal(ctx context.Context, tx *sql.Tx, d *Device) error {

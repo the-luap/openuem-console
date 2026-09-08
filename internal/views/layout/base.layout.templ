@@ -23,6 +23,9 @@ templ Base(section string, commonInfo *partials.CommonInfo) {
 			<link rel="stylesheet" href="/assets/css/simple-icons.min.css" type="text/css"/>
 			<link rel="stylesheet" href="/assets/css/markdown.css" type="text/css"/>
 			<link rel="stylesheet" href="/assets/css/main.css" type="text/css"/>
+			if section == "audit" {
+<link rel="stylesheet" href="/assets/css/audit.css" type="text/css"/>
+}
 			<link rel="stylesheet" href="/assets/css/flag-icons.min.css" type="text/css"/>
 			<script src="/assets/js/_hyperscript.min.js"></script>
 			<script src="/assets/js/core.iife.js" type="module"></script>

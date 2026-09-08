@@ -330,7 +330,7 @@ func (s *Store) CleanupPushRequests(ctx context.Context) error {
 	), expired AS (
 	 UPDATE mdm_apple_push_requests r SET status='expired',encrypted_key=NULL,completed_at=clock_timestamp()
 	 FROM due WHERE r.id=due.id RETURNING r.tenant_id,r.id
-	) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id)
-	 SELECT tenant_id,'system','apple.push_request.expire',id::text FROM expired`)
+	) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id,details)
+	 SELECT tenant_id,'system','apple.push_request.expire',id::text,'{"site_id":0,"result":"success"}'::jsonb FROM expired`)
 	return err
 }

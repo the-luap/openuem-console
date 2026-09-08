@@ -166,6 +166,5 @@ func (s *Store) Devices(ctx context.Context, scope Scope) ([]Device, error) {
 }
 
 func audit(ctx context.Context, tx *sql.Tx, tenant int, actor, action, resource string) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id) VALUES($1,$2,$3,$4)`, tenant, actor, action, resource)
-	return err
+	return auditOutcome(ctx, tx, tenant, actor, action, resource, "success")
 }

@@ -302,6 +302,9 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			if err = s.finishIdentityRenewal(ctx, tx, d, peer.renewalID, "failed", "command_failed"); err != nil {
 				return nil, err
 			}
+			if err = auditOutcome(ctx, tx, current.TenantID, "device:"+current.ID, "apple.command.failed", commandID, "failure"); err != nil {
+				return nil, err
+			}
 			return nil, tx.Commit()
 		}
 		if !peer.tokenUpdated {
@@ -331,6 +334,9 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='acknowledged',error='' WHERE id=$1`, id); err != nil {
 				return nil, err
 			}
+			if err = audit(ctx, tx, current.TenantID, "device:"+current.ID, "apple.command.acknowledged", id); err != nil {
+				return nil, err
+			}
 		}
 		if previous == "queued" {
 			return nil, errors.New("command has not been delivered")
@@ -351,6 +357,9 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 				if err = s.finishIdentityRenewal(ctx, tx, current, renewalID, "failed", "command_failed"); err != nil {
 					return nil, err
 				}
+				if err = auditOutcome(ctx, tx, current.TenantID, "device:"+current.ID, "apple.command.failed", id, "failure"); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if previous == "sent" || previous == "not_now" {
@@ -365,6 +374,15 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			}
 			_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status=$1,error=$2,available_at=CASE WHEN $1='not_now' THEN now()+interval '1 minute' ELSE available_at END,completed_at=CASE WHEN $1='not_now' THEN NULL ELSE now() END WHERE id=$3`, next, detail, id)
 			if err != nil {
+				return nil, err
+			}
+			result := "success"
+			if next == "failed" {
+				result = "failure"
+			} else if next == "not_now" {
+				result = "deferred"
+			}
+			if err = auditOutcome(ctx, tx, current.TenantID, "device:"+current.ID, "apple.command."+next, id, result); err != nil {
 				return nil, err
 			}
 			if next == "failed" {

@@ -15,17 +15,18 @@ const (
 type Capability string
 
 const (
-	ReadDevices        Capability = "devices.read"
-	RefreshDevices     Capability = "devices.refresh"
-	EnrollDevices      Capability = "devices.enroll"
-	RevokeDevices      Capability = "devices.revoke"
-	ReadProfiles       Capability = "profiles.read"
-	ManageProfiles     Capability = "profiles.manage"
-	AssignProfiles     Capability = "profiles.assign"
-	ManageUpdates      Capability = "updates.manage"
-	ManageCertificates Capability = "certificates.manage"
-	ReadAudit          Capability = "audit.read"
-	ManageAccess       Capability = "access.manage"
+	ReadDevices          Capability = "devices.read"
+	RefreshDevices       Capability = "devices.refresh"
+	EnrollDevices        Capability = "devices.enroll"
+	RevokeDevices        Capability = "devices.revoke"
+	ReadProfiles         Capability = "profiles.read"
+	ManageProfiles       Capability = "profiles.manage"
+	AssignProfiles       Capability = "profiles.assign"
+	ManageUpdates        Capability = "updates.manage"
+	ManageCertificates   Capability = "certificates.manage"
+	ReadAudit            Capability = "audit.read"
+	ManageAuditRetention Capability = "audit.retention.manage"
+	ManageAccess         Capability = "access.manage"
 )
 
 type Scope struct {
@@ -82,7 +83,7 @@ func roleAllows(role Role, capability Capability) bool {
 		return role == Viewer || role == Operator || role == TenantAdmin || role == Administrator
 	case RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates:
 		return role == Operator || role == TenantAdmin || role == Administrator
-	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit:
+	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention:
 		return role == TenantAdmin || role == Administrator
 	case ManageAccess:
 		return role == Administrator

@@ -106,6 +106,10 @@ func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc)
 		// reading registry metadata or performing enrollment actions.
 		return next(c)
 	}
+	if _, ok := auditCapability(c.Request().Method, c.Path()); ok {
+		// Audit handlers and their database transactions authorize the exact URL scope.
+		return next(c)
+	}
 	if c.Path() == "/myaccount" && c.Request().Method == http.MethodGet {
 		return next(c)
 	}

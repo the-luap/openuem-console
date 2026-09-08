@@ -240,14 +240,17 @@ type AuditEvent struct {
 }
 
 func (s *Store) Audit(ctx context.Context, actor string, beforeID int64) ([]AuditEvent, error) {
-	p, err := s.Principal(ctx, actor)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	if !p.IsAdministrator() {
-		return nil, ErrDenied
+	defer tx.Rollback()
+	if err = s.AuthorizeTransaction(ctx, tx, actor, ReadAudit, Scope{}); err != nil {
+		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,actor,subject,action,before_grants,after_grants,created_at FROM uem_access_audit WHERE ($1=0 OR id<$1) ORDER BY id DESC LIMIT 100`, beforeID)
+	rows, err := tx.QueryContext(ctx, `SELECT id,actor,subject,action,before_grants,after_grants,created_at FROM uem_access_audit WHERE ($1=0 OR id<$1) ORDER BY id DESC LIMIT 100`, beforeID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,5 +263,12 @@ func (s *Store) Audit(ctx context.Context, actor string, beforeID int64) ([]Audi
 		}
 		events = append(events, e)
 	}
-	return events, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }

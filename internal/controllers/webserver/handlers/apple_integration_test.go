@@ -256,6 +256,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	}
 	exerciseConsolePermissions(t, h, e, ctx, tenant.ID, site.ID, profiles[0].ID)
 	exerciseDesktopConsolePermissions(t, h, e, ctx, tenant.ID, site.ID)
+	exerciseAuditConsole(t, h, e, ctx, tenant.ID, site.ID)
 }
 
 // seedExistingAppleSettings represents existing credentials only inside a disposable

@@ -199,7 +199,7 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 	if err = audit(ctx, tx, c.TenantID, actor, "apple.push_connection.verify", fingerprint); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `WITH superseded AS (UPDATE mdm_apple_push_requests SET status='superseded',encrypted_key=NULL,completed_at=clock_timestamp() WHERE tenant_id=$1 AND status='pending' RETURNING id) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id) SELECT $1,$2,'apple.push_request.supersede',id::text FROM superseded`, c.TenantID, actor); err != nil {
+	if _, err = tx.ExecContext(ctx, `WITH superseded AS (UPDATE mdm_apple_push_requests SET status='superseded',encrypted_key=NULL,completed_at=clock_timestamp() WHERE tenant_id=$1 AND status='pending' RETURNING id) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id,details) SELECT $1,$2,'apple.push_request.supersede',id::text,'{"site_id":0,"result":"success"}'::jsonb FROM superseded`, c.TenantID, actor); err != nil {
 		return err
 	}
 	if err = audit(ctx, tx, c.TenantID, actor, "apple.settings.save", fmt.Sprint(c.TenantID)); err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/desktop"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
@@ -32,6 +33,9 @@ type WebServer struct {
 	reminderMu     sync.Mutex
 	reminderCancel context.CancelFunc
 	reminderDone   chan struct{}
+	auditMu        sync.Mutex
+	auditCancel    context.CancelFunc
+	auditDone      chan struct{}
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -85,6 +89,15 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	w.Handler.Access = permissions
+	w.Handler.Audit, err = audit.NewStore(w.Handler.Model.DB, permissions)
+	if err != nil {
+		return err
+	}
+	if err = w.Handler.Audit.Migrate(ctx); err != nil {
+		return err
+	}
+	w.startAuditRetention()
+	defer w.stopAuditRetention()
 	w.startAppleReminders()
 	defer w.stopAppleReminders()
 	identity, err := clientidentity.FromEnvironment()
@@ -109,6 +122,7 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 }
 
 func (w *WebServer) Close() error {
+	w.stopAuditRetention()
 	w.stopAppleReminders()
 	w.stopDesktop()
 	if w.AppleCancel != nil {

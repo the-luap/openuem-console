@@ -20,10 +20,12 @@ import (
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
 )
 
 type Handler struct {
 	Access                *access.Store
+	Audit                 *audit.Store
 	PublicOrigin          string
 	Model                 *models.Model
 	Apple                 *apple.Store

@@ -76,7 +76,12 @@ user, previous grants, resulting grants and UTC time. It is restricted to global
 server administrators and paginates 100 records at a time. Native Apple inventory
 reads and profile downloads are recorded separately in `mdm_apple_audit`; no
 profile contents, invitation tokens or private keys are stored in those events.
-A scoped general audit viewer, protected exports and retention are still pending.
+The [scoped audit log](audit-log.md) combines Apple, agent, access, release and
+audit activity/retention metadata. Organization administrators can read/export
+their own scope and set an explicitly confirmed organization retention policy;
+server administrators can also search all organizations and manage server-wide
+retention. The default is indefinite. Sensitive audit reads recheck permissions
+in their database transaction, serialized with permission replacement.
 
 The global request-token/Origin CSRF layer and explicit confirmation protect
 permission changes. Login, MFA and the [private gateway boundary](gateway-operations.md)

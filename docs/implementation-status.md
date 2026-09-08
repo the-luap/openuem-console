@@ -29,7 +29,7 @@ CA/master-key rotation and the remaining ENR-01/PKI-01 requirements stay open.
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | No ADE integration | Apple Business/ADE tokens, device assignments, setup/re-enrollment, groups/rings and directory associations |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
-| SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization, scoped general audit viewer/export/retention |
+| SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation | Apps & Books/license lifecycle, own packages, unified execution verification, updates and self-service; later BYOD/Shared iPad acceptance as specified |
 
@@ -40,6 +40,17 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Scoped audit logging](audit-log.md) queries available original Apple, agent,
+  access, release, audit access and retention sources with exact scope/filter
+  enforcement and stable pagination. CSV/JSON exports exclude secret payloads
+  and are bounded by rows, bytes, concurrency and request lifetime. Explicit
+  one-use retention previews default to indefinite storage; transactional batch
+  deletion preserves permanent policy/deletion evidence. PostgreSQL and console
+  tests cover scope, revocation, CSRF/MFA, pagination, preview replay, concurrent
+  cleanup, rollback and joined cancellation. Responsive browser checks cover
+  390/768/1440 px and keyboard confirmation. Historical unknown outcomes/sites
+  remain explicit; comprehensive legacy action coverage is still open.
 
 - [Apple device identity renewal](apple-identity-renewal.md) schedules replacement
   enrollment profiles without changing immutable MDM fields. One-use SCEP

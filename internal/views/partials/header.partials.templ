@@ -90,6 +90,9 @@ templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
 			</ul>
 		</nav>
 		<div id="console-header-controls" class="flex min-w-0 max-w-full flex-wrap items-center gap-4">
+			if commonInfo.Can(access.ReadAudit) {
+				<a class="sm:hidden underline" href={ templ.URL(GetNavigationUrl(commonInfo, "/audit")) }>Audit log</a>
+			}
 			<form class="flex items-center gap-2">
 				<span class="uk-text-muted">
 					<uk-icon
