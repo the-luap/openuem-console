@@ -5,9 +5,11 @@ An organization certificate administrator can create a PKCS#10 CSR in the consol
 download its public bytes for an authorized vendor, and later import the resulting
 PEM certificate without uploading or downloading the private key.
 
-This is partial APP-01 implementation. Automatic vendor signing, validation of a
-vendor-signed portal request, Apple issuer-chain validation and a pre-activation
-APNs connectivity test are not implemented. Local import checks do not prove that
+This is partial APP-01 implementation. [Authorized vendor signing](apple-vendor-signing.md)
+now supports offline vendor infrastructure, signed-response verification and
+complete portal-request download. Automatic signing-service transport, Apple
+issuer-chain validation of the final push certificate and a pre-activation APNs
+connectivity test are not implemented. Local import checks do not prove that
 Apple issued or accepts a certificate. Actual Apple issuance and renewal remain
 acceptance requirements. The console explicitly describes the available checks.
 
@@ -26,7 +28,9 @@ acceptance requirements. The console explicitly describes the available checks.
    accepted by Apple's Push Certificates Portal. This fork has no implicit right
    to use another vendor's signing service. Apple describes vendor credential
    access in its [MDM Vendor CSR Signing Certificate documentation](https://developer.apple.com/help/account/certificates/mdm-vendor-csr-signing-certificate/).
-4. Obtain the actual signed portal request from that vendor. Open the Apple Push
+4. Obtain the signed response from that vendor. Upload it to the same request in
+   OpenUEM for verification against its public CSR and the operator-approved vendor
+   certificate. Download the verified portal request. Open the Apple Push
    Certificates Portal using the console link, which opens a new tab. For renewal,
    use the responsible account and renew the existing portal entry. Creating a
    different entry changes the topic and cannot replace an existing enrollment.
@@ -63,13 +67,13 @@ the push key or enrollment CA key.
 
 There can be at most five unexpired pending requests per organization. A request
 expires after seven days. Expired, revoked, consumed and superseded requests are
-unusable; terminal records have no encrypted key value. When the Apple listener and worker are enabled, the maintenance
-loop clears expired keys in batches of up to 100 and audits expiry. Expiry is
+unusable; terminal records have no encrypted key value. When the Apple listener
+and worker are enabled, the maintenance loop clears expired keys in batches of up to 100 and audits expiry. Expiry is
 checked by the database during access and again before import commits, even if
 maintenance has not yet run. Revocation affects the pending request and leaves
 the active certificate intact. Administrators can also revoke expired pending
-requests to remove their keys while the background worker is disabled. Removing a database value does not erase earlier
-backups, WAL or replicas; their retention remains an operator responsibility.
+requests to remove their keys while the background worker is disabled. Removing a
+database value does not erase earlier backups, WAL or replicas; their retention remains an operator responsibility.
 
 Active credentials, request consumption, invalidation of competing keys and audit
 events commit together. A failed validation, scope mismatch, stale generation,
@@ -92,8 +96,8 @@ The rendered setup fixture was also checked in headless Chrome at 390, 768 and
 the required confirmation checkbox blocked submission until selected. This is
 rendering and browser-form evidence, not a live Apple portal or issuance test.
 
-Remaining APP-01 work includes an authorized vendor integration with operational
-ownership; verification and download of the actual signed portal request; trusted
-Apple certificate-chain checks and a meaningful APNs connection test before
-activation; full guided error recovery and renewal reminders; and actual Apple
+Remaining APP-01 work includes deployment-specific vendor permission and
+operational ownership; automatic signing-service transport; trusted Apple
+certificate-chain checks for the final push certificate and a meaningful APNs
+connection test before activation; full guided error recovery and renewal reminders; and actual Apple
 issuance/renewal with enrolled-device continuity. The full roadmap stays open.

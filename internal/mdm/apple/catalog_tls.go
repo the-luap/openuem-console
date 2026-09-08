@@ -11,14 +11,15 @@ import (
 )
 
 // Apple's software catalog uses an Apple PKI chain which is not present in all
-// OS trust stores. Scope this additional root to the fixed catalog client.
+// OS trust stores. The catalog client and vendor envelope verifier explicitly
+// opt into this root; it is never installed in the OS trust store.
 // Source and fingerprint are recorded in certs/README.md.
 //
 //go:embed certs/AppleIncRootCertificate.cer
-var appleCatalogRootDER []byte
+var appleRootDER []byte
 
 func catalogClient() (*http.Client, error) {
-	root, err := x509.ParseCertificate(appleCatalogRootDER)
+	root, err := x509.ParseCertificate(appleRootDER)
 	if err != nil {
 		return nil, fmt.Errorf("parse Apple catalog trust anchor: %w", err)
 	}

@@ -30,7 +30,7 @@ func TestCatalogTrustsAppleRootWithoutDisablingTLSVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.CloseIdleConnections()
-	root, err := x509.ParseCertificate(appleCatalogRootDER)
+	root, err := x509.ParseCertificate(appleRootDER)
 	if err != nil {
 		t.Fatal(err)
 	}

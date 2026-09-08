@@ -80,7 +80,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 	}
 }
 
-templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings, requests []apple.PushRequest, canManage bool, setupError, message string, listener bool) {
+templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings, requests []apple.PushRequest, canManage, vendorConfigured bool, setupError, message string, listener bool) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-setup.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple setup", Url: partials.GetNavigationUrl(info, "/ios/setup")}}, info)
@@ -105,7 +105,7 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 						<dl class="uk-description-list"><dt>Push topic</dt><dd>{ settings.Topic }</dd><dt>Certificate expires</dt><dd>{ settings.PushExpiresAt.Format("2006-01-02") }</dd><dt>Public management URL</dt><dd>{ settings.PublicURL }</dd></dl>
 					}
 					if canManage {
-						@PushRequests(info, settings, requests)
+						@PushRequests(info, settings, requests, vendorConfigured)
 						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
 							@CSRF(info)

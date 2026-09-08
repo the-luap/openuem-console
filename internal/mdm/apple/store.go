@@ -17,9 +17,16 @@ var migrations embed.FS
 type Store struct {
 	db      *sql.DB
 	secrets *secretBox
+	vendor  *VendorTrust
 }
 
 func NewStore(db *sql.DB, masterKey string) (*Store, error) {
+	return NewStoreWithVendor(db, masterKey, nil)
+}
+
+// NewStoreWithVendor fixes the operator's vendor trust for this store's lifetime.
+// Restart all replicas with the same explicit pins when changing vendors.
+func NewStoreWithVendor(db *sql.DB, masterKey string, vendor *VendorTrust) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("Apple management requires PostgreSQL")
 	}
@@ -27,7 +34,10 @@ func NewStore(db *sql.DB, masterKey string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db, secrets: box}, nil
+	if vendor != nil && (vendor.root == nil || len(vendor.pins) == 0) {
+		return nil, ErrVendorNotConfigured
+	}
+	return &Store{db: db, secrets: box, vendor: vendor}, nil
 }
 
 // Migrate is additive and serialized across console replicas. It never runs

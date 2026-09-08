@@ -30,7 +30,9 @@ initial server administration rights.
 
 The [Apple push request workflow](apple-push-requests.md) generates a public CSR
 with an encrypted instance-held key and supports certificate-only import after
-external vendor signing. Vendor integration and pre-activation APNs verification
+external vendor signing. The [vendor signing guide](apple-vendor-signing.md) covers
+operator-approved certificate pins, offline vendor tooling and verified portal
+request downloads. Deployment vendor authority and pre-activation APNs verification
 remain open; see that guide for the current checks and renewal behavior.
 
 ## Deployment prerequisites

@@ -122,7 +122,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	})
 	t.Run("every native mutation denies a viewer including aliases", func(t *testing.T) {
 		for _, prefix := range []string{"", fmt.Sprintf("/tenant/%d", tenantID), base} {
-			for _, suffix := range []string{"/ios/setup", "/ios/setup/requests", "/ios/setup/requests/10000000-0000-0000-0000-000000000001/revoke", "/ios/setup/requests/10000000-0000-0000-0000-000000000001/certificate", "/ios/enroll", "/ios/configurations", "/ios/configurations/" + profileID + "/assign", "/ios/configurations/" + profileID + "/delete", "/ios/" + devices[0].DeviceID + "/refresh", "/ios/" + devices[0].DeviceID + "/revoke", "/ios/" + devices[0].DeviceID + "/update", "/ios/" + devices[0].DeviceID + "/commands/10000000-0000-0000-0000-000000000001/retry"} {
+			for _, suffix := range []string{"/ios/setup", "/ios/setup/requests", "/ios/setup/requests/10000000-0000-0000-0000-000000000001/revoke", "/ios/setup/requests/10000000-0000-0000-0000-000000000001/certificate", "/ios/setup/requests/10000000-0000-0000-0000-000000000001/vendor", "/ios/enroll", "/ios/configurations", "/ios/configurations/" + profileID + "/assign", "/ios/configurations/" + profileID + "/delete", "/ios/" + devices[0].DeviceID + "/refresh", "/ios/" + devices[0].DeviceID + "/revoke", "/ios/" + devices[0].DeviceID + "/update", "/ios/" + devices[0].DeviceID + "/commands/10000000-0000-0000-0000-000000000001/retry"} {
 				rec := request("scoped-viewer", "POST", prefix+suffix, nil)
 				if rec.Code != 403 {
 					t.Errorf("reader reached %s: %d %s", prefix+suffix, rec.Code, rec.Body.String())

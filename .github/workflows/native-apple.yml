@@ -20,6 +20,8 @@ jobs:
           cache: true
       - name: Native protected bootstrap key provisioning
         run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
+      - name: Native protected vendor signing files
+        run: go test -count=1 -run "VendorSigningFiles|VendorPrivateKey" ./internal/mdm/apple
   test:
     runs-on: ubuntu-latest
     services:

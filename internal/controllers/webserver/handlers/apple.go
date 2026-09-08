@@ -31,6 +31,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/setup", h.AppleSettings)
 		g.POST("/ios/setup/requests", h.AppleCreatePushRequest)
 		g.GET("/ios/setup/requests/:id/csr", h.ApplePushRequestCSR)
+		g.POST("/ios/setup/requests/:id/vendor", h.AppleAttachVendorRequest)
+		g.GET("/ios/setup/requests/:id/portal", h.AppleVendorPortalRequest)
 		g.POST("/ios/setup/requests/:id/revoke", h.AppleRevokePushRequest)
 		g.POST("/ios/setup/requests/:id/certificate", h.AppleImportPushCertificate)
 		g.POST("/ios/enroll", h.AppleInvite)
@@ -243,7 +245,7 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 	} else if settings != nil {
 		settings.AppleAccount = ""
 	}
-	return renderApple(c, mdm_views.Setup(c, info, settings, requests, canManage, setupError, message, os.Getenv("APPLE_MDM_LISTEN_ADDR") != ""))
+	return renderApple(c, mdm_views.Setup(c, info, settings, requests, canManage, h.Apple != nil && h.Apple.VendorConfigured(), setupError, message, os.Getenv("APPLE_MDM_LISTEN_ADDR") != ""))
 }
 
 func readAppleUpload(c echo.Context, name string, limit int64) ([]byte, error) {

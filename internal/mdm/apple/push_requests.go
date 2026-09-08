@@ -21,15 +21,19 @@ import (
 // the CSR is returned by list operations. A CSR is not a vendor-signed request
 // accepted by Apple's Push Certificates Portal.
 type PushRequest struct {
-	ID            string
-	Organization  string
-	PublicURL     string
-	AppleAccount  string
-	ExpectedTopic string
-	BaseRevision  int64
-	Status        string
-	CreatedAt     time.Time
-	ExpiresAt     time.Time
+	ID                string
+	Organization      string
+	PublicURL         string
+	AppleAccount      string
+	ExpectedTopic     string
+	BaseRevision      int64
+	Status            string
+	CreatedAt         time.Time
+	ExpiresAt         time.Time
+	HasVendorRequest  bool
+	VendorFingerprint string
+	VendorExpiresAt   *time.Time
+	VendorAvailable   bool
 }
 
 func (r PushRequest) Pending() bool {
@@ -43,11 +47,11 @@ func (r PushRequest) State() string {
 	return r.Status
 }
 
-const pushRequestColumns = `id,organization,public_url,apple_account,expected_topic,base_revision,status,created_at,expires_at`
+const pushRequestColumns = `id,organization,public_url,apple_account,expected_topic,base_revision,status,created_at,expires_at,(vendor_request IS NOT NULL),vendor_fingerprint,vendor_expires_at`
 
 func scanPushRequest(row scanner) (*PushRequest, error) {
 	var r PushRequest
-	err := row.Scan(&r.ID, &r.Organization, &r.PublicURL, &r.AppleAccount, &r.ExpectedTopic, &r.BaseRevision, &r.Status, &r.CreatedAt, &r.ExpiresAt)
+	err := row.Scan(&r.ID, &r.Organization, &r.PublicURL, &r.AppleAccount, &r.ExpectedTopic, &r.BaseRevision, &r.Status, &r.CreatedAt, &r.ExpiresAt, &r.HasVendorRequest, &r.VendorFingerprint, &r.VendorExpiresAt)
 	return &r, notFound(err)
 }
 
@@ -153,6 +157,7 @@ func (s *Store) PushRequests(ctx context.Context, tenant int) ([]PushRequest, er
 		if err != nil {
 			return nil, err
 		}
+		r.VendorAvailable = r.Pending() && r.HasVendorRequest && r.VendorExpiresAt != nil && time.Now().Before(*r.VendorExpiresAt) && s.vendor.accepts(r.VendorFingerprint)
 		requests = append(requests, *r)
 	}
 	return requests, rows.Err()

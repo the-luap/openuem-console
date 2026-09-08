@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
@@ -19,7 +20,17 @@ func (w *WebServer) initApple(masterKey string) {
 		w.Handler.AppleSetupError = "Set a 32-byte ENCRYPTION_MASTER_KEY to enable encrypted Apple management."
 		return
 	}
-	s, err := apple.NewStore(w.Handler.Model.DB, masterKey)
+	var vendor *apple.VendorTrust
+	if pins := strings.TrimSpace(os.Getenv("APPLE_MDM_VENDOR_CERT_SHA256")); pins != "" {
+		var err error
+		vendor, err = apple.NewVendorTrust(strings.Split(pins, ","))
+		if err != nil {
+			// An optional signer configuration must not disable active device
+			// management. Invalid pins disable only vendor envelope operations.
+			slog.Error("Apple vendor certificate pins are invalid; portal request verification is disabled")
+		}
+	}
+	s, err := apple.NewStoreWithVendor(w.Handler.Model.DB, masterKey, vendor)
 	if err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		err = s.Migrate(ctx)

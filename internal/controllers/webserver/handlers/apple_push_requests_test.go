@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
 )
 
 func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, tenant, site, otherTenant, otherSite int) {
@@ -64,7 +65,10 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 				if rec := request(user, "GET", p+"/csr", "", nil); rec.Code != 403 {
 					t.Fatal("scoped reader or operator downloaded CSR", user, rec.Code)
 				}
-				for _, suffix := range []string{"/revoke", "/certificate"} {
+				if rec := request(user, "GET", p+"/portal", "", nil); rec.Code != 403 {
+					t.Fatal("scoped reader or operator downloaded vendor response", user, rec.Code)
+				}
+				for _, suffix := range []string{"/revoke", "/certificate", "/vendor"} {
 					if rec := post(user, p+suffix); rec.Code != 403 {
 						t.Fatal("scoped reader or operator reached mutation", user, suffix, rec.Code)
 					}
@@ -79,6 +83,46 @@ func exercisePushRequestRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 		if rec.Code != 200 || !strings.Contains(rec.Body.String(), id) || strings.Contains(rec.Body.String(), "<script>private-account</script>") || !strings.Contains(rec.Body.String(), "&lt;script&gt;") {
 			t.Fatal("unsafe or missing request metadata", rec.Code)
 		}
+		if rec := request("organization-admin", "GET", path+"/portal", "", nil); rec.Code != 503 {
+			t.Fatal("unconfigured vendor download did not fail closed", rec.Code)
+		}
+		originalStore := h.Apple
+		trust, err := apple.NewVendorTrust([]string{strings.Repeat("a", 64)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		configuredStore, err := apple.NewStoreWithVendor(h.Model.DB, strings.Repeat("k", 32), trust)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.Apple = configuredStore
+		defer func() { h.Apple = originalStore }()
+		if rec := request("organization-admin", "GET", path+"/portal", "", nil); rec.Code != 404 {
+			t.Fatal("missing signed request downloadable", rec.Code)
+		}
+		var vendorBody bytes.Buffer
+		vendorWriter := multipart.NewWriter(&vendorBody)
+		if err := vendorWriter.WriteField("csrf", "console-test-token"); err != nil {
+			t.Fatal(err)
+		}
+		vendorPart, err := vendorWriter.CreateFormFile("vendor_request", "untrusted.plist")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = vendorPart.Write([]byte("untrusted vendor response")); err != nil {
+			t.Fatal(err)
+		}
+		if err = vendorWriter.Close(); err != nil {
+			t.Fatal(err)
+		}
+		badCSRF := bytes.ReplaceAll(vendorBody.Bytes(), []byte("console-test-token"), []byte("invalid-token"))
+		if rec := request("organization-admin", "POST", path+"/vendor", vendorWriter.FormDataContentType(), badCSRF); rec.Code != 403 {
+			t.Fatal("vendor upload accepted invalid CSRF", rec.Code)
+		}
+		if rec := request("organization-admin", "POST", path+"/vendor", vendorWriter.FormDataContentType(), vendorBody.Bytes()); rec.Code != 400 || strings.Contains(rec.Body.String(), "untrusted vendor response") {
+			t.Fatal("invalid vendor upload was accepted or echoed", rec.Code)
+		}
+		h.Apple = originalStore
 		foreignPath := fmt.Sprintf("/tenant/%d/site/%d/ios/setup/requests/%s/csr", otherTenant, otherSite, id)
 		if rec := request("apple-console-admin", "GET", foreignPath, "", nil); rec.Code != 404 {
 			t.Fatal("server admin crossed selected object scope", rec.Code)
