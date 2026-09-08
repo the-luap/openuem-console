@@ -64,6 +64,7 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 	w.Handler.Register(w.Router, registerRateLimit)
 	w.initApple(encryptionMasterKey)
 	w.initDesktop(encryptionMasterKey)
+	w.initMacLinks()
 
 	// Add the session manager
 	w.SessionManager = s

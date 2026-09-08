@@ -193,13 +193,16 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: Show(detail.Device.Name), Url: partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID)}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: Show(detail.Device.Name), Url: partials.GetNavigationUrl(info, detail.DevicePath())}}, info)
 		<main id="apple-device" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">{ Show(detail.Device.Name) }</h1>
 				<p class="uk-text-muted">{ detail.Device.Platform()+" · "+StateLabel(detail.Device.Status) }</p>
 				@Navigation(info)
 			</div>
+			if detail.Device.Family()==apple.PlatformMacOS {
+				@MacBindingPanel(info, detail)
+			}
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Inventory</h2></div>
 				<div class="uk-card-body">
@@ -384,7 +387,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
 									<td>
 										{ cmd.Error }
-										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
+										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
 											if info.Can(access.AssignProfiles) {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
 													@CSRF(info)

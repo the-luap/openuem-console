@@ -133,6 +133,7 @@ type Assignment struct {
 }
 
 type Command struct {
+	MacBinding      bool       `json:"mac_binding"`
 	IdentityRenewal bool       `json:"identity_renewal"`
 	ID              string     `json:"id"`
 	DeviceID        string     `json:"device_id"`

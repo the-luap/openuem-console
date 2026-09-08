@@ -129,6 +129,11 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 }
 
 func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired string) error {
+	if desired == "installed" {
+		if _, err := ParseProfile(p.Payload); err != nil {
+			return err
+		}
+	}
 	current, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, d.ID, d.TenantID))
 	if err != nil {
 		return err

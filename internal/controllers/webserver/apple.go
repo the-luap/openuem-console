@@ -44,6 +44,17 @@ func (w *WebServer) initApple(masterKey string) {
 	w.Handler.Apple = s
 }
 
+func (w *WebServer) initMacLinks() {
+	if w.Handler.Apple == nil || w.Handler.Desktop == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := w.Handler.Apple.MigrateMacLinks(ctx); err != nil {
+		slog.Error("Mac channel association initialization failed")
+	}
+}
+
 func (w *WebServer) startApple(certFile, keyFile string) error {
 	address := os.Getenv("APPLE_MDM_LISTEN_ADDR")
 	if address == "" || w.Handler.Apple == nil {

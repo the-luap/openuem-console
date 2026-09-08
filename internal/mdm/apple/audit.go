@@ -20,6 +20,12 @@ func auditOutcome(ctx context.Context, tx *sql.Tx, tenant int, actor, action, re
 	site := 0
 	query, target := "", resource
 	switch {
+	case action == "apple.mac.binding.request" || action == "apple.mac.channels.conflict":
+		query = `SELECT site_id FROM mdm_apple_mac_bindings WHERE tenant_id=$1 AND id::text=$2`
+	case action == "apple.mac.binding.cancel" || action == "apple.mac.binding.cleanup.request":
+		query = `SELECT site_id FROM mdm_apple_devices WHERE tenant_id=$1 AND id::text=$2`
+	case action == "apple.mac.channels.link":
+		query = `SELECT site_id FROM uem_mac_devices WHERE tenant_id=$1 AND id::text=$2`
 	case strings.HasPrefix(action, "apple.identity.renewal."):
 		query = `SELECT d.site_id FROM mdm_apple_identity_renewals r JOIN mdm_apple_devices d ON d.id=r.device_id AND d.tenant_id=r.tenant_id WHERE r.tenant_id=$1 AND r.id::text=$2`
 	case strings.HasPrefix(action, "apple.command."):

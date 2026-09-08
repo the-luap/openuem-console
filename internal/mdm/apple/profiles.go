@@ -30,6 +30,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 		return nil, errors.New("only System profiles are supported; user-channel profiles require separate management")
 	}
 	id := stringValue(root, "PayloadIdentifier")
+	if reservedMacBindingIdentifier(id) {
+		return nil, ErrMacBinding
+	}
 	if id == "" || len(id) > 255 || strings.ContainsAny(id, "\x00\r\n") {
 		return nil, errors.New("a valid PayloadIdentifier is required")
 	}
@@ -52,6 +55,18 @@ func ParseProfile(data []byte) (*Profile, error) {
 			return nil, errors.New("nested configuration and MDM enrollment payloads cannot be deployed as settings")
 		}
 		pid := stringValue(p, "PayloadIdentifier")
+		if reservedMacBindingIdentifier(pid) {
+			return nil, ErrMacBinding
+		}
+		if kind == "com.apple.ManagedClient.preferences" {
+			if domains, ok := p["PayloadContent"].(map[string]any); ok {
+				for domain := range domains {
+					if reservedMacBindingIdentifier(domain) {
+						return nil, ErrMacBinding
+					}
+				}
+			}
+		}
 		if pid == "" || seen[pid] {
 			return nil, errors.New("each payload needs a unique PayloadIdentifier")
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent/agent"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/filters"
@@ -42,6 +43,9 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/configurations/:id/assign", h.AppleAssignProfile)
 		g.POST("/ios/configurations/:id/delete", h.AppleDeleteProfile)
 		g.GET("/ios/:id", h.AppleDevice)
+		g.GET("/mac/:id", h.MacDevice)
+		g.POST("/ios/:id/mac-binding", h.AppleMacBinding)
+		g.POST("/ios/:id/mac-binding/cancel", h.AppleMacBinding)
 		g.POST("/ios/:id/refresh", h.AppleRefresh)
 		g.POST("/ios/:id/revoke", h.AppleRevoke)
 		g.POST("/ios/:id/update", h.AppleUpdate)
@@ -170,6 +174,25 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid platform filter")
 	}
 	search := strings.ToLower(strings.TrimSpace(c.QueryParam("q")))
+	mdmAliases, agentAliases := map[string]string{}, map[string]string{}
+	if h.Apple != nil && (platform == "" || platform == "apple" || platform == "macos") {
+		mdmAliases, agentAliases, err = h.Apple.MacAliases(c.Request().Context(), scope)
+		if err != nil {
+			return err
+		}
+		macs, e := h.Apple.MacDevices(c.Request().Context(), scope)
+		if e != nil {
+			return e
+		}
+		for _, m := range macs {
+			state := "MDM: " + mdm_views.StateLabel(m.MDMStatus) + " · Agent: " + mdm_views.StateLabel(m.AgentStatus)
+			seen := m.LastSeen
+			if m.AgentSeen != nil && (seen == nil || m.AgentSeen.After(*seen)) {
+				seen = m.AgentSeen
+			}
+			rows = append(rows, mdm_views.DeviceRow{ID: m.ID, Name: m.Name, Platform: "macOS", OSVersion: m.OSVersion, Model: m.Model, Serial: m.Serial, Status: state, LastSeen: seen, URL: partials.GetNavigationUrl(info, "/mac/"+m.ID)})
+		}
+	}
 	if platform == "" || platform == "windows" || platform == "macos" || platform == "linux" || platform == "unknown" {
 		p := partials.PaginationAndSort{SortBy: "nickname", SortOrder: "asc"}
 		computers, err := h.Model.GetComputersByPage(p, filters.AgentFilter{}, info)
@@ -177,6 +200,9 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			return err
 		}
 		for _, d := range computers {
+			if agentAliases[d.ID] != "" {
+				continue
+			}
 			if platform != "" && platform != desktopPlatform(d.OS) {
 				continue
 			}
@@ -198,6 +224,9 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			return err
 		}
 		for _, d := range devices {
+			if mdmAliases[d.ID] != "" {
+				continue
+			}
 			if platform != "" && platform != "apple" && platform != string(d.Family()) {
 				continue
 			}
@@ -344,11 +373,44 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	entity, err := h.Apple.MacForMDM(c.Request().Context(), scope, id)
+	if err != nil {
+		return appleFailure(err)
+	}
+	if entity != "" {
+		return appleRedirect(c, info, "/mac/"+entity)
+	}
+	return h.renderAppleDevice(c, info, scope, id, nil)
+}
+
+func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, scope apple.Scope, id string, mac *apple.MacDevice) error {
 	d, err := h.Apple.Device(c.Request().Context(), scope, id)
 	if err != nil {
 		return appleFailure(err)
 	}
-	detail := mdm_views.Detail{Device: d}
+	detail := mdm_views.Detail{Device: d, Mac: mac}
+	if mac != nil && info.Principal.IsAdministrator() {
+		var available bool
+		if err = h.Model.DB.QueryRowContext(c.Request().Context(), `SELECT EXISTS(SELECT 1 FROM agents a JOIN site_agents sa ON sa.agent_id=a.oid WHERE a.oid=$1 AND sa.site_id=$2 AND (SELECT count(*) FROM site_agents WHERE agent_id=a.oid)=1)`, mac.AgentID, d.SiteID).Scan(&available); err != nil {
+			return err
+		}
+		if available {
+			available, err = h.Model.Client.Agent.Query().Where(agent.ID(mac.AgentID), agent.HasComputer(), agent.HasOperatingsystem(), agent.HasRelease()).Exist(c.Request().Context())
+			if err != nil {
+				return err
+			}
+		}
+		if available {
+			detail.AgentURL = partials.GetNavigationUrl(info, "/computers/"+mac.AgentID)
+		}
+	}
+	if d.Family() == apple.PlatformMacOS {
+		detail.MacBindingReady = h.Desktop != nil && h.Apple.MacLinksReady(c.Request().Context())
+		detail.MacBinding, err = h.Apple.MacBinding(c.Request().Context(), scope, id)
+		if err != nil {
+			return err
+		}
+	}
 	detail.IdentityRenewals, err = h.Apple.IdentityRenewals(c.Request().Context(), scope, id)
 	if err != nil {
 		return err

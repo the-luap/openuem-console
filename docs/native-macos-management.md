@@ -130,14 +130,12 @@ compliance.
 
 ## Verification and remaining acceptance
 
-The [agent hardware evidence protocol](macos-agent-mdm-linkage.md) now supplies
-separate authenticated observations for future channel association. Console
-startup migrates its registry table and the broker scopes the new operation to
-each individual identity. The agent preserves platform UUID and provisioning
-UDID, reads a protected system managed-preferences proof and negotiates worker
-support without changing ordinary inventory JSON. The worker rechecks scope,
-certificate expiry and revocation, then stores only the proof hash. MDM challenge
-issuance, association reconciliation and one-device navigation remain open.
+The [agent and MDM association](macos-agent-mdm-linkage.md) uses a temporary native
+MDM profile and an independently authenticated agent proof to establish one scoped
+Mac identity. Challenge expiry/cleanup, conflicting evidence, revocation, concurrent
+association and re-enrollment history have PostgreSQL coverage. The shared detail
+retains separate MDM and agent authorization; legacy actions remain restricted to
+global administrators. Hardware observations alone never merge records.
 
 Automated PostgreSQL, SCEP and HTTP/TLS tests cover Mac enrollment and instructions,
 platform filters, minimal-inventory discovery, profile install/remove verification,
@@ -150,6 +148,6 @@ APNs or install profiles on physical devices.
 Rendered Mac enrollment, Mac detail and the shared device list were checked at
 390, 768 and 1440 pixels, including disabled update enforcement and keyboard help.
 The native macOS/Safari installation prompts, actual token escrow, update/reboot
-continuity and agent/MDM linkage still need implementation or hardware acceptance
+continuity and agent/MDM linkage still need hardware acceptance
 as recorded in the roadmap. FileVault recovery escrow, Recovery Lock, user-channel
 profiles and Mac security templates are not supplied by this change.

@@ -175,6 +175,10 @@ func TestMacEnrollmentInventoryBootstrapAndUpdatePolicy(t *testing.T) {
 }
 
 func drainMacInventory(t *testing.T, s *Store, d *Device) {
+	drainMacHardwareInventory(t, s, d, nil)
+}
+
+func drainMacHardwareInventory(t *testing.T, s *Store, d *Device, hardware map[string]any) {
 	t.Helper()
 	message := map[string]any{"UDID": d.UDID, "Status": "Idle"}
 	seen := map[string]bool{}
@@ -197,6 +201,9 @@ func drainMacInventory(t *testing.T, s *Store, d *Device) {
 		switch kind {
 		case "DeviceInformation":
 			message["QueryResponses"] = map[string]any{"ProductName": "Mac16,1", "OSVersion": "15.0", "IsSupervised": true, "IsAppleSilicon": true, "SoftwareUpdateDeviceID": "J313AP"}
+			for key, value := range hardware {
+				message["QueryResponses"].(map[string]any)[key] = value
+			}
 		case "SecurityInfo":
 			message["SecurityInfo"] = map[string]any{"ManagementStatus": map[string]any{"UserApprovedEnrollment": true, "IsUserEnrollment": false}, "BootstrapTokenAllowedForAuthentication": "allowed", "BootstrapTokenRequiredForSoftwareUpdate": true, "FDE_PersonalRecoveryKey": "never-put-recovery-keys-in-generic-inventory"}
 		case "ProfileList":

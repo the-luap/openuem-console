@@ -14,6 +14,10 @@ type DeviceRow struct {
 }
 
 type Detail struct {
+	AgentURL         string
+	Mac              *apple.MacDevice
+	MacBinding       *apple.MacBinding
+	MacBindingReady  bool
 	Device           *apple.Device
 	IdentityRenewals []apple.IdentityRenewal
 	Commands         []apple.Command
@@ -23,6 +27,13 @@ type Detail struct {
 	Compliance       string
 	Releases         []apple.OSRelease
 	CatalogAt        *time.Time
+}
+
+func (d Detail) DevicePath() string {
+	if d.Mac != nil {
+		return "/mac/" + d.Mac.ID
+	}
+	return "/ios/" + d.Device.ID
 }
 
 func When(t *time.Time) string {
@@ -40,6 +51,15 @@ func Show(s string) string {
 }
 
 func StateLabel(state string) string {
+	if state == "consumed" {
+		return "Channels verified"
+	}
+	if state == "conflict" {
+		return "Conflicting evidence"
+	}
+	if state == "stale" {
+		return "Waiting for a recent report"
+	}
 	labels := map[string]string{"agent": "Agent managed", "pending": "Pending", "authenticating": "Enrollment in progress", "enrolled": "Managed", "unenrolled": "Enrollment removed", "revoked": "Access revoked", "queued": "Queued", "sent": "Sent to device", "acknowledged": "Acknowledged", "not_now": "Deferred by device", "deferred": "Deferred by device", "cancelled": "Cancelled", "expired": "Expired", "failed": "Failed", "installed": "Installed", "removed": "Removed", "verifying": "Verifying on device", "verified": "Verified on device", "missing": "Expected profile not found", "not_managed": "Not managed", "unknown": "Waiting for fresh inventory", "compliant": "Up to date", "update_required": "Update required", "accepted": "Push accepted", "invalid_token": "Push token invalid", "enforced": "Update policy active", "unavailable": "Update policy unavailable"}
 	if label, ok := labels[state]; ok {
 		return label
