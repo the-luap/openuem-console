@@ -35,6 +35,7 @@ func enrollmentCSRF(token, browser string) string {
 // EnrollmentStatus contains only the information needed by the invited browser.
 // It never exposes inventory, identifiers, push errors or device credentials.
 type EnrollmentStatus struct {
+	Platform                          Platform
 	State, Organization, PublicOrigin string
 	ExpiresAt                         time.Time
 	DownloadsRemaining                int
@@ -50,19 +51,19 @@ func (s *Store) EnrollmentStatus(ctx context.Context, token, browser string) (*E
 	var downloads int
 	var hasProfile bool
 	result := &EnrollmentStatus{}
-	err := s.db.QueryRowContext(ctx, `SELECT d.status,d.invite_expires_at,s.organization,s.public_url,COALESCE(c.browser_hash,''),c.download_expires_at,c.status_expires_at,COALESCE(c.download_count,0),c.profile IS NOT NULL
+	err := s.db.QueryRowContext(ctx, `SELECT d.status,d.invite_expires_at,s.organization,s.public_url,COALESCE(c.browser_hash,''),c.download_expires_at,c.status_expires_at,COALESCE(c.download_count,0),c.profile IS NOT NULL,d.enrollment_platform
 	 FROM mdm_apple_devices d JOIN mdm_apple_settings s ON s.tenant_id=d.tenant_id
 	 LEFT JOIN mdm_apple_enrollment_claims c ON c.device_id=d.id
-	 WHERE d.invite_hash=$1 OR c.invite_hash=$1`, digest([]byte(token))).Scan(&state, &inviteExpiry, &result.Organization, &result.PublicOrigin, &browserHash, &downloadExpiry, &statusExpiry, &downloads, &hasProfile)
+	 WHERE d.invite_hash=$1 OR c.invite_hash=$1`, digest([]byte(token))).Scan(&state, &inviteExpiry, &result.Organization, &result.PublicOrigin, &browserHash, &downloadExpiry, &statusExpiry, &downloads, &hasProfile, &result.Platform)
 	if err != nil {
 		return nil, notFound(err)
 	}
 	if browserHash != "" && (!validEnrollmentToken(browser) || !hmac.Equal([]byte(browserHash), []byte(digest([]byte(browser))))) {
-		result.State, result.Organization = "used", ""
+		result.State, result.Organization, result.Platform = "used", "", ""
 		return result, nil
 	}
 	if statusExpiry.Valid && !time.Now().Before(statusExpiry.Time) {
-		result.State, result.Organization = "expired", ""
+		result.State, result.Organization, result.Platform = "expired", "", ""
 		return result, nil
 	}
 	switch state {
@@ -86,17 +87,20 @@ func (s *Store) EnrollmentStatus(ctx context.Context, token, browser string) (*E
 
 // ClaimEnrollment authorizes one SCEP identity. Duplicate submissions from the
 // same browser are idempotent; another browser cannot read the enrollment secret.
-func (s *Store) ClaimEnrollment(ctx context.Context, token, browser string) error {
+func (s *Store) ClaimEnrollment(ctx context.Context, token, browser string, platform ...Platform) error {
 	if !validEnrollmentToken(browser) {
 		return ErrUnauthorized
 	}
-	_, err := s.issueEnrollmentProfile(ctx, token, browser)
+	_, err := s.issueEnrollmentProfile(ctx, token, browser, platform...)
 	if !errors.Is(err, ErrNotFound) {
 		return err
 	}
 	status, statusErr := s.EnrollmentStatus(ctx, token, browser)
 	if statusErr != nil {
 		return statusErr
+	}
+	if len(platform) == 1 && status.Platform != platform[0] {
+		return ErrConflict
 	}
 	if status.State == "claimed" || status.State == "enrolled" {
 		return nil

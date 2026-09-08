@@ -97,6 +97,23 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 			return
 		}
 		if parts[1] == "checkin" {
+			if kind := stringValue(message, "MessageType"); kind == "SetBootstrapToken" || kind == "GetBootstrapToken" {
+				response, err := s.BootstrapToken(r.Context(), d, message)
+				if err != nil {
+					protocolError(w, err, logger)
+					return
+				}
+				if kind == "GetBootstrapToken" {
+					data, err := plist.Marshal(response, plist.XMLFormat)
+					if err != nil {
+						protocolError(w, err, logger)
+						return
+					}
+					w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+					_, _ = w.Write(data)
+				}
+				return
+			}
 			if stringValue(message, "MessageType") == "DeclarativeManagement" {
 				response, err := s.DeclarativeManagement(r.Context(), d, message)
 				if err != nil {

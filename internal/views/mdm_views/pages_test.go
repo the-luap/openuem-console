@@ -52,13 +52,21 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	d.CertificateExpiresAt = now.Add(20 * 24 * time.Hour)
 	detail.IdentityRenewals[0].CertificateExpiresAt = &identityExpires
 	detail.Commands = []apple.Command{{ID: detail.IdentityRenewals[0].CommandID, IdentityRenewal: true, RequestType: "InstallProfile", Status: "expired"}, {ID: "60000000-0000-0000-0000-000000000001", RequestType: "DeviceInformation", Status: "failed"}}
+	mac := *d
+	mac.Name, mac.Model, mac.OSVersion, mac.BuildVersion = "Design Mac", "Mac16,1", "15.0", "24A335"
+	silicon := true
+	mac.AppleSilicon, mac.SupervisedReported, mac.SecurityAt = &silicon, true, &now
+	mac.SoftwareUpdateDeviceID = "J313AP"
+	mac.SecurityInventory = map[string]any{"ManagementStatus": map[string]any{"UserApprovedEnrollment": true}, "BootstrapTokenAllowedForAuthentication": "allowed", "BootstrapTokenRequiredForSoftwareUpdate": true}
+	macDetail := Detail{Device: &mac, CatalogAt: &now, Releases: []apple.OSRelease{{Version: "15.1", Build: "24B1"}}, Policy: &apple.UpdatePolicy{TargetVersion: "15.1", TargetBuild: "24B1", Deadline: "2026-10-01T18:00:00", Status: "unavailable"}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
-		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "iOS profiles"}},
+		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "Apple profiles"}},
 		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`, "Automatic renewal starts 30 days", "New push data received; awaiting command-channel confirmation", "New identity in use", strings.Repeat("2b", 32)}},
+		{"mac-device", DeviceDetails(c, info, macDetail), []string{"Design Mac", "Mac management readiness", "Apple silicon", "Not escrowed", "J313AP", "Wait for this Mac to escrow", "Remove update policy", "Device channel"}},
 		{"profiles", Profiles(c, info, []apple.Profile{p}, []apple.Device{*d}), []string{"Create a Wi-Fi profile", "Save and deploy revision", "Company Wi-Fi", "test-csrf-token"}},
 		{"setup", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", Topic: "com.apple.mgmt.example", AppleAccount: "mdm-owner@example.test", PushCheckedAt: &now, PushFingerprint: strings.Repeat("b", 64), PushExpiresAt: now.AddDate(1, 0, 0)}, []apple.PushRequest{{ID: "30000000-0000-0000-0000-000000000001", Organization: "Example organization", PublicURL: "https://mdm.example.test", AppleAccount: "mdm-owner@example.test", ExpectedTopic: "com.apple.mgmt.example", BaseRevision: 1, Status: "pending", CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour), HasVendorRequest: true, VendorAvailable: true, VendorExpiresAt: &vendorExpires, VendorFingerprint: strings.Repeat("a", 64)}}, true, true, "", "", true), []string{"Create enrollment invitation", "push_certificate", "push_key", "test-csrf-token", "APNs connection checked (UTC)", strings.Repeat("b", 64), "Verify connection and import"}},
 	}
@@ -71,6 +79,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			html := b.String()
 			if tc.name == "device" && (strings.Contains(html, detail.IdentityRenewals[0].CommandID+"/retry") || !strings.Contains(html, "60000000-0000-0000-0000-000000000001/retry")) {
 				t.Fatal("renewal command retry was exposed or normal retry disappeared")
+			}
+			if tc.name == "mac-device" && !strings.Contains(html, `disabled>Enforce update policy`) {
+				t.Fatal("unready Mac enforcement button is enabled")
 			}
 			for _, required := range tc.required {
 				if !strings.Contains(html, required) {

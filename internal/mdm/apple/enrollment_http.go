@@ -131,8 +131,8 @@ func (s *Store) enrollmentPage(w http.ResponseWriter, r *http.Request, token str
 	}
 	switch r.PostForm.Get("action") {
 	case "claim":
-		if r.PostForm.Get("confirm") != "yes" || (r.PostForm.Get("platform") != "ios" && r.PostForm.Get("platform") != "ipados") {
-			fail(400, "Select iPhone or iPad and confirm device management. Other platforms cannot use this invitation.")
+		if len(r.PostForm["platform"]) != 1 || r.PostForm.Get("confirm") != "yes" || (r.PostForm.Get("platform") != "ios" && r.PostForm.Get("platform") != "ipados" && r.PostForm.Get("platform") != "macos") {
+			fail(400, "Select iPhone, iPad or Mac and confirm device management. Other platforms cannot use this invitation.")
 			return
 		}
 		select {
@@ -143,7 +143,7 @@ func (s *Store) enrollmentPage(w http.ResponseWriter, r *http.Request, token str
 			fail(429, "Enrollment is busy. Wait 10 seconds and try again.")
 			return
 		}
-		if err = s.ClaimEnrollment(r.Context(), token, browser); err == nil {
+		if err = s.ClaimEnrollment(r.Context(), token, browser, Platform(r.PostForm.Get("platform"))); err == nil {
 			// Starting near the invitation deadline must still leave the browser
 			// its bounded download/status window. This does not extend DB expiry.
 			setEnrollmentBrowser(w, browser)

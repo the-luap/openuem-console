@@ -30,6 +30,17 @@ func TestProfileValidationAndRevisionIdentity(t *testing.T) {
 	if _, err = plist.Unmarshal(b, &root); err != nil {
 		t.Fatal(err)
 	}
+	for _, scope := range []any{"User", "user", 1, []string{"System"}, map[string]any{"scope": "System"}} {
+		root["PayloadScope"] = scope
+		userProfile, err := plist.Marshal(root, plist.XMLFormat)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = ParseProfile(userProfile); err == nil {
+			t.Fatal("unsupported scope changed into a system profile", scope)
+		}
+	}
+	root["PayloadScope"] = "System"
 	root["PayloadContent"].([]any)[0].(map[string]any)["PayloadType"] = "com.apple.mdm"
 	b, err = plist.Marshal(root, plist.XMLFormat)
 	if err != nil {
@@ -69,7 +80,7 @@ func TestSecretBoxBindsTenantResourceAndPurpose(t *testing.T) {
 }
 
 func TestDDMStableTokensRemovalAndDeadline(t *testing.T) {
-	d := Device{ID: uuid.NewString(), OSVersion: "18.6", Status: "enrolled"}
+	d := Device{ID: uuid.NewString(), Model: "iPhone16,1", OSVersion: "18.6", Status: "enrolled"}
 	p := UpdatePolicy{TargetVersion: "18.7.1", Deadline: "2026-10-01T18:00:00"}
 	if err := ValidateUpdatePolicy(d, p); err != nil {
 		t.Fatal(err)

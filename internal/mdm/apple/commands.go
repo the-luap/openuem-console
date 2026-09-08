@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"howett.net/plist"
 )
-
-var inventoryQueries = []string{"UDID", "DeviceName", "OSVersion", "BuildVersion", "ModelName", "Model", "ProductName", "SerialNumber", "IsSupervised", "DeviceCapacity", "AvailableDeviceCapacity", "BatteryLevel", "IsDeviceLocatorServiceEnabled", "IsActivationLockEnabled"}
 
 func commandPayload(kind string, arguments map[string]any) ([]byte, string, error) {
 	id := uuid.NewString()
@@ -58,11 +57,11 @@ func (s *Store) RefreshInventory(ctx context.Context, scope Scope, id, actor str
 		return err
 	}
 	defer tx.Rollback()
-	var currentState string
-	if err = tx.QueryRowContext(ctx, `SELECT status FROM mdm_apple_devices WHERE id=$1 FOR UPDATE`, id).Scan(&currentState); err != nil {
+	d, err = scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2 AND ($3=0 OR site_id=$3) FOR UPDATE`, id, scope.TenantID, scope.SiteID))
+	if err != nil {
 		return err
 	}
-	if currentState != "enrolled" {
+	if d.Status != "enrolled" {
 		return errors.New("device is no longer enrolled")
 	}
 	if err = s.queueInventory(ctx, tx, d); err != nil {
@@ -75,7 +74,16 @@ func (s *Store) RefreshInventory(ctx context.Context, scope Scope, id, actor str
 }
 
 func (s *Store) queueInventory(ctx context.Context, tx *sql.Tx, d *Device) error {
-	for _, kind := range []string{"DeviceInformation", "InstalledApplicationList", "ProfileList", "AvailableOSUpdates"} {
+	return s.queuePlatformInventory(ctx, tx, d, true)
+}
+
+func (s *Store) queuePlatformInventory(ctx context.Context, tx *sql.Tx, d *Device, includeDevice bool) error {
+	kinds := []string{}
+	if includeDevice {
+		kinds = append(kinds, "DeviceInformation")
+	}
+	kinds = append(kinds, inventoryKindsFor(*d)...)
+	for _, kind := range kinds {
 		var exists bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_commands WHERE device_id=$1 AND request_type=$2 AND status IN ('queued','sent','not_now') AND expires_at>now())`, d.ID, kind).Scan(&exists); err != nil {
 			return err
@@ -84,10 +92,21 @@ func (s *Store) queueInventory(ctx context.Context, tx *sql.Tx, d *Device) error
 			continue
 		}
 		args := map[string]any{}
-		if kind == "DeviceInformation" {
-			args["Queries"] = inventoryQueries
+		if kind == "DeclarativeManagement" {
+			p, err := scanPolicy(tx.QueryRowContext(ctx, `SELECT `+policyColumns+` FROM mdm_apple_update_policies WHERE device_id=$1`, d.ID))
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return err
+			}
+			data, err := json.Marshal(Tokens(Declarations(*d, p)))
+			if err != nil {
+				return err
+			}
+			args["Data"] = data
 		}
-		if kind == "InstalledApplicationList" {
+		if kind == "DeviceInformation" {
+			args["Queries"] = inventoryQueriesFor(*d)
+		}
+		if kind == "InstalledApplicationList" && d.Family() != PlatformMacOS && CompareVersions(d.OSVersion, "7.0") >= 0 {
 			args["ManagedAppsOnly"] = false
 		}
 		if _, err := s.enqueue(ctx, tx, d, kind, args, nil, nil); err != nil {
@@ -118,8 +137,8 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 }
 
 func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) error {
-	if stringValue(message, "UserID") != "" || stringValue(message, "EnrollmentID") != "" {
-		return errors.New("this enrollment supports the device channel only")
+	if !deviceChannelMessage(message) {
+		return ErrUnauthorized
 	}
 	udid := stringValue(message, "UDID")
 	if udid == "" || len(udid) > 255 {
@@ -162,14 +181,17 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	}
 	switch kind {
 	case "Authenticate":
-		model := stringValue(message, "ProductName")
-		if model == "" {
-			model = stringValue(message, "Model")
+		model, modelErr := reportedModel(message, current.Model)
+		if modelErr != nil {
+			return modelErr
 		}
-		if model != "" && !strings.HasPrefix(model, "iPhone") && !strings.HasPrefix(model, "iPad") && !strings.HasPrefix(model, "iPod") {
-			return errors.New("only iOS and iPadOS device enrollment is supported")
+		if model != "" && DetectPlatform(model) == PlatformUnknown {
+			return errors.New("only iPhone, iPad and Mac device enrollment is supported")
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET udid=$1,serial_number=$2,model=$3,os_version=$4,build_version=$5,last_seen=now() WHERE id=$6`, udid, stringValue(message, "SerialNumber"), model, stringValue(message, "OSVersion"), stringValue(message, "BuildVersion"), current.ID)
+		if current.EnrollmentPlatform != "" && model != "" && current.EnrollmentPlatform != DetectPlatform(model) {
+			return errors.New("the device does not match the platform selected for enrollment")
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET udid=$1,serial_number=COALESCE(NULLIF($2,''),serial_number),model=$3,os_version=COALESCE(NULLIF($4,''),os_version),build_version=COALESCE(NULLIF($5,''),build_version),last_seen=now() WHERE id=$6`, udid, stringValue(message, "SerialNumber"), model, stringValue(message, "OSVersion"), stringValue(message, "BuildVersion"), current.ID)
 	case "TokenUpdate":
 		if current.UDID == "" {
 			return ErrUnauthorized
@@ -208,6 +230,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	case "CheckOut":
 		if current.UDID == "" {
 			return ErrUnauthorized
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_bootstrap_tokens WHERE device_id=$1`, current.ID); err != nil {
+			return err
 		}
 		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET status='unenrolled',push_token=NULL,push_magic=NULL,last_seen=now() WHERE id=$1`, current.ID)
 		if err != nil {
@@ -262,7 +287,7 @@ func responseError(message map[string]any) string {
 // Connect serializes the device's result ingestion and next-command delivery in
 // a single transaction. Command IDs are checked against the authenticated device.
 func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) ([]byte, error) {
-	if stringValue(message, "UDID") != d.UDID || d.UDID == "" || stringValue(message, "UserID") != "" || stringValue(message, "EnrollmentID") != "" {
+	if stringValue(message, "UDID") != d.UDID || d.UDID == "" || !deviceChannelMessage(message) {
 		return nil, ErrUnauthorized
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -483,13 +508,38 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 		version := stringValue(info, "OSVersion")
 		build := stringValue(info, "BuildVersion")
 		name := stringValue(info, "DeviceName")
-		model := stringValue(info, "ProductName")
-		if model == "" {
-			model = stringValue(info, "Model")
+		model, err := reportedModel(info, d.Model)
+		if err != nil {
+			return err
+		}
+		if d.EnrollmentPlatform != "" && DetectPlatform(model) != PlatformUnknown && d.EnrollmentPlatform != DetectPlatform(model) {
+			return errors.New("inventory platform does not match the enrollment")
 		}
 		supervised, hasSupervised := info["IsSupervised"].(bool)
-		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET inventory=$1,name=COALESCE(NULLIF($2,''),name),serial_number=COALESCE(NULLIF($3,''),serial_number),model=COALESCE(NULLIF($4,''),model),os_version=COALESCE(NULLIF($5,''),os_version),build_version=COALESCE(NULLIF($6,''),build_version),supervised=CASE WHEN $7 THEN $8 ELSE supervised END,inventory_at=CASE WHEN $5<>'' THEN now() ELSE inventory_at END WHERE id=$9`, data, name, stringValue(info, "SerialNumber"), model, version, build, hasSupervised, supervised, d.ID)
-		return err
+		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET inventory=$1,name=COALESCE(NULLIF($2,''),name),serial_number=COALESCE(NULLIF($3,''),serial_number),model=COALESCE(NULLIF($4,''),model),os_version=COALESCE(NULLIF($5,''),os_version),build_version=COALESCE(NULLIF($6,''),build_version),supervised=CASE WHEN $7 THEN $8 ELSE supervised END,supervised_reported=supervised_reported OR $7,inventory_at=CASE WHEN $5<>'' THEN now() ELSE inventory_at END WHERE id=$9`, data, name, stringValue(info, "SerialNumber"), model, version, build, hasSupervised, supervised, d.ID)
+		if err != nil {
+			return err
+		}
+		if err = s.savePlatformInventory(ctx, tx, d, info, model); err != nil {
+			return err
+		}
+		next, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1`, d.ID))
+		if err != nil {
+			return err
+		}
+		// A minimal first check-in can omit the OS version. Once inventory
+		// identifies it, request the newly supported fields and commands now.
+		if !slices.Equal(inventoryKindsFor(*d), inventoryKindsFor(*next)) || !slices.Equal(inventoryQueriesFor(*d), inventoryQueriesFor(*next)) {
+			if err = s.queuePlatformInventory(ctx, tx, next, !slices.Equal(inventoryQueriesFor(*d), inventoryQueriesFor(*next))); err != nil {
+				return err
+			}
+		}
+		return s.reconcileDeviceUpdate(ctx, tx, next)
+	case "SecurityInfo":
+		if err := s.saveSecurityInventory(ctx, tx, d, message); err != nil {
+			return err
+		}
+		return s.reconcileDeviceUpdate(ctx, tx, d)
 	case "InstalledApplicationList":
 		var apps []Application
 		v, exists := message["InstalledApplicationList"]

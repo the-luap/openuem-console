@@ -129,19 +129,22 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 }
 
 func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired string) error {
-	var state string
-	if err := tx.QueryRowContext(ctx, `SELECT status FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, d.ID, d.TenantID).Scan(&state); err != nil {
-		return notFound(err)
+	current, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, d.ID, d.TenantID))
+	if err != nil {
+		return err
 	}
-	if state != "enrolled" {
+	if current.Status != "enrolled" {
 		return errors.New("device is no longer enrolled")
+	}
+	if !current.Capabilities().Profiles {
+		return errors.New("refresh inventory to identify the platform and OS version before assigning profiles")
 	}
 	// Cancel previous queued/sent work so stale responses cannot reverse the new
 	// desired state. A new assignment always replaces all commands for this pair.
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND profile_id=$2 AND status IN ('queued','sent','not_now')`, d.ID, p.ID); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_profile_assignments(tenant_id,profile_id,device_id,revision,desired) VALUES($1,$2,$3,$4,$5) ON CONFLICT(profile_id,device_id) DO UPDATE SET revision=excluded.revision,desired=excluded.desired,status='pending',error='',updated_at=now()`, d.TenantID, p.ID, d.ID, p.Revision, desired)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_profile_assignments(tenant_id,profile_id,device_id,revision,desired) VALUES($1,$2,$3,$4,$5) ON CONFLICT(profile_id,device_id) DO UPDATE SET revision=excluded.revision,desired=excluded.desired,status='pending',error='',updated_at=now()`, d.TenantID, p.ID, d.ID, p.Revision, desired)
 	if err != nil {
 		return err
 	}

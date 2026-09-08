@@ -1,5 +1,6 @@
 /* Keep device metadata and renewal evidence within the available viewport. */
-#apple-device {
+#apple-device,
+#device-management {
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
   color: hsl(var(--foreground));
@@ -7,7 +8,10 @@
 
 #apple-device > *,
 #apple-device form,
-#apple-device article {
+#apple-device article,
+#device-management > *,
+#device-management form,
+#device-management label {
   min-width: 0;
 }
 
@@ -15,11 +19,14 @@
 #apple-device dd,
 #apple-device label,
 #apple-device h3,
-#apple-device summary {
+#apple-device summary,
+#device-management p,
+#device-management label {
   overflow-wrap: anywhere;
 }
 
-#apple-device .uk-button {
+#apple-device .uk-button,
+#device-management .uk-button {
   height: auto;
   min-height: 2.25rem;
   padding-top: 0.4rem;
@@ -28,7 +35,9 @@
 }
 
 #apple-device input:not([type="checkbox"]),
-#apple-device select {
+#apple-device select,
+#device-management input,
+#device-management select {
   min-width: 0;
   max-width: 100%;
 }

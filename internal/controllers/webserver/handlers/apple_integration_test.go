@@ -218,6 +218,26 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Finance Windows") || !strings.Contains(rec.Body.String(), "Sales iPhone") {
 		t.Fatal("unified device query failed", rec.Code, rec.Body.String())
 	}
+	// An invitation's name is not platform evidence. Native filters use the
+	// reported model and never include unrelated desktop rows.
+	for _, model := range []struct{ value, platform string }{{"iPhone16,1", "ios"}, {"iPad16,6", "ipados"}, {"Mac16,1", "macos"}, {"AppleTV14,1", "unknown"}, {"", "unknown"}} {
+		if _, err = m.DB.Exec(`UPDATE mdm_apple_devices SET model=$1 WHERE tenant_id=$2`, model.value, tenant.ID); err != nil {
+			t.Fatal(err)
+		}
+		for _, filter := range []string{"ios", "ipados", "macos", "linux", "windows", "unknown", "apple"} {
+			rec = request("GET", base+"/devices?platform="+filter, "", nil)
+			if rec.Code != 200 {
+				t.Fatal("platform route failed", filter, rec.Code)
+			}
+			if strings.Contains(rec.Body.String(), "Sales iPhone") != (filter == model.platform || filter == "apple") || strings.Contains(rec.Body.String(), "Finance Windows") != (filter == "windows") {
+				t.Fatal("incorrect platform filter", model, filter)
+			}
+		}
+	}
+	rec = request("GET", base+"/devices?platform=android", "", nil)
+	if rec.Code != 400 {
+		t.Fatal("invalid filter widened device scope", rec.Code)
+	}
 	form = url.Values{"csrf": {"console-test-token"}, "editor": {"passcode"}, "name": {"Company PIN"}, "identifier": {"eu.example.pin"}, "min_length": {"6"}}
 	rec = request("POST", base+"/ios/configurations", "application/x-www-form-urlencoded", []byte(form.Encode()))
 	if rec.Code != 303 {

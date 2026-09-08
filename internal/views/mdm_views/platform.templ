@@ -1,0 +1,43 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/mdm/apple"
+
+templ MacCapabilities(d *apple.Device) {
+	if d.Family()==apple.PlatformMacOS {
+		<section class="uk-card uk-card-default">
+			<div class="uk-card-header"><h2 class="uk-card-title">Mac management readiness</h2></div>
+			<div class="uk-card-body">
+				<dl class="uk-description-list">
+					<dt>Processor family</dt><dd>{ macProcessor(d) }</dd>
+					<dt>User-approved enrollment</dt><dd>{ macApproval(d) }</dd>
+					<dt>Bootstrap token</dt>
+					<dd>
+						if d.BootstrapTokenEscrowed {
+							{ "Escrowed" }
+						} else {
+							{ "Not escrowed" }
+						}
+					</dd>
+					<dt>Software update device identifier</dt><dd>{ Show(d.SoftwareUpdateDeviceID) }</dd>
+					<dt>Security inventory collected</dt><dd>{ When(d.SecurityAt) }</dd>
+				</dl>
+				<p class="uk-text-muted mt-4">Apple silicon updates require a bootstrap token from this Mac. A token-enabled user may need to sign in before macOS sends it. Use Refresh device, apps &amp; profiles to request current readiness information.</p>
+				<p class="uk-text-muted mt-4">Device enrollment manages system profiles. A separately installed OpenUEM agent currently has its own inventory record.</p>
+			</div>
+		</section>
+	}
+}
+
+func macProcessor(d *apple.Device) string {
+	if d.AppleSilicon == nil { return "Not yet reported" }
+	if *d.AppleSilicon { return "Apple silicon" }
+	return "Intel"
+}
+
+func macApproval(d *apple.Device) string {
+	m, _ := d.SecurityInventory["ManagementStatus"].(map[string]any)
+	approved, ok := m["UserApprovedEnrollment"].(bool)
+	if !ok { return "Not yet reported" }
+	if approved { return "Yes" }
+	return "No"
+}

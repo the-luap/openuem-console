@@ -26,10 +26,30 @@ type SoftwareCatalog struct {
 }
 
 func (c SoftwareCatalog) Releases(model string, now time.Time) []OSRelease {
+	return c.DeviceReleases(Device{Model: model}, now)
+}
+
+func (c SoftwareCatalog) DeviceReleases(d Device, now time.Time) []OSRelease {
 	result := []OSRelease{}
+	groupName := "iOS"
+	model := d.SoftwareUpdateDeviceID
+	if d.Family() == PlatformMacOS {
+		groupName = "macOS"
+		// GDMF Mac identifiers can differ from the marketed hardware model.
+		// Without a reported update identifier, no compatibility is assumed.
+		if model == "" {
+			return result
+		}
+	} else if d.Family() == PlatformIOS || d.Family() == PlatformIPadOS {
+		if model == "" {
+			model = d.Model
+		}
+	} else {
+		return result
+	}
 	seen := map[string]bool{}
 	for _, group := range []map[string][]OSRelease{c.PublicAssetSets, c.AssetSets} {
-		for _, r := range group["iOS"] {
+		for _, r := range group[groupName] {
 			if !versionPattern.MatchString(r.Version) {
 				continue
 			}
@@ -55,7 +75,7 @@ func (c SoftwareCatalog) Releases(model string, now time.Time) []OSRelease {
 }
 
 func (c SoftwareCatalog) Supports(d Device, p UpdatePolicy, now time.Time) bool {
-	for _, r := range c.Releases(d.Model, now) {
+	for _, r := range c.DeviceReleases(d, now) {
 		versionMatches := r.Version == p.TargetVersion || (strings.Count(p.TargetVersion, ".") == 1 && strings.HasPrefix(r.Version, p.TargetVersion+"."))
 		if versionMatches && (p.TargetBuild == "" || p.TargetBuild == r.Build) {
 			return true
@@ -120,8 +140,8 @@ func (s *Store) RefreshCatalog(ctx context.Context) error {
 	if fetchErr == nil {
 		var catalog SoftwareCatalog
 		fetchErr = json.Unmarshal(data, &catalog)
-		if fetchErr == nil && len(catalog.PublicAssetSets["iOS"])+len(catalog.AssetSets["iOS"]) == 0 {
-			fetchErr = errors.New("Apple software catalog contains no iOS releases")
+		if fetchErr == nil && len(catalog.PublicAssetSets["iOS"])+len(catalog.AssetSets["iOS"])+len(catalog.PublicAssetSets["macOS"])+len(catalog.AssetSets["macOS"]) == 0 {
+			fetchErr = errors.New("Apple software catalog contains no supported Apple releases")
 		}
 	}
 	if fetchErr != nil {

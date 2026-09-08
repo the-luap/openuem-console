@@ -66,7 +66,7 @@ func (s *Store) ReconcileUpdateAvailability(ctx context.Context) error {
 		return err
 	}
 	if fetched == nil || time.Since(*fetched) > 48*time.Hour {
-		return nil
+		catalog = nil
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT device_id,tenant_id FROM mdm_apple_update_policies ORDER BY device_id`)
 	if err != nil {
@@ -122,26 +122,55 @@ func (s *Store) reconcileUpdate(ctx context.Context, tx *sql.Tx, catalog *Softwa
 	if err != nil {
 		return err
 	}
-	available := catalog.Supports(*d, *p, time.Now())
-	if available && p.Status != "unavailable" {
+	capabilities := d.Capabilities()
+	ready := capabilities.SpecificOSUpdate && capabilities.UpdateReason == ""
+	// Stale catalog data cannot restore a withdrawn policy, but must not
+	// prevent withdrawal when device authorization becomes unavailable.
+	if catalog == nil && ready {
 		return nil
 	}
-	if !available && p.Status == "unavailable" {
+	available := ready && catalog != nil && catalog.Supports(*d, *p, time.Now())
+	if available && p.Status != "unavailable" {
 		return nil
 	}
 	status, detail := "pending", ""
 	if !available {
 		status = "unavailable"
 		detail = "Apple no longer offers the selected release for this model. Choose another release."
+		if reason := d.Capabilities().UpdateReason; reason != "" {
+			detail = reason
+		}
+	}
+	if p.Status == status && p.Error == detail {
+		return nil
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET status=$1,error=$2,updated_at=now() WHERE device_id=$3`, status, detail, id); err != nil {
 		return err
 	}
 	p.Status = status
-	data, err := json.Marshal(Tokens(Declarations(*d, p)))
-	if err != nil {
+	return s.queueDeclarations(ctx, tx, d, p)
+}
+
+// Capability changes reconcile in the same transaction as inventory or escrow.
+// A lost token must not wait for a catalog refresh to withdraw authorization.
+func (s *Store) reconcileDeviceUpdate(ctx context.Context, tx *sql.Tx, d *Device) error {
+	var assigned bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_update_policies WHERE device_id=$1 AND tenant_id=$2)`, d.ID, d.TenantID).Scan(&assigned); err != nil {
 		return err
 	}
-	_, err = s.enqueue(ctx, tx, d, "DeclarativeManagement", map[string]any{"Data": data}, nil, nil)
-	return err
+	if !assigned {
+		return nil
+	}
+	var data []byte
+	var fetched *time.Time
+	if err := tx.QueryRowContext(ctx, `SELECT document,fetched_at FROM mdm_apple_software_catalog WHERE singleton=true`).Scan(&data, &fetched); err != nil {
+		return err
+	}
+	var catalog *SoftwareCatalog
+	if fetched != nil && time.Since(*fetched) <= 48*time.Hour {
+		if err := json.Unmarshal(data, &catalog); err != nil {
+			return err
+		}
+	}
+	return s.reconcileUpdate(ctx, tx, catalog, d.ID, d.TenantID)
 }

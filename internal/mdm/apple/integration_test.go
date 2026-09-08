@@ -120,6 +120,10 @@ func testEnroll(t *testing.T, s *Store, scope Scope, name string, existingUDID .
 }
 
 func testEnrollWithKey(t *testing.T, s *Store, scope Scope, name string, existingUDID ...string) (*Device, *x509.Certificate, *rsa.PrivateKey) {
+	return testEnrollPlatformWithKey(t, s, scope, name, "iPhone16,1", "18.6", existingUDID...)
+}
+
+func testEnrollPlatformWithKey(t *testing.T, s *Store, scope Scope, name, model, version string, existingUDID ...string) (*Device, *x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 	ctx := context.Background()
 	invite, err := s.Invite(ctx, scope, name, "test-admin")
@@ -127,7 +131,12 @@ func testEnrollWithKey(t *testing.T, s *Store, scope Scope, name string, existin
 		t.Fatal(err)
 	}
 	token := invite.URL[strings.LastIndex(invite.URL, "/")+1:]
-	profile, err := s.EnrollmentProfile(ctx, token)
+	var profile []byte
+	if DetectPlatform(model) == PlatformMacOS {
+		profile, err = s.issueEnrollmentProfile(ctx, token, "", PlatformMacOS)
+	} else {
+		profile, err = s.EnrollmentProfile(ctx, token)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +152,7 @@ func testEnrollWithKey(t *testing.T, s *Store, scope Scope, name string, existin
 	if len(existingUDID) > 0 {
 		udid = existingUDID[0]
 	}
-	if err = s.CheckIn(ctx, d, map[string]any{"MessageType": "Authenticate", "UDID": udid, "Topic": "com.apple.mgmt.test", "ProductName": "iPhone16,1", "OSVersion": "18.6", "SerialNumber": "TEST-" + name}); err != nil {
+	if err = s.CheckIn(ctx, d, map[string]any{"MessageType": "Authenticate", "UDID": udid, "Topic": "com.apple.mgmt.test", "ProductName": model, "OSVersion": version, "SerialNumber": "TEST-" + name}); err != nil {
 		t.Fatal(err)
 	}
 	d, err = s.AuthenticateCertificate(ctx, invite.DeviceID, cert)

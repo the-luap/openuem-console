@@ -141,6 +141,19 @@ func renderApple(c echo.Context, component templ.Component) error {
 	return component.Render(c.Request().Context(), c.Response())
 }
 
+func desktopPlatform(os string) string {
+	switch strings.ToLower(strings.TrimSpace(os)) {
+	case "windows":
+		return "windows"
+	case "darwin", "macos", "mac os x":
+		return "macos"
+	case "linux":
+		return "linux"
+	default:
+		return "unknown"
+	}
+}
+
 func (h *Handler) UnifiedDevices(c echo.Context) error {
 	info, scope, err := h.appleInfo(c)
 	if err != nil {
@@ -148,18 +161,23 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 	}
 	rows := []mdm_views.DeviceRow{}
 	platform := c.QueryParam("platform")
-	if strings.HasSuffix(c.Path(), "/ios") {
-		platform = "ios"
+	if strings.HasSuffix(c.Path(), "/ios") && platform == "" {
+		platform = "apple"
+	}
+	switch platform {
+	case "", "apple", "ios", "ipados", "macos", "windows", "linux", "unknown":
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid platform filter")
 	}
 	search := strings.ToLower(strings.TrimSpace(c.QueryParam("q")))
-	if platform != "ios" {
+	if platform == "" || platform == "windows" || platform == "macos" || platform == "linux" || platform == "unknown" {
 		p := partials.PaginationAndSort{SortBy: "nickname", SortOrder: "asc"}
 		computers, err := h.Model.GetComputersByPage(p, filters.AgentFilter{}, info)
 		if err != nil {
 			return err
 		}
 		for _, d := range computers {
-			if platform == "windows" && !strings.EqualFold(d.OS, "windows") {
+			if platform != "" && platform != desktopPlatform(d.OS) {
 				continue
 			}
 			name := d.Nickname
@@ -174,12 +192,15 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: name, Platform: d.OS, OSVersion: d.Version, Serial: d.Serial, Model: d.Model, Status: "agent", LastSeen: &seen, URL: deviceURL})
 		}
 	}
-	if h.Apple != nil && platform != "windows" {
+	if h.Apple != nil && platform != "windows" && platform != "linux" {
 		devices, err := h.Apple.Devices(c.Request().Context(), scope)
 		if err != nil {
 			return err
 		}
 		for _, d := range devices {
+			if platform != "" && platform != "apple" && platform != string(d.Family()) {
+				continue
+			}
 			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: d.Platform(), OSVersion: d.OSVersion, Serial: d.SerialNumber, Model: d.Model, Status: d.Status, LastSeen: d.LastSeen, URL: partials.GetNavigationUrl(info, "/ios/"+d.ID)})
 		}
 	}
@@ -357,7 +378,7 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 	}
 	detail.CatalogAt = fetched
 	if fetched != nil && time.Since(*fetched) < 48*time.Hour {
-		detail.Releases = catalog.Releases(d.Model, time.Now())
+		detail.Releases = catalog.DeviceReleases(*d, time.Now())
 	}
 	if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "inventory.read", id); err != nil {
 		return err

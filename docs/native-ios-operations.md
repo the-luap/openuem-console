@@ -1,4 +1,4 @@
-# Native iOS/iPadOS management
+# Native Apple management
 
 This fork keeps OpenUEM's Windows agent, workers, NATS integration and software
 deployment workflows, and adds an Apple management implementation inside the
@@ -6,8 +6,12 @@ console binary. The `/devices` page combines computer and mobile inventory and
 links to the relevant actions. No NanoMDM service or library is required.
 
 The implementation has automated protocol, PostgreSQL, TLS and console tests.
-Physical iPhone/iPad acceptance and a Windows endpoint deployment with this
+Physical iPhone/iPad/Mac acceptance and a Windows endpoint deployment with this
 fork are still outstanding. Treat this branch as a pilot until those checks pass.
+
+[Native Mac management](native-macos-management.md) documents Mac enrollment,
+platform/version gates, device-channel profiles, update compatibility and encrypted
+bootstrap-token escrow. Mac user channels and agent/MDM identity linkage remain open.
 
 ## Included workflows
 

@@ -14,6 +14,7 @@ type enrollmentLayout struct {
 	profileUUID, mdmUUID, identityUUID, caUUID string
 	identityType, publicURL, topic             string
 	accessRights                               int64
+	bootstrapToken                             bool
 }
 
 func newEnrollmentLayout(c *Settings) enrollmentLayout {
@@ -42,13 +43,13 @@ func saveEnrollmentLayout(ctx context.Context, tx *sql.Tx, tenant int, deviceID 
 	if err := l.validate(); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights)
+	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights,bootstrap_token) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10,$11) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights, l.bootstrapToken)
 	return err
 }
 
 func loadEnrollmentLayout(ctx context.Context, tx *sql.Tx, deviceID string) (*enrollmentLayout, error) {
 	var l enrollmentLayout
-	err := tx.QueryRowContext(ctx, `SELECT profile_uuid,mdm_uuid,identity_uuid,COALESCE(ca_uuid,''),identity_type,public_url,topic,access_rights FROM mdm_apple_enrollment_layouts WHERE device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights)
+	err := tx.QueryRowContext(ctx, `SELECT profile_uuid,mdm_uuid,identity_uuid,COALESCE(ca_uuid,''),identity_type,public_url,topic,access_rights,bootstrap_token FROM mdm_apple_enrollment_layouts WHERE device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken)
 	if err != nil {
 		return nil, notFound(err)
 	}

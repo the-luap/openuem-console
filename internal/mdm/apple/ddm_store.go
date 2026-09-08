@@ -63,14 +63,7 @@ func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 		if err != nil {
 			return err
 		}
-		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND request_type='DeclarativeManagement' AND status IN ('queued','sent','not_now')`, id); err != nil {
-			return err
-		}
-		data, err := json.Marshal(Tokens(Declarations(*d, p)))
-		if err != nil {
-			return err
-		}
-		if _, err = s.enqueue(ctx, tx, d, "DeclarativeManagement", map[string]any{"Data": data}, nil, nil); err != nil {
+		if err = s.queueDeclarations(ctx, tx, d, p); err != nil {
 			return err
 		}
 		if err = audit(ctx, tx, scope.TenantID, actor, "apple.update.policy", id); err != nil {
@@ -80,8 +73,25 @@ func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 	return tx.Commit()
 }
 
+// queueDeclarations supersedes pending notifications using current capability
+// evidence. Removing a policy remains possible after an OS becomes unsupported.
+func (s *Store) queueDeclarations(ctx context.Context, tx *sql.Tx, d *Device, p *UpdatePolicy) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND request_type='DeclarativeManagement' AND status IN ('queued','sent','not_now')`, d.ID); err != nil {
+		return err
+	}
+	if !d.Capabilities().DeclarativeManagement {
+		return nil
+	}
+	data, err := json.Marshal(Tokens(Declarations(*d, p)))
+	if err != nil {
+		return err
+	}
+	_, err = s.enqueue(ctx, tx, d, "DeclarativeManagement", map[string]any{"Data": data}, nil, nil)
+	return err
+}
+
 func (s *Store) DeclarativeManagement(ctx context.Context, d *Device, message map[string]any) (any, error) {
-	if d.Status != "enrolled" || d.UDID == "" || stringValue(message, "UDID") != d.UDID || stringValue(message, "UserID") != "" || stringValue(message, "EnrollmentID") != "" {
+	if d.Status != "enrolled" || d.UDID == "" || stringValue(message, "UDID") != d.UDID || !deviceChannelMessage(message) {
 		return nil, ErrUnauthorized
 	}
 	endpoint := stringValue(message, "Endpoint")
@@ -108,6 +118,9 @@ func (s *Store) DeclarativeManagement(ctx context.Context, d *Device, message ma
 	if current.Status != "enrolled" || current.UDID != d.UDID {
 		return nil, ErrUnauthorized
 	}
+	if !current.Capabilities().DeclarativeManagement {
+		return nil, errors.New("declarative management is unavailable for this platform or OS version")
+	}
 	if err = s.requireActiveIdentity(ctx, tx, d); err != nil {
 		return nil, err
 	}
@@ -131,10 +144,13 @@ func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport)
 		return err
 	}
 	defer tx.Rollback()
-	var old []byte
-	var state string
-	if err = tx.QueryRowContext(ctx, `SELECT ddm_status,status FROM mdm_apple_devices WHERE id=$1 FOR UPDATE`, d.ID).Scan(&old, &state); err != nil {
+	current, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 FOR UPDATE`, d.ID))
+	if err != nil {
 		return err
+	}
+	old, state := current.DDMStatus, current.Status
+	if !current.Capabilities().DeclarativeManagement {
+		return errors.New("declarative status is unavailable for this platform or OS version")
 	}
 	if err = s.requireActiveIdentity(ctx, tx, d); err != nil {
 		return err
@@ -160,6 +176,11 @@ func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport)
 	if err != nil {
 		return err
 	}
+	if updateID := statusString(report.StatusItems, "softwareupdate", "device-id"); updateID != "" {
+		if err = s.savePlatformInventory(ctx, tx, current, map[string]any{"SoftwareUpdateDeviceID": updateID}, current.Model); err != nil {
+			return err
+		}
+	}
 	installState := statusString(items, "softwareupdate", "install-state")
 	if installState != "" {
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET status=$1,updated_at=now() WHERE device_id=$2 AND status<>'unavailable'`, installState, d.ID); err != nil {
@@ -183,7 +204,14 @@ func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport)
 			}
 		}
 	}
-	if err = s.updateDeclarationState(ctx, tx, d, report.StatusItems); err != nil {
+	current, err = scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1`, d.ID))
+	if err != nil {
+		return err
+	}
+	if err = s.reconcileDeviceUpdate(ctx, tx, current); err != nil {
+		return err
+	}
+	if err = s.updateDeclarationState(ctx, tx, current, report.StatusItems); err != nil {
 		return err
 	}
 	// Keep protocol-level status errors visible; never translate a missing status

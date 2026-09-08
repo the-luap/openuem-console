@@ -39,14 +39,15 @@ func ValidateUpdatePolicy(d Device, p UpdatePolicy) error {
 	if d.Status != "enrolled" {
 		return errors.New("device must be enrolled")
 	}
-	if !versionPattern.MatchString(d.OSVersion) || CompareVersions(d.OSVersion, "17.0") < 0 {
-		return errors.New("update enforcement requires iOS/iPadOS 17 or later")
+	capabilities := d.Capabilities()
+	if !capabilities.SpecificOSUpdate || capabilities.UpdateReason != "" {
+		return errors.New(capabilities.UpdateReason)
 	}
 	if !versionPattern.MatchString(p.TargetVersion) {
 		return errors.New("enter an OS version such as 18.7.1")
 	}
 	if CompareVersions(p.TargetVersion, d.OSVersion) < 0 {
-		return errors.New("iOS cannot be downgraded through an update policy")
+		return errors.New("the operating system cannot be downgraded through an update policy")
 	}
 	if len(p.TargetBuild) > 32 || strings.ContainsAny(p.TargetBuild, " /\r\n\t") {
 		return errors.New("invalid target build")
@@ -94,10 +95,16 @@ func declaration(kind, id string, payload map[string]any) Declaration {
 }
 
 func Declarations(d Device, policy *UpdatePolicy) []Declaration {
+	if !d.Capabilities().DeclarativeManagement {
+		return []Declaration{}
+	}
 	prefix := "eu.openuem.apple." + d.ID
 	names := []string{"device.operating-system.version", "device.operating-system.build-version", "management.declarations"}
-	if CompareVersions(d.OSVersion, "17.0") >= 0 {
+	if d.Capabilities().SpecificOSUpdate {
 		names = append(names, "softwareupdate.install-state", "softwareupdate.failure-reason", "softwareupdate.pending-version")
+	}
+	if (d.Family() == PlatformMacOS && CompareVersions(d.OSVersion, "15.0") >= 0 && d.Supervised && d.SupervisedReported) || ((d.Family() == PlatformIOS || d.Family() == PlatformIPadOS) && CompareVersions(d.OSVersion, "18.0") >= 0) {
+		names = append(names, "softwareupdate.device-id")
 	}
 	subscriptions := []map[string]string{}
 	for _, name := range names {
@@ -106,7 +113,7 @@ func Declarations(d Device, policy *UpdatePolicy) []Declaration {
 	sub := declaration("com.apple.configuration.management.status-subscriptions", prefix+".status", map[string]any{"StatusItems": subscriptions})
 	result := []Declaration{sub}
 	configs := []string{sub.Identifier}
-	if policy != nil && policy.Status != "unavailable" {
+	if policy != nil && policy.Status != "unavailable" && d.Capabilities().SpecificOSUpdate && d.Capabilities().UpdateReason == "" {
 		payload := map[string]any{"TargetOSVersion": policy.TargetVersion, "TargetLocalDateTime": policy.Deadline}
 		if policy.TargetBuild != "" {
 			payload["TargetBuildVersion"] = policy.TargetBuild

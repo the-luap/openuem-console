@@ -127,6 +127,7 @@ func testPublicProtocolIdentity(t *testing.T, proxied bool) {
 	}
 	address := server.URL + "/mdm/apple/enroll/" + token
 	form := portalStart(t, client, address)
+	form.Set("platform", "ios")
 	response := portalPost(t, client, address, server.URL, form)
 	portalRead(t, response)
 	if response.StatusCode != 303 {

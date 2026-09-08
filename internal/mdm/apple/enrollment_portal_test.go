@@ -130,7 +130,7 @@ func TestEnrollmentPortalDoesNotConsumeScannerReadsAndRequiresConfirmation(t *te
 	}{
 		{"csrf", "", server.URL, 403}, {"csrf", "forged", server.URL, 403},
 		{"confirm", "", server.URL, 400}, {"platform", "windows", server.URL, 400},
-		{"platform", "macos", server.URL, 400}, {"platform", "ios", "https://attacker.example", 403},
+		{"platform", "android", server.URL, 400}, {"platform", "ios", "https://attacker.example", 403},
 		{"platform", "ios", "", 403},
 		{"platform", "ios", "null", 403},
 	} {
@@ -373,5 +373,61 @@ func TestEnrollmentExpiryAndRevocationCloseRetryAccess(t *testing.T) {
 	}
 	if _, err = s.EnrollmentStatus(ctx, token, browser); !errors.Is(err, ErrNotFound) {
 		t.Fatal("expired status retained", err)
+	}
+}
+
+func TestMacEnrollmentPortalKeepsPlatformAndShowsMacInstructions(t *testing.T) {
+	s, server, invite, token := portalFixture(t)
+	client := server.Client()
+	form := portalStart(t, client, invite.URL)
+	form.Set("platform", "macos")
+	response := portalPost(t, client, invite.URL, server.URL, form)
+	portalRead(t, response)
+	if response.StatusCode != 303 {
+		t.Fatal("Mac claim rejected", response.StatusCode)
+	}
+	response, err := client.Get(invite.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := portalRead(t, response)
+	if response.StatusCode != 200 || !bytes.Contains(body, []byte("Open System Settings")) || bytes.Contains(body, []byte("eight minutes")) || bytes.Contains(body, []byte("VPN &amp; Device Management")) {
+		t.Fatal("wrong platform instructions", response.StatusCode, string(body))
+	}
+	savePortalArtifact(t, "mac-enrollment", body)
+	status, err := s.EnrollmentStatus(t.Context(), token, client.Jar.Cookies(response.Request.URL)[0].Value)
+	if err != nil || status.Platform != PlatformMacOS {
+		t.Fatal("platform did not persist", status, err)
+	}
+	response = portalPost(t, client, invite.URL, server.URL, form)
+	portalRead(t, response)
+	if response.StatusCode != 303 {
+		t.Fatal("same-platform retry not idempotent", response.StatusCode)
+	}
+	form.Set("platform", "ios")
+	response = portalPost(t, client, invite.URL, server.URL, form)
+	portalRead(t, response)
+	if response.StatusCode != 409 {
+		t.Fatal("retry changed platform", response.StatusCode)
+	}
+	form.Set("action", "download")
+	response = portalPost(t, client, invite.URL, server.URL, form)
+	profile := portalRead(t, response)
+	if response.StatusCode != 200 {
+		t.Fatal("Mac profile unavailable", response.StatusCode)
+	}
+	if !bytes.Contains(profile, []byte("com.apple.mdm.bootstraptoken")) {
+		t.Fatal("Mac enrollment lacks bootstrap capability")
+	}
+	_, cert := testSCEPEnrollHTTP(t, client, invite.DeviceID, profile)
+	d, err := s.AuthenticateCertificate(t.Context(), invite.DeviceID, cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.CheckIn(t.Context(), d, map[string]any{"MessageType": "Authenticate", "Topic": "com.apple.mgmt.test", "UDID": "mac-portal-test", "ProductName": "iPhone16,1", "OSVersion": "18.6"}); err == nil {
+		t.Fatal("iPhone accepted Mac enrollment choice")
+	}
+	if err = s.CheckIn(t.Context(), d, map[string]any{"MessageType": "Authenticate", "Topic": "com.apple.mgmt.test", "UDID": "mac-portal-test", "Model": "Mac16,1", "ModelName": "MacBook Pro", "OSVersion": "15.0"}); err != nil {
+		t.Fatal("Mac check-in rejected", err)
 	}
 }

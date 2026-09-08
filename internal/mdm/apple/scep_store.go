@@ -123,6 +123,9 @@ func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settin
 		return nil, err
 	}
 	layout := newEnrollmentLayout(c)
+	if err = tx.QueryRowContext(ctx, `SELECT enrollment_platform='macos' FROM mdm_apple_devices WHERE id=$1`, deviceID).Scan(&layout.bootstrapToken); err != nil {
+		return nil, err
+	}
 	data, err := scepEnrollmentProfile(c, deviceID, challenge, "/mdm/apple/"+deviceID+"/scep", layout)
 	if err != nil {
 		return nil, err
@@ -162,6 +165,9 @@ func scepEnrollmentProfile(c *Settings, deviceID, challenge, endpoint string, la
 	content := map[string]any{"URL": c.PublicURL + endpoint, "Challenge": challenge, "Key Type": "RSA", "Keysize": 2048, "Key Usage": 5, "KeyIsExtractable": false, "AllowAllAppsAccess": false, "Subject": []any{[]any{[]any{"CN", deviceID}}}}
 	identity := map[string]any{"PayloadType": "com.apple.security.scep", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".identity", "PayloadUUID": identityID, "PayloadDisplayName": "OpenUEM device identity", "PayloadContent": content}
 	mdm := map[string]any{"PayloadType": "com.apple.mdm", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".mdm", "PayloadUUID": layout.mdmUUID, "PayloadDisplayName": "OpenUEM management", "IdentityCertificateUUID": identityID, "Topic": c.Topic, "ServerURL": c.PublicURL + "/mdm/apple/" + deviceID + "/connect", "CheckInURL": c.PublicURL + "/mdm/apple/" + deviceID + "/checkin", "CheckOutWhenRemoved": true, "SignMessage": false, "AccessRights": layout.accessRights}
+	if layout.bootstrapToken {
+		mdm["ServerCapabilities"] = []string{"com.apple.mdm.bootstraptoken"}
+	}
 	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": layout.profileUUID, "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{trust, identity, mdm}}
 	return plist.Marshal(profile, plist.XMLFormat)
 }

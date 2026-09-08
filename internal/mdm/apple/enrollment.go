@@ -265,7 +265,17 @@ func (s *Store) EnrollmentProfile(ctx context.Context, token string) ([]byte, er
 	return s.issueEnrollmentProfile(ctx, token, "")
 }
 
-func (s *Store) issueEnrollmentProfile(ctx context.Context, token, browser string) ([]byte, error) {
+func (s *Store) issueEnrollmentProfile(ctx context.Context, token, browser string, platforms ...Platform) ([]byte, error) {
+	platform := Platform("")
+	if len(platforms) > 1 {
+		return nil, ErrConflict
+	}
+	if len(platforms) == 1 {
+		platform = platforms[0]
+		if platform != PlatformIOS && platform != PlatformIPadOS && platform != PlatformMacOS {
+			return nil, ErrConflict
+		}
+	}
 	if !validEnrollmentToken(token) || (browser != "" && !validEnrollmentToken(browser)) {
 		return nil, ErrNotFound
 	}
@@ -299,6 +309,9 @@ func (s *Store) issueEnrollmentProfile(ctx context.Context, token, browser strin
 	}
 	if !time.Now().Before(c.PushExpiresAt) {
 		return nil, ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET enrollment_platform=$2 WHERE id=$1`, id, platform); err != nil {
+		return nil, err
 	}
 	data, err := s.prepareSCEPEnrollment(ctx, tx, c, id)
 	if err != nil {

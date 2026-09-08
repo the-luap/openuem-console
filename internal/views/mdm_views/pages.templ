@@ -18,7 +18,7 @@ templ Navigation(info *partials.CommonInfo) {
 		if info.Principal.IsAdministrator() {
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) }>Windows profiles</a>
 		}
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>iOS profiles</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Apple profiles</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup")) }>Apple setup & enrollment</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/desktop/enrollment")) }>Desktop enrollment</a>
 	</div>
@@ -30,11 +30,12 @@ templ CSRF(info *partials.CommonInfo) {
 
 templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string) {
 	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}}, info)
 		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="device-management">
 			<div>
 				<h1 class="text-2xl font-semibold">Device management</h1>
-				<p class="uk-text-muted mt-2">Windows, iPhone and iPad inventory in one place. Open a device for the actions supported by its platform.</p>
+				<p class="uk-text-muted mt-2">Windows, Linux, Mac, iPhone and iPad inventory in one place. Open a device for the actions supported by its platform.</p>
 				@Navigation(info)
 			</div>
 			if setupError!="" {
@@ -45,7 +46,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 				<div class="uk-card-body">
 					<form method="get" action={ partials.GetNavigationUrl(info, "/devices") } class="flex flex-wrap items-end gap-4 mb-4">
 						<label>Search<input class="uk-input" type="search" name="q" value={ search } placeholder="Name, serial, model or OS version"/></label>
-						<label>Platform<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>All platforms</option><option value="windows" selected?={ platform=="windows" }>Windows</option><option value="ios" selected?={ platform=="ios" }>iOS / iPadOS</option></select></label>
+						<label>Platform<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>All platforms</option><option value="windows" selected?={ platform=="windows" }>Windows</option><option value="linux" selected?={ platform=="linux" }>Linux</option><option value="macos" selected?={ platform=="macos" }>macOS</option><option value="ios" selected?={ platform=="ios" }>iOS</option><option value="ipados" selected?={ platform=="ipados" }>iPadOS</option><option value="apple" selected?={ platform=="apple" }>All Apple MDM devices</option><option value="unknown" selected?={ platform=="unknown" }>Platform not yet identified</option></select></label>
 						<button type="submit" class="uk-button uk-button-primary">Filter</button>
 					</form>
 					<div class="overflow-x-auto">
@@ -72,7 +73,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 						</table>
 					</div>
 					if len(rows)==0 {
-						<p class="uk-text-muted my-6">No devices match this view. Enroll an Apple device or install and admit a Windows agent to get started.</p>
+						<p class="uk-text-muted my-6">No devices match this view. Enroll an Apple device or install and admit a desktop agent to get started.</p>
 					}
 				</div>
 			</section>
@@ -127,7 +128,7 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 			</section>
 			if settings!=nil {
 				<section class="uk-card uk-card-default">
-					<div class="uk-card-header"><h2 class="uk-card-title">Enroll an iPhone or iPad</h2><p>Create a single-use link for a company device. Each device receives its own management identity.</p></div>
+					<div class="uk-card-header"><h2 class="uk-card-title">Enroll an iPhone, iPad or Mac</h2><p>Create a single-use link for a company device. Each device receives its own management identity.</p></div>
 					<div class="uk-card-body">
 						if info.Can(access.EnrollDevices) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/enroll") } class="grid gap-4">
@@ -175,7 +176,7 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h1 class="uk-card-title">Enrollment invitation ready</h1></div>
 				<div class="uk-card-body grid gap-4">
-					<p>Open this link or scan the QR code on the intended iPhone or iPad. Safari will show the enrollment instructions before asking the owner to continue.</p>
+					<p>Open this link or scan the QR code on the intended iPhone, iPad or Mac. Safari will show the enrollment instructions before asking the owner to continue.</p>
 					<label>Single-use enrollment URL<input class="uk-input" readonly value={ invite.URL } aria-label="Enrollment URL"/></label>
 					if code := EnrollmentQR(invite.URL); code != "" {
 						<img src={ code } alt="Scan to open the private enrollment invitation" width="256" height="256" class="max-w-full"/>
@@ -209,12 +210,16 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						<dd>{ Show(detail.Device.Model)+" / "+Show(detail.Device.SerialNumber) }</dd>
 						<dt>Supervised</dt>
 						<dd>
-							if detail.Device.Supervised {
+							if !detail.Device.SupervisedReported {
+								{ "Not yet reported" }
+							} else if detail.Device.Supervised {
 								{ "Yes" }
 							} else {
-								{ "No / not yet reported" }
+								{ "No" }
 							}
 						</dd>
+						<dt>Enrollment method</dt><dd>Manual device enrollment</dd>
+						<dt>Management channel</dt><dd>Device channel · System profiles</dd>
 						<dt>Last contact</dt>
 						<dd>{ When(detail.Device.LastSeen) }</dd>
 						<dt>OS inventory collected</dt>
@@ -251,9 +256,13 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				</div>
 			</section>
 			@DeviceIdentity(detail)
+			@MacCapabilities(detail.Device)
 			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. iOS/iPadOS 17 or later enforces the update when Apple's installation conditions are met.</p></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. Requires iOS/iPadOS 17 or later, or a supervised Mac running macOS 14 or later with update authorization. Apple also checks installation conditions on the device.</p></div>
 				<div class="uk-card-body">
+					if reason:=detail.Device.Capabilities().UpdateReason; reason!="" {
+						<p role="status" class="uk-alert uk-alert-warning">{ reason }</p>
+					}
 					if detail.Policy!=nil {
 						<p class="font-medium">{ "Compliance: "+StateLabel(detail.Compliance) }</p>
 						<p>{ "Target: "+detail.Policy.TargetVersion+" · Deadline: "+detail.Policy.Deadline+" (device local time)" }</p>
@@ -282,7 +291,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								<label>Installation deadline (device local time)<input class="uk-input" type="datetime-local" name="deadline" required value={ policyDeadline(detail.Policy) }/></label>
 								<label>Update information URL (optional)<input class="uk-input" type="url" name="details_url" placeholder="https://" value={ policyURL(detail.Policy) }/></label>
 								<p class="uk-text-muted">The target must be an Apple release available for this model. Offline devices and devices with insufficient battery cannot install immediately. Compliance is confirmed from fresh OS inventory.</p>
-								<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 }>Enforce update policy</button>
+								<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 || detail.Device.Capabilities().UpdateReason!="" }>Enforce update policy</button>
 							</form>
 						}
 						if detail.Policy!=nil {
@@ -421,11 +430,11 @@ func policyURL(p *apple.UpdatePolicy) string {
 
 templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profile, devices []apple.Device) {
 	@layout.Base("devices", info) {
-		@partials.Header(c, []partials.Breadcrumb{{Title: "iOS profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}}, info)
 		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
-				<h1 class="text-2xl font-semibold">iOS & iPadOS profiles</h1>
-				<p>Manage configuration profiles, deploy revisions and verify what each device has installed.</p>
+				<h1 class="text-2xl font-semibold">Apple configuration profiles</h1>
+				<p>Manage system configuration profiles for iPhone, iPad and Mac. Check each payload's platform requirements before assigning it. Mac user-channel profiles are not available yet.</p>
 				@Navigation(info)
 			</div>
 			if info.Can(access.ManageProfiles) {
@@ -524,7 +533,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 				</section>
 			}
 			if len(profiles)==0 {
-				<p class="uk-text-muted">No iOS profiles yet. Upload a configuration or create one above.</p>
+				<p class="uk-text-muted">No Apple profiles yet. Upload a configuration or create one above.</p>
 			}
 		</main>
 	}

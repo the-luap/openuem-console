@@ -24,7 +24,7 @@ func auditOutcome(ctx context.Context, tx *sql.Tx, tenant int, actor, action, re
 		query = `SELECT d.site_id FROM mdm_apple_identity_renewals r JOIN mdm_apple_devices d ON d.id=r.device_id AND d.tenant_id=r.tenant_id WHERE r.tenant_id=$1 AND r.id::text=$2`
 	case strings.HasPrefix(action, "apple.command."):
 		query = `SELECT d.site_id FROM mdm_apple_commands c JOIN mdm_apple_devices d ON d.id=c.device_id AND d.tenant_id=c.tenant_id WHERE c.tenant_id=$1 AND c.id::text=$2`
-	case strings.HasPrefix(action, "apple.enrollment."), strings.HasPrefix(action, "apple.checkin."), action == "apple.inventory.refresh", action == "apple.update.policy", action == "apple.identity.layout.recover", action == "apple.scep.enrollment.issue":
+	case strings.HasPrefix(action, "apple.enrollment."), strings.HasPrefix(action, "apple.checkin."), strings.HasPrefix(action, "apple.bootstrap_token."), action == "apple.inventory.refresh", action == "apple.update.policy", action == "apple.identity.layout.recover", action == "apple.scep.enrollment.issue":
 		query = `SELECT site_id FROM mdm_apple_devices WHERE tenant_id=$1 AND id::text=$2`
 	case action == "apple.profile.installed" || action == "apple.profile.removed":
 		parts := strings.Split(resource, "/")

@@ -11,6 +11,11 @@ replacement profiles, verifies new-key use and preserves existing device records
 including tested server-side legacy metadata recovery. Hardware acceptance,
 CA/master-key rotation and the remaining ENR-01/PKI-01 requirements stay open.
 
+[Native Mac management](native-macos-management.md) adds platform-aware enrollment,
+inventory, system profiles and DDM update readiness with encrypted bootstrap-token
+escrow. MAC-01/MAC-02 remain open for linkage, user channels, security workflows
+and physical-device acceptance.
+
 ## Package ledger
 
 | Package | Current evidence | Remaining work |
@@ -21,8 +26,8 @@ CA/master-key rotation and the remaining ENR-01/PKI-01 requirements stay open.
 | APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain/production usage verification and a mandatory fresh TLS/HTTP2 APNs connection gate; atomic renewal revision/topic checks, account metadata, setup warning and persistent scoped SMTP expiry reminders/history; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; independent certificate revocation checking; deployment SMTP delivery and actual Apple issuance/renewal/device continuity |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
-| MAC-01 | Upstream desktop agent only | Native Mac model/capabilities/channels, shared agent/MDM identity, profiles, inventory and real Mac acceptance |
-| MAC-02 | No native Mac update/security workflow | Catalog/DDM compatibility and authorization, bootstrap tokens, FileVault escrow/verification and hardware update acceptance |
+| MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests | Shared agent/MDM identity, user-channel profiles, Mac template coverage and real Mac acceptance |
+| MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; PostgreSQL/HTTP tests | FileVault recovery escrow/verification, complete Mac security workflows and hardware update/reboot acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |

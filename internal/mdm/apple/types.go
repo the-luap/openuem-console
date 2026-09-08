@@ -43,39 +43,41 @@ type Settings struct {
 
 type Device struct {
 	// Set only by certificate authentication, never by a console read or JSON.
-	peerFingerprint      string
-	peerExpiresAt        time.Time
-	ID                   string             `json:"id"`
-	TenantID             int                `json:"tenant_id"`
-	SiteID               int                `json:"site_id"`
-	UDID                 string             `json:"udid"`
-	Name                 string             `json:"name"`
-	SerialNumber         string             `json:"serial_number"`
-	Model                string             `json:"model"`
-	OSVersion            string             `json:"os_version"`
-	BuildVersion         string             `json:"build_version"`
-	Supervised           bool               `json:"supervised"`
-	Status               string             `json:"status"`
-	LastSeen             *time.Time         `json:"last_seen"`
-	InventoryAt          *time.Time         `json:"inventory_at"`
-	AppsAt               *time.Time         `json:"apps_at"`
-	ProfilesAt           *time.Time         `json:"profiles_at"`
-	EnrolledAt           *time.Time         `json:"enrolled_at"`
-	CertificateExpiresAt time.Time          `json:"certificate_expires_at"`
-	IdentityRenewalError string             `json:"identity_renewal_error"`
-	Inventory            map[string]any     `json:"inventory"`
-	Apps                 []Application      `json:"apps"`
-	InstalledProfiles    []InstalledProfile `json:"installed_profiles"`
-	DDMStatus            json.RawMessage    `json:"ddm_status"`
-	PushStatus           string             `json:"push_status"`
-	PushError            string             `json:"push_error"`
-}
-
-func (d Device) Platform() string {
-	if len(d.Model) >= 4 && d.Model[:4] == "iPad" {
-		return "iPadOS"
-	}
-	return "iOS"
+	peerFingerprint        string
+	peerExpiresAt          time.Time
+	ID                     string             `json:"id"`
+	TenantID               int                `json:"tenant_id"`
+	SiteID                 int                `json:"site_id"`
+	UDID                   string             `json:"udid"`
+	Name                   string             `json:"name"`
+	SerialNumber           string             `json:"serial_number"`
+	Model                  string             `json:"model"`
+	OSFamily               Platform           `json:"platform"`
+	EnrollmentMethod       string             `json:"enrollment_method"`
+	EnrollmentPlatform     Platform           `json:"enrollment_platform"`
+	SupervisedReported     bool               `json:"supervised_reported"`
+	SoftwareUpdateDeviceID string             `json:"software_update_device_id"`
+	AppleSilicon           *bool              `json:"apple_silicon"`
+	SecurityInventory      map[string]any     `json:"security_inventory"`
+	SecurityAt             *time.Time         `json:"security_at"`
+	BootstrapTokenEscrowed bool               `json:"bootstrap_token_escrowed"`
+	OSVersion              string             `json:"os_version"`
+	BuildVersion           string             `json:"build_version"`
+	Supervised             bool               `json:"supervised"`
+	Status                 string             `json:"status"`
+	LastSeen               *time.Time         `json:"last_seen"`
+	InventoryAt            *time.Time         `json:"inventory_at"`
+	AppsAt                 *time.Time         `json:"apps_at"`
+	ProfilesAt             *time.Time         `json:"profiles_at"`
+	EnrolledAt             *time.Time         `json:"enrolled_at"`
+	CertificateExpiresAt   time.Time          `json:"certificate_expires_at"`
+	IdentityRenewalError   string             `json:"identity_renewal_error"`
+	Inventory              map[string]any     `json:"inventory"`
+	Apps                   []Application      `json:"apps"`
+	InstalledProfiles      []InstalledProfile `json:"installed_profiles"`
+	DDMStatus              json.RawMessage    `json:"ddm_status"`
+	PushStatus             string             `json:"push_status"`
+	PushError              string             `json:"push_error"`
 }
 
 func (d Device) InventoryFresh(now time.Time) bool {

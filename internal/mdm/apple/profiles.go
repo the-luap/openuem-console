@@ -26,6 +26,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 	if stringValue(root, "PayloadType") != "Configuration" {
 		return nil, errors.New("root PayloadType must be Configuration")
 	}
+	if scope, exists := root["PayloadScope"]; exists && scope != "System" {
+		return nil, errors.New("only System profiles are supported; user-channel profiles require separate management")
+	}
 	id := stringValue(root, "PayloadIdentifier")
 	if id == "" || len(id) > 255 || strings.ContainsAny(id, "\x00\r\n") {
 		return nil, errors.New("a valid PayloadIdentifier is required")

@@ -33,6 +33,9 @@ func (s *Store) RevokeEnrollment(ctx context.Context, scope Scope, id, actor str
 	if err = s.cancelDeviceRenewal(ctx, tx, &Device{ID: id, TenantID: scope.TenantID}); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_bootstrap_tokens WHERE device_id=$1`, id); err != nil {
+		return err
+	}
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.enrollment.revoke", id); err != nil {
 		return err
 	}
