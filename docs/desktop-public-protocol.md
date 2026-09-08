@@ -211,12 +211,22 @@ The initial server signer/routes at console `b8a810f` passed
 [console CI](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
 Console `3593d4b` adds the protected signer provisioning command, with
 [passing Linux and native Windows checks](https://github.com/the-luap/openuem-console/actions/runs/34189388894).
-The current library pin `126bca15f12f` adds bounded installer streaming, exact
+Library `126bca15f12f` adds bounded installer streaming, exact
 size/hash verification and expiry checks before and after transfer. Its
 [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
 The shared download method accepts only the configured origin/release/target and
 does not follow redirects or automatically retry. Failed streams remain untrusted
 staging data; actual native signatures and installation still need verification.
+
+Library `92c941119613` adds optional signed `agent_size`/`agent_sha256` fields for
+the final executable inside each installer. Its [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34191669027).
+The console now pins that version and preserves this binding through catalog
+admission, invitation configuration and the real gateway/client integration test.
+The test verifies separate package and executable fixture bytes; it does not install
+or attest an endpoint. Preview releases without these fields remain readable but
+cannot pass native `VerifyAgent`. Produce the final signed executable before
+packaging, then hash the completed signed/notarized installer. Upgrade consumers
+before approving the new fields; earlier strict clients reject unknown fields.
 Its keys are retained in test memory. The related agent's separate native storage
 suite now covers DPAPI and isolated Keychain recovery after a lost HTTPS response;
 see [desktop integration evidence](desktop-enrollment-plan.md).

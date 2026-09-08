@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/gateway"
@@ -32,6 +35,10 @@ func TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway(t *testi
 	if _, err := f.store.Registry.EnsureAuthority(ctx, 3, "Native client integration", origin, "fixture-admin", nil, nil); err != nil {
 		t.Fatal(err)
 	}
+	agentBytes := []byte("separate non-executable installed-agent fixture")
+	agentDigest := sha256.Sum256(agentBytes)
+	f.manifest.Artifacts[0].AgentSize = int64(len(agentBytes))
+	f.manifest.Artifacts[0].AgentSHA256 = hex.EncodeToString(agentDigest[:])
 	data, release, _ := f.prepare(t, f.manifest)
 	if _, err := f.catalog.Accept(ctx, data, "fixture-release-admin"); err != nil {
 		t.Fatal(err)
@@ -101,6 +108,12 @@ func TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway(t *testi
 	var packageBytes bytes.Buffer
 	if err := verified.DownloadPackage(ctx, client, &packageBytes); err != nil || !bytes.Equal(packageBytes.Bytes(), f.content) {
 		t.Fatal("native download did not return the configured release bytes", err)
+	}
+	if err := verified.VerifyAgent(bytes.NewReader(agentBytes)); err != nil {
+		t.Fatal("live release lost its installed-agent binding", err)
+	}
+	if err := verified.VerifyAgent(bytes.NewReader(packageBytes.Bytes())); err != artifacts.ErrAgentBinding {
+		t.Fatal("installer bytes substituted for installed agent", err)
 	}
 	keys, err := enrollment.GenerateKeys()
 	if err != nil {

@@ -237,8 +237,8 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/the-luap/openuem-nats v0.11.1-0.20260908052234-126bca15f12f h1:+IjFnZCKketpQxieYu0H+F5rkMA6VTow1gg5H5OpTdU=
-github.com/the-luap/openuem-nats v0.11.1-0.20260908052234-126bca15f12f/go.mod h1:Y5Zz2a4L7Tu2EUixIE9y8O+N7cJcPxP4xTFZZEZ4mX0=
+github.com/the-luap/openuem-nats v0.11.1-0.20260908054238-92c941119613 h1:fwTIVY4DBYdcdFhTPURoGEXE7dW7nkrNWrU7US06u1w=
+github.com/the-luap/openuem-nats v0.11.1-0.20260908054238-92c941119613/go.mod h1:Y5Zz2a4L7Tu2EUixIE9y8O+N7cJcPxP4xTFZZEZ4mX0=
 github.com/tiendc/go-deepcopy v1.7.2 h1:Ut2yYR7W9tWjTQitganoIue4UGxZwCcJy3orjrrIj44=
 github.com/tiendc/go-deepcopy v1.7.2/go.mod h1:4bKjNC2r7boYOkD2IOuZpYjmlDdzjbpTRyCx+goBCJQ=
 github.com/urfave/cli/v2 v2.27.7 h1:bH59vdhbjLv3LAvIu6gd0usJHgoTTPhCFib8qqOwXYU=
