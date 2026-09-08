@@ -98,6 +98,18 @@ The console now initializes the registry and exposes scoped public metadata,
 organization-authority setup/import, invitation revocation and identity revocation
 with confirmation and CSRF. Its real-router PostgreSQL tests and browser fixture
 cover these actions. See [desktop administration](desktop-console.md).
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34176188721)
+for this administration work at `d3030a5`, including route/database race checks
+and Linux/Windows builds. Browser acceptance also caught and fixed the fixture's
+shutdown ordering and the dark-mode heading/header foreground.
+
+Library commit `53e1022ff390` adds authenticated immutable installer manifests,
+strict target/content binding and persistent-checkpoint validation. Its
+[Linux and native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34176695980).
+The console now pins that version and adds a persisted installer catalog and
+`openuem-agent-releases` administration command. Local PostgreSQL race checks cover
+concurrent admission, rollback/sequence reuse, restart, withdrawal and verified
+file descriptors. See [release admission operations](agent-release-operations.md).
 Signed artifact selection, new console invitations, endpoint storage/bootstrap
 and reference deployment wiring remain open.
 

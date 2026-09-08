@@ -4,8 +4,11 @@ package desktop
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/base64"
 	"errors"
+	"io/fs"
+	"sort"
 	"strings"
 	"time"
 
@@ -26,7 +29,50 @@ func NewStore(db *sql.DB, masterKey string) (*Store, error) {
 	return &Store{Registry: identity, db: db}, nil
 }
 
-func (s *Store) Migrate(ctx context.Context) error { return s.Registry.Migrate(ctx) }
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+func (s *Store) Migrate(ctx context.Context) error {
+	if err := s.Registry.Migrate(ctx); err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684627912)`); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS uem_desktop_migrations(name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); err != nil {
+		return err
+	}
+	names, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return err
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var applied bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_desktop_migrations WHERE name=$1)`, name).Scan(&applied); err != nil {
+			return err
+		}
+		if applied {
+			continue
+		}
+		body, err := migrations.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, string(body)); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO uem_desktop_migrations(name) VALUES($1)`, name); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
 
 type InvitationRow struct {
 	registry.InvitationOptions

@@ -20,7 +20,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Baseline encrypted Apple secrets; documented/tested gateway leaf rotation | Automatic device renewal, CA/master-key rotation, expiry health, encrypted backup/restore preserving enrollments |
-| OPS-01 | Console CI builds and new gateway CLI; security tests added to CI definition | Versioned agent/console distribution across repositories, signed/notarized installers, secure release/update/rollback manifests, monitoring, fresh-install and restore runbooks |
+| OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors and release-admission CLI with PostgreSQL race tests | Public artifact/bootstrap wiring, native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | No ADE integration | Apple Business/ADE tokens, device assignments, setup/re-enrollment, groups/rings and directory associations |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization, scoped general audit viewer/export/retention |
@@ -71,6 +71,11 @@ the table's package summaries do not remove any detail from the roadmap.
   PostgreSQL tests cover roles, foreign scopes, CSRF and command cleanup. A live
   TLS browser fixture covers native setup, keyboard confirmation and responsive
   tables; signed installation artifacts and new invitation creation remain open.
+- [Installer release admission](agent-release-operations.md): explicit public-key
+  trust, signed immutable metadata, all-target file verification, transactional
+  sequence/digest checkpoint, concurrent approval protection, withdrawal and
+  database-independent candidate inspection. Native signing and public download
+  integration are still separate unfinished work.
 
 ## Verification record
 
