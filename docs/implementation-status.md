@@ -64,15 +64,15 @@ the table's package summaries do not remove any detail from the roadmap.
   public key/configuration routes; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34188910114).
   Library `c3688fa59622` adds bounded native HTTPS GET methods and strict origin-key
   parsing, with [passing Linux/Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34189077681).
-  The current pin `126bca15f12f` also streams verified installer bytes with a
+  Library `126bca15f12f` also streams verified installer bytes with a
   separate 15-minute bound and expiry checks before/after transfer;
   [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
   The console exercises all these methods through its live TLS gateway/registry
   fixture. Console `3593d4b` adds the bootstrap-key CLI, which provisions or
   validates a private signer without overwriting existing state;
   [Linux/native Windows CI passed](https://github.com/the-luap/openuem-console/actions/runs/34189388894).
-  Native installation and origin
-  authorization remain open.
+  The later native command below adds explicit administrator authorization;
+  finished end-user installation remains open.
 
 - Agent `0a1b28d` adds bounded native signature verification: Windows Authenticode
   with revocation checks and macOS's explicit notarized Developer ID assessment.
@@ -81,9 +81,17 @@ the table's package summaries do not remove any detail from the roadmap.
   descriptor-bound hashing before/after native verification, checkpoint checks,
   cancellation and conservative cleanup; [all three CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34191314823).
   Windows exercises the complete staging path with the Go project's licensed
-  embedded-signature fixture, without running it. Real release signing,
-  installed-executable binding, native bootstrap/activation and device acceptance
-  remain open. See [staging implementation](https://github.com/the-luap/openuem-agent/blob/5076ec5b57d6ee0ce297152d6cf39189cea5d9a8/docs/bootstrap-package-staging.md).
+  embedded-signature fixture, without running it. Shared-library `92c941119613`
+  adds separate installed-agent bindings, and agent `6c4bf3c` verifies the running
+  executable's bytes, identity and permissions; [native CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34192280621).
+  Console `bc76544` tests that binding through its actual TLS configuration route;
+  [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34192284726).
+  Agent `8bc63f8` joins those checks with explicit native-command management/scope
+  authorization, protected input, independent release trust and durable store
+  admission before claims and identity publication. [All three CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34193859066),
+  including real Windows WinTrust/HTTPS/DPAPI enrollment and idempotent retry.
+  Real release signing, finished installers/consent UI, service activation and
+  device acceptance remain open. See [native command implementation](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
 
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata/configuration/key documents, strict endpoint-key claims and approved

@@ -17,7 +17,8 @@ package bytes before downloads. It has a separate optional private TLS listener,
 an exact gateway allowlist, bounded bodies/rates/concurrency/deadlines and joined
 shutdown. PostgreSQL/TLS race tests cover scanner safety, strict claims, retries,
 revocation, changed files, source-header trust and public administrator denial.
-This does not complete native bootstrap configuration or installer execution.
+The native command integration below connects this configuration protocol to
+protected credentials; finished installers and service activation remain open.
 
 Library commit `d6129ce9fe9b` adds a bounded HTTPS claim client and strict returned
 certificate/key/device/origin validation, with generic errors and no redirects,
@@ -62,7 +63,24 @@ rehashes the same opened file and cleans up only owned staging. Its
 [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34191314823),
 including actual Windows acceptance of a licensed embedded-signature test fixture
 and rejection after byte modification. No fixture package is installed or executed.
-Native origin authorization, bootstrap activation, installer integration, renewal,
+Shared library `92c941119613` adds separate signed installed-executable size/hash
+bindings; [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34191669027).
+Agent `6c4bf3c` retains and verifies the actual running executable against these
+bindings; [all native CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34192280621).
+Console `bc76544` preserves the binding through actual TLS gateway configuration
+downloads; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34192284726).
+
+Agent `8bc63f8` adds the native `enroll` command with explicit origin, organization,
+site and management authorization, protected invitation/release-key input, exact
+requested-token verification, native package checks and installed-executable
+admission before claims and identity publication. Same-key recovery survives a
+failed post-issuance check. Windows CI joins actual executable verification,
+WinTrust, HTTPS issuance and DPAPI storage; retry returns the persisted identity
+without another claim. [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34193859066),
+including full builds and native command help without service startup. Tests never
+install or execute fixture packages. See [command authorization, recovery and limits](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
+
+Service activation, guided end-user consent, installer integration, renewal,
 signed updater commands, inherited handler execution bounds and reference
 console/deployment wiring remain open.
 
