@@ -107,7 +107,7 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 					if canManage {
 						@PushRequests(info, settings, requests, vendorConfigured)
 						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
-							<p>Import verifies the Apple certificate chain, production push usage, matching private key, validity dates and MDM topic. APNs connectivity and certificate revocation are not checked.</p>
+							<p>Import verifies the Apple certificate chain, production push usage, matching private key, validity dates and MDM topic, then checks a fresh APNs connection before replacing active credentials. The connection check can take up to 10 seconds and sends no device command.</p>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
 							@CSRF(info)
 							<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
@@ -116,7 +116,7 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 							<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
 							<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
 							<p class="uk-text-muted">Saving credentials supersedes all pending requests for this organization.</p>
-							<button class="uk-button uk-button-primary" type="submit">Save Apple credentials</button>
+							<button class="uk-button uk-button-primary" type="submit">Verify connection and save</button>
 						</form>
 						</details>
 					}

@@ -32,8 +32,10 @@ The [Apple push request workflow](apple-push-requests.md) generates a public CSR
 with an encrypted instance-held key and supports certificate-only import after
 external vendor signing. The [vendor signing guide](apple-vendor-signing.md) covers
 operator-approved certificate pins, offline vendor tooling and verified portal
-request downloads. Deployment vendor authority and pre-activation APNs verification
-remain open; see that guide for the current checks and renewal behavior.
+request downloads. Both credential import paths require a
+[fresh APNs connection check before activation](apple-apns-connection-check.md).
+Deployment vendor authority and actual Apple issuance/renewal acceptance remain
+open; see these guides for checks and renewal behavior.
 
 ## Deployment prerequisites
 
@@ -107,7 +109,9 @@ Windows for deployment. Protocol and console handler tests can run on macOS.
    organization name and public HTTPS origin, then upload the certificate and
    key as PEM files, or use the certificate-only request workflow above. Both
    paths verify the Apple issuer chain, production/client usage, matching key,
-   validity period and MDM topic. See [validation limits and trust maintenance](apple-push-certificate-validation.md).
+   validity period and MDM topic, followed by a fresh APNs connection using the
+   candidate credential. Outbound TCP 443 must reach `api.push.apple.com` directly.
+   See [validation limits and trust maintenance](apple-push-certificate-validation.md).
 3. Select a site and create an invitation for one device. Open its URL or scan its
    QR code on that iPhone/iPad. The public page explains the organization and
    installation steps before the owner confirms enrollment.

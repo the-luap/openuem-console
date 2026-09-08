@@ -24,17 +24,20 @@ func (s Scope) Validate() error {
 }
 
 type Settings struct {
-	// AppleAccount is administrator metadata, never part of public device JSON.
-	AppleAccount    string    `json:"-"`
-	TenantID        int       `json:"tenant_id"`
-	PublicURL       string    `json:"public_url"`
-	Organization    string    `json:"organization"`
-	Topic           string    `json:"topic"`
-	PushExpiresAt   time.Time `json:"push_expires_at"`
-	PushCertificate []byte    `json:"-"`
-	PushKey         []byte    `json:"-"`
-	CACertificate   []byte    `json:"-"`
-	CAKey           []byte    `json:"-"`
+	// Account and connection evidence are administrator metadata, never part of
+	// public device JSON.
+	AppleAccount    string     `json:"-"`
+	PushCheckedAt   *time.Time `json:"-"`
+	PushFingerprint string     `json:"-"`
+	TenantID        int        `json:"tenant_id"`
+	PublicURL       string     `json:"public_url"`
+	Organization    string     `json:"organization"`
+	Topic           string     `json:"topic"`
+	PushExpiresAt   time.Time  `json:"push_expires_at"`
+	PushCertificate []byte     `json:"-"`
+	PushKey         []byte     `json:"-"`
+	CACertificate   []byte     `json:"-"`
+	CAKey           []byte     `json:"-"`
 }
 
 type Device struct {

@@ -9,9 +9,10 @@ This is partial APP-01 implementation. [Authorized vendor signing](apple-vendor-
 now supports offline vendor infrastructure, signed-response verification and
 complete portal-request download. Both import paths now perform
 [offline Apple issuer-chain validation](apple-push-certificate-validation.md).
-Automatic signing-service transport and a pre-activation APNs connectivity test
-are not implemented. Offline chain validation does not check revocation or
-prove current APNs acceptance. Actual Apple issuance and renewal remain
+Both also require a [fresh APNs connection check](apple-apns-connection-check.md)
+before activation. Automatic signing-service transport and independent
+revocation checks are not implemented. A connection check does not prove device
+delivery or continued management. Actual Apple issuance and renewal remain
 acceptance requirements. The console explicitly describes the available checks.
 
 ## Administrator workflow
@@ -39,10 +40,12 @@ acceptance requirements. The console explicitly describes the available checks.
    certificates only, in PEM format, up to 64 KiB and eight certificates. No key
    upload is needed. Import checks the Apple issuer chain, explicit client
    authentication and production push usage, selected stored key, current validity
-   and an unambiguous MDM topic; renewal must preserve the existing topic. A successful local
-   import immediately replaces active push credentials. Because a connectivity
-   test is still absent, this workflow does not satisfy the full APP-01 activation
-   gate and must not be described as a fully verified Apple setup wizard.
+   and an unambiguous MDM topic; renewal must preserve the existing topic.
+   A fresh APNs connection using the new credential must also succeed before the
+   replacement commits. The check can take up to ten seconds and sends no device
+   command. If it fails, existing settings and request keys remain available;
+   correct the problem and retry the same upload. Actual Apple issuance and
+   enrolled-device continuity still require acceptance.
 
 The existing certificate/private-key pair import remains in a separate expandable
 section. Both import paths preserve the enrollment CA. Successful replacement
@@ -104,6 +107,6 @@ rendering and browser-form evidence, not a live Apple portal or issuance test.
 
 Remaining APP-01 work includes deployment-specific vendor permission and
 operational ownership; automatic signing-service transport; Apple
-certificate revocation checks and a meaningful APNs connection test before
-activation; full guided error recovery and renewal reminders; and actual Apple
+certificate revocation checks and deployment acceptance of the APNs connection
+check; full guided error recovery and renewal reminders; and actual Apple
 issuance/renewal with enrolled-device continuity. The full roadmap stays open.

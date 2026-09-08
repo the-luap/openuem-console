@@ -22,6 +22,8 @@ jobs:
         run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
       - name: Native protected vendor signing files
         run: go test -count=1 -run "VendorSigningFiles|VendorPrivateKey" ./internal/mdm/apple
+      - name: APNs certificate connection protocol
+        run: go test -count=1 -run TestAPNsCheck ./internal/mdm/apple
   test:
     runs-on: ubuntu-latest
     services:

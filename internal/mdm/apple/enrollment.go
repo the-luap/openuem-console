@@ -174,6 +174,15 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 	if _, err = s.pushTrust.verify(c.PushCertificate, time.Now()); err != nil {
 		return err
 	}
+	if s.checkPushConnection == nil || s.checkPushConnection(ctx, &c) != nil {
+		return ErrPushConnection
+	}
+	// Check validity again after the network operation, before activation.
+	if _, err = s.pushTrust.verify(c.PushCertificate, time.Now()); err != nil {
+		return err
+	}
+	leaf, _ := pem.Decode(c.PushCertificate)
+	fingerprint := digest(leaf.Bytes)
 	pushKey, err := s.secrets.seal(c.PushKey, secretPurpose(c.TenantID, "settings", "push_key"))
 	if err != nil {
 		return err
@@ -184,6 +193,12 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_settings(tenant_id,public_url,organization,topic,push_expires_at,push_certificate,push_key,ca_certificate,ca_key,apple_account) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(tenant_id) DO UPDATE SET public_url=excluded.public_url,organization=excluded.organization,push_expires_at=excluded.push_expires_at,push_certificate=excluded.push_certificate,push_key=excluded.push_key,push_revision=mdm_apple_settings.push_revision+1,apple_account=CASE WHEN $11 THEN excluded.apple_account ELSE mdm_apple_settings.apple_account END,updated_at=now()`, c.TenantID, c.PublicURL, c.Organization, c.Topic, c.PushExpiresAt, c.PushCertificate, pushKey, c.CACertificate, caKey, c.AppleAccount, accountConfirmed)
 	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_settings SET push_checked_at=clock_timestamp(),push_fingerprint=$2 WHERE tenant_id=$1`, c.TenantID, fingerprint); err != nil {
+		return err
+	}
+	if err = audit(ctx, tx, c.TenantID, actor, "apple.push_connection.verify", fingerprint); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `WITH superseded AS (UPDATE mdm_apple_push_requests SET status='superseded',encrypted_key=NULL,completed_at=clock_timestamp() WHERE tenant_id=$1 AND status='pending' RETURNING id) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id) SELECT $1,$2,'apple.push_request.supersede',id::text FROM superseded`, c.TenantID, actor); err != nil {

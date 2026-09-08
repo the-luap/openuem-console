@@ -12,6 +12,12 @@ templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests
 			<p role="alert" class="uk-alert uk-alert-warning">Renew the Apple push certificate now. Its expiry date is approaching or has passed. Use the same Apple account and renew the existing portal entry to preserve device management.</p>
 		}
 		<p class="mt-4">Responsible Apple account: { Show(settings.AppleAccount) }</p>
+		if settings.PushCheckedAt!=nil {
+			<dl class="uk-description-list"><dt>APNs connection checked (UTC)</dt><dd>{ settings.PushCheckedAt.UTC().Format("2006-01-02 15:04:05") }</dd><dt>Checked certificate fingerprint (SHA-256)</dt><dd>{ settings.PushFingerprint }</dd></dl>
+			<p class="uk-text-muted">This records a connection check at import. Device delivery and management acknowledgements are tracked separately.</p>
+		} else {
+			<p class="uk-text-muted">No APNs connection check is recorded for the active certificate. New imports require a successful check.</p>
+		}
 	}
 	<h3 class="text-lg font-semibold mt-6">Create a CSR for your authorized vendor</h3>
 	<p class="mt-2">OpenUEM generates and stores the private key in this instance. Only the public certificate signing request (CSR) is downloaded. Arrange signing with an Apple-authorized MDM vendor before proceeding.</p>
@@ -62,8 +68,8 @@ templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests
 					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup/requests/"+r.ID+"/certificate") } enctype="multipart/form-data" class="grid gap-3">
 						@CSRF(info)
 						<label>Apple-issued certificate for this request (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
-						<p class="uk-text-muted">Import verifies the Apple certificate chain, production push usage, stored key, validity dates and MDM topic. It replaces the active certificate and supersedes other pending requests. An APNs connection test is not yet available.</p>
-						<button class="uk-button uk-button-primary" type="submit">Import certificate for this request</button>
+						<p class="uk-text-muted">Import verifies the Apple certificate chain, production push usage, stored key, validity dates and MDM topic, then checks a fresh APNs connection. The connection check can take up to 10 seconds and sends no device command. Only a successful check replaces the active certificate and supersedes other pending requests. If it fails, correct the connection or certificate problem and retry this upload.</p>
+						<button class="uk-button uk-button-primary" type="submit">Verify connection and import</button>
 					</form>
 				}
 				if r.Status=="pending" {

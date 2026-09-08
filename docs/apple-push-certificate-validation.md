@@ -2,8 +2,10 @@
 
 Both certificate-only request import and the existing certificate/private-key
 pair import verify the uploaded certificate before replacing active settings.
-This is an offline trust check. APNs connectivity, revocation checking and a real
-Apple issuance/renewal acceptance run are still required to finish APP-01.
+The offline trust check is followed by a mandatory
+[fresh APNs connection check](apple-apns-connection-check.md) before activation.
+Independent revocation checks and real Apple issuance/renewal acceptance remain
+open APP-01 work.
 
 ## Import checks
 
@@ -49,7 +51,8 @@ An uploaded new intermediate can be accepted when it chains to an existing root.
 
 The same validation applies to both import paths. Expiry/chain validation is
 repeated after taking the organization lock and generating an enrollment CA,
-before the settings write. Request consumption, other pending-key invalidation,
+before the settings write, with another validity check after the APNs probe.
+Request consumption, other pending-key invalidation,
 settings replacement and audit commit together. A rejected certificate leaves
 the existing settings and pending request key intact for a corrected upload.
 HTTP request import returns a fixed validation error without certificate content.
@@ -58,8 +61,9 @@ Existing stored credentials are not automatically disabled or migrated. Reading
 settings and sending existing pushes keep their current behavior. The new checks
 apply when credentials are imported or replaced. They do not prove that Apple
 currently accepts a certificate, that it has not been revoked, or that a device
-receives and acknowledges a management command. A successful import still
-activates immediately; the pre-activation APNs gate remains unfinished.
+receives and acknowledges a management command. The mandatory APNs probe proves
+a working TLS/HTTP2 connection using the candidate; deployment acceptance still
+needs real issuance and existing-device continuity.
 
 ## Test evidence
 

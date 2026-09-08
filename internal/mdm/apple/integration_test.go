@@ -62,6 +62,9 @@ func testStore(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 	s.pushTrust = testPushTrust(t)
+	// Most database tests isolate persistence from networking. Dedicated APNs
+	// tests use real loopback TLS/HTTP2 peers and test the replacement gate.
+	s.checkPushConnection = func(ctx context.Context, _ *Settings) error { return ctx.Err() }
 	// Minimal upstream scope tables; the console integration test separately
 	// exercises migrations against the real Ent schema.
 	if _, err = db.Exec(`CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT NOT NULL REFERENCES tenants(id)); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(1,1),(2,2)`); err != nil {

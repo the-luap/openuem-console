@@ -105,7 +105,7 @@ func (s *Store) PushPending(ctx context.Context) error {
 			var client *http.Client
 			client, err = pushClient(c)
 			if err == nil {
-				err = Push(ctx, client, "https://api.push.apple.com", c.Topic, token, string(magic))
+				err = Push(ctx, client, "https://"+apnsProductionHost, c.Topic, token, string(magic))
 				client.CloseIdleConnections()
 			}
 		}

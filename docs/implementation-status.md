@@ -12,7 +12,7 @@ scope is proven. A passing protocol simulator is not physical-device acceptance.
 | NET-01 | Native HTTPS gateway; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/configuration/key/claim/download routes with pinned private TLS and bounded streaming; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; Windows protocol routing; full reference installation/firewall proof; TLS automation, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked | Legacy desktop route scope/action permissions beyond current global-admin boundary; audit all existing mutation paths; complete authorization and direct-access regression matrix |
 | ENR-01 | Baseline individual Apple identity; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows/macOS activation, macOS app bundle assembly and authenticated local readiness, and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS signed-release registration/approval acceptance, signed installer distribution, binding migration/updates, renewal and release integration |
-| APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain and production usage verification; atomic renewal revision/topic checks, account metadata and setup-page expiry warning; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; certificate revocation checking and APNs connectivity before activation; complete renewal reminders and actual Apple issuance/device continuity |
+| APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain/production usage verification and a mandatory fresh TLS/HTTP2 APNs connection gate; atomic renewal revision/topic checks, account metadata and setup-page expiry warning; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; independent certificate revocation checking and real APNs/renewal acceptance; complete renewal reminders and actual Apple issuance/device continuity |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
 | MAC-01 | Upstream desktop agent only | Native Mac model/capabilities/channels, shared agent/MDM identity, profiles, inventory and real Mac acceptance |
@@ -44,15 +44,22 @@ the table's package summaries do not remove any detail from the roadmap.
   explicit operator certificate pins, exact-CSR signature/chain validation and
   transactional portal-request upload/download. Synthetic issuers exercise the
   cryptography and persistence; real Apple permission, issuer acceptance and
-  real push issuance and APNs connectivity remain unproven.
+  real push issuance and deployment APNs connectivity remain unproven.
 
 - [Push certificate validation](apple-push-certificate-validation.md) now rejects
   untrusted issuer chains through both import paths, requires production push
   and client authentication usage, and preserves active credentials and pending
   requests on rejection. Fixed public Apple roots and intermediates are embedded;
   no upload-controlled AIA URLs or OS roots are used. Synthetic chain/database
-  tests and real-router rejection tests cover the change. APNs connectivity,
-  revocation and actual issuance/renewal acceptance remain open.
+  tests and real-router rejection tests cover the change. Independent revocation
+  and actual issuance/renewal acceptance remain open.
+- [APNs connection checks](apple-apns-connection-check.md) now gate both import
+  paths on a fresh certificate-authenticated TLS/HTTP2 connection and PING ACK.
+  Loopback TLS 1.2/1.3 tests cover failure and cancellation; PostgreSQL tests
+  exercise rejection, corrected retry and rollback through both import paths.
+  Successful imports atomically record the leaf fingerprint/check time and audit.
+  This sends no device command and does not establish real Apple or device
+  continuity acceptance.
 
 - Shared library client `d6129ce9fe9b` verifies HTTPS, bounds requests/responses,
   rejects redirects and binds issued certificate purpose, key, device and WSS

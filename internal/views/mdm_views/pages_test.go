@@ -54,7 +54,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "iOS profiles"}},
 		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`}},
 		{"profiles", Profiles(c, info, []apple.Profile{p}, []apple.Device{*d}), []string{"Create a Wi-Fi profile", "Save and deploy revision", "Company Wi-Fi", "test-csrf-token"}},
-		{"setup", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", Topic: "com.apple.mgmt.example", AppleAccount: "mdm-owner@example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, []apple.PushRequest{{ID: "30000000-0000-0000-0000-000000000001", Organization: "Example organization", PublicURL: "https://mdm.example.test", AppleAccount: "mdm-owner@example.test", ExpectedTopic: "com.apple.mgmt.example", BaseRevision: 1, Status: "pending", CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour), HasVendorRequest: true, VendorAvailable: true, VendorExpiresAt: &vendorExpires, VendorFingerprint: strings.Repeat("a", 64)}}, true, true, "", "", true), []string{"Create enrollment invitation", "push_certificate", "push_key", "test-csrf-token"}},
+		{"setup", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", Topic: "com.apple.mgmt.example", AppleAccount: "mdm-owner@example.test", PushCheckedAt: &now, PushFingerprint: strings.Repeat("b", 64), PushExpiresAt: now.AddDate(1, 0, 0)}, []apple.PushRequest{{ID: "30000000-0000-0000-0000-000000000001", Organization: "Example organization", PublicURL: "https://mdm.example.test", AppleAccount: "mdm-owner@example.test", ExpectedTopic: "com.apple.mgmt.example", BaseRevision: 1, Status: "pending", CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour), HasVendorRequest: true, VendorAvailable: true, VendorExpiresAt: &vendorExpires, VendorFingerprint: strings.Repeat("a", 64)}}, true, true, "", "", true), []string{"Create enrollment invitation", "push_certificate", "push_key", "test-csrf-token", "APNs connection checked (UTC)", strings.Repeat("b", 64), "Verify connection and import"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -87,5 +87,13 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}
 	if strings.Contains(b.String(), malicious.Name) {
 		t.Fatal("device-supplied name was emitted as executable HTML")
+	}
+	b.Reset()
+	privateFingerprint := strings.Repeat("c", 64)
+	if err = Setup(c, info, &apple.Settings{Organization: "Example organization", Topic: "com.apple.mgmt.example", PushCheckedAt: &now, PushFingerprint: privateFingerprint}, nil, false, true, "", "", true).Render(ctx, &b); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), privateFingerprint) || strings.Contains(b.String(), "APNs connection checked (UTC)") {
+		t.Fatal("connection metadata visible without certificate authority")
 	}
 }

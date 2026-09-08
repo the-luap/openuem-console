@@ -56,10 +56,11 @@ func scanPushRequest(row scanner) (*PushRequest, error) {
 }
 
 // SettingsMetadata reads the public setup summary without decrypting credentials.
-// Callers must restrict AppleAccount to organization certificate administrators.
+// Callers must restrict AppleAccount and connection evidence to organization
+// certificate administrators.
 func (s *Store) SettingsMetadata(ctx context.Context, tenant int) (*Settings, error) {
 	var c Settings
-	err := s.db.QueryRowContext(ctx, `SELECT tenant_id,public_url,organization,topic,push_expires_at,apple_account FROM mdm_apple_settings WHERE tenant_id=$1`, tenant).Scan(&c.TenantID, &c.PublicURL, &c.Organization, &c.Topic, &c.PushExpiresAt, &c.AppleAccount)
+	err := s.db.QueryRowContext(ctx, `SELECT tenant_id,public_url,organization,topic,push_expires_at,apple_account,push_checked_at,push_fingerprint FROM mdm_apple_settings WHERE tenant_id=$1`, tenant).Scan(&c.TenantID, &c.PublicURL, &c.Organization, &c.Topic, &c.PushExpiresAt, &c.AppleAccount, &c.PushCheckedAt, &c.PushFingerprint)
 	return &c, notFound(err)
 }
 
@@ -231,7 +232,7 @@ func (s *Store) RevokePushRequest(ctx context.Context, tenant int, id, actor str
 
 // ImportPushCertificate uses the selected request's key, never the newest key.
 // Validation, settings replacement, request consumption and audit are atomic.
-// This verifies the Apple issuer chain locally; it does not test APNs connectivity.
+// This verifies the Apple issuer chain and a fresh APNs connection before activation.
 func (s *Store) ImportPushCertificate(ctx context.Context, tenant int, id string, certificate []byte, actor string) error {
 	if err := certificateOnlyPEM(certificate); err != nil {
 		return err

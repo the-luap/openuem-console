@@ -222,7 +222,7 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 		if err != nil {
 			setupError = err.Error()
 		} else {
-			message = "Apple push credentials saved. You can now create an enrollment invitation."
+			message = "APNs connection verified and Apple push credentials saved. You can now create an enrollment invitation."
 		}
 	}
 	var settings *apple.Settings
@@ -244,6 +244,8 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 		}
 	} else if settings != nil {
 		settings.AppleAccount = ""
+		settings.PushCheckedAt = nil
+		settings.PushFingerprint = ""
 	}
 	return renderApple(c, mdm_views.Setup(c, info, settings, requests, canManage, h.Apple != nil && h.Apple.VendorConfigured(), setupError, message, os.Getenv("APPLE_MDM_LISTEN_ADDR") != ""))
 }
