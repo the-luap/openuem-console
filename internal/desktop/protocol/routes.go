@@ -30,8 +30,11 @@ func Parse(r *http.Request) (Route, bool) {
 	if len(p) == 4 && p[3] == "bootstrap-keys" && read {
 		return Route{Kind: "bootstrap-keys"}, true
 	}
+	if len(p) == 4 && enrollment.ValidToken(p[3]) && read {
+		return Route{Kind: "portal", Token: p[3]}, true
+	}
 	if len(p) == 5 && enrollment.ValidToken(p[3]) {
-		if ((p[4] == "metadata" || p[4] == "configuration") && read) || (p[4] == "claim" && r.Method == http.MethodPost) {
+		if ((p[4] == "metadata" || p[4] == "configuration" || p[4] == "invitation") && read) || (p[4] == "claim" && r.Method == http.MethodPost) {
 			return Route{Kind: p[4], Token: p[3]}, true
 		}
 	}

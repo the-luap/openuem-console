@@ -7,7 +7,7 @@ worker request boundaries, service runtimes, scoped console administration and
 the public HTTPS claim/download protocol now have automated evidence. Protected
 Windows/macOS storage and durable HTTPS claim recovery also pass native CI. The
 console now creates scoped release-bound invitations for the native enrollment
-command. The public installation portal, native service activation, installers
+command and serves administrator-assisted public installation instructions. Native service activation, installers
 and production deployment wiring remain open.
 
 ## Source baselines
@@ -203,8 +203,8 @@ The console pins this version and uses those transactions for exact installer
 release binding and canonical-origin checks. PostgreSQL tests observe actual lock
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
-New console invitations, native bootstrap activation
-and reference deployment wiring remain open.
+The later console form and public instructions now use these transactions. Native
+service activation and reference deployment wiring remain open.
 
 ## Required boundaries
 

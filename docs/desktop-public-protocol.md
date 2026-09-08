@@ -4,8 +4,9 @@ The console can run a separate, private HTTPS listener for individual Windows/Ma
 enrollment and approved installer downloads. The gateway exposes its exact routes
 on the canonical public HTTPS origin. No console routes are registered on this
 listener. It serves independently signed bootstrap configuration as well as the
-claim protocol. Native installer integration and the installation page remain open.
-The console does not yet offer a new installation-link form.
+claim protocol. The [console invitation form](desktop-console-invitations.md) now
+provides an administrator-assisted public installation page and limited token-file
+download. Finished native installers and automatic service activation remain open.
 
 ## Enable the private listener
 
@@ -83,6 +84,8 @@ payload digest, not a package hash.
 
 | Method and path | Behavior |
 | --- | --- |
+| `GET` or `HEAD /enroll/desktop/<token>` | Read-only English installation instructions, authorized organization/site/server, target/release, expiry, capacity and administrator recovery guidance |
+| `GET` or `HEAD /enroll/desktop/<token>/invitation` | The existing limited token plus one LF as `openuem-invitation.txt`; requires metadata that can produce a valid native configuration and a compatible installed-agent binding |
 | `GET /enroll/desktop/<token>/metadata` | Public organization/site labels and IDs, exact platform/architecture, expiry, remaining uses, approved artifact, original signed release envelope and download URL |
 | `HEAD /enroll/desktop/<token>/metadata` | The same availability check and representation headers without a body |
 | `GET` or `HEAD /enroll/desktop/bootstrap-keys` | Schema-1 key document containing the configured origin and current configuration signing public key with its SHA-256 key ID |
@@ -90,8 +93,8 @@ payload digest, not a package hash.
 | `POST /enroll/desktop/<token>/claim` | Validate both endpoint key proofs, claim the bound invitation and return the assigned individual identity and public certificates |
 | `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows` or `macos`, architecture is `amd64` or `arm64` |
 
-The base invitation URL is reserved for the future installation page and is not
-currently a public gateway route. Metadata, configuration and package reads do not reserve a use,
+The base invitation URL now serves the public installation page. Page, invitation
+file, metadata, configuration and package reads do not reserve a use,
 issue an identity or register a device. Metadata remains readable after all uses
 are consumed so a pending client can recover using its original keys. This grants
 no right to create another identity. Configuration remains available for the same
@@ -155,11 +158,16 @@ Responses use `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, no-r
 protection and no CORS permissions. No request URL, token, CSR, key or database error
 is logged by this listener. A native client need not send an Origin header. When
 present, Origin must exactly match the configured public origin; `null`, foreign
-origins and browser cross-origin Fetch Metadata are rejected. Claims require JSON
+origins and browser cross-origin Fetch Metadata are rejected. The sole exception
+to Fetch Metadata restrictions is a `GET`/`HEAD` top-level `navigate`/`document`
+request to the read-only installation page from `same-site` or `cross-site`, so an
+invitation in webmail can open normally. Foreign Origin headers, embedded frames,
+cross-origin fetches and cross-site configuration/token/package/claim requests are
+still rejected. Claims require JSON
 and both key proofs and do not use browser cookies or HTTP authorization headers.
 
-The listener admits at most 4 claims, 8 downloads and 32 metadata/configuration/key
-document requests at once.
+The listener admits at most 4 claims, 8 package downloads and 32 metadata,
+configuration, key-document, page or invitation-file requests at once.
 It applies a global 100 requests/second, burst-200 limiter and per-source
 2 requests/second, burst-30 limit, with at most 4096 source buckets. IPv6 sources
 share a /64 bucket. Forwarded source addresses are used only from a pinned gateway
@@ -170,13 +178,35 @@ with `Retry-After: 5`. These initial limits are fixed in the implementation.
 Headers are bounded to 32 KiB. Claims have a 10-second body read deadline and a
 20-second request context; the body deadline is cleared once its bounded input is
 complete, so HTTP/2 does not reset a valid claim during a database wait. Metadata
-and both bootstrap routes also have a 20-second context. Ordinary server
+and the bootstrap/page/invitation routes also have a 20-second context. Ordinary server
 responses have a 60-second write deadline. Only an admitted download receives a
 15-minute context/write deadline, on both TLS legs. The gateway admits at most
 16 concurrent downloads, including requests awaiting the backend. Shutdown cancels
 desktop requests at the gateway; the console closes listener connections, cancels
 and joins handlers before closing their catalog. Native clients must retain their
 protected pending keys and retry safely after interrupted claims or transfers.
+
+The installation page embeds only its compiled stylesheet, authorized by an exact
+CSP SHA-256 hash. It uses no script, external font, image, analytics or browser
+cookie. Its CSP forbids frames, forms, base URL changes and other resources. HTML
+escapes stored labels and rendering is capped at 64 KiB before response headers
+are written; HEAD returns the representation length without a body. The page
+checks that its metadata can produce the same signed configuration a native client
+will verify. Missing setup or incompatible/invalid metadata disables file controls.
+
+After all invitation uses are consumed, the page explains the computer limit and
+retains administrator configuration/token downloads for same-key recovery. It does
+not reveal any issued device ID or inventory. Revoked, expired or superseded links
+do not expose active organization details or token files. Temporary database/service
+failures return a generic 503 page. Native claims remain the only issuance operation.
+
+Real PostgreSQL/TLS tests cover repeated GET/HEAD scans, unchanged invitation usage,
+no device issuance, exact token-file bytes, capacity/revocation, CSP/rendering limits,
+escaped labels and the narrow webmail-navigation exception. Gateway tests exercise
+the two added routes through the actual pinned TLS backend with and without the
+agent broker enabled. Saved HTTP-response HTML was inspected at 390, 768 and 1440
+pixels, including its dark stylesheet; the local static preview is rendering
+evidence, not a replacement for these TLS and authorization tests.
 
 ## Verification
 

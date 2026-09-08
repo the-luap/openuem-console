@@ -134,15 +134,18 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	// A native client has no Origin. Browser requests must be same-origin; the
-	// claim additionally requires an explicit JSON body and both key proofs.
+	// Only the read-only landing page accepts a top-level navigation from another
+	// site (for example an invitation in webmail). Native clients have no Origin;
+	// every download/API/claim retains its existing same-origin restrictions.
 	if values := r.Header.Values("Origin"); len(values) > 1 || (len(values) == 1 && values[0] != h.origin) {
 		http.Error(w, "request origin is not allowed", http.StatusForbidden)
 		return
 	}
 	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "none" && site != "same-origin" {
-		http.Error(w, "request origin is not allowed", http.StatusForbidden)
-		return
+		if (site != "same-site" && site != "cross-site") || route.Kind != "portal" || r.Header.Get("Sec-Fetch-Mode") != "navigate" || r.Header.Get("Sec-Fetch-Dest") != "document" {
+			http.Error(w, "request origin is not allowed", http.StatusForbidden)
+			return
+		}
 	}
 	if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Encoding") != "" || (route.Kind != "claim" && (r.ContentLength != 0 || len(r.TransferEncoding) != 0)) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -170,6 +173,10 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stop := context.AfterFunc(h.lifetime, cancel)
 	defer stop()
 	r = r.WithContext(ctx)
+	if route.Kind == "portal" || route.Kind == "invitation" {
+		h.portal(w, r, route)
+		return
+	}
 	if route.Kind == "download" {
 		if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)

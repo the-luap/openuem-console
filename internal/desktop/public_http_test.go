@@ -44,7 +44,16 @@ type publicFixture struct {
 
 func newPublicFixture(t *testing.T, bootstrapKeys ...ed25519.PrivateKey) *publicFixture {
 	t.Helper()
+	return newPublicFixtureWithAgent(t, false, bootstrapKeys...)
+}
+
+func newPublicFixtureWithAgent(t *testing.T, bindAgent bool, bootstrapKeys ...ed25519.PrivateKey) *publicFixture {
+	t.Helper()
 	f := newCatalogFixture(t)
+	if bindAgent {
+		f.manifest.Artifacts[0].AgentSize = 1
+		f.manifest.Artifacts[0].AgentSHA256 = strings.Repeat("a", 64)
+	}
 	invitation, request := prepareInstallerInvitation(t, f)
 	handler, err := NewPublicHandler(f.store, f.catalog, "https://uem.example.test", clientidentity.Policy{}, bootstrapKeys...)
 	if err != nil {
@@ -253,6 +262,8 @@ func publicTestIdentity(t *testing.T, name string) (tls.Certificate, []byte) {
 
 func TestPublicDesktopThroughGatewayRejectsDirectAccessAndAdministratorAliases(t *testing.T) {
 	f := newCatalogFixture(t)
+	f.manifest.Artifacts[0].AgentSize = 1
+	f.manifest.Artifacts[0].AgentSHA256 = strings.Repeat("a", 64)
 	_, bootstrapKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -311,13 +322,13 @@ func TestPublicDesktopThroughGatewayRejectsDirectAccessAndAdministratorAliases(t
 			client := &http.Client{Transport: transport}
 			defer client.CloseIdleConnections()
 			tokenPath := "/enroll/desktop/" + claim.Invitation
-			for _, path := range []string{tokenPath + "/metadata", tokenPath + "/configuration", "/enroll/desktop/bootstrap-keys", protocol.DownloadPath(invitation.ReleaseDigest, "windows", "amd64")} {
+			for _, path := range []string{tokenPath, tokenPath + "/invitation", tokenPath + "/metadata", tokenPath + "/configuration", "/enroll/desktop/bootstrap-keys", protocol.DownloadPath(invitation.ReleaseDigest, "windows", "amd64")} {
 				response, data := publicRequest(t, client, server.URL, "GET", path, nil, map[string]string{"Client-Cert": "forged", "X-SSL-Client-Cert": "forged", "X-Forwarded-For": "10.42.1.1"})
 				if response.StatusCode != 200 {
 					t.Fatal("public route failed through gateway", response.StatusCode, string(data))
 				}
 			}
-			for _, path := range []string{"/login", "/desktop/enrollment", "/tenant/1/site/1/desktop/enrollment", "/desktop/setup", tokenPath, tokenPath + "/claim", tokenPath + "/metadata?token=other", tokenPath + "/metadata/", tokenPath + "/configuration/", "/enroll/desktop/bootstrap-keys?", "/enroll/desktop/releases/" + invitation.ReleaseDigest + "/windows/arm64/admin"} {
+			for _, path := range []string{"/login", "/desktop/enrollment", "/tenant/1/site/1/desktop/enrollment", "/desktop/setup", tokenPath + "/", tokenPath + "/claim", tokenPath + "/metadata?token=other", tokenPath + "/metadata/", tokenPath + "/configuration/", "/enroll/desktop/bootstrap-keys?", "/enroll/desktop/releases/" + invitation.ReleaseDigest + "/windows/arm64/admin"} {
 				response, _ := publicRequest(t, client, server.URL, "GET", path, nil, map[string]string{"X-Forwarded-For": "10.42.1.1"})
 				if response.StatusCode != 403 {
 					t.Fatal("unlisted public path reached a backend", response.StatusCode)

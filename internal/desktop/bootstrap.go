@@ -87,14 +87,7 @@ func (h *PublicHandler) configuration(w http.ResponseWriter, r *http.Request, to
 		publicFailure(w, err)
 		return
 	}
-	now := time.Now().UTC()
-	data, err := bootstrap.Sign(bootstrap.Config{
-		Schema: bootstrap.Schema, Origin: h.origin, Organization: metadata.Organization,
-		Site: metadata.Site, TenantID: metadata.TenantID, SiteID: metadata.SiteID,
-		Invitation: token, Platform: metadata.Platform, Architecture: metadata.Architecture,
-		IssuedAt: now, ExpiresAt: metadata.ExpiresAt, ReleaseDigest: metadata.ReleaseDigest,
-		ReleaseEnvelope: metadata.ReleaseEnvelope,
-	}, h.bootstrapKey, now)
+	data, err := h.signConfiguration(metadata, token, time.Now().UTC())
 	if err != nil {
 		publicFailure(w, ErrBootstrapConfiguration)
 		return
@@ -102,4 +95,14 @@ func (h *PublicHandler) configuration(w http.ResponseWriter, r *http.Request, to
 	defer clear(data)
 	w.Header().Set("Content-Disposition", `attachment; filename="openuem-enrollment.json"`)
 	publicJSON(w, r, json.RawMessage(data))
+}
+
+func (h *PublicHandler) signConfiguration(metadata *InstallerMetadata, token string, now time.Time) ([]byte, error) {
+	return bootstrap.Sign(bootstrap.Config{
+		Schema: bootstrap.Schema, Origin: h.origin, Organization: metadata.Organization,
+		Site: metadata.Site, TenantID: metadata.TenantID, SiteID: metadata.SiteID,
+		Invitation: token, Platform: metadata.Platform, Architecture: metadata.Architecture,
+		IssuedAt: now, ExpiresAt: metadata.ExpiresAt, ReleaseDigest: metadata.ReleaseDigest,
+		ReleaseEnvelope: metadata.ReleaseEnvelope,
+	}, h.bootstrapKey, now)
 }

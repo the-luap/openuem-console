@@ -3,8 +3,9 @@
 The Desktop enrollment page now creates release-bound Windows/macOS invitations
 for the explicitly selected organization and site. This connects console operators
 to the [native agent enrollment command](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
-It is an administrator workflow. A finished public installation portal, signed
-end-user installers, guided consent and automatic service activation remain open.
+It is an administrator workflow with a [public installation page](desktop-public-protocol.md)
+for each created link. Finished signed end-user installers, guided native consent
+and automatic service activation remain open.
 
 ## Availability and scope
 
@@ -46,7 +47,7 @@ package cannot publish an invitation. GET requests never create or consume one.
 
 ## Token handling
 
-The successful POST displays the canonical limited token once, with selected target,
+The successful POST displays the installation link and canonical limited token once, with selected target,
 organization/site IDs, release, capacity and exact expiry. The response uses
 `Cache-Control: no-store`, `Referrer-Policy: strict-origin` and escaped HTML. No token
 is placed in a redirect, query string or session; subsequent lists expose only
@@ -77,3 +78,7 @@ inspected. This browser-only fixture can use `OPENUEM_DESKTOP_BROWSER_HTTP=1` on
 code, supplies only an isolated test session and drops its schema on exit. Its
 configured public enrollment origin remains HTTPS; the actual gateway/native
 protocol continues to be tested separately through both TLS legs.
+
+Console commit `e75f777` passed [native/console CI](https://github.com/the-luap/openuem-console/actions/runs/34195300064),
+including scoped invitation creation and Linux/Windows builds. The subsequent public
+page adds browser instructions and read-only downloads without changing issuance.

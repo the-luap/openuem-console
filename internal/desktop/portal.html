@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Computer enrollment | OpenUEM</title><style>{{.CSS}}</style></head>
+<body><main>
+<p class="brand">OpenUEM</p>
+<h1>Set up your computer</h1>
+{{if .Available}}
+<p class="intro">Your computer is invited to join <strong>{{.Organization}}</strong>.</p>
+<section aria-labelledby="details-title"><h2 id="details-title">Check your invitation</h2>
+<dl><div><dt>Organization</dt><dd>{{.Organization}} <span class="muted">(ID {{.TenantID}})</span></dd></div><div><dt>Site</dt><dd>{{.Site}} <span class="muted">(ID {{.SiteID}})</span></dd></div><div><dt>Management server</dt><dd>{{.Origin}}</dd></div><div><dt>Computer type</dt><dd>{{.Target}}</dd></div><div><dt>Approved agent</dt><dd>{{.Release}}</dd></div><div><dt>Invitation expires</dt><dd>{{.Expires}}</dd></div></dl>
+<p class="notice">Continue only if you expected this invitation and recognize the organization and server address. Contact your IT administrator if anything looks unfamiliar.</p>
+</section>
+{{if .Compatible}}
+{{if gt .Remaining 0}}
+<section aria-labelledby="install-title"><h2 id="install-title">Install with your IT administrator</h2>
+<ol><li>Download the approved agent for <strong>{{.Target}}</strong>. Your computer must match this type.</li><li>Open the installer and follow your operating system's signature and administrator prompts. Do not bypass a security warning.</li><li>Your IT administrator completes enrollment with the installed agent and your explicit management approval. The organization may collect inventory and perform administrator management actions.</li></ol>
+<a class="button" href="{{.PackageURL}}" download>Download approved agent</a>
+<p class="muted">Opening this page or downloading a file does not enroll your computer. {{if eq .Remaining 1}}One computer can enroll with this invitation.{{else}}Up to {{.Remaining}} computers can enroll with this invitation.{{end}}</p>
+</section>
+{{else}}
+<section aria-labelledby="used-title"><h2 id="used-title">This invitation has reached its computer limit</h2><p>Ask your IT administrator for a new invitation for another computer. If enrollment on this computer was interrupted, your administrator can retry with the original protected identity state while this invitation remains valid.</p></section>
+{{end}}
+<details><summary>Administrator enrollment files</summary>
+<p>These files are for the installed agent's native <code>enroll</code> command. Securely provision the invitation into a private file for the elevated administrator or root account. Authorize the server and organization/site IDs independently, and use release public keys from your trusted release pipeline.</p>
+<div class="downloads"><a class="button secondary" href="{{.InvitationURL}}" download>Download invitation file</a><a class="button secondary" href="{{.ConfigurationURL}}" download>Download signed configuration</a></div>
+<p class="muted">The invitation is limited and sensitive. Share it only with the intended administrator. The signed configuration does not supply a permanent device private key or establish its own release trust.</p>
+<p>The native command prepares protected credentials. Your IT administrator must then activate the agent service and verify that the computer appears online in the management console.</p>
+</details>
+{{else}}
+<section aria-labelledby="unavailable-title"><h2 id="unavailable-title">Enrollment is not ready</h2><p>Your administrator must configure a compatible approved agent release and signed enrollment configuration before this invitation can be used.</p></section>
+{{end}}
+{{else}}
+<section aria-labelledby="unavailable-title"><h2 id="unavailable-title">This invitation is unavailable</h2><p>The invitation may have expired or been revoked, or its approved agent release may have changed. Ask your IT administrator to check it or provide a new invitation.</p></section>
+{{end}}
+<footer>Keep this invitation link private. If you need help, contact your IT administrator.</footer>
+</main></body></html>

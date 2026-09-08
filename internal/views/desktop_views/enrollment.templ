@@ -137,11 +137,13 @@ templ InvitationCreation(info *partials.CommonInfo, data EnrollmentData) {
 				<p role="alert" class="uk-alert uk-alert-danger">{ data.FormError }</p>
 			}
 			if data.Created!=nil {
-				<div role="status" class="uk-alert uk-alert-success">Invitation created. Copy its token now; it will not be shown again.</div>
+				<div role="status" class="uk-alert uk-alert-success">Invitation created. Copy its installation link now; it will not be shown again.</div>
+				<label class="grid min-w-0 gap-2">Installation link<input class="uk-input w-full min-w-0" readonly value={ data.Created.URL }/></label>
+				<a class="uk-button uk-button-primary" href={ templ.URL(data.Created.URL) } target="_blank" rel="noopener noreferrer">Open installation instructions</a>
 				<dl class="uk-description-list"><dt>Computer type</dt><dd>{ targetLabel(data.Created.Platform, data.Created.Architecture) }</dd><dt>Organization / site IDs</dt><dd>{ fmt.Sprintf("%d / %d",data.Created.TenantID,data.Created.SiteID) }</dd><dt>Approved agent</dt><dd>{ data.Created.Version }</dd><dt>Maximum computers</dt><dd>{ fmt.Sprint(data.Created.MaxUses) }</dd><dt>Expires</dt><dd>{ data.Created.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</dd></dl>
 				<label class="grid min-w-0 gap-2">Invitation token<textarea id="desktop-invitation-token" class="uk-textarea w-full min-w-0 font-mono" readonly rows="2" spellcheck="false" autocomplete="off">{ invitationToken(data.Created) }</textarea></label>
 				<p>Use this token with the installed, signed agent's <code>enroll</code> command. An administrator must place it in a private invitation file and authorize the server address and organization/site IDs. Share it only with the intended installer or administrator.</p>
-				<p class="uk-text-muted">This prepares enrollment for the native command. Guided installation and automatic service activation are not available from this page yet. An invitation or saved identity does not confirm that a computer is online.</p>
+				<p class="uk-text-muted">An administrator completes installation and service activation. An invitation or saved identity does not confirm that a computer is online.</p>
 				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info,"/desktop/enrollment")) }>Return to invitations</a>
 			} else if !info.Can(access.EnrollDevices) {
 				<p>You have read-only access to enrollment invitations in this view.</p>
