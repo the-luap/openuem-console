@@ -124,9 +124,13 @@ func testEnrollWithKey(t *testing.T, s *Store, scope Scope, name string, existin
 }
 
 func testEnrollPlatformWithKey(t *testing.T, s *Store, scope Scope, name, model, version string, existingUDID ...string) (*Device, *x509.Certificate, *rsa.PrivateKey) {
+	return testEnrollOptionsWithKey(t, s, scope, name, model, version, EnrollmentOptions{}, existingUDID...)
+}
+
+func testEnrollOptionsWithKey(t *testing.T, s *Store, scope Scope, name, model, version string, options EnrollmentOptions, existingUDID ...string) (*Device, *x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 	ctx := context.Background()
-	invite, err := s.Invite(ctx, scope, name, "test-admin")
+	invite, err := s.invite(ctx, scope, name, "test-admin", options, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

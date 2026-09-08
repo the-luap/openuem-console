@@ -347,6 +347,18 @@ func (h *Handler) AppleInvite(c echo.Context) error {
 	if err = h.appleReady(); err != nil {
 		return err
 	}
+	if err = c.Request().ParseForm(); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid enrollment form")
+	}
+	for _, key := range []string{"name", "site_id", "allow_mac_device_lock"} {
+		if len(c.Request().PostForm[key]) > 1 || len(c.QueryParams()[key]) != 0 {
+			return echo.NewHTTPError(http.StatusBadRequest, "Ambiguous enrollment setting")
+		}
+	}
+	lockValues := c.Request().PostForm["allow_mac_device_lock"]
+	if len(lockValues) == 1 && lockValues[0] != "yes" {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid device lock option")
+	}
 	if scope.SiteID == 0 || c.FormValue("site_id") != "" {
 		site, err := strconv.Atoi(c.FormValue("site_id"))
 		if err != nil {
@@ -363,8 +375,11 @@ func (h *Handler) AppleInvite(c echo.Context) error {
 	if err := h.requireApplePermission(c, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
 		return err
 	}
-	invite, err := h.Apple.Invite(c.Request().Context(), scope, c.FormValue("name"), h.appleActor(c))
+	invite, err := h.Apple.InviteWithOptions(c.Request().Context(), scope, c.FormValue("name"), h.appleActor(c), apple.EnrollmentOptions{AllowMacDeviceLock: len(lockValues) == 1}, h.Access)
 	if err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return echo.NewHTTPError(http.StatusForbidden, "Enrollment or device security management permission denied")
+		}
 		return appleFailure(err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")

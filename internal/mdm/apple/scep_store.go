@@ -123,9 +123,14 @@ func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settin
 		return nil, err
 	}
 	layout := newEnrollmentLayout(c)
-	if err = tx.QueryRowContext(ctx, `SELECT enrollment_platform='macos' FROM mdm_apple_devices WHERE id=$1`, deviceID).Scan(&layout.bootstrapToken); err != nil {
+	var deviceLockAllowed bool
+	if err = tx.QueryRowContext(ctx, `SELECT enrollment_platform='macos',device_lock_allowed FROM mdm_apple_devices WHERE id=$1`, deviceID).Scan(&layout.bootstrapToken, &deviceLockAllowed); err != nil {
 		return nil, err
 	}
+	if deviceLockAllowed && !layout.bootstrapToken {
+		return nil, ErrConflict
+	}
+	layout.accessRights = enrollmentRights(deviceLockAllowed)
 	layout.perUserConnections = layout.bootstrapToken
 	data, err := scepEnrollmentProfile(c, deviceID, challenge, "/mdm/apple/"+deviceID+"/scep", layout)
 	if err != nil {

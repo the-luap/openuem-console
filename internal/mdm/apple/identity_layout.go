@@ -9,6 +9,14 @@ import (
 )
 
 const enrollmentAccessRights = 1 | 2 | 16 | 256 | 512 | 1024 | 2048 | 4096
+const enrollmentDeviceLockRight = 4
+
+func enrollmentRights(deviceLockAllowed bool) int64 {
+	if deviceLockAllowed {
+		return enrollmentAccessRights | enrollmentDeviceLockRight
+	}
+	return enrollmentAccessRights
+}
 
 type enrollmentLayout struct {
 	profileUUID, mdmUUID, identityUUID, caUUID string
@@ -34,7 +42,7 @@ func (l enrollmentLayout) validate() error {
 		}
 		seen[id.String()] = true
 	}
-	if (l.identityType != "com.apple.security.scep" && l.identityType != "com.apple.security.pkcs12") || l.accessRights != enrollmentAccessRights || l.publicURL == "" || l.topic == "" {
+	if (l.identityType != "com.apple.security.scep" && l.identityType != "com.apple.security.pkcs12") || (l.accessRights != enrollmentRights(false) && l.accessRights != enrollmentRights(true)) || l.publicURL == "" || l.topic == "" {
 		return ErrConflict
 	}
 	return nil
@@ -50,9 +58,14 @@ func saveEnrollmentLayout(ctx context.Context, tx *sql.Tx, tenant int, deviceID 
 
 func loadEnrollmentLayout(ctx context.Context, tx *sql.Tx, deviceID string) (*enrollmentLayout, error) {
 	var l enrollmentLayout
-	err := tx.QueryRowContext(ctx, `SELECT profile_uuid,mdm_uuid,identity_uuid,COALESCE(ca_uuid,''),identity_type,public_url,topic,access_rights,bootstrap_token,per_user_connections FROM mdm_apple_enrollment_layouts WHERE device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken, &l.perUserConnections)
+	var allowed bool
+	var platform Platform
+	err := tx.QueryRowContext(ctx, `SELECT l.profile_uuid,l.mdm_uuid,l.identity_uuid,COALESCE(l.ca_uuid,''),l.identity_type,l.public_url,l.topic,l.access_rights,l.bootstrap_token,l.per_user_connections,d.device_lock_allowed,d.enrollment_platform FROM mdm_apple_enrollment_layouts l JOIN mdm_apple_devices d ON d.id=l.device_id AND d.tenant_id=l.tenant_id WHERE l.device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken, &l.perUserConnections, &allowed, &platform)
 	if err != nil {
 		return nil, notFound(err)
+	}
+	if l.accessRights != enrollmentRights(allowed) || (allowed && platform != PlatformMacOS) {
+		return nil, ErrConflict
 	}
 	return &l, l.validate()
 }
@@ -78,7 +91,17 @@ func (s *Store) recoverEnrollmentLayout(ctx context.Context, tx *sql.Tx, d *Devi
 	if found == nil {
 		return nil
 	}
-	l := enrollmentLayout{profileUUID: found.UUID, accessRights: enrollmentAccessRights, perUserConnections: d.PerUserConnections, bootstrapToken: d.Family() == PlatformMacOS}
+	// ProfileList does not report AccessRights. Only the immutable invitation
+	// choice can restore them; a Mac model alone never grants additional rights.
+	var allowed bool
+	var platform Platform
+	if err := tx.QueryRowContext(ctx, `SELECT device_lock_allowed,enrollment_platform FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2`, d.ID, d.TenantID).Scan(&allowed, &platform); err != nil {
+		return err
+	}
+	if allowed && platform != PlatformMacOS {
+		return ErrConflict
+	}
+	l := enrollmentLayout{profileUUID: found.UUID, accessRights: enrollmentRights(allowed), perUserConnections: d.PerUserConnections, bootstrapToken: d.Family() == PlatformMacOS}
 	seen := make(map[string]bool)
 	for _, p := range found.Payloads {
 		if seen[p.Identifier] || p.UUID == "" {

@@ -145,6 +145,10 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 										</select>
 									</label>
 								}
+								if info.Can(access.ManageDeviceSecurity) {
+									<label><input type="checkbox" name="allow_mac_device_lock" value="yes"/> Allow Recovery Lock and device lock management (Mac only)</label>
+									<p class="uk-text-muted">Adds device lock and passcode removal rights to this new Mac enrollment. The device owner must confirm them before downloading the profile. Existing enrollments cannot gain these rights through renewal.</p>
+								}
 								<button class="uk-button uk-button-primary" type="submit">Create enrollment invitation</button>
 							</form>
 						}
@@ -176,7 +180,11 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h1 class="uk-card-title">Enrollment invitation ready</h1></div>
 				<div class="uk-card-body grid gap-4">
-					<p>Open this link or scan the QR code on the intended iPhone, iPad or Mac. Safari will show the enrollment instructions before asking the owner to continue.</p>
+					if invite.DeviceLockAllowed {
+						<p>Open this link or scan the QR code on the intended Mac. The owner must confirm Recovery Lock and device lock management before downloading the profile.</p>
+					} else {
+						<p>Open this link or scan the QR code on the intended iPhone, iPad or Mac. Safari will show the enrollment instructions before asking the owner to continue.</p>
+					}
 					<label>Single-use enrollment URL<input class="uk-input" readonly value={ invite.URL } aria-label="Enrollment URL"/></label>
 					if code := EnrollmentQR(invite.URL); code != "" {
 						<img src={ code } alt="Scan to open the private enrollment invitation" width="256" height="256" class="max-w-full"/>

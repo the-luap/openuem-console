@@ -74,7 +74,7 @@ func portalStart(t *testing.T, client *http.Client, address string) url.Values {
 	return url.Values{"csrf": {string(match[1])}, "action": {"claim"}, "confirm": {"yes"}, "platform": {"ipados"}}
 }
 
-func portalFixture(t *testing.T) (*Store, *httptest.Server, *Invitation, string) {
+func portalFixture(t *testing.T, options ...EnrollmentOptions) (*Store, *httptest.Server, *Invitation, string) {
 	t.Helper()
 	s := testStore(t)
 	testSettings(t, s, 1)
@@ -83,7 +83,11 @@ func portalFixture(t *testing.T) (*Store, *httptest.Server, *Invitation, string)
 	if _, err := s.db.Exec(`UPDATE mdm_apple_settings SET public_url=$1`, server.URL); err != nil {
 		t.Fatal(err)
 	}
-	invite, err := s.Invite(context.Background(), Scope{TenantID: 1, SiteID: 1}, "Portal test", "admin")
+	option := EnrollmentOptions{}
+	if len(options) == 1 {
+		option = options[0]
+	}
+	invite, err := s.invite(context.Background(), Scope{TenantID: 1, SiteID: 1}, "Portal test", "admin", option, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

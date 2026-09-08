@@ -129,10 +129,18 @@ func (s *Store) enrollmentPage(w http.ResponseWriter, r *http.Request, token str
 		fail(403, "The enrollment form expired. Reload this page and try again.")
 		return
 	}
+	if len(r.PostForm["action"]) != 1 {
+		fail(400, "Choose one action from the enrollment page.")
+		return
+	}
 	switch r.PostForm.Get("action") {
 	case "claim":
-		if len(r.PostForm["platform"]) != 1 || r.PostForm.Get("confirm") != "yes" || (r.PostForm.Get("platform") != "ios" && r.PostForm.Get("platform") != "ipados" && r.PostForm.Get("platform") != "macos") {
+		if len(r.PostForm["platform"]) != 1 || len(r.PostForm["confirm"]) != 1 || r.PostForm.Get("confirm") != "yes" || (r.PostForm.Get("platform") != "ios" && r.PostForm.Get("platform") != "ipados" && r.PostForm.Get("platform") != "macos") {
 			fail(400, "Select iPhone, iPad or Mac and confirm device management. Other platforms cannot use this invitation.")
+			return
+		}
+		if status.DeviceLockAllowed && (r.PostForm.Get("platform") != "macos" || len(r.PostForm["confirm_device_lock"]) != 1 || r.PostForm.Get("confirm_device_lock") != "yes") {
+			fail(400, "This invitation is for a Mac. Confirm Recovery Lock and device lock management before continuing.")
 			return
 		}
 		select {

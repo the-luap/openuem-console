@@ -40,6 +40,11 @@ SCEP identity payload a new UUID and updates `IdentityCertificateUUID`. Existing
 root metadata is retained; older profiles without a root payload gain one. A
 PKCS#12 device key is never copied into the replacement.
 
+New Mac invitations may explicitly include
+[device lock rights](macos-recovery-lock.md). Renewal preserves their `7959`
+access mask, while ordinary and existing enrollments retain `7955`. The immutable
+invitation choice and saved layout must agree; renewal cannot upgrade either.
+
 ## Issuance and activation
 
 | State | Meaning and authority |

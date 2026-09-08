@@ -35,6 +35,7 @@ func enrollmentCSRF(token, browser string) string {
 // EnrollmentStatus contains only the information needed by the invited browser.
 // It never exposes inventory, identifiers, push errors or device credentials.
 type EnrollmentStatus struct {
+	DeviceLockAllowed                 bool
 	Platform                          Platform
 	State, Organization, PublicOrigin string
 	ExpiresAt                         time.Time
@@ -51,19 +52,21 @@ func (s *Store) EnrollmentStatus(ctx context.Context, token, browser string) (*E
 	var downloads int
 	var hasProfile bool
 	result := &EnrollmentStatus{}
-	err := s.db.QueryRowContext(ctx, `SELECT d.status,d.invite_expires_at,s.organization,s.public_url,COALESCE(c.browser_hash,''),c.download_expires_at,c.status_expires_at,COALESCE(c.download_count,0),c.profile IS NOT NULL,d.enrollment_platform
+	err := s.db.QueryRowContext(ctx, `SELECT d.status,d.invite_expires_at,s.organization,s.public_url,COALESCE(c.browser_hash,''),c.download_expires_at,c.status_expires_at,COALESCE(c.download_count,0),c.profile IS NOT NULL,d.enrollment_platform,d.device_lock_allowed
 	 FROM mdm_apple_devices d JOIN mdm_apple_settings s ON s.tenant_id=d.tenant_id
 	 LEFT JOIN mdm_apple_enrollment_claims c ON c.device_id=d.id
-	 WHERE d.invite_hash=$1 OR c.invite_hash=$1`, digest([]byte(token))).Scan(&state, &inviteExpiry, &result.Organization, &result.PublicOrigin, &browserHash, &downloadExpiry, &statusExpiry, &downloads, &hasProfile, &result.Platform)
+	 WHERE d.invite_hash=$1 OR c.invite_hash=$1`, digest([]byte(token))).Scan(&state, &inviteExpiry, &result.Organization, &result.PublicOrigin, &browserHash, &downloadExpiry, &statusExpiry, &downloads, &hasProfile, &result.Platform, &result.DeviceLockAllowed)
 	if err != nil {
 		return nil, notFound(err)
 	}
 	if browserHash != "" && (!validEnrollmentToken(browser) || !hmac.Equal([]byte(browserHash), []byte(digest([]byte(browser))))) {
 		result.State, result.Organization, result.Platform = "used", "", ""
+		result.DeviceLockAllowed = false
 		return result, nil
 	}
 	if statusExpiry.Valid && !time.Now().Before(statusExpiry.Time) {
 		result.State, result.Organization, result.Platform = "expired", "", ""
+		result.DeviceLockAllowed = false
 		return result, nil
 	}
 	switch state {

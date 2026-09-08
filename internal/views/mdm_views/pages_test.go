@@ -66,6 +66,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	linked.MacBinding = &apple.MacBinding{Status: "consumed", ExpiresAt: now.Add(time.Hour), InstalledAt: &now, CompletedAt: &now, CleanupAt: &now}
 	reader := *info
 	reader.Principal = access.Principal{UserID: "preview-reader", Grants: []access.Grant{{Role: access.Viewer, Scope: access.Scope{TenantID: 1}}}}
+	operator := *info
+	operator.Principal = access.Principal{UserID: "preview-operator", Grants: []access.Grant{{Role: access.Operator, Scope: access.Scope{TenantID: 1}}}}
+	lockMac := mac
+	lockMac.DeviceLockAllowed = true
+	lockDetail := macDetail
+	lockDetail.Device = &lockMac
 	queued := macDetail
 	queued.MacBinding = &apple.MacBinding{Status: "queued", ExpiresAt: now.Add(time.Hour)}
 	conflict := macDetail
@@ -112,6 +118,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		component templ.Component
 		required  []string
 	}{
+		{"setup-device-lock-admin", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Allow Recovery Lock and device lock management", `name="allow_mac_device_lock"`, "Existing enrollments cannot gain these rights through renewal"}},
+		{"setup-device-lock-operator", Setup(c, &operator, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Create enrollment invitation"}},
+		{"setup-device-lock-reader", Setup(c, &reader, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Apple setup"}},
+		{"mac-device-lock-allowed", DeviceDetails(c, info, lockDetail), []string{"Included in this enrollment", "does not indicate whether a Recovery Lock password is set"}},
 		{"mac-filevault-rotation-ready", DeviceDetails(c, info, rotationDetail("rotated")), []string{"New recovery key stored and validated", "Rotate current recovery key", "/rotate"}},
 		{"mac-filevault-rotation-queued", DeviceDetails(c, info, rotationDetail("queued")), []string{"Waiting for the Mac to replace its recovery key"}},
 		{"mac-filevault-rotation-uncertain", DeviceDetails(c, info, rotationDetail("uncertain")), []string{"Another rotation remains blocked", "Validate current recovery key"}},
@@ -146,6 +156,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if (tc.name == "setup-device-lock-operator" || tc.name == "setup-device-lock-reader") && strings.Contains(html, `name="allow_mac_device_lock"`) {
+				t.Fatal("lock rights offered without device security permission")
+			}
 			if tc.name == "mac-filevault-reader" && (strings.Contains(html, "Retrieve recovery key") || strings.Contains(html, "Remove management profiles") || strings.Contains(html, "Validate current recovery key")) {
 				t.Fatal("viewer has FileVault controls")
 			}

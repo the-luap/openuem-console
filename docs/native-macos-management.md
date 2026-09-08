@@ -5,8 +5,8 @@ iPad enrollment. This implements part of MAC-01 and MAC-02 in the
 [roadmap ledger](implementation-status.md). Native and agent channels can share a
 verified Mac identity, and new enrollments support separately managed user
 channels. FileVault supports staged profiles, encrypted recovery escrow and
-audited retrieval; key validation and rotation, broader Mac security workflows
-and physical-device acceptance remain open. See [channel linkage](macos-agent-mdm-linkage.md),
+audited retrieval, authenticated validation and journaled rotation. Broader Mac
+security workflows and physical-device acceptance remain open. See [channel linkage](macos-agent-mdm-linkage.md),
 [Mac user management](macos-user-channels.md) and [FileVault](macos-filevault.md).
 
 ## Enroll and identify a Mac
@@ -33,6 +33,12 @@ unknown platforms. The existing `/ios` route remains an Apple MDM list alias, an
 existing `/ios/:id` detail links continue working for native Apple devices.
 Organization/site permissions apply to Mac inventory, enrollment, profiles,
 updates, identity renewal and read audits.
+
+New Mac invitations can explicitly include device lock and passcode removal
+rights for Recovery Lock management. The administrator needs device security
+permission, and the device owner separately confirms the rights. Existing
+enrollments retain their original rights through renewal. This option does not
+itself set a password; see [Recovery Lock scope and progress](macos-recovery-lock.md).
 
 New Mac enrollment profiles advertise `com.apple.mdm.bootstraptoken` and
 `com.apple.mdm.per-user-connections`. Their saved layout retains these capabilities

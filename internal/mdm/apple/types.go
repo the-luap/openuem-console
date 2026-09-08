@@ -42,6 +42,8 @@ type Settings struct {
 }
 
 type Device struct {
+	// Invitation permission only; it does not report the Recovery Lock state.
+	DeviceLockAllowed  bool `json:"device_lock_allowed"`
 	PerUserConnections bool `json:"per_user_connections"`
 	// Set only by certificate authentication, never by a console read or JSON.
 	peerFingerprint        string

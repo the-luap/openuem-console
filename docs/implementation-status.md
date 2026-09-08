@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Recovery Lock enrollment permission](macos-recovery-lock.md) adds an explicit,
+  security-authorized Mac invitation option and separate owner confirmation.
+  Database guards preserve the original access rights across migration, browser
+  retries, SCEP identity renewal and layout recovery. Tests cover role/scope
+  restrictions, revoked access, malformed forms, CSRF and atomic audit rollback.
+  Password operations and hardware acceptance remain open.
+
 - [Mac firewall profiles](macos-firewall.md) add a System-scope editor with
   explicit firewall settings and bounded app rules. The editor and uploaded
   profiles enforce field types, device platform and version-specific settings.

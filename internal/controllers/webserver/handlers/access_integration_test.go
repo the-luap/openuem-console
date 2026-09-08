@@ -92,6 +92,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		return rec
 	}
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenantID, siteID)
+	t.Run("Mac invitation rights require explicit security permission", func(t *testing.T) {
+		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
+	})
 	exercisePushRequestRoutes(t, h, e, ctx, tenantID, siteID, otherTenant.ID, otherSite.ID)
 	t.Run("readers see only permitted scope and no mutation controls", func(t *testing.T) {
 		for _, path := range []string{"/devices", fmt.Sprintf("/tenant/%d/devices", tenantID), base + "/devices"} {

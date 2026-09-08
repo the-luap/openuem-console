@@ -10,6 +10,14 @@ templ MacCapabilities(d *apple.Device) {
 				<dl class="uk-description-list">
 					<dt>Processor family</dt><dd>{ macProcessor(d) }</dd>
 					<dt>User-approved enrollment</dt><dd>{ macApproval(d) }</dd>
+					<dt>Recovery Lock and device lock permission</dt>
+					<dd>
+						if d.DeviceLockAllowed {
+							{ "Included in this enrollment. This does not indicate whether a Recovery Lock password is set." }
+						} else {
+							{ "Not included. A new enrollment with device lock rights is required; identity renewal cannot add them." }
+						}
+					</dd>
 					<dt>Bootstrap token</dt>
 					<dd>
 						if d.BootstrapTokenEscrowed {

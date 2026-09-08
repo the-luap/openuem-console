@@ -19,6 +19,7 @@
 <h2 id="before-heading">Before you start</h2>
 <p>Open this page in Safari on the iPhone, iPad or Mac you want to enroll. Keep the device connected to the internet. No OpenUEM app is required.</p>
 <p>Your organization will be able to view device information and manage configuration profiles and software update policies. This is device enrollment. It does not use Apple's separate User Enrollment privacy model.</p>
+{{if .DeviceLockAllowed}}<p class="notice">This invitation is for a Mac and also grants device lock and passcode removal rights. These rights allow Recovery Lock password management on supported Macs. A Recovery Lock password protects access to macOS Recovery; it is separate from your login password and FileVault recovery key.</p>{{end}}
 <p>Continue only if you recognize the organization and expect this invitation. Opening or refreshing this page does not use the invitation.</p>
 <p class="muted">Invitation expires {{.ExpiresAt.UTC.Format "2006-01-02 15:04 UTC"}}.</p>
 <form method="post" action="{{.Path}}">
@@ -27,9 +28,10 @@
 <label for="platform">Device to enroll</label>
 <select id="platform" name="platform" required>
 <option value="" selected disabled>Select your device</option>
-<option value="ios">iPhone</option><option value="ipados">iPad</option><option value="macos">Mac</option>
+{{if not .DeviceLockAllowed}}<option value="ios">iPhone</option><option value="ipados">iPad</option>{{end}}<option value="macos">Mac</option>
 </select>
 <label class="confirmation"><input type="checkbox" name="confirm" value="yes" required><span>I agree to enroll this device with the organization shown above.</span></label>
+{{if .DeviceLockAllowed}}<label class="confirmation"><input type="checkbox" name="confirm_device_lock" value="yes" required><span>I also agree to Recovery Lock and device lock management for this Mac.</span></label>{{end}}
 <button type="submit">Continue to profile download</button>
 </form>
 </section>
@@ -44,6 +46,7 @@
 <li><strong>Return to this page.</strong> Check the status after installation.</li>
 </ol>
 <p>Install only the profile for your intended organization. Your Mac must finish the enrollment prompts before OpenUEM can manage it.</p>
+{{if .DeviceLockAllowed}}<p>The profile includes device lock and passcode removal rights for Recovery Lock management. Installing it does not itself set a Recovery Lock password.</p>{{end}}
 {{else}}
 <ol>
 <li><strong>Download the profile.</strong> Allow the download when Safari asks.</li>

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 func certificateSerial() (*big.Int, error) {
@@ -209,12 +210,43 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 }
 
 type Invitation struct {
-	DeviceID  string    `json:"device_id"`
-	URL       string    `json:"url"`
-	ExpiresAt time.Time `json:"expires_at"`
+	DeviceID          string    `json:"device_id"`
+	URL               string    `json:"url"`
+	ExpiresAt         time.Time `json:"expires_at"`
+	DeviceLockAllowed bool      `json:"device_lock_allowed"`
+}
+
+// EnrollmentOptions are fixed when the invitation is created. They cannot be
+// added during a browser claim, identity renewal or inventory reconciliation.
+type EnrollmentOptions struct {
+	AllowMacDeviceLock bool
 }
 
 func (s *Store) Invite(ctx context.Context, scope Scope, name, actor string) (*Invitation, error) {
+	return s.invite(ctx, scope, name, actor, EnrollmentOptions{}, nil)
+}
+
+// InviteWithOptions authorizes console enrollment and holds its permission locks
+// through insertion and audit. Additional lock rights require security management.
+func (s *Store) InviteWithOptions(ctx context.Context, scope Scope, name, actor string, options EnrollmentOptions, permissions *access.Store) (*Invitation, error) {
+	if permissions == nil {
+		return nil, access.ErrDenied
+	}
+	return s.invite(ctx, scope, name, actor, options, func(ctx context.Context, tx *sql.Tx) error {
+		scoped := access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}
+		if err := permissions.AuthorizeTransaction(ctx, tx, actor, access.EnrollDevices, scoped); err != nil {
+			return err
+		}
+		if options.AllowMacDeviceLock {
+			return permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageDeviceSecurity, scoped)
+		}
+		return nil
+	})
+}
+
+func (s *Store) invite(ctx context.Context, scope Scope, name, actor string, options EnrollmentOptions, authorize func(context.Context, *sql.Tx) error) (*Invitation, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -242,21 +274,34 @@ func (s *Store) Invite(ctx context.Context, scope Scope, name, actor string) (*I
 		return nil, err
 	}
 	defer tx.Rollback()
+	if authorize != nil {
+		if err = authorize(ctx, tx); err != nil {
+			return nil, err
+		}
+	}
 	var siteID int
-	if err = tx.QueryRowContext(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant_sites=$2 FOR KEY SHARE`, scope.SiteID, scope.TenantID).Scan(&siteID); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant_sites=$2 FOR SHARE`, scope.SiteID, scope.TenantID).Scan(&siteID); err != nil {
 		return nil, notFound(err)
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,invite_hash,invite_expires_at,certificate_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, scope.TenantID, siteID, name, digest([]byte(token)), expires, time.Now().AddDate(1, 0, 0))
+	if !time.Now().Before(expires) || !time.Now().Before(c.PushExpiresAt) {
+		return nil, ErrConflict
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,invite_hash,invite_expires_at,certificate_expires_at,device_lock_allowed) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, id, scope.TenantID, siteID, name, digest([]byte(token)), expires, time.Now().AddDate(1, 0, 0), options.AllowMacDeviceLock)
 	if err != nil {
 		return nil, err
 	}
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.enrollment.invite", id); err != nil {
 		return nil, err
 	}
+	if options.AllowMacDeviceLock {
+		if err = audit(ctx, tx, scope.TenantID, actor, "apple.enrollment.device_lock.allow", id); err != nil {
+			return nil, err
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &Invitation{DeviceID: id, URL: c.PublicURL + "/mdm/apple/enroll/" + token, ExpiresAt: expires}, nil
+	return &Invitation{DeviceID: id, URL: c.PublicURL + "/mdm/apple/enroll/" + token, ExpiresAt: expires, DeviceLockAllowed: options.AllowMacDeviceLock}, nil
 }
 
 // EnrollmentProfile atomically consumes an invitation and returns a unique
@@ -287,9 +332,13 @@ func (s *Store) issueEnrollmentProfile(ctx context.Context, token, browser strin
 	var id string
 	var tenant int
 	var invitationExpiry time.Time
-	err = tx.QueryRowContext(ctx, `SELECT id,tenant_id,invite_expires_at FROM mdm_apple_devices WHERE invite_hash=$1 AND invite_expires_at>clock_timestamp() AND status='pending' FOR UPDATE`, digest([]byte(token))).Scan(&id, &tenant, &invitationExpiry)
+	var deviceLockAllowed bool
+	err = tx.QueryRowContext(ctx, `SELECT id,tenant_id,invite_expires_at,device_lock_allowed FROM mdm_apple_devices WHERE invite_hash=$1 AND invite_expires_at>clock_timestamp() AND status='pending' FOR UPDATE`, digest([]byte(token))).Scan(&id, &tenant, &invitationExpiry, &deviceLockAllowed)
 	if err != nil {
 		return nil, notFound(err)
+	}
+	if deviceLockAllowed && platform != PlatformMacOS {
+		return nil, ErrConflict
 	}
 	// Serialize identity issuance with settings renewal/origin changes. Once a
 	// profile has been issued, Configure must observe an active enrollment.
