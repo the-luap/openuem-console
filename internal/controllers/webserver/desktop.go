@@ -2,6 +2,7 @@ package webserver
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
 	"errors"
 	"log/slog"
@@ -37,7 +38,8 @@ func (w *WebServer) startDesktop(certFile, keyFile string) error {
 	address := os.Getenv("OPENUEM_AGENT_ENROLLMENT_LISTEN_ADDR")
 	directory := os.Getenv("OPENUEM_AGENT_RELEASES_DIRECTORY")
 	keysFile := os.Getenv("OPENUEM_AGENT_RELEASE_KEYS_FILE")
-	if address == "" && directory == "" && keysFile == "" {
+	bootstrapKeyFile := os.Getenv("OPENUEM_AGENT_BOOTSTRAP_KEY_FILE")
+	if address == "" && directory == "" && keysFile == "" && bootstrapKeyFile == "" {
 		return nil
 	}
 	if address == "" || directory == "" || keysFile == "" || w.Handler.Desktop == nil {
@@ -61,7 +63,15 @@ func (w *WebServer) startDesktop(certFile, keyFile string) error {
 	if err != nil {
 		return errors.New("desktop gateway trust configuration is invalid")
 	}
-	public, err := desktop.NewPublicHandler(w.Handler.Desktop, catalog, w.Handler.PublicOrigin, identity)
+	var bootstrapKey ed25519.PrivateKey
+	if bootstrapKeyFile != "" {
+		bootstrapKey, err = desktop.LoadBootstrapKey(bootstrapKeyFile)
+		if err != nil {
+			return err
+		}
+		defer clear(bootstrapKey)
+	}
+	public, err := desktop.NewPublicHandler(w.Handler.Desktop, catalog, w.Handler.PublicOrigin, identity, bootstrapKey)
 	if err != nil {
 		return err
 	}

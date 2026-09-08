@@ -6,7 +6,7 @@ claim. Shared proof, durable registry, broker authorization, gateway transport a
 worker request boundaries, service runtimes, scoped console administration and
 the public HTTPS claim/download protocol now have automated evidence. Protected
 Windows/macOS storage and durable HTTPS claim recovery also pass native CI. New
-console installation invitations, signed bootstrap integration, installers
+console installation invitations, native bootstrap activation, installers
 and production deployment wiring remain open.
 
 ## Source baselines
@@ -45,7 +45,15 @@ permissions; [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem
 It pins shared-library `2503532eb824`, whose read-only consumer helper also has
 [passing broker/database and Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34185830066).
 See [runtime configuration and limits](https://github.com/the-luap/openuem-agent/blob/1345f54bd894d4ac0804c31e450b2bcab19103d8/docs/individual-agent-runtime.md).
-Independent signed bootstrap authorization, installer integration, renewal,
+Library `d21252be66de` adds separate configuration/release signatures, strict
+configuration verification and immutable origin/target/checkpoint binding;
+[Linux and Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34187288931).
+Agent `e65091e` binds verified scope and release sequence to protected pending
+state, rejects rollback and rechecks configuration expiry after issuance before
+publishing an identity. Its [three-platform CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34187759140).
+The console now signs limited configurations with a dedicated protected key and
+serves an origin key document through the exact public TLS gateway routes.
+Native origin authorization, bootstrap activation, installer integration, renewal,
 signed updater commands, inherited handler execution bounds and reference
 console/deployment wiring remain open.
 
@@ -160,7 +168,7 @@ The console pins this version and uses those transactions for exact installer
 release binding and canonical-origin checks. PostgreSQL tests observe actual lock
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
-New console invitations, signed bootstrap configuration, endpoint runtime/bootstrap
+New console invitations, native bootstrap activation
 and reference deployment wiring remain open.
 
 ## Required boundaries

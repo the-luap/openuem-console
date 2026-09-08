@@ -3,6 +3,7 @@ package desktop
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -44,6 +45,8 @@ type PublicHandler struct {
 	requests                    sync.WaitGroup
 	lifetime                    context.Context
 	cancel                      context.CancelFunc
+	bootstrapKey                ed25519.PrivateKey
+	closeOnce                   sync.Once
 }
 
 type publicBucket struct {
@@ -51,13 +54,30 @@ type publicBucket struct {
 	last    time.Time
 }
 
-func NewPublicHandler(store *Store, catalog *Catalog, publicOrigin string, identity clientidentity.Policy) (*PublicHandler, error) {
+func NewPublicHandler(store *Store, catalog *Catalog, publicOrigin string, identity clientidentity.Policy, bootstrapKeys ...ed25519.PrivateKey) (*PublicHandler, error) {
 	if store == nil || catalog == nil || catalog.db != store.db || !canonicalEnrollmentOrigin(publicOrigin) {
 		return nil, errors.New("desktop enrollment requires a store, approved catalog and canonical HTTPS origin")
 	}
+	if len(bootstrapKeys) > 1 {
+		return nil, ErrBootstrapConfiguration
+	}
+	var bootstrapKey ed25519.PrivateKey
+	if len(bootstrapKeys) == 1 && len(bootstrapKeys[0]) != 0 {
+		key := bootstrapKeys[0]
+		if !validBootstrapKey(key) {
+			return nil, ErrBootstrapConfiguration
+		}
+		public := key.Public().(ed25519.PublicKey)
+		for _, releaseKey := range catalog.trusted {
+			if bytes.Equal(public, releaseKey) {
+				return nil, ErrBootstrapConfiguration
+			}
+		}
+		bootstrapKey = bytes.Clone(key)
+	}
 	u, _ := gateway.ParseOrigin(publicOrigin)
 	lifetime, cancel := context.WithCancel(context.Background())
-	return &PublicHandler{store: store, catalog: catalog, origin: publicOrigin, host: u.Host, identity: identity,
+	return &PublicHandler{store: store, catalog: catalog, origin: publicOrigin, host: u.Host, identity: identity, bootstrapKey: bootstrapKey,
 		claims: make(chan struct{}, 4), downloads: make(chan struct{}, 8), metadata: make(chan struct{}, 32),
 		clients: make(map[netip.Addr]publicBucket), global: rate.NewLimiter(100, 200), lifetime: lifetime, cancel: cancel}, nil
 }
@@ -65,11 +85,14 @@ func NewPublicHandler(store *Store, catalog *Catalog, publicOrigin string, ident
 // Close stops admission, cancels requests and joins all handlers before their
 // shared catalog/database can be closed. The owning server must also be closed.
 func (h *PublicHandler) Close() {
-	h.mu.Lock()
-	h.closed = true
-	h.cancel()
-	h.mu.Unlock()
-	h.requests.Wait()
+	h.closeOnce.Do(func() {
+		h.mu.Lock()
+		h.closed = true
+		h.cancel()
+		h.mu.Unlock()
+		h.requests.Wait()
+		clear(h.bootstrapKey)
+	})
 }
 
 // Server has bounded headers, bodies, idle connections and ordinary responses.
@@ -162,6 +185,14 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		publicJSON(w, r, metadata)
+		return
+	}
+	if route.Kind == "bootstrap-keys" {
+		h.bootstrapKeys(w, r)
+		return
+	}
+	if route.Kind == "configuration" {
+		h.configuration(w, r, route.Token)
 		return
 	}
 	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))

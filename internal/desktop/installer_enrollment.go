@@ -30,6 +30,9 @@ type InstallerInvitation struct {
 type InstallerMetadata struct {
 	Version         int                `json:"version"`
 	Organization    string             `json:"organization"`
+	Site            string             `json:"site"`
+	TenantID        int                `json:"tenant_id"`
+	SiteID          int                `json:"site_id"`
 	Platform        string             `json:"platform"`
 	Architecture    string             `json:"architecture"`
 	ExpiresAt       time.Time          `json:"expires_at"`
@@ -61,14 +64,14 @@ func (s *Store) InstallerMetadata(ctx context.Context, catalog *Catalog, token, 
 	}
 	digest := sha256.Sum256([]byte(token))
 	result := &InstallerMetadata{Version: enrollment.Version, ReleaseDigest: current.Digest()}
-	err = tx.QueryRowContext(ctx, `SELECT a.organization,i.platform,i.architecture,i.expires_at,i.max_uses-i.uses,r.envelope
+	err = tx.QueryRowContext(ctx, `SELECT a.organization,s.description,i.tenant_id,i.site_id,i.platform,i.architecture,i.expires_at,i.max_uses-i.uses,r.envelope
 		FROM uem_agent_invitations i
 		JOIN uem_desktop_invitation_releases b ON b.invitation_id=i.id
 		JOIN uem_desktop_releases r ON r.digest=b.release_digest
 		JOIN uem_agent_authorities a ON a.tenant_id=i.tenant_id
 		JOIN sites s ON s.id=i.site_id AND s.tenant_sites=i.tenant_id
 		WHERE i.token_hash=$1 AND b.release_digest=$2 AND a.public_origin=$3
-		AND i.revoked_at IS NULL AND i.expires_at>clock_timestamp() AND a.expires_at>clock_timestamp()`, hex.EncodeToString(digest[:]), current.Digest(), publicOrigin).Scan(&result.Organization, &result.Platform, &result.Architecture, &result.ExpiresAt, &result.AvailableUses, &result.ReleaseEnvelope)
+		AND i.revoked_at IS NULL AND i.expires_at>clock_timestamp() AND a.expires_at>clock_timestamp()`, hex.EncodeToString(digest[:]), current.Digest(), publicOrigin).Scan(&result.Organization, &result.Site, &result.TenantID, &result.SiteID, &result.Platform, &result.Architecture, &result.ExpiresAt, &result.AvailableUses, &result.ReleaseEnvelope)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, registry.ErrNotFound
 	}

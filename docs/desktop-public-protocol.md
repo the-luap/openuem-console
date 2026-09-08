@@ -3,8 +3,8 @@
 The console can run a separate, private HTTPS listener for individual Windows/Mac
 enrollment and approved installer downloads. The gateway exposes its exact routes
 on the canonical public HTTPS origin. No console routes are registered on this
-listener. This implements the server protocol; the signed bootstrap configuration,
-native installer/agent integration and user-facing installation page remain open.
+listener. It serves independently signed bootstrap configuration as well as the
+claim protocol. Native installer integration and the installation page remain open.
 The console does not yet offer a new installation-link form.
 
 ## Enable the private listener
@@ -46,6 +46,14 @@ supplied Ed25519 public keys and admit a release with the
 allowed at startup so an administrator can subsequently accept its first release.
 The listener never accepts release keys supplied by a request or its manifest.
 
+To enable signed configuration downloads, also set
+`OPENUEM_AGENT_BOOTSTRAP_KEY_FILE` to a protected, single PKCS#8 Ed25519 private-key
+PEM file. Provision it for the console service account using the platform's private
+file permissions. This dedicated server key must differ from every trusted release
+key; it is not an organization CA key. Invalid or reused keys prevent startup.
+Without this optional setting, the two bootstrap routes return 404. Key generation,
+distribution and rotation are currently operator-managed.
+
 ## Exact routes and responses
 
 Paths, methods, targets and tokens must be canonical. Query parameters, encoded
@@ -55,16 +63,19 @@ payload digest, not a package hash.
 
 | Method and path | Behavior |
 | --- | --- |
-| `GET /enroll/desktop/<token>/metadata` | Public organization, exact platform/architecture, expiry, remaining uses, approved artifact, original signed release envelope and download URL |
+| `GET /enroll/desktop/<token>/metadata` | Public organization/site labels and IDs, exact platform/architecture, expiry, remaining uses, approved artifact, original signed release envelope and download URL |
 | `HEAD /enroll/desktop/<token>/metadata` | The same availability check and representation headers without a body |
+| `GET` or `HEAD /enroll/desktop/bootstrap-keys` | Schema-1 key document containing the configured origin and current configuration signing public key with its SHA-256 key ID |
+| `GET` or `HEAD /enroll/desktop/<token>/configuration` | Signed configuration attachment binding the origin, organization/site, invitation, target, expiry and exact approved release envelope |
 | `POST /enroll/desktop/<token>/claim` | Validate both endpoint key proofs, claim the bound invitation and return the assigned individual identity and public certificates |
 | `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows` or `macos`, architecture is `amd64` or `arm64` |
 
 The base invitation URL is reserved for the future installation page and is not
-currently a public gateway route. Metadata and package reads do not reserve a use,
+currently a public gateway route. Metadata, configuration and package reads do not reserve a use,
 issue an identity or register a device. Metadata remains readable after all uses
 are consumed so a pending client can recover using its original keys. This grants
-no right to create another identity. Unknown, expired, revoked, superseded and
+no right to create another identity. Configuration remains available for the same
+recovery purpose. Unknown, expired, revoked, superseded and
 withdrawn invitations do not expose an active installation. Changed site ownership
 also makes the old invitation unavailable.
 
@@ -85,10 +96,20 @@ Release acceptance/withdrawal serializes with issuance: an already authorized
 claim may finish, while subsequent claims use the new committed release state.
 Release withdrawal does not revoke identities previously issued successfully.
 
-The release envelope authenticates **only the release manifest** under separately
-pinned release keys. It does not authenticate an embedded configuration signer,
-organization or origin. Native clients must independently authorize the expected
-server origin, verify HTTPS without redirecting credentials, verify the release
+The configuration signature uses a dedicated domain and key, distinct from the
+release signature. Clients must authorize the expected origin independently before
+fetching its key document over verified HTTPS. The origin/key inside a downloaded
+configuration cannot establish its own trust. The schema-1 key document uses
+`keys: [{"key_id": "<SHA-256>", "public_key": "<unpadded standard base64>"}]`.
+The shared `bootstrap.Verify` requires the authorized origin, authenticated
+configuration keys, independently pinned release keys, target and release checkpoint.
+It verifies both signatures and their origin, scope, lifetime and release binding.
+Configuration expiry cannot exceed invitation or release expiry. Current database
+state is checked again during claims; a downloaded configuration does not override
+withdrawal or revocation.
+
+Native clients must independently authorize the expected server origin, verify
+HTTPS without redirecting credentials, verify the release
 signature/checkpoint/package and verify the operating system's native code
 signature. The shared `enrollment.NewHTTPClient` now performs the bounded HTTPS
 claim and validates the returned identity against the local CSR key and expected
@@ -114,7 +135,8 @@ present, Origin must exactly match the configured public origin; `null`, foreign
 origins and browser cross-origin Fetch Metadata are rejected. Claims require JSON
 and both key proofs and do not use browser cookies or HTTP authorization headers.
 
-The listener admits at most 4 claims, 8 downloads and 32 metadata requests at once.
+The listener admits at most 4 claims, 8 downloads and 32 metadata/configuration/key
+document requests at once.
 It applies a global 100 requests/second, burst-200 limiter and per-source
 2 requests/second, burst-30 limit, with at most 4096 source buckets. IPv6 sources
 share a /64 bucket. Forwarded source addresses are used only from a pinned gateway
@@ -125,7 +147,7 @@ with `Retry-After: 5`. These initial limits are fixed in the implementation.
 Headers are bounded to 32 KiB. Claims have a 10-second body read deadline and a
 20-second request context; the body deadline is cleared once its bounded input is
 complete, so HTTP/2 does not reset a valid claim during a database wait. Metadata
-also has a 20-second context. Ordinary server
+and both bootstrap routes also have a 20-second context. Ordinary server
 responses have a 60-second write deadline. Only an admitted download receives a
 15-minute context/write deadline, on both TLS legs. The gateway admits at most
 16 concurrent downloads, including requests awaiting the backend. Shutdown cancels
@@ -155,6 +177,10 @@ The subsequent shared client at library commit `d6129ce9fe9b` passed
 published client against the actual private handler, two TLS legs and PostgreSQL
 registry. It verifies current release binding, certificate/key/origin validation,
 one-identity recovery after reconstructing the client and withdrawal rejection.
+It also fetches origin keys, verifies the independently signed configuration and
+checks the selected package through the real public TLS gateway. Separate tests
+cover GET/HEAD without invitation use, disabled signing, key-role reuse, protected
+key-file parsing, revoked invitations and withdrawn releases.
 Its keys are retained in test memory. The related agent's separate native storage
 suite now covers DPAPI and isolated Keychain recovery after a lost HTTPS response;
 see [desktop integration evidence](desktop-enrollment-plan.md).
@@ -167,5 +193,5 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
 ```
 
 These are server-side protocol and build checks. Signed installer execution,
-native runtime/bootstrap integration, user-facing consent and physical endpoint
+native bootstrap activation, user-facing consent and physical endpoint
 acceptance remain separate implementation and verification work.

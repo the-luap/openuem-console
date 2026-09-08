@@ -50,7 +50,7 @@ func desktopStore(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if _, err = db.Exec(`CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT NOT NULL REFERENCES tenants(id)); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(1,1),(2,2),(3,1)`); err != nil {
+	if _, err = db.Exec(`CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT NOT NULL REFERENCES tenants(id),description TEXT NOT NULL DEFAULT 'Isolated site'); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites(id,tenant_sites) VALUES(1,1),(2,2),(3,1)`); err != nil {
 		t.Fatal(err)
 	}
 	store, err := NewStore(db, "isolated-desktop-metadata-master-key")

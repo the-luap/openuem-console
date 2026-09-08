@@ -2,8 +2,13 @@ package desktop
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
@@ -11,6 +16,8 @@ import (
 	"time"
 
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/artifacts"
+	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/gateway"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
@@ -41,7 +48,12 @@ func TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	public, err := NewPublicHandler(f.store, f.catalog, origin, policy)
+	_, signingKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(signingKey)
+	public, err := NewPublicHandler(f.store, f.catalog, origin, policy, signingKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +76,47 @@ func TestNativeEnrollmentClientClaimsAndRecoversThroughThePinnedGateway(t *testi
 	publicServer.StartTLS()
 	serverRoots := x509.NewCertPool()
 	serverRoots.AddCert(publicServer.Certificate())
+	// Authenticate the key document through TLS to the independently selected
+	// origin. Neither a key nor an origin embedded in the configuration is trusted.
+	httpsClient := publicServer.Client()
+	httpsClient.Timeout = 5 * time.Second
+	keyResponse, err := httpsClient.Get(origin + "/enroll/desktop/bootstrap-keys")
+	if err != nil {
+		t.Fatal("could not fetch the authenticated bootstrap key document")
+	}
+	var keyDocument bootstrapKeyDocument
+	err = json.NewDecoder(io.LimitReader(keyResponse.Body, 8192)).Decode(&keyDocument)
+	keyResponse.Body.Close()
+	if err != nil || keyResponse.StatusCode != 200 || keyDocument.Schema != 1 || keyDocument.Origin != origin || len(keyDocument.Keys) != 1 {
+		t.Fatal("invalid origin key document")
+	}
+	configKey, err := base64.RawStdEncoding.Strict().DecodeString(keyDocument.Keys[0].PublicKey)
+	if err != nil || len(configKey) != ed25519.PublicKeySize || artifacts.KeyID(configKey) != keyDocument.Keys[0].KeyID {
+		t.Fatal("invalid origin key fingerprint")
+	}
+	configResponse, err := httpsClient.Get(invitation.URL + "/configuration")
+	if err != nil {
+		t.Fatal("could not fetch the signed configuration through the gateway")
+	}
+	configuration, err := io.ReadAll(io.LimitReader(configResponse.Body, bootstrap.MaxEnvelopeSize+1))
+	configResponse.Body.Close()
+	if err != nil || configResponse.StatusCode != 200 {
+		t.Fatal("signed configuration was unavailable")
+	}
+	verified, err := bootstrap.Verify(configuration, bootstrap.Trust{Origin: origin, BootstrapKeys: []ed25519.PublicKey{configKey}, ReleaseKeys: []ed25519.PublicKey{f.public}, Checkpoint: release.Checkpoint(), Platform: "windows", Architecture: "amd64"}, time.Now())
+	clear(configuration)
+	if err != nil || verified.Config().TenantID != 3 || verified.Config().SiteID != 4 {
+		t.Fatal("live signed configuration did not bind the expected scope", err)
+	}
+	packageResponse, err := httpsClient.Get(verified.DownloadURL())
+	if err != nil {
+		t.Fatal("could not download the configured package")
+	}
+	err = verified.VerifyPackage(packageResponse.Body)
+	packageResponse.Body.Close()
+	if err != nil || packageResponse.StatusCode != 200 {
+		t.Fatal("configured package did not match its separately signed release", err)
+	}
 	client, err := enrollment.NewHTTPClient(origin, serverRoots)
 	if err != nil {
 		t.Fatal(err)

@@ -3,7 +3,7 @@
 The gateway implements Apple/administrator routing, an optional native-agent
 WSS route and bounded desktop enrollment/download routes for NET-01 and SEC-01.
 It is not yet the complete one-port distribution:
-production agent enrollment integration, signed bootstrap configuration,
+production installer integration,
 Windows MDM routes, automated certificate provisioning, rate limits and a complete
 reference deployment remain open in [implementation status](implementation-status.md).
 
@@ -45,11 +45,13 @@ The current public allowlist contains only:
   explicit private agent backend is configured
 - `GET` and `HEAD /enroll/desktop/<canonical token>/metadata`, and
   `POST /enroll/desktop/<canonical token>/claim`, when `--desktop-url` is configured
+- `GET` and `HEAD /enroll/desktop/bootstrap-keys` and
+  `/enroll/desktop/<canonical token>/configuration`, when `--desktop-url` is configured
 - `GET` and `HEAD /enroll/desktop/releases/<release digest>/<platform>/<architecture>`
   when `--desktop-url` is configured; exact supported targets and no query parameters
 
 See [desktop protocol operations](desktop-public-protocol.md) for its independent
-private TLS listener, JSON proof, signed release admission, read-only downloads,
+private TLS listener, JSON proof, separate configuration/release signatures, read-only downloads,
 rate/concurrency limits and bounded transfer deadlines. Its invitation landing
 page and native bootstrap/installer integration remain open.
 
