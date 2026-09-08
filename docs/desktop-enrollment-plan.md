@@ -53,6 +53,15 @@ state, rejects rollback and rechecks configuration expiry after issuance before
 publishing an identity. Its [three-platform CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34187759140).
 The console now signs limited configurations with a dedicated protected key and
 serves an origin key document through the exact public TLS gateway routes.
+Library `126bca15f12f` adds native configuration/package downloads with exact-origin
+paths, bounded streams and post-transfer expiry checks; [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
+Console `a52b948` exercises those methods through its actual public gateway and
+PostgreSQL issuer; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34190576115).
+Agent `5076ec5` stages the package privately, checks native Authenticode/notarization,
+rehashes the same opened file and cleans up only owned staging. Its
+[Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34191314823),
+including actual Windows acceptance of a licensed embedded-signature test fixture
+and rejection after byte modification. No fixture package is installed or executed.
 Native origin authorization, bootstrap activation, installer integration, renewal,
 signed updater commands, inherited handler execution bounds and reference
 console/deployment wiring remain open.

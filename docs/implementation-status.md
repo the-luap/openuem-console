@@ -74,6 +74,17 @@ the table's package summaries do not remove any detail from the roadmap.
   Native installation and origin
   authorization remain open.
 
+- Agent `0a1b28d` adds bounded native signature verification: Windows Authenticode
+  with revocation checks and macOS's explicit notarized Developer ID assessment.
+  Its [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34190740402).
+  Agent `5076ec5` connects exact-origin package downloads to private staging,
+  descriptor-bound hashing before/after native verification, checkpoint checks,
+  cancellation and conservative cleanup; [all three CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34191314823).
+  Windows exercises the complete staging path with the Go project's licensed
+  embedded-signature fixture, without running it. Real release signing,
+  installed-executable binding, native bootstrap/activation and device acceptance
+  remain open. See [staging implementation](https://github.com/the-luap/openuem-agent/blob/5076ec5b57d6ee0ce297152d6cf39189cea5d9a8/docs/bootstrap-package-staging.md).
+
 - `internal/desktop/public_http.go`, `internal/desktop/protocol` and the optional console
   TLS listener expose read-only metadata/configuration/key documents, strict endpoint-key claims and approved
   package downloads through the exact gateway allowlist. Real PostgreSQL/TLS race
