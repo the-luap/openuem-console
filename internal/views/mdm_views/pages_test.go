@@ -85,17 +85,30 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	mac.PerUserConnections = true
 	macDetail.Users = []apple.UserChannel{*user}
 	filevault := macDetail
-	filevault.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "active", KeyID: "e0000000-0000-4000-8000-000000000001", EscrowedAt: &now}
+	filevault.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "active", KeyID: "e0000000-0000-4000-8000-000000000001", EscrowedAt: &now, ValidationReady: true}
 	filevault.FileVaultKeys = []apple.FileVaultKeyHistory{{ID: filevault.FileVault.KeyID, Current: true, CreatedAt: now, ObservedAt: now}}
 	filevault.Commands = []apple.Command{{ID: "e0000000-0000-4000-8000-000000000002", FileVault: true, Status: "failed", RequestType: "InstallProfile"}}
 	filevaultFailure := filevault
 	filevaultFailure.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "failed", Error: "escrow_profile_missing"}
+	validationDetail := func(status string) Detail {
+		d := filevault
+		v := *filevault.FileVault
+		v.Validation = &apple.FileVaultValidation{ID: "e0000000-0000-4000-8000-000000000003", Status: status, CreatedAt: now, CompletedAt: &now}
+		if status != "queued" {
+			v.VerifiedAt = &now
+		}
+		d.FileVault = &v
+		return d
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
-		{"mac-filevault", DeviceDetails(c, info, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume", "Retrieve recovery key", "Disk encryption remains enabled"}},
+		{"mac-filevault", DeviceDetails(c, info, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume", "Retrieve recovery key", "Disk encryption remains enabled", "Validate current recovery key"}},
+		{"mac-filevault-validation-queued", DeviceDetails(c, info, validationDetail("queued")), []string{"Waiting for the Mac to validate the current key"}},
+		{"mac-filevault-validation-valid", DeviceDetails(c, info, validationDetail("valid")), []string{"Validated on", "Validate current recovery key"}},
+		{"mac-filevault-validation-invalid", DeviceDetails(c, info, validationDetail("invalid")), []string{"does not unlock its volume", "Validate current recovery key"}},
 		{"mac-filevault-reader", DeviceDetails(c, &reader, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume"}},
 		{"mac-filevault-failed", DeviceDetails(c, info, filevaultFailure), []string{"Encryption activation was not queued", "Enable FileVault with recovery escrow"}},
 		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "Apple profiles"}},
@@ -120,8 +133,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
-			if tc.name == "mac-filevault-reader" && (strings.Contains(html, "Retrieve recovery key") || strings.Contains(html, "Remove management profiles")) {
+			if tc.name == "mac-filevault-reader" && (strings.Contains(html, "Retrieve recovery key") || strings.Contains(html, "Remove management profiles") || strings.Contains(html, "Validate current recovery key")) {
 				t.Fatal("viewer has FileVault controls")
+			}
+			if tc.name == "mac-filevault-validation-queued" && strings.Contains(html, "Validate current recovery key") {
+				t.Fatal("queued validation exposed duplicate form")
 			}
 			if tc.name == "mac-filevault" && strings.Contains(html, filevault.Commands[0].ID+"/retry") {
 				t.Fatal("FileVault command exposes generic retry")

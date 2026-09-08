@@ -21,6 +21,7 @@ func TestFileVaultRoutesRequireDedicatedCapabilities(t *testing.T) {
 	for path, want := range map[string]access.Capability{
 		"/ios/:id/filevault":                  access.ManageDeviceSecurity,
 		"/ios/:id/filevault/keys/:key/reveal": access.RetrieveRecoveryKeys,
+		"/ios/:id/filevault/keys/:key/verify": access.ManageDeviceSecurity,
 	} {
 		for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 			if got, ok := appleCapability("POST", prefix+path); !ok || got != want {
@@ -48,7 +49,7 @@ func exerciseAppleFileVault(t *testing.T, h *Handler, ctx context.Context, tenan
 	base := fmt.Sprintf("/tenant/%d/site/%d/ios/%s", tenant, site, invite.DeviceID)
 	keyID := uuid.NewString()
 	for _, user := range []string{"scoped-viewer", "scoped-operator"} {
-		for _, suffix := range []string{"/filevault", "/filevault/keys/" + keyID + "/reveal"} {
+		for _, suffix := range []string{"/filevault", "/filevault/keys/" + keyID + "/reveal", "/filevault/keys/" + keyID + "/verify"} {
 			if rec := request(user, "POST", base+suffix, url.Values{"desired": {"enabled"}}); rec.Code != 403 {
 				t.Fatal("unauthorized FileVault mutation", user, rec.Code)
 			}
@@ -123,4 +124,5 @@ func exerciseAppleFileVault(t *testing.T, h *Handler, ctx context.Context, tenan
 	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_audit WHERE action='apple.filevault.key.reveal' AND resource_id=$1 AND details->>'site_id'=$2 AND actor='organization-admin'`, keyID, fmt.Sprint(site)).Scan(&count); err != nil || count != 1 {
 		t.Fatal("recovery read audit missing", count, err)
 	}
+	exerciseFileVaultValidation(t, h, ctx, scope, invite.DeviceID, keyID, base, sibling, request, artifact)
 }

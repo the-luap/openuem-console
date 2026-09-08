@@ -1,8 +1,8 @@
 # FileVault profiles and recovery escrow
 
 The Mac device page can stage FileVault activation, receive encrypted personal
-recovery keys and audit administrator retrieval. This is part of MAC-02, not its
-completion: console integration of key validation against the volume, recovery-key rotation,
+recovery keys, validate them through the linked Mac agent and audit administrator
+retrieval. This is part of MAC-02, not its completion: recovery-key rotation,
 escrow certificate rotation and physical Mac acceptance remain open.
 
 ## Policy lifecycle
@@ -42,8 +42,21 @@ An already encrypted Mac may not provide a new personal key merely because an
 escrow profile was installed. It may require key rotation; this implementation
 does not yet initiate rotation. The console keeps encryption, installed policy,
 key escrow and key validation as separate states. Keys remain **Not yet validated
-against the Mac volume** until console task authorization and signed-result
-reconciliation are connected to the agent validation transport described below.
+against the Mac volume** until the linked Mac agent returns an authenticated
+successful check and the console accepts that result.
+
+An organization or server administrator can select **Validate current recovery
+key**. This action checks the exact key version shown on the page, requires a
+current individual Mac agent with a registered recovery recipient and a verified
+MDM association, and sends an encrypted request that expires within 15 minutes.
+Both channels need recent, matching hardware inventory. The action does not
+return the key to the browser or change disk encryption. Duplicate submissions
+reuse a pending request. Refresh the device page to see its eventual outcome.
+
+The page distinguishes a valid key from an invalid key, an unavailable check,
+an unsupported agent, expiry, cancellation and an unauthenticated response. A
+later negative check is shown even if an earlier check succeeded; the last
+successful timestamp remains historical evidence in recovery-key history.
 
 ## Agent validation transport
 
@@ -64,12 +77,26 @@ is cleared before sending; lost acknowledgments retry the signed receipt only.
 The worker commits that receipt and its audit record together, scrubs terminal
 ciphertext and periodically erases stale tasks even for offline agents.
 
-The console does not yet create these tasks or mark escrowed keys verified from
-their receipts. That next step must transactionally authorize security management,
-recheck the current canonical native/agent association and key version, and verify
-the signed result against the still-current certificate and recipient. Late,
-foreign, revoked or superseded results must not validate the current key. Native
-recovery-key rotation and physical volume acceptance remain separate open work.
+Native migration 016 stores the console's independent expectations for every
+request. Queueing holds the administrator's security permission through commit,
+then serializes against channel attachment, native enrollment, agent identity
+and inventory changes. The console checks the native and agent channels, current
+key version, organization/site, recipient epoch, certificate and hardware again
+before accepting a receipt. It independently verifies the RSA signature and
+expected nonce hash; a routing worker cannot turn an invalid result into success.
+Both queueing and completion commit their audit events in the same transaction.
+
+Maintenance processes up to 25 due checks per pass and fairly reschedules pending
+requests. Revoked, expired, replaced or conflicting identities cancel the check;
+a newer escrow key supersedes the old request. Pending ciphertext is erased on
+cancellation. An authenticated result received before its deadline can be accepted
+after a console delay only if the current key and both identities still match.
+The recorded validation time is the original result time, not the later processing
+time. Historical keys and previous successful timestamps are never discarded by
+a failed check. Native-only deployments remain usable without agent tables.
+
+This is an authenticated OS report, not hardware attestation. Recovery-key
+rotation, escrow-certificate rotation and physical volume acceptance remain open.
 
 ## Recovery access
 
@@ -113,5 +140,15 @@ Synthetic cryptographic tests and fuzzing cover malformed envelopes, recipient
 binding, truncation, nesting limits and cipher interoperability. PostgreSQL tests
 exercise profile ordering, receipt isolation, scoped encryption, history,
 retention, audit rollback and competing assignments. Console tests cover roles,
-CSRF, retrieval headers, read auditing and secret-free device pages. These tests
-do not establish interoperability or recovery on a physical Mac.
+CSRF, retrieval headers, read auditing and secret-free device pages.
+
+Validation tests exercise the real encrypted task and signed receipt protocol,
+concurrent request deduplication, all endpoint outcomes, independent receipt
+tampering, permission revocation, identity and recipient changes, key replacement,
+site conflicts and transactional audit failures. They also cover certificate
+expiry while waiting for a database lock and timely receipts processed after the
+task deadline. Router tests verify scoped POST-only actions, CSRF and role-aware
+states. Browser checks cover six rendered states at 390, 768 and 1440 pixels,
+including keyboard submission and history expansion. No test invokes the host's
+FileVault command. These tests do not establish interoperability or recovery on a
+physical Mac.

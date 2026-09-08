@@ -33,11 +33,7 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 				</dd>
 				<dt>Recovery key validation</dt>
 				<dd>
-					if detail.FileVault!=nil && detail.FileVault.VerifiedAt!=nil {
-						{ "Validated on " + When(detail.FileVault.VerifiedAt) }
-					} else {
-						Not yet validated against the Mac volume
-					}
+					{ FileVaultValidationState(detail.FileVault) }
 				</dd>
 			</dl>
 			if detail.FileVault!=nil {
@@ -50,6 +46,19 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 			}
 			<p>OpenUEM installs and confirms the recovery escrow profile before requesting FileVault activation. The Mac user completes deferred activation at login or logout, with up to three login deferrals, and is shown their recovery key.</p>
 			<p>Already encrypted Macs may need a recovery key rotation before they report a key for this escrow destination. A stored key is not proof that it unlocks the volume.</p>
+			if info.Can(access.ManageDeviceSecurity) && detail.FileVault!=nil && detail.FileVault.KeyID!="" && detail.Device.Status=="enrolled" {
+				if detail.FileVault.Validation==nil || detail.FileVault.Validation.Status!="queued" {
+					if detail.FileVault.ValidationReady {
+						<form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/filevault/keys/"+detail.FileVault.KeyID+"/verify") }>
+							@CSRF(info)
+							<p class="mb-4">The linked Mac agent checks the latest stored key without changing disk encryption. The request expires within 15 minutes.</p>
+							<button class="uk-button uk-button-default" type="submit">Validate current recovery key</button>
+						</form>
+					} else {
+						<p class="uk-text-muted">Validation requires a current individual Mac agent, its verified MDM association and recent hardware inventory.</p>
+					}
+				}
+			}
 			if info.Can(access.ManageDeviceSecurity) && detail.Device.Status=="enrolled" {
 				if detail.FileVault==nil || detail.FileVault.Phase=="failed" || detail.FileVault.Phase=="removed" || detail.FileVault.Phase=="not_managed" {
 					if reason:=detail.Device.FileVaultReason(time.Now()); reason!="" {
@@ -91,6 +100,9 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 									</strong>{ " · " + When(&key.CreatedAt) }
 								</p>
 								<p class="mt-2">{ "Last received: " + When(&key.ObservedAt) }</p>
+								if key.VerifiedAt!=nil {
+									<p class="mt-2">{ "Last successful validation: "+When(key.VerifiedAt) }</p>
+								}
 								<form class="mt-2" method="post" target="_blank" rel="noopener noreferrer" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/filevault/keys/"+key.ID+"/reveal") }>
 									@CSRF(info)
 									<button class="uk-button uk-button-default" type="submit">Retrieve recovery key</button>

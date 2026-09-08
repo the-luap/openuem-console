@@ -17,16 +17,18 @@ import (
 // FileVault contains lifecycle metadata only. Neither CMS envelopes nor
 // decrypted keys are part of device inventory, command history or this model.
 type FileVault struct {
-	DeviceID      string     `json:"device_id"`
-	Desired       string     `json:"desired"`
-	Phase         string     `json:"phase"`
-	Error         string     `json:"error"`
-	RecoveryError string     `json:"recovery_error"`
-	KeyID         string     `json:"key_id,omitempty"`
-	EscrowedAt    *time.Time `json:"escrowed_at"`
-	ObservedAt    *time.Time `json:"observed_at"`
-	VerifiedAt    *time.Time `json:"verified_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	Validation      *FileVaultValidation `json:"validation,omitempty"`
+	ValidationReady bool                 `json:"validation_ready"`
+	DeviceID        string               `json:"device_id"`
+	Desired         string               `json:"desired"`
+	Phase           string               `json:"phase"`
+	Error           string               `json:"error"`
+	RecoveryError   string               `json:"recovery_error"`
+	KeyID           string               `json:"key_id,omitempty"`
+	EscrowedAt      *time.Time           `json:"escrowed_at"`
+	ObservedAt      *time.Time           `json:"observed_at"`
+	VerifiedAt      *time.Time           `json:"verified_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
 }
 
 type FileVaultKeyHistory struct {
@@ -58,11 +60,12 @@ func (s *Store) FileVaultKeyHistory(ctx context.Context, scope Scope, device str
 }
 
 func (s *Store) FileVault(ctx context.Context, scope Scope, id string) (*FileVault, error) {
-	if _, err := s.Device(ctx, scope, id); err != nil {
+	d, err := s.Device(ctx, scope, id)
+	if err != nil {
 		return nil, err
 	}
 	v := &FileVault{}
-	err := s.db.QueryRowContext(ctx, `SELECT p.device_id,p.desired,
+	err = s.db.QueryRowContext(ctx, `SELECT p.device_id,p.desired,
  CASE WHEN c.status IN ('failed','expired','cancelled') AND p.phase NOT IN ('active','removed','not_managed','failed') THEN 'failed' ELSE p.phase END,
  CASE WHEN c.status IN ('failed','expired','cancelled') AND p.error='' THEN 'command_failed' ELSE p.error END,
  p.recovery_error,COALESCE(p.current_key_id::text,''),k.created_at,k.observed_at,k.verified_at,p.updated_at
@@ -71,6 +74,9 @@ func (s *Store) FileVault(ctx context.Context, scope Scope, id string) (*FileVau
  WHERE p.device_id=$1 AND p.tenant_id=$2 AND ($3=0 OR p.site_id=$3)`, id, scope.TenantID, scope.SiteID).Scan(&v.DeviceID, &v.Desired, &v.Phase, &v.Error, &v.RecoveryError, &v.KeyID, &v.EscrowedAt, &v.ObservedAt, &v.VerifiedAt, &v.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
+	}
+	if err == nil {
+		err = s.fileVaultValidationMetadata(ctx, d, v)
 	}
 	return v, err
 }

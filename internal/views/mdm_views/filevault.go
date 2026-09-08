@@ -68,3 +68,32 @@ func FileVaultEncryption(d *apple.Device) string {
 	}
 	return "Not yet reported"
 }
+
+func FileVaultValidationState(v *apple.FileVault) string {
+	if v == nil || v.Validation == nil {
+		if v != nil && v.VerifiedAt != nil {
+			return "Last validated on " + When(v.VerifiedAt)
+		}
+		return "Not yet validated against the Mac volume"
+	}
+	switch v.Validation.Status {
+	case "queued":
+		return "Waiting for the Mac to validate the current key"
+	case "valid":
+		return "Validated on " + When(v.Validation.CompletedAt)
+	case "invalid":
+		return "The Mac reported that this key does not unlock its volume"
+	case "unavailable":
+		return "The Mac could not complete the check. Inspect the agent and retry."
+	case "unsupported":
+		return "This check requires the current root Mac agent"
+	case "expired":
+		return "The verification request expired. Check agent connectivity and retry."
+	case "rejected":
+		return "The verification response could not be authenticated. Retry with the current agent."
+	case "superseded":
+		return "A newer recovery key replaced this request"
+	default:
+		return "Verification cancelled because the device or agent connection changed"
+	}
+}
