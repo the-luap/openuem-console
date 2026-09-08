@@ -8,9 +8,9 @@ the public HTTPS claim/download protocol now have automated evidence. Protected
 Windows/macOS storage and durable HTTPS claim recovery also pass native CI. The
 console now creates scoped release-bound invitations for the native enrollment
 command and serves administrator-assisted public installation instructions.
-The agent also has a separate Windows activation command for completed protected
-identities. macOS activation, finished installers and production deployment wiring
-remain open.
+The agent has separate Windows and macOS activation flows for completed protected
+identities. Finished installers, positive signed-release acceptance and production
+deployment wiring remain open.
 
 ## Source baselines
 
@@ -32,8 +32,11 @@ protected credentials. [Windows activation](https://github.com/the-luap/openuem-
 adds private operational configuration, exact automatic Local System registration
 and local readiness after enrollment. It retains identity state and registration
 on startup failure. The admitted executable hash is stored with the identity and
-checked again by the runtime. Unbound-record migration, authorized binary updates,
-macOS activation and finished installer integration remain open.
+checked again by the runtime. [macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) validates the installed app seal,
+Developer ID/notarization and native bundle context, registers its bundled daemon,
+reports pending administrator approval and requires an authenticated local readiness
+proof. Unbound-record migration, authorized binary updates, positive signed-release
+Mac acceptance and finished installer integration remain open.
 
 Library commit `d6129ce9fe9b` adds a bounded HTTPS claim client and strict returned
 certificate/key/device/origin validation, with generic errors and no redirects,
@@ -95,7 +98,7 @@ without another claim. [Windows/macOS/Linux CI passed](https://github.com/the-lu
 including full builds and native command help without service startup. Tests never
 install or execute fixture packages. See [command authorization, recovery and limits](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
 
-Service activation, guided end-user consent, installer integration, renewal,
+Positive signed-release activation acceptance, guided end-user consent, installer integration, renewal,
 signed updater commands, inherited handler execution bounds and reference
 console/deployment wiring remain open.
 
@@ -211,7 +214,7 @@ release binding and canonical-origin checks. PostgreSQL tests observe actual loc
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
 The later console form and public instructions now use these transactions.
-macOS service activation and reference deployment wiring remain open.
+Signed-release macOS registration/approval acceptance and reference deployment wiring remain open.
 
 ## Required boundaries
 

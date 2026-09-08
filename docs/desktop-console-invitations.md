@@ -6,8 +6,9 @@ to the [native agent enrollment command](https://github.com/the-luap/openuem-age
 It is an administrator workflow with a [public installation page](desktop-public-protocol.md)
 for each created link. Finished signed end-user installers, guided native consent
 and installer-driven activation remain open. Administrators can use the separate
-[Windows activation command](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md)
-after completed enrollment; macOS service registration is still outstanding.
+[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md) and
+[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) commands after completed enrollment. Positive macOS
+registration/approval acceptance with the final signed release remains outstanding.
 
 ## Availability and scope
 

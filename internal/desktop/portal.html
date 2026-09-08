@@ -24,7 +24,8 @@
 <p>These files are for the installed agent's native <code>enroll</code> command. Securely provision the invitation into a private file for the elevated administrator or root account. Authorize the server and organization/site IDs independently, and use release public keys from your trusted release pipeline.</p>
 <div class="downloads"><a class="button secondary" href="{{.InvitationURL}}" download>Download invitation file</a><a class="button secondary" href="{{.ConfigurationURL}}" download>Download signed configuration</a></div>
 <p class="muted">The invitation is limited and sensitive. Share it only with the intended administrator. The signed configuration does not supply a permanent device private key or establish its own release trust.</p>
-<p>The native command prepares protected credentials. Your IT administrator must then activate the agent service and verify that the computer appears online in the management console.</p>
+<p>After enrollment, your IT administrator runs the installed agent's <code>activate</code> command with the same protected identity directory. Verify that the computer appears online in the management console.</p>
+{{if .Mac}}<p>If macOS requests background-service approval, an administrator must allow OpenUEM Agent in System Settings &gt; General &gt; Login Items, then retry activation. A pending approval does not mean the agent is running.</p>{{end}}
 </details>
 {{else}}
 <section aria-labelledby="unavailable-title"><h2 id="unavailable-title">Enrollment is not ready</h2><p>Your administrator must configure a compatible approved agent release and signed enrollment configuration before this invitation can be used.</p></section>

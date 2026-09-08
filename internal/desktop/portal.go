@@ -32,6 +32,7 @@ type portalData struct {
 	PackageURL, InvitationURL   string
 	ConfigurationURL            string
 	Available, Compatible       bool
+	Mac                         bool
 }
 
 func (h *PublicHandler) portal(w http.ResponseWriter, r *http.Request, route protocol.Route) {
@@ -68,6 +69,7 @@ func (h *PublicHandler) portal(w http.ResponseWriter, r *http.Request, route pro
 	data.Release, data.Expires = release.Manifest().Version, metadata.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC")
 	data.Target = "Windows (x64)"
 	if metadata.Platform == "macos" {
+		data.Mac = true
 		data.Target = "Mac (Intel)"
 		if metadata.Architecture == "arm64" {
 			data.Target = "Mac (Apple silicon)"

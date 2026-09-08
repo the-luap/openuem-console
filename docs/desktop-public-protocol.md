@@ -6,10 +6,11 @@ on the canonical public HTTPS origin. No console routes are registered on this
 listener. It serves independently signed bootstrap configuration as well as the
 claim protocol. The [console invitation form](desktop-console-invitations.md) now
 provides an administrator-assisted public installation page and limited token-file
-download. The agent provides a separate administrator
-[Windows activation command](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md).
-Finished native installers, their automatic activation flow and macOS service
-registration remain open.
+download. The agent provides separate administrator
+[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md) and
+[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) commands. The Mac flow distinguishes native approval
+from authenticated local readiness. Finished native installers, their automatic
+activation flow and positive signed-release registration acceptance remain open.
 
 ## Enable the private listener
 
@@ -272,5 +273,5 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
 ```
 
 These are server-side protocol and build checks. Signed installer execution,
-native bootstrap activation, user-facing consent and physical endpoint
+production activation acceptance, user-facing consent and physical endpoint
 acceptance remain separate implementation and verification work.
