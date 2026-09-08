@@ -17,10 +17,14 @@ CREATE FUNCTION mdm_apple_enrollment_rights_guard() RETURNS trigger LANGUAGE plp
 DECLARE
  allowed BOOLEAN;
  platform TEXT;
+ expected_rights BIGINT := 7955;
 BEGIN
  SELECT device_lock_allowed,enrollment_platform INTO allowed,platform
  FROM mdm_apple_devices WHERE id=NEW.device_id AND tenant_id=NEW.tenant_id;
- IF allowed IS NULL OR NEW.access_rights <> CASE WHEN allowed THEN 7959 ELSE 7955 END
+ IF allowed THEN
+  expected_rights := 7959;
+ END IF;
+ IF allowed IS NULL OR NEW.access_rights <> expected_rights
     OR (allowed AND platform <> 'macos') THEN
   RAISE EXCEPTION 'Enrollment access rights do not match the invitation';
  END IF;
