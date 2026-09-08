@@ -73,6 +73,17 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	cleanup := linked
 	cleanup.MacBinding = &apple.MacBinding{Status: "consumed", ExpiresAt: now.Add(time.Hour), InstalledAt: &now, CompletedAt: &now, CleanupAttempts: 1, CleanupStatus: "queued"}
 	cleanup.Commands = []apple.Command{{ID: "90000000-0000-4000-8000-000000000001", RequestType: "RemoveProfile", Status: "failed", MacBinding: true}}
+
+	user := &apple.UserChannel{ID: "a0000000-0000-4000-8000-000000000001", DeviceID: mac.ID, UserID: "b0000000-0000-4000-8000-000000000001", ShortName: "alice", LongName: "Alice Example", Status: "enrolled", PushStatus: "accepted", LastSeen: now, ProfilesAt: &now, InstalledProfiles: []apple.InstalledProfile{{Identifier: "com.example.user", UUID: "c0000000-0000-4000-8000-000000000001", Name: "User preferences", Managed: true}}}
+	userProfile := p
+	userProfile.Scope = "User"
+	userDetail := UserDetail{Device: &mac, User: user, Profiles: []apple.Profile{p, userProfile}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: "User preferences", Revision: 2, Desired: "installed", Status: "verified"}}, Commands: []apple.Command{{ID: "d0000000-0000-4000-8000-000000000001", RequestType: "ProfileList", Status: "failed", CreatedAt: now}}}
+	pausedUser := *user
+	pausedUser.Status = "blocked"
+	pausedDetail := userDetail
+	pausedDetail.User = &pausedUser
+	mac.PerUserConnections = true
+	macDetail.Users = []apple.UserChannel{*user}
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -86,6 +97,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-queued", DeviceDetails(c, info, queued), []string{"Cancel verification"}},
 		{"mac-conflict", DeviceDetails(c, info, conflict), []string{"Conflicting evidence", "Retry profile cleanup"}},
 		{"mac-cleanup", DeviceDetails(c, info, cleanup), []string{"Waiting for the Mac"}},
+		{"mac-user", UserDetails(c, info, userDetail), []string{"Alice Example", "User profile assignments", "Refresh user profiles", "Apply to this user", "Pause this user", "Retry user command", "test-csrf-token"}},
+		{"mac-user-reader", UserDetails(c, &reader, userDetail), []string{"Alice Example", "User profile assignments", "User command history"}},
+		{"mac-user-paused", UserDetails(c, info, pausedDetail), []string{"Resume user management", "Installed profiles may remain"}},
+		{"user-profiles", Profiles(c, info, []apple.Profile{userProfile}, []apple.Device{mac}), []string{"User scope", "Assign user profiles"}},
 		{"profiles", Profiles(c, info, []apple.Profile{p}, []apple.Device{*d}), []string{"Create a Wi-Fi profile", "Save and deploy revision", "Company Wi-Fi", "test-csrf-token"}},
 		{"setup", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", Topic: "com.apple.mgmt.example", AppleAccount: "mdm-owner@example.test", PushCheckedAt: &now, PushFingerprint: strings.Repeat("b", 64), PushExpiresAt: now.AddDate(1, 0, 0)}, []apple.PushRequest{{ID: "30000000-0000-0000-0000-000000000001", Organization: "Example organization", PublicURL: "https://mdm.example.test", AppleAccount: "mdm-owner@example.test", ExpectedTopic: "com.apple.mgmt.example", BaseRevision: 1, Status: "pending", CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour), HasVendorRequest: true, VendorAvailable: true, VendorExpiresAt: &vendorExpires, VendorFingerprint: strings.Repeat("a", 64)}}, true, true, "", "", true), []string{"Create enrollment invitation", "push_certificate", "push_key", "test-csrf-token", "APNs connection checked (UTC)", strings.Repeat("b", 64), "Verify connection and import"}},
 	}
@@ -96,6 +111,13 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "mac-user-reader" && (strings.Contains(html, `action="/tenant/1`+userDetail.Path()+`/`) || strings.Contains(html, "Apply to this user")) {
+				t.Fatal("viewer has user mutation controls")
+			}
+			if tc.name == "user-profiles" && strings.Contains(html, "Target devices") {
+				t.Fatal("user profile exposes a device assignment")
+			}
+
 			if tc.name == "device" && (strings.Contains(html, detail.IdentityRenewals[0].CommandID+"/retry") || !strings.Contains(html, "60000000-0000-0000-0000-000000000001/retry")) {
 				t.Fatal("renewal command retry was exposed or normal retry disappeared")
 			}

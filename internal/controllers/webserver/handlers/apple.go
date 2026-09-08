@@ -43,6 +43,12 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/configurations/:id/assign", h.AppleAssignProfile)
 		g.POST("/ios/configurations/:id/delete", h.AppleDeleteProfile)
 		g.GET("/ios/:id", h.AppleDevice)
+		g.GET("/ios/:id/users/:user", h.AppleUser)
+		g.POST("/ios/:id/users/:user/refresh", h.AppleUserAction)
+		g.POST("/ios/:id/users/:user/profiles", h.AppleUserAction)
+		g.POST("/ios/:id/users/:user/commands/:command/retry", h.AppleUserAction)
+		g.POST("/ios/:id/users/:user/pause", h.AppleUserAction)
+		g.POST("/ios/:id/users/:user/resume", h.AppleUserAction)
 		g.GET("/mac/:id", h.MacDevice)
 		g.POST("/ios/:id/mac-binding", h.AppleMacBinding)
 		g.POST("/ios/:id/mac-binding/cancel", h.AppleMacBinding)
@@ -405,6 +411,10 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 		}
 	}
 	if d.Family() == apple.PlatformMacOS {
+		detail.Users, err = h.Apple.Users(c.Request().Context(), scope, id)
+		if err != nil {
+			return err
+		}
 		detail.MacBindingReady = h.Desktop != nil && h.Apple.MacLinksReady(c.Request().Context())
 		detail.MacBinding, err = h.Apple.MacBinding(c.Request().Context(), scope, id)
 		if err != nil {
@@ -526,6 +536,9 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 		data, err = readAppleUpload(c, "profile", apple.MaxProfileBytes)
 	} else {
 		settings := map[string]any{"SSID_STR": c.FormValue("ssid"), "EncryptionType": c.FormValue("wifi_security"), "Password": c.FormValue("wifi_password")}
+		if scope := c.FormValue("payload_scope"); scope != "" {
+			settings["PayloadScope"] = scope
+		}
 		length, _ := strconv.Atoi(c.FormValue("min_length"))
 		settings["minLength"] = length
 		settings["requireAlphanumeric"] = c.FormValue("alphanumeric") == "on"

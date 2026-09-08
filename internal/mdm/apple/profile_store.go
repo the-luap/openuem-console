@@ -8,12 +8,12 @@ import (
 	"slices"
 )
 
-const profileColumns = `id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,updated_at`
+const profileColumns = `id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,updated_at,payload_scope`
 
 func (s *Store) scanProfile(row scanner) (*Profile, error) {
 	var p Profile
 	var types []byte
-	err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Identifier, &p.UUID, &p.Revision, &types, &p.Payload, &p.UpdatedAt)
+	err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Identifier, &p.UUID, &p.Revision, &types, &p.Payload, &p.UpdatedAt, &p.Scope)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -75,6 +75,9 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 		if old.Identifier != p.Identifier {
 			return nil, errors.New("profile identifier cannot change; create a new profile instead")
 		}
+		if old.Scope != p.Scope {
+			return nil, errors.New("profile scope cannot change; create a new profile instead")
+		}
 		p.ID = id
 		p.Revision = old.Revision + 1
 	}
@@ -87,7 +90,7 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 		return nil, err
 	}
 	if id == "" {
-		err = tx.QueryRowContext(ctx, `INSERT INTO mdm_apple_profiles(id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING updated_at`, p.ID, tenant, p.Name, p.Identifier, p.UUID, p.Revision, types, encrypted).Scan(&p.UpdatedAt)
+		err = tx.QueryRowContext(ctx, `INSERT INTO mdm_apple_profiles(id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,payload_scope) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING updated_at`, p.ID, tenant, p.Name, p.Identifier, p.UUID, p.Revision, types, encrypted, p.Scope).Scan(&p.UpdatedAt)
 	} else {
 		err = tx.QueryRowContext(ctx, `UPDATE mdm_apple_profiles SET name=$1,payload_uuid=$2,revision=$3,payload_types=$4,payload=$5,updated_at=now() WHERE tenant_id=$6 AND id=$7 RETURNING updated_at`, p.Name, p.UUID, p.Revision, types, encrypted, tenant, p.ID).Scan(&p.UpdatedAt)
 	}
@@ -118,6 +121,9 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 				return nil, err
 			}
 		}
+		if err = s.updateUserProfileAssignments(ctx, tx, p); err != nil {
+			return nil, err
+		}
 	}
 	if err = audit(ctx, tx, tenant, actor, "apple.profile.save", p.ID); err != nil {
 		return nil, err
@@ -129,6 +135,9 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 }
 
 func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired string) error {
+	if p.Scope != "System" {
+		return errors.New("User profiles must be assigned to a Mac user channel")
+	}
 	if desired == "installed" {
 		if _, err := ParseProfile(p.Payload); err != nil {
 			return err
@@ -243,6 +252,18 @@ func (s *Store) DeleteProfile(ctx context.Context, tenant int, id, actor string)
 	}
 	if assigned {
 		return errors.New("remove and verify this profile on all devices before deleting it")
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_user_assignments a JOIN mdm_apple_devices d ON d.id=a.device_id WHERE a.profile_id=$1 AND d.status IN ('authenticating','enrolled') AND (a.desired<>'removed' OR a.status<>'verified'))`, id).Scan(&assigned); err != nil {
+		return err
+	}
+	if assigned {
+		return errors.New("remove and verify this profile on all managed user channels before deleting it")
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_user_assignments WHERE profile_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_user_commands SET profile_id=NULL,profile_revision=NULL,payload=''::bytea,status=CASE WHEN status IN ('queued','sent','not_now') THEN 'cancelled' ELSE status END,completed_at=COALESCE(completed_at,clock_timestamp()) WHERE profile_id=$1`, id); err != nil {
+		return err
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_profile_assignments WHERE profile_id=$1`, id); err != nil {
 		return err

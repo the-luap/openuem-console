@@ -69,6 +69,9 @@ func (s *Store) confirmIdentity(ctx context.Context, tx *sql.Tx, d *Device, rene
 	} else if n != 1 {
 		return ErrConflict
 	}
+	if err = s.confirmUserIdentityTokens(ctx, tx, d, renewalID); err != nil {
+		return err
+	}
 	grace := time.Now().Add(10 * time.Minute)
 	if baseExpires.Before(grace) {
 		grace = baseExpires
@@ -129,6 +132,9 @@ func (s *Store) finishIdentityRenewal(ctx context.Context, tx *sql.Tx, d *Device
 		return nil
 	}
 	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_user_renewal_tokens WHERE renewal_id=$1`, id); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=clock_timestamp(),error='Identity renewal is no longer available' WHERE id=$1 AND status IN ('queued','sent','not_now')`, commandID); err != nil {

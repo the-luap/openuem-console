@@ -43,7 +43,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id":
+		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
 		case "/ios/configurations":
 			return access.ReadProfiles, true
@@ -61,13 +61,13 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/ios/configurations", "/ios/configurations/:id/delete":
 			return access.ManageProfiles, true
-		case "/ios/configurations/:id/assign":
+		case "/ios/configurations/:id/assign", "/ios/:id/users/:user/profiles", "/ios/:id/users/:user/commands/:command/retry":
 			return access.AssignProfiles, true
-		case "/ios/:id/refresh":
+		case "/ios/:id/refresh", "/ios/:id/users/:user/refresh":
 			return access.RefreshDevices, true
-		case "/ios/:id/mac-binding", "/ios/:id/mac-binding/cancel":
+		case "/ios/:id/mac-binding", "/ios/:id/mac-binding/cancel", "/ios/:id/users/:user/resume":
 			return access.EnrollDevices, true
-		case "/ios/:id/revoke":
+		case "/ios/:id/revoke", "/ios/:id/users/:user/pause":
 			return access.RevokeDevices, true
 		case "/ios/:id/update":
 			return access.ManageUpdates, true

@@ -42,6 +42,7 @@ type Settings struct {
 }
 
 type Device struct {
+	PerUserConnections bool `json:"per_user_connections"`
 	// Set only by certificate authentication, never by a console read or JSON.
 	peerFingerprint        string
 	peerExpiresAt          time.Time
@@ -110,6 +111,7 @@ type InstalledProfile struct {
 }
 
 type Profile struct {
+	Scope        string    `json:"scope"`
 	ID           string    `json:"id"`
 	TenantID     int       `json:"tenant_id"`
 	Name         string    `json:"name"`

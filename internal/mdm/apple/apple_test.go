@@ -30,7 +30,7 @@ func TestProfileValidationAndRevisionIdentity(t *testing.T) {
 	if _, err = plist.Unmarshal(b, &root); err != nil {
 		t.Fatal(err)
 	}
-	for _, scope := range []any{"User", "user", 1, []string{"System"}, map[string]any{"scope": "System"}} {
+	for _, scope := range []any{"user", 1, []string{"System"}, map[string]any{"scope": "System"}} {
 		root["PayloadScope"] = scope
 		userProfile, err := plist.Marshal(root, plist.XMLFormat)
 		if err != nil {

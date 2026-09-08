@@ -78,6 +78,7 @@ func (d Device) Capabilities() DeviceCapabilities {
 	known := d.Family() == PlatformIOS || d.Family() == PlatformIPadOS || d.Family() == PlatformMacOS
 	validVersion := versionPattern.MatchString(d.OSVersion)
 	c.DeviceChannel = known
+	c.UserChannel = d.PerUserConnections && d.Family() == PlatformMacOS && validVersion && CompareVersions(d.OSVersion, "10.7") >= 0
 	c.Profiles = validVersion && ((d.Family() == PlatformMacOS && CompareVersions(d.OSVersion, "10.7") >= 0) || ((d.Family() == PlatformIOS || d.Family() == PlatformIPadOS) && CompareVersions(d.OSVersion, "4.0") >= 0))
 	if d.Family() == PlatformMacOS {
 		c.DeclarativeManagement = validVersion && CompareVersions(d.OSVersion, "13.0") >= 0
@@ -131,7 +132,7 @@ func reportedModel(info map[string]any, current string) (string, error) {
 }
 
 func deviceChannelMessage(message map[string]any) bool {
-	for _, key := range []string{"UserID", "EnrollmentID", "EnrollmentUserID", "UserShortName", "UserLongName", "NotOnConsole"} {
+	for _, key := range []string{"UserID", "EnrollmentID", "EnrollmentUserID", "UserShortName", "UserLongName", "NotOnConsole", "AuthToken"} {
 		if _, exists := message[key]; exists {
 			return false
 		}

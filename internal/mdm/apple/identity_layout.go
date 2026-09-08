@@ -15,6 +15,7 @@ type enrollmentLayout struct {
 	identityType, publicURL, topic             string
 	accessRights                               int64
 	bootstrapToken                             bool
+	perUserConnections                         bool
 }
 
 func newEnrollmentLayout(c *Settings) enrollmentLayout {
@@ -43,13 +44,13 @@ func saveEnrollmentLayout(ctx context.Context, tx *sql.Tx, tenant int, deviceID 
 	if err := l.validate(); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights,bootstrap_token) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10,$11) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights, l.bootstrapToken)
+	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights,bootstrap_token,per_user_connections) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10,$11,$12) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights, l.bootstrapToken, l.perUserConnections)
 	return err
 }
 
 func loadEnrollmentLayout(ctx context.Context, tx *sql.Tx, deviceID string) (*enrollmentLayout, error) {
 	var l enrollmentLayout
-	err := tx.QueryRowContext(ctx, `SELECT profile_uuid,mdm_uuid,identity_uuid,COALESCE(ca_uuid,''),identity_type,public_url,topic,access_rights,bootstrap_token FROM mdm_apple_enrollment_layouts WHERE device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken)
+	err := tx.QueryRowContext(ctx, `SELECT profile_uuid,mdm_uuid,identity_uuid,COALESCE(ca_uuid,''),identity_type,public_url,topic,access_rights,bootstrap_token,per_user_connections FROM mdm_apple_enrollment_layouts WHERE device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken, &l.perUserConnections)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -77,7 +78,7 @@ func (s *Store) recoverEnrollmentLayout(ctx context.Context, tx *sql.Tx, d *Devi
 	if found == nil {
 		return nil
 	}
-	l := enrollmentLayout{profileUUID: found.UUID, accessRights: enrollmentAccessRights}
+	l := enrollmentLayout{profileUUID: found.UUID, accessRights: enrollmentAccessRights, perUserConnections: d.PerUserConnections, bootstrapToken: d.Family() == PlatformMacOS}
 	seen := make(map[string]bool)
 	for _, p := range found.Payloads {
 		if seen[p.Identifier] || p.UUID == "" {

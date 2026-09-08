@@ -63,7 +63,7 @@ func (s *Store) RecordRead(ctx context.Context, scope Scope, actor, action, reso
 		return errors.New("read audit requires an actor and resource")
 	}
 	switch action {
-	case "inventory.list", "inventory.read", "profile.download":
+	case "inventory.list", "inventory.read", "user.inventory.read", "profile.download":
 	default:
 		return errors.New("unsupported read audit action")
 	}

@@ -1,0 +1,202 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ MacUsers(info *partials.CommonInfo, d *apple.Device, users []apple.UserChannel) {
+	<section class="uk-card uk-card-default">
+		<div class="uk-card-header"><h2 class="uk-card-title">Managed Mac users</h2></div>
+		<div class="uk-card-body grid gap-4">
+			if !d.PerUserConnections {
+				<p>This enrollment manages the device channel only. Re-enroll the Mac to enable user channels; renewing its certificate preserves the original channel configuration.</p>
+			} else {
+				<p>User profiles have separate commands, push status and inventory. Names and user identifiers are reported by this Mac; they do not confirm a directory sign-in.</p>
+				for _,u:=range users {
+					<article class="border rounded p-4">
+						<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/users/"+u.ID)) }>{ Show(u.ShortName) }</a></h3>
+						<p>{ Show(u.LongName)+" · "+StateLabel(u.Status) }</p>
+						<p>{ "Console session: "+userConsole(u) }</p>
+						<p class="uk-text-muted">{ "User ID: "+u.UserID }</p>
+					</article>
+				}
+				if len(users)==0 {
+					<p class="uk-text-muted">No user channel has checked in. macOS chooses which users become managed; creating a local account alone does not enroll that user.</p>
+				}
+			}
+		</div>
+	</section>
+}
+
+templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: Show(detail.Device.Name), Url: partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID)}, {Title: Show(detail.User.ShortName), Url: partials.GetNavigationUrl(info, detail.Path())}}, info)
+		<main id="apple-device" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">{ Show(detail.User.ShortName) }</h1>
+				<p>{ "Mac user channel · "+Show(detail.Device.Name) }</p>
+				@Navigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">User channel</h2></div>
+				<div class="uk-card-body grid gap-4">
+					<dl class="uk-description-list">
+						<dt>Full name</dt>
+						<dd>{ Show(detail.User.LongName) }</dd>
+						<dt>User ID reported by macOS</dt>
+						<dd>{ detail.User.UserID }</dd>
+						<dt>Management state</dt>
+						<dd>{ StateLabel(detail.User.Status) }</dd>
+						<dt>Console session</dt>
+						<dd>{ userConsole(*detail.User) }</dd>
+						<dt>Last seen</dt>
+						<dd>{ When(&detail.User.LastSeen) }</dd>
+						<dt>Push status</dt>
+						<dd>{ StateLabel(detail.User.PushStatus) }</dd>
+						if detail.User.PushError!="" {
+							<dt>Push result</dt>
+							<dd>{ detail.User.PushError }</dd>
+						}
+						<dt>Profile inventory</dt>
+						<dd>{ When(detail.User.ProfilesAt) }</dd>
+					</dl>
+					<p class="uk-text-muted">A user identifier is an OS-reported account handle, not proof of directory authentication. Commands wait while this user is not on the console.</p>
+					if detail.Device.Status=="enrolled" {
+						if detail.User.Status=="enrolled" && info.Can(access.RefreshDevices) {
+							<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/refresh") }>
+								@CSRF(info)
+								<button class="uk-button uk-button-default" type="submit">Refresh user profiles</button>
+							</form>
+						}
+						if detail.User.Status=="blocked" {
+							<p>Management is paused. Installed profiles may remain on the Mac. Resuming queues current assignments and waits for a new user TokenUpdate, usually after the next login.</p>
+							if info.Can(access.EnrollDevices) {
+								<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/resume") }>
+									@CSRF(info)
+									<button class="uk-button uk-button-primary" type="submit">Resume user management</button>
+								</form>
+							}
+						} else if detail.User.Status=="enrolled" || detail.User.Status=="pending" {
+							if info.Can(access.RevokeDevices) {
+								<details>
+									<summary class="cursor-pointer">Pause user management</summary>
+									<p class="my-4">Pausing clears this user's push credentials and cancels pending commands. It does not remove installed profiles. Remove and verify profiles first if they should no longer apply.</p>
+									<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/pause") }>
+										@CSRF(info)
+										<button class="uk-button uk-button-default" type="submit">Pause this user</button>
+									</form>
+								</details>
+							}
+						}
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">User profile assignments</h2></div>
+				<div class="uk-card-body grid gap-4">
+					if detail.Device.Status=="enrolled" && detail.User.Status=="enrolled" && info.Can(access.AssignProfiles) {
+						<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/profiles") } class="grid gap-4">
+							@CSRF(info)
+							<label>
+								User profile
+								<select class="uk-select" name="profile_id" required>
+									<option value="">Select a user profile</option>
+									for _,p:=range detail.Profiles {
+										if p.Scope=="User" {
+											<option value={ p.ID }>{ p.Name+" · Revision "+Number(p.Revision) }</option>
+										}
+									}
+								</select>
+							</label>
+							<button class="uk-button uk-button-primary" type="submit" name="desired" value="installed">Apply to this user</button>
+						</form>
+					}
+					for _,a:=range detail.Assignments {
+						<article class="border rounded p-4 grid gap-4">
+							<h3 class="font-semibold">{ a.Name }</h3>
+							<p>{ "Revision "+Number(a.Revision)+" · Desired: "+StateLabel(a.Desired)+" · Result: "+StateLabel(a.Status) }</p>
+							if a.Error!="" {
+								<p>{ a.Error }</p>
+							}
+							if detail.Device.Status=="enrolled" && detail.User.Status=="enrolled" && info.Can(access.AssignProfiles) {
+								<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/profiles") }>
+									@CSRF(info)
+									<input type="hidden" name="profile_id" value={ a.ProfileID }/><button class="uk-button uk-button-default" type="submit" name="desired" value="removed">Remove from this user</button>
+								</form>
+							}
+						</article>
+					}
+					if len(detail.Assignments)==0 {
+						<p class="uk-text-muted">No profiles assigned to this user.</p>
+					}
+					<p class="uk-text-muted">Acknowledgement starts verification. A later user ProfileList must report the current managed profile UUID, or confirm its absence after removal.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">Profiles reported by this user</h2></div>
+				<div class="uk-card-body grid gap-4">
+					for _,p:=range detail.User.InstalledProfiles {
+						<article class="border rounded p-4">
+							<h3 class="font-semibold">{ Show(p.Name) }</h3>
+							<p>{ p.Identifier }</p>
+							<p class="uk-text-muted">{ "Profile UUID: "+Show(p.UUID) }</p>
+							<p>
+								if p.Managed {
+									{ "Managed profile" }
+								} else {
+									{ "Not reported as managed" }
+								}
+							</p>
+						</article>
+					}
+					if len(detail.User.InstalledProfiles)==0 {
+						<p class="uk-text-muted">No profiles in the latest user inventory.</p>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">User command history</h2></div>
+				<div class="uk-card-body grid gap-4">
+					for _,command:=range detail.Commands {
+						<article class="border rounded p-4 grid gap-4">
+							<h3 class="font-semibold">{ command.RequestType+" · "+StateLabel(command.Status) }</h3>
+							<p>{ "Created: "+When(&command.CreatedAt)+" · Attempts: "+Number(command.Attempts) }</p>
+							<p class="uk-text-muted">{ command.ID }</p>
+							if command.Error!="" {
+								<p>{ command.Error }</p>
+							}
+							if detail.Device.Status=="enrolled" && detail.User.Status=="enrolled" && info.Can(access.AssignProfiles) && (command.Status=="failed" || command.Status=="expired") {
+								<form method="post" action={ partials.GetNavigationUrl(info, detail.Path()+"/commands/"+command.ID+"/retry") }>
+									@CSRF(info)
+									<button class="uk-button uk-button-default" type="submit">Retry user command</button>
+								</form>
+							}
+						</article>
+					}
+					if len(detail.Commands)==0 {
+						<p class="uk-text-muted">No user commands yet.</p>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ ProfileScopeField() {
+	<label>Profile scope<select class="uk-select" name="payload_scope"><option value="System">System · device channel</option><option value="User">User · managed Mac user</option></select></label>
+}
+
+func userConsole(u apple.UserChannel) string {
+	if u.Status != "enrolled" {
+		return "Not currently managed"
+	}
+	if u.NotOnConsole {
+		return "Not on console"
+	}
+	return "On console at last check-in"
+}

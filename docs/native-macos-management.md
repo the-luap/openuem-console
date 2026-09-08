@@ -2,9 +2,11 @@
 
 The native Apple module accepts manual Mac Device Enrollment alongside iPhone and
 iPad enrollment. This implements part of MAC-01 and MAC-02 in the
-[roadmap ledger](implementation-status.md). Agent/MDM identity linkage, Mac user
-channels, FileVault recovery-key management and physical-device acceptance remain
-open. Installing the agent and enrolling MDM currently produces separate records.
+[roadmap ledger](implementation-status.md). Native and agent channels can share a
+verified Mac identity, and new enrollments support separately managed user
+channels. FileVault recovery-key management, broader Mac security workflows and
+physical-device acceptance remain open. See [channel linkage](macos-agent-mdm-linkage.md)
+and [Mac user management](macos-user-channels.md).
 
 ## Enroll and identify a Mac
 
@@ -31,8 +33,10 @@ existing `/ios/:id` detail links continue working for native Apple devices.
 Organization/site permissions apply to Mac inventory, enrollment, profiles,
 updates, identity renewal and read audits.
 
-New Mac enrollment profiles advertise `com.apple.mdm.bootstraptoken`. Their saved
-layout retains that capability during automatic identity replacement. Existing
+New Mac enrollment profiles advertise `com.apple.mdm.bootstraptoken` and
+`com.apple.mdm.per-user-connections`. Their saved layout retains these capabilities
+during automatic identity replacement. Existing device-only Mac enrollments stay
+device-only when renewed. Existing
 phone/iPad enrollment layouts retain their original capabilities. See
 [SCEP enrollment](apple-scep-enrollment.md) and
 [identity renewal](apple-identity-renewal.md) for the cryptographic lifecycle.
@@ -50,7 +54,7 @@ These thresholds describe implemented protocol support, not hardware acceptance.
 | Specific OS update enforcement | iOS/iPadOS 17+ | macOS 14+, reported supervision and readiness checks below |
 | DDM software update identifier | iOS/iPadOS 18+ | macOS 15+, reported supervision |
 | Bootstrap-token exchange | Not implemented | macOS 10.15+, enrolled device identity |
-| User channel | Not implemented | Not implemented |
+| User channel | Not implemented | macOS 10.7+, new per-user enrollment; user profile lifecycle |
 
 The version and channel thresholds follow Apple's pinned
 [profile command](https://github.com/apple/device-management/blob/67045e2fa06f528b196c01edee6a8bf88b844beb/mdm/commands/profile.install.yaml),
@@ -149,5 +153,5 @@ Rendered Mac enrollment, Mac detail and the shared device list were checked at
 390, 768 and 1440 pixels, including disabled update enforcement and keyboard help.
 The native macOS/Safari installation prompts, actual token escrow, update/reboot
 continuity and agent/MDM linkage still need hardware acceptance
-as recorded in the roadmap. FileVault recovery escrow, Recovery Lock, user-channel
-profiles and Mac security templates are not supplied by this change.
+as recorded in the roadmap. FileVault recovery escrow, Recovery Lock, broader profile
+templates and Mac security templates are not supplied by this change.

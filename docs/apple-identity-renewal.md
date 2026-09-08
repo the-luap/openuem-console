@@ -94,6 +94,13 @@ overwrite status or delay delivery for a newer encrypted push token.
 
 ## Offline devices, errors and recovery
 
+Mac user channels stage their candidate push credentials separately. A user
+TokenUpdate or command connection cannot activate the shared certificate. Native
+device confirmation promotes the staged user tokens in the same transaction;
+withdrawal or failed renewal discards them. The enrollment's original per-user
+capability survives renewal and metadata recovery. See
+[Mac user channels](macos-user-channels.md) for supported commands and controls.
+
 An issued candidate survives the issuance/command deadline: an offline device
 may already have installed it. It can later submit TokenUpdate and confirm while
 that candidate certificate remains valid, including after the old identity has

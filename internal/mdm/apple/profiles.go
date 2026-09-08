@@ -26,8 +26,12 @@ func ParseProfile(data []byte) (*Profile, error) {
 	if stringValue(root, "PayloadType") != "Configuration" {
 		return nil, errors.New("root PayloadType must be Configuration")
 	}
-	if scope, exists := root["PayloadScope"]; exists && scope != "System" {
-		return nil, errors.New("only System profiles are supported; user-channel profiles require separate management")
+	scope := "System"
+	if value, exists := root["PayloadScope"]; exists {
+		if value != "System" && value != "User" {
+			return nil, errors.New("PayloadScope must be System or User")
+		}
+		scope = value.(string)
 	}
 	id := stringValue(root, "PayloadIdentifier")
 	if reservedMacBindingIdentifier(id) {
@@ -78,6 +82,11 @@ func ParseProfile(data []byte) (*Profile, error) {
 			return nil, errors.New("each payload needs PayloadVersion 1")
 		}
 		types[kind] = true
+		if scope == "User" {
+			if err := validateUserPayload(p, nil); err != nil {
+				return nil, err
+			}
+		}
 	}
 	name := strings.TrimSpace(stringValue(root, "PayloadDisplayName"))
 	if name == "" {
@@ -88,12 +97,12 @@ func ParseProfile(data []byte) (*Profile, error) {
 	}
 	profileUUID := uuid.NewString()
 	root["PayloadUUID"] = profileUUID
-	root["PayloadScope"] = "System"
+	root["PayloadScope"] = scope
 	canonical, err := plist.Marshal(root, plist.XMLFormat)
 	if err != nil {
 		return nil, err
 	}
-	p := &Profile{ID: uuid.NewString(), Name: name, Identifier: id, UUID: profileUUID, Revision: 1, Payload: canonical}
+	p := &Profile{ID: uuid.NewString(), Name: name, Identifier: id, UUID: profileUUID, Revision: 1, Payload: canonical, Scope: scope}
 	for kind := range types {
 		p.PayloadTypes = append(p.PayloadTypes, kind)
 	}
@@ -127,6 +136,13 @@ func numberValue(v any) uint64 {
 // BuildProfile provides native editors for common iOS configurations while the
 // upload path supports additional Apple payloads without a server release.
 func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byte, error) {
+	scope := "System"
+	if value, exists := settings["PayloadScope"]; exists {
+		if value != "System" && value != "User" {
+			return nil, errors.New("profile scope must be System or User")
+		}
+		scope = value.(string)
+	}
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(identifier) == "" {
 		return nil, errors.New("name and identifier are required")
 	}
@@ -177,5 +193,5 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	default:
 		return nil, errors.New("unknown profile editor")
 	}
-	return plist.Marshal(map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": identifier, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": name, "PayloadContent": []any{payload}}, plist.XMLFormat)
+	return plist.Marshal(map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": identifier, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": name, "PayloadScope": scope, "PayloadContent": []any{payload}}, plist.XMLFormat)
 }

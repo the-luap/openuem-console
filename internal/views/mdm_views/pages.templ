@@ -260,6 +260,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 			</section>
 			@DeviceIdentity(detail)
 			@MacCapabilities(detail.Device)
+			if detail.Device.Family()==apple.PlatformMacOS {
+				@MacUsers(info,detail.Device,detail.Users)
+			}
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. Requires iOS/iPadOS 17 or later, or a supervised Mac running macOS 14 or later with update authorization. Apple also checks installation conditions on the device.</p></div>
 				<div class="uk-card-body">
@@ -437,7 +440,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">Apple configuration profiles</h1>
-				<p>Manage system configuration profiles for iPhone, iPad and Mac. Check each payload's platform requirements before assigning it. Mac user-channel profiles are not available yet.</p>
+				<p>Manage system profiles for iPhone, iPad and Mac, and user profiles for managed Mac users. Assign user profiles from the user's page on a Mac.</p>
 				@Navigation(info)
 			</div>
 			if info.Can(access.ManageProfiles) {
@@ -456,6 +459,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 							if info.Can(access.ManageProfiles) {
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
 									@CSRF(info)
+									@ProfileScopeField()
 									<input type="hidden" name="editor" value="passcode"/><label>Name<input class="uk-input" name="name" required placeholder="Company passcode"/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.passcode"/></label><label>Minimum length<input class="uk-input" type="number" name="min_length" min="4" max="16" value="6" required/></label><label><input type="checkbox" name="alphanumeric"/> Require letters and numbers</label><button class="uk-button uk-button-primary" type="submit">Create passcode profile</button>
 								</form>
 							}
@@ -465,6 +469,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 							if info.Can(access.ManageProfiles) {
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
 									@CSRF(info)
+									@ProfileScopeField()
 									<input type="hidden" name="editor" value="wifi"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.wifi"/></label><label>SSID<input class="uk-input" name="ssid" maxlength="32" required/></label><label>Security<select class="uk-select" name="wifi_security"><option value="WPA2">WPA2 Personal</option><option value="WPA3">WPA3 Personal</option><option value="WPA">WPA Personal</option><option value="None">Open network</option></select></label><label>Password<input class="uk-input" type="password" name="wifi_password" autocomplete="new-password"/></label><button class="uk-button uk-button-primary" type="submit">Create Wi-Fi profile</button>
 								</form>
 							}
@@ -474,6 +479,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 							if info.Can(access.ManageProfiles) {
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
 									@CSRF(info)
+									@ProfileScopeField()
 									<input type="hidden" name="editor" value="restrictions"/><label>Name<input class="uk-input" name="name" required/></label><label>Identifier<input class="uk-input" name="identifier" required placeholder="com.company.restrictions"/></label>
 									@RestrictionField("allowCamera", "Camera")
 									@RestrictionField("allowScreenShot", "Screenshots")
@@ -489,7 +495,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 			}
 			for _,p:=range profiles {
 				<section class="uk-card uk-card-default">
-					<div class="uk-card-header"><h2 class="uk-card-title">{ p.Name }</h2><p>{ p.Identifier+" · Revision "+Number(p.Revision) }</p></div>
+					<div class="uk-card-header"><h2 class="uk-card-title">{ p.Name }</h2><p>{ p.Identifier+" · "+p.Scope+" scope · Revision "+Number(p.Revision) }</p></div>
 					<div class="uk-card-body grid gap-4">
 						<p>
 							{ "Payloads: " }
@@ -500,7 +506,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						if info.Can(access.ManageProfiles) {
 							<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/download")) }>Download current profile</a>
 						}
-						if info.Can(access.AssignProfiles) {
+						if p.Scope!="User" && info.Can(access.AssignProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/assign") } class="grid gap-4">
 								@CSRF(info)
 								<label>
@@ -522,7 +528,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4 mt-4">
 									@CSRF(info)
 									<input type="hidden" name="editor" value="upload"/><input type="hidden" name="profile_id" value={ p.ID }/><input type="hidden" name="revision" value={ Number(p.Revision) }/><label>Replacement profile<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label>
-									<p>The identifier must stay the same. Saving queues the new revision for every device assigned this profile.</p><button class="uk-button uk-button-primary" type="submit">Save and deploy revision</button>
+									<p>The identifier and scope must stay the same. Saving queues the new revision for every active device or user channel assigned this profile.</p><button class="uk-button uk-button-primary" type="submit">Save and deploy revision</button>
 								</form>
 							}
 						</details>

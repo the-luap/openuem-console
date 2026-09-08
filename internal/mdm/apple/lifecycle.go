@@ -36,6 +36,9 @@ func (s *Store) RevokeEnrollment(ctx context.Context, scope Scope, id, actor str
 	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_bootstrap_tokens WHERE device_id=$1`, id); err != nil {
 		return err
 	}
+	if err = s.withdrawUserChannels(ctx, tx, &Device{ID: id, TenantID: scope.TenantID}); err != nil {
+		return err
+	}
 	if err = s.reconcileMacBindingsForDevice(ctx, tx, &Device{ID: id, TenantID: scope.TenantID, Status: "revoked"}); err != nil {
 		return err
 	}

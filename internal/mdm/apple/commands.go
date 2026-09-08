@@ -231,6 +231,10 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 		if current.UDID == "" {
 			return ErrUnauthorized
 		}
+		if err = s.withdrawUserChannels(ctx, tx, current); err != nil {
+			return err
+		}
+
 		if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_bootstrap_tokens WHERE device_id=$1`, current.ID); err != nil {
 			return err
 		}

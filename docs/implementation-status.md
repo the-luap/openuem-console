@@ -13,7 +13,7 @@ CA/master-key rotation and the remaining ENR-01/PKI-01 requirements stay open.
 
 [Native Mac management](native-macos-management.md) adds platform-aware enrollment,
 inventory, system profiles and DDM update readiness with encrypted bootstrap-token
-escrow. MAC-01/MAC-02 remain open for user channels, security workflows
+escrow. MAC-01/MAC-02 remain open for broader templates, security workflows
 and physical-device acceptance.
 
 [Mac channel association](macos-agent-mdm-linkage.md) now has a separate scoped
@@ -21,8 +21,15 @@ hardware RPC, bounded Mac collection, protected managed-preference proof reading
 capability negotiation and transactional hashed evidence. Native MDM challenges,
 bounded cleanup, association reconciliation and canonical device navigation now
 preserve channel history across re-enrollment. Multiple active claims and hardware
-conflicts do not silently transfer authority. Physical acceptance, user channels
+conflicts do not silently transfer authority. Physical acceptance, broader Mac templates
 and hardware-repair/cross-site merge workflows remain open.
+
+[Mac user channels](macos-user-channels.md) add immutable enrollment capability
+tracking, separate encrypted push and profile command state, Apple-schema channel
+gates, staged renewal tokens, pause/resume and scoped console actions. PostgreSQL
+race tests and console route tests cover ownership, lifecycle and rollback; managed,
+paused and reader views were checked at 390/768/1440 pixels. Actual user login,
+fast switching, APNs delivery and profile effects still need Mac hardware acceptance.
 
 ## Package ledger
 
@@ -34,7 +41,7 @@ and hardware-repair/cross-site merge workflows remain open.
 | APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain/production usage verification and a mandatory fresh TLS/HTTP2 APNs connection gate; atomic renewal revision/topic checks, account metadata, setup warning and persistent scoped SMTP expiry reminders/history; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; independent certificate revocation checking; deployment SMTP delivery and actual Apple issuance/renewal/device continuity |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
-| MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping | User-channel profiles, Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
+| MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping; per-user enrollment, separate encrypted push/command/profile state, capability-gated user profiles, renewal staging, pause/resume and scoped console controls | Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
 | MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; PostgreSQL/HTTP tests | FileVault recovery escrow/verification, complete Mac security workflows and hardware update/reboot acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |

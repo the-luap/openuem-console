@@ -96,6 +96,24 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 			http.Error(w, "invalid plist", 400)
 			return
 		}
+		message = normalizeDeviceMarker(d, message)
+		if userChannelMessage(message) {
+			var response []byte
+			if parts[1] == "checkin" {
+				response, err = s.UserCheckIn(r.Context(), d, message)
+			} else {
+				response, err = s.UserConnect(r.Context(), d, message)
+			}
+			if err != nil {
+				protocolError(w, err, logger)
+				return
+			}
+			if len(response) > 0 {
+				w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+				_, _ = w.Write(response)
+			}
+			return
+		}
 		if parts[1] == "checkin" {
 			if kind := stringValue(message, "MessageType"); kind == "SetBootstrapToken" || kind == "GetBootstrapToken" {
 				response, err := s.BootstrapToken(r.Context(), d, message)
@@ -144,6 +162,8 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 
 func protocolError(w http.ResponseWriter, err error, logger *slog.Logger) {
 	switch {
+	case errors.Is(err, ErrUserChannelDeclined):
+		http.Error(w, "user-channel management is unavailable for this enrollment", http.StatusGone)
 	case errors.Is(err, ErrNotFound):
 		http.Error(w, "not found", 404)
 	case errors.Is(err, ErrUnauthorized):
