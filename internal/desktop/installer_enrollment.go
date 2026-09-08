@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/open-uem/nats/enrollment"
 	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/openuem-console/internal/desktop/protocol"
 	"github.com/open-uem/openuem-console/internal/gateway"
 )
 
@@ -20,6 +22,68 @@ type InstallerInvitation struct {
 	ReleaseDigest string             `json:"release_digest"`
 	Version       string             `json:"version"`
 	Artifact      artifacts.Artifact `json:"artifact"`
+}
+
+// InstallerMetadata contains only public installation information. The release
+// envelope authenticates artifact hashes under separately pinned release keys;
+// it does not sign the organization, invitation or origin in this response.
+type InstallerMetadata struct {
+	Version         int                `json:"version"`
+	Organization    string             `json:"organization"`
+	Platform        string             `json:"platform"`
+	Architecture    string             `json:"architecture"`
+	ExpiresAt       time.Time          `json:"expires_at"`
+	AvailableUses   int                `json:"available_uses"`
+	ReleaseDigest   string             `json:"release_digest"`
+	ReleaseEnvelope json.RawMessage    `json:"release_envelope"`
+	Artifact        artifacts.Artifact `json:"artifact"`
+	DownloadURL     string             `json:"download_url"`
+}
+
+// InstallerMetadata never reserves a use or changes enrollment state. A fully
+// used invitation may still expose public metadata for recovery with the same
+// endpoint keys; ClaimInstaller alone decides whether that retry is authorized.
+func (s *Store) InstallerMetadata(ctx context.Context, catalog *Catalog, token, publicOrigin string) (*InstallerMetadata, error) {
+	if catalog == nil || catalog.db != s.db {
+		return nil, ErrNoRelease
+	}
+	if !enrollment.ValidToken(token) || !canonicalEnrollmentOrigin(publicOrigin) {
+		return nil, registry.ErrNotFound
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	current, err := catalog.currentInTransaction(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256([]byte(token))
+	result := &InstallerMetadata{Version: enrollment.Version, ReleaseDigest: current.Digest()}
+	err = tx.QueryRowContext(ctx, `SELECT a.organization,i.platform,i.architecture,i.expires_at,i.max_uses-i.uses,r.envelope
+		FROM uem_agent_invitations i
+		JOIN uem_desktop_invitation_releases b ON b.invitation_id=i.id
+		JOIN uem_desktop_releases r ON r.digest=b.release_digest
+		JOIN uem_agent_authorities a ON a.tenant_id=i.tenant_id
+		JOIN sites s ON s.id=i.site_id AND s.tenant_sites=i.tenant_id
+		WHERE i.token_hash=$1 AND b.release_digest=$2 AND a.public_origin=$3
+		AND i.revoked_at IS NULL AND i.expires_at>clock_timestamp() AND a.expires_at>clock_timestamp()`, hex.EncodeToString(digest[:]), current.Digest(), publicOrigin).Scan(&result.Organization, &result.Platform, &result.Architecture, &result.ExpiresAt, &result.AvailableUses, &result.ReleaseEnvelope)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, registry.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	result.Artifact, err = current.Select(result.Platform, result.Architecture)
+	if err != nil {
+		return nil, err
+	}
+	result.DownloadURL = publicOrigin + protocol.DownloadPath(current.Digest(), result.Platform, result.Architecture)
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // InviteInstaller binds a scoped invitation to the exact approved release. The

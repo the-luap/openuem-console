@@ -5,8 +5,9 @@ Admission authenticates a release manifest, checks every declared package's byte
 and stores a monotonic checkpoint in PostgreSQL. It does not sign native packages,
 perform Windows Authenticode verification or submit Mac packages for notarization.
 The trusted release pipeline must complete and verify those platform steps before
-signing a manifest. Public download routes and invitation/bootstrap integration
-are still in progress; accepting a release does not enable those routes by itself.
+signing a manifest. The [public protocol listener](desktop-public-protocol.md)
+must be configured separately; accepting a release does not enable HTTP routes
+by itself. Native bootstrap and installer integration remain in progress.
 
 ## Trust and repository preparation
 
@@ -132,7 +133,9 @@ revoked by withdrawing a release. A pending installation whose release has been
 superseded or withdrawn needs a new invitation; retries require its selected
 release to remain current and active.
 
-The console's public enrollment portal, invitation-creation UI, package HTTP
-handler, signed bootstrap configuration/installer flow and native release signing
-jobs are the next integration steps. Test package bytes are non-executable fixtures
+The optional public HTTP protocol now serves approved packages, scanner-safe
+metadata and release-bound key-proof claims through the pinned private listener
+and gateway. The installation page, invitation-creation UI, signed bootstrap
+configuration/installer flow and native release signing jobs remain integration
+steps. Test package bytes are non-executable fixtures
 and provide no physical installation or native signing evidence.

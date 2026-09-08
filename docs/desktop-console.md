@@ -67,8 +67,9 @@ command provisioning. It does not infer online status from unused timestamps.
 
 ## Installation boundary and verification
 
-The current page does not create new installation links. Signed package selection,
-the public Windows/Mac installation portal, endpoint key storage and bootstrap
+The current page does not create new installation links. Approved release binding
+and the [private/public HTTP protocol](desktop-public-protocol.md) are implemented.
+The Windows/Mac installation page, endpoint key storage and signed bootstrap
 integration are still in progress. Existing invitations created through the
 shared registry can be reviewed and revoked. Legacy desktop administration routes
 retain their separate server-administrator boundary.

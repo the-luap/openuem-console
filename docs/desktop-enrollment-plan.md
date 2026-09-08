@@ -3,11 +3,20 @@
 This is the active implementation design for ENR-01, the desktop portion of
 ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
 claim. Shared proof, durable registry, broker authorization, gateway transport and
-worker request boundaries, service runtimes and scoped console administration now
-have automated evidence. New installation invitations, native-agent storage,
+worker request boundaries, service runtimes, scoped console administration and
+the public HTTPS claim/download protocol now have automated evidence. New console
+installation invitations, native-agent storage,
 installers and production deployment wiring remain open.
 
 ## Source baselines
+
+The [desktop public protocol](desktop-public-protocol.md) now binds HTTP claims to
+the current approved release, serves read-only invitation metadata and verifies
+package bytes before downloads. It has a separate optional private TLS listener,
+an exact gateway allowlist, bounded bodies/rates/concurrency/deadlines and joined
+shutdown. PostgreSQL/TLS race tests cover scanner safety, strict claims, retries,
+revocation, changed files, source-header trust and public administrator denial.
+This does not complete native bootstrap configuration or installer execution.
 
 Local related repositories were checked out from upstream into sibling directories:
 
@@ -120,7 +129,7 @@ The console pins this version and uses those transactions for exact installer
 release binding and canonical-origin checks. PostgreSQL tests observe actual lock
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
-Signed artifact selection, new console invitations, endpoint storage/bootstrap
+New console invitations, signed bootstrap configuration, endpoint storage/bootstrap
 and reference deployment wiring remain open.
 
 ## Required boundaries

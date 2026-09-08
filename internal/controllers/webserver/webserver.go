@@ -13,6 +13,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
+	"github.com/open-uem/openuem-console/internal/desktop"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
@@ -25,6 +26,8 @@ type WebServer struct {
 	SessionManager *sessions.SessionManager
 	AppleServer    *http.Server
 	AppleCancel    context.CancelFunc
+	DesktopServer  *http.Server
+	desktopPublic  *desktop.PublicHandler
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -82,6 +85,10 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	if err != nil {
 		return err
 	}
+	if err := w.startDesktop(certFile, certKey); err != nil {
+		return err
+	}
+	defer w.stopDesktop()
 	if err := w.startApple(certFile, certKey); err != nil {
 		return err
 	}
@@ -96,6 +103,7 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 }
 
 func (w *WebServer) Close() error {
+	w.stopDesktop()
 	if w.AppleCancel != nil {
 		w.AppleCancel()
 	}

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"errors"
 	"net"
@@ -12,13 +13,16 @@ import (
 )
 
 // Gateway tracks upgraded connections because http.Server.Shutdown does not
-// close hijacked WebSockets. Close ends those streams and prevents new upgrades.
+// close hijacked WebSockets. Close ends those streams, cancels desktop requests
+// and prevents new upgrades and desktop requests.
 type Gateway struct {
-	handler     http.Handler
-	mu          sync.Mutex
-	closed      bool
-	connections map[net.Conn]struct{}
-	slots       chan struct{}
+	handler        http.Handler
+	mu             sync.Mutex
+	closed         bool
+	connections    map[net.Conn]struct{}
+	slots          chan struct{}
+	desktopContext context.Context
+	desktopCancel  context.CancelFunc
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) { g.handler.ServeHTTP(w, r) }
@@ -26,6 +30,9 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) { g.handler.
 func (g *Gateway) Close() error {
 	g.mu.Lock()
 	g.closed = true
+	if g.desktopCancel != nil {
+		g.desktopCancel()
+	}
 	connections := make([]net.Conn, 0, len(g.connections))
 	for conn := range g.connections {
 		connections = append(connections, conn)

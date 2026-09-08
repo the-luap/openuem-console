@@ -29,6 +29,7 @@ type Handler struct {
 	Apple             *apple.Store
 	AppleSetupError   string
 	Desktop           *desktop.Store
+	DesktopCatalog    *desktop.Catalog
 	DesktopSetupError string
 
 	SessionManager       *sessions.SessionManager

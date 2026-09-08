@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/desktop/protocol"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
@@ -27,8 +29,10 @@ type Config struct {
 	// AgentURL enables the exact native-agent WebSocket route to private NATS.
 	AgentURL             string
 	AgentConnectionLimit int
-	AdminNetworks        []netip.Prefix
-	BackendTLS           *tls.Config
+	// DesktopURL enables only the public installer metadata, claim and download routes.
+	DesktopURL    string
+	AdminNetworks []netip.Prefix
+	BackendTLS    *tls.Config
 }
 
 func ParseOrigin(value string) (*url.URL, error) {
@@ -66,9 +70,16 @@ func New(config Config) (*Gateway, error) {
 	}
 	g := &Gateway{connections: make(map[net.Conn]struct{}), slots: make(chan struct{}, limit)}
 	addresses := []string{config.AppleURL, config.ConsoleURL, config.AuthURL}
+	agentIndex, desktopIndex := -1, -1
 	if config.AgentURL != "" {
+		agentIndex = len(addresses)
 		addresses = append(addresses, config.AgentURL)
 	}
+	if config.DesktopURL != "" {
+		desktopIndex = len(addresses)
+		addresses = append(addresses, config.DesktopURL)
+	}
+	downloads := make(chan struct{}, 16)
 	proxies := make([]http.Handler, len(addresses))
 	for i, address := range addresses {
 		upstream, err := ParseOrigin(address)
@@ -97,7 +108,7 @@ func New(config Config) (*Gateway, error) {
 				r.Out.Header.Set("X-Forwarded-Host", origin.Host)
 				r.Out.Header.Set("X-Forwarded-Proto", "https")
 				clientidentity.Forward(r.Out, r.In)
-				if i == 3 {
+				if i == agentIndex {
 					// Broker identity is NKey nonce proof, never a forwarded HTTP
 					// credential or the gateway's own TLS client identity.
 					r.Out.Header.Del("Client-Cert")
@@ -112,6 +123,7 @@ func New(config Config) (*Gateway, error) {
 			},
 		}
 	}
+	g.desktopContext, g.desktopCancel = context.WithCancel(context.Background())
 	g.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Omit URL paths/tokens while preserving Origin on native form POSTs.
 		w.Header().Set("Referrer-Policy", "strict-origin")
@@ -127,7 +139,41 @@ func New(config Config) (*Gateway, error) {
 			return
 		}
 		if config.AgentURL != "" && r.URL.Path == "/agent-channel" {
-			g.serveAgent(proxies[3], w, r)
+			g.serveAgent(proxies[agentIndex], w, r)
+			return
+		}
+		if route, ok := protocol.Parse(r); desktopIndex >= 0 && ok {
+			if g.desktopContext.Err() != nil {
+				http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			ctx, cancel := context.WithCancel(r.Context())
+			defer cancel()
+			stop := context.AfterFunc(g.desktopContext, cancel)
+			defer stop()
+			r = r.WithContext(ctx)
+			if route.Kind == "download" {
+				if r.ContentLength != 0 || len(r.TransferEncoding) != 0 {
+					http.Error(w, "invalid download request", http.StatusBadRequest)
+					return
+				}
+				select {
+				case downloads <- struct{}{}:
+					defer func() { <-downloads }()
+				default:
+					w.Header().Set("Retry-After", "5")
+					http.Error(w, "please retry later", http.StatusTooManyRequests)
+					return
+				}
+				ctx, cancel := context.WithTimeout(r.Context(), protocol.DownloadTimeout)
+				defer cancel()
+				r = r.WithContext(ctx)
+				if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(protocol.DownloadTimeout)); err != nil {
+					http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
+					return
+				}
+			}
+			proxies[desktopIndex].ServeHTTP(w, r)
 			return
 		}
 		if !allowedAdmin(r.RemoteAddr, networks) {
