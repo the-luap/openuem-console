@@ -291,8 +291,18 @@ func TestSCEPResponseWithOpenSSL(t *testing.T) {
 			t.Fatalf("OpenSSL interoperability: %v\n%s", err, output)
 		}
 	}
-	run("cms", "-verify", "-inform", "DER", "-in", "response.der", "-CAfile", "ca.pem", "-purpose", "any", "-out", "envelope.der")
-	run("cms", "-decrypt", "-inform", "DER", "-in", "envelope.der", "-recip", "client.pem", "-inkey", "client.key", "-out", "issued.der")
+	// Every nested CMS layer is binary DER. OpenSSL's text-mode output changes
+	// line endings on Windows unless -binary is explicit for each operation.
+	run("cms", "-verify", "-binary", "-inform", "DER", "-in", "response.der", "-CAfile", "ca.pem", "-purpose", "any", "-out", "envelope.der")
+	verified, err := os.ReadFile(filepath.Join(dir, "envelope.der"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := pkcs7.Parse(response)
+	if err != nil || !bytes.Equal(verified, signed.Content) {
+		t.Fatal("OpenSSL verification changed binary envelope bytes", err)
+	}
+	run("cms", "-decrypt", "-binary", "-inform", "DER", "-in", "envelope.der", "-recip", "client.pem", "-inkey", "client.key", "-out", "issued.der")
 	issued, err := os.ReadFile(filepath.Join(dir, "issued.der"))
 	if err != nil {
 		t.Fatal(err)
