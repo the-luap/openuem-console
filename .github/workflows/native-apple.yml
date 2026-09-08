@@ -38,7 +38,7 @@ jobs:
         run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
       - name: Existing Windows deployment models
         run: go test -count=1 -run TestDeploymentTestSuite ./internal/models
-      - name: Individual agent authorization service lifecycle
+      - name: Individual agent authorization and command service lifecycles
         run: go test -race -count=1 ./internal/desktop/...
   build:
     runs-on: ubuntu-latest

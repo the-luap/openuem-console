@@ -21,9 +21,14 @@ legacy shared agent credentials in that account. Configure these separate users:
 | `UEM_DEVICES` | Dynamic individual grants issued by authorization; trusted workers use separate service credentials |
 
 The auth callout's issuer is the **public account NKey** matching the service's
-issuer seed, its account is `UEM_AUTH`, its auth user is the authorization user's
-public NKey, and its allowed account is `UEM_DEVICES`. Set the system account to
-`UEM_SYSTEM`. A configured NKey service user is required for the stock server to
+issuer seed, its account is `UEM_AUTH`, and its allowed account is `UEM_DEVICES`.
+In config mode, `auth_users` is the callout bypass list: include the authorization
+user and all statically configured trusted service NKeys (worker, console,
+provisioner and revocation service). They still authenticate by NKey and retain
+only their configured account permissions. Otherwise a worker in `UEM_DEVICES`
+is sent to the device registry and rejected. Never add individual device keys to
+this list. Set the system account to `UEM_SYSTEM`.
+A configured NKey service user is required for the stock server to
 send a nonce; merely adding `auth_callout` does not enable nonce authentication.
 
 Keep native broker TLS and monitoring listeners private. The existing gateway's

@@ -3,8 +3,9 @@
 This is the active implementation design for ENR-01, the desktop portion of
 ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
 claim. Shared proof, durable registry, broker authorization, gateway transport and
-worker request boundaries now have automated evidence. Console issuance, service
-credentials, native-agent storage, installers and production deployment remain open.
+worker request boundaries and service runtimes now have automated evidence. Console
+issuance, service provisioning, native-agent storage, installers and production
+deployment remain open.
 
 ## Source baselines
 
@@ -20,8 +21,8 @@ Local related repositories were checked out from upstream into sibling directori
 
 The console remains on its native Apple feature branch. Related repositories use
 feature branches named `feature/individual-agent-enrollment`. The NATS library and
-worker are now forked at `the-luap/openuem-nats` and `the-luap/openuem-worker`; the
-agent, certificate manager and Docker repositories are still local upstream
+worker and certificate manager are now forked under `the-luap`; the
+agent and Docker repositories are still local upstream
 checkouts. Feature branches are implementation work, not signed releases.
 
 Local NATS library commit `0a8ad01` adds the shared endpoint-generated CSR/NKey
@@ -44,8 +45,9 @@ including native Windows ACL tests. The console pins that published commit.
 The console now includes the private `openuem-agent-auth` executable with separate
 authorization/revocation NKeys, verified TLS, loopback readiness and graceful
 shutdown. Its real PostgreSQL/TLS broker race test passes locally and covers active
-revocation and broker failure. See [service operations](agent-authorization-operations.md).
-Worker service credentials, production provisioning and released-agent use remain open.
+revocation and broker failure. Its [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34171756069)
+at commit `74ab1b8`. See [service operations](agent-authorization-operations.md).
+Production provisioning and released-agent use remain open.
 
 The console gateway now supports an optional exact native-agent WSS route with
 mutual TLS to the private broker, strict upgrade validation, bounded concurrent
@@ -65,6 +67,30 @@ for this exact commit. Startup
 in both console and worker now preserves newer additive columns/indexes.
 [Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34170372575)
 for commit `ffac98f`, including the gateway, access controls and guided Apple portal.
+
+Worker commit `c705189` adds the production TLS/NKey service runtime for CLI and
+installed Linux/Windows services. It requires separate protected environment
+configuration and returns startup or asynchronous broker permission failures.
+It stops accepting work before closing its database. The actual runtime passes
+the deployment-exclusion integration test, including deliberately partial broker
+permissions. [Worker CI passed](https://github.com/the-luap/openuem-worker/actions/runs/34172361553),
+including race tests and Linux/Windows builds. Its shared-library pin is now
+`6940f11772a9`; [library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34172052566)
+with broker restart/reconnection and native Windows ACL tests. Inherited handler
+operations still need a consistent upper time bound.
+
+Certificate Manager commit `a5a15e3` adds the `individual-broker` setup command:
+protected service keys, public broker configuration, partial setup recovery,
+identical retries and explicit conflicts/missing-key failures. Its
+[Linux/Windows CI passed](https://github.com/the-luap/openuem-cert-manager/actions/runs/34173268997).
+The shared library now renders the actual stock NATS account configuration and
+provisions bounded fixed consumers. Its database work queue handles issuance,
+revocation, site moves, expiry, leases, stale completions and periodic recovery.
+[Library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34173775027)
+at `b46d0913482e`; the console now pins this version. The executable
+`openuem-agent-commands` passes its local PostgreSQL/TLS race test, including
+broker-state repair and revocation deletion. See [command service operations](agent-command-operations.md).
+Console issuance, endpoint storage/bootstrap and reference deployment wiring remain open.
 
 ## Required boundaries
 
