@@ -28,6 +28,11 @@ administrator. Read [access control](access-control.md) before upgrading: existi
 accounts need explicit assignments and only the selected bootstrap account receives
 initial server administration rights.
 
+The [Apple push request workflow](apple-push-requests.md) generates a public CSR
+with an encrypted instance-held key and supports certificate-only import after
+external vendor signing. Vendor integration and pre-activation APNs verification
+remain open; see that guide for the current checks and renewal behavior.
+
 ## Deployment prerequisites
 
 Start from a working OpenUEM installation. Existing PostgreSQL, NATS, workers,

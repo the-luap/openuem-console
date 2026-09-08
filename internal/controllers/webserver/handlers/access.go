@@ -47,13 +47,15 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/ios/configurations":
 			return access.ReadProfiles, true
+		case "/ios/setup/requests/:id/csr":
+			return access.ManageCertificates, true
 		case "/ios/configurations/:id/download":
 			return access.ManageProfiles, true
 		}
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/ios/setup":
+		case "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate":
 			return access.ManageCertificates, true
 		case "/ios/enroll":
 			return access.EnrollDevices, true

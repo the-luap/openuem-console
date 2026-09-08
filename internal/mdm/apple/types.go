@@ -24,6 +24,8 @@ func (s Scope) Validate() error {
 }
 
 type Settings struct {
+	// AppleAccount is administrator metadata, never part of public device JSON.
+	AppleAccount    string    `json:"-"`
 	TenantID        int       `json:"tenant_id"`
 	PublicURL       string    `json:"public_url"`
 	Organization    string    `json:"organization"`

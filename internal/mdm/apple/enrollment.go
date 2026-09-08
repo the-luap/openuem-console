@@ -60,9 +60,7 @@ func PushTopic(cert *x509.Certificate) string {
 	return ""
 }
 
-// Configure creates or renews APNs credentials. A renewal cannot silently change
-// the push topic or enrollment CA and strand existing devices.
-func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
+func validatePushOrganization(c *Settings) error {
 	if c.TenantID <= 0 {
 		return errors.New("organization is required")
 	}
@@ -74,9 +72,16 @@ func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
 	if c.Organization == "" || len(c.Organization) > 255 {
 		return errors.New("organization name is required")
 	}
+	return nil
+}
+
+func validatePushSettings(c *Settings) error {
+	if err := validatePushOrganization(c); err != nil {
+		return err
+	}
 	pair, err := tls.X509KeyPair(c.PushCertificate, c.PushKey)
 	if err != nil {
-		return fmt.Errorf("invalid APNs certificate/key pair: %w", err)
+		return errors.New("invalid APNs certificate/key pair")
 	}
 	cert, err := x509.ParseCertificate(pair.Certificate[0])
 	if err != nil {
@@ -90,6 +95,15 @@ func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
 		return errors.New("APNs certificate is not currently valid")
 	}
 	c.PushExpiresAt = cert.NotAfter
+	return nil
+}
+
+// Configure creates or renews APNs credentials without changing an existing
+// topic or enrollment CA. A successful replacement supersedes pending requests.
+func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
+	if err := validatePushSettings(&c); err != nil {
+		return err
+	}
 	// Serializing setup also prevents concurrent initializations from creating
 	// different CAs. Private CA material is never returned through the web API.
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -100,9 +114,18 @@ func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684627902,$1::integer)`, c.TenantID); err != nil {
 		return err
 	}
+	if err = s.configurePushTx(ctx, tx, c, actor, false); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// The caller holds the organization setup lock. Request import and the legacy
+// pair import share one atomic replacement and invalidate all other pending keys.
+func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, actor string, accountConfirmed bool) error {
 	var oldTopic, oldURL string
 	var oldCA, oldKey []byte
-	err = tx.QueryRowContext(ctx, `SELECT topic,public_url,ca_certificate,ca_key FROM mdm_apple_settings WHERE tenant_id=$1 FOR UPDATE`, c.TenantID).Scan(&oldTopic, &oldURL, &oldCA, &oldKey)
+	err := tx.QueryRowContext(ctx, `SELECT topic,public_url,ca_certificate,ca_key FROM mdm_apple_settings WHERE tenant_id=$1 FOR UPDATE`, c.TenantID).Scan(&oldTopic, &oldURL, &oldCA, &oldKey)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -138,14 +161,17 @@ func (s *Store) Configure(ctx context.Context, c Settings, actor string) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_settings(tenant_id,public_url,organization,topic,push_expires_at,push_certificate,push_key,ca_certificate,ca_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(tenant_id) DO UPDATE SET public_url=excluded.public_url,organization=excluded.organization,push_expires_at=excluded.push_expires_at,push_certificate=excluded.push_certificate,push_key=excluded.push_key,updated_at=now()`, c.TenantID, c.PublicURL, c.Organization, c.Topic, c.PushExpiresAt, c.PushCertificate, pushKey, c.CACertificate, caKey)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_settings(tenant_id,public_url,organization,topic,push_expires_at,push_certificate,push_key,ca_certificate,ca_key,apple_account) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(tenant_id) DO UPDATE SET public_url=excluded.public_url,organization=excluded.organization,push_expires_at=excluded.push_expires_at,push_certificate=excluded.push_certificate,push_key=excluded.push_key,push_revision=mdm_apple_settings.push_revision+1,apple_account=CASE WHEN $11 THEN excluded.apple_account ELSE mdm_apple_settings.apple_account END,updated_at=now()`, c.TenantID, c.PublicURL, c.Organization, c.Topic, c.PushExpiresAt, c.PushCertificate, pushKey, c.CACertificate, caKey, c.AppleAccount, accountConfirmed)
 	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `WITH superseded AS (UPDATE mdm_apple_push_requests SET status='superseded',encrypted_key=NULL,completed_at=clock_timestamp() WHERE tenant_id=$1 AND status='pending' RETURNING id) INSERT INTO mdm_apple_audit(tenant_id,actor,action,resource_id) SELECT $1,$2,'apple.push_request.supersede',id::text FROM superseded`, c.TenantID, actor); err != nil {
 		return err
 	}
 	if err = audit(ctx, tx, c.TenantID, actor, "apple.settings.save", fmt.Sprint(c.TenantID)); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 type Invitation struct {

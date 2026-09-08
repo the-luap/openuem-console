@@ -1,0 +1,68 @@
+package mdm_views
+
+import (
+	"time"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests []apple.PushRequest) {
+	if settings!=nil {
+		if !settings.PushExpiresAt.After(time.Now().Add(30*24*time.Hour)) {
+			<p role="alert" class="uk-alert uk-alert-warning">Renew the Apple push certificate now. Its expiry date is approaching or has passed. Use the same Apple account and renew the existing portal entry to preserve device management.</p>
+		}
+		<p class="mt-4">Responsible Apple account: { Show(settings.AppleAccount) }</p>
+	}
+	<h3 class="text-lg font-semibold mt-6">Create a CSR for your authorized vendor</h3>
+	<p class="mt-2">OpenUEM generates and stores the private key in this instance. Only the public certificate signing request (CSR) is downloaded. Arrange signing with an Apple-authorized MDM vendor before proceeding.</p>
+	<p class="mt-2">Automatic vendor signing is not configured. The CSR download is vendor input and cannot be uploaded directly to Apple's Push Certificates Portal.</p>
+	<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup/requests") } class="grid gap-4 mt-4">
+		@CSRF(info)
+		<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
+		<label>Public HTTPS management URL<input class="uk-input" type="url" name="public_url" required placeholder="https://mdm.example.com" value={ settingURL(settings) }/></label>
+		<label>Responsible Apple account<input class="uk-input" name="apple_account" required maxlength="320" value={ pushAccount(settings) } autocomplete="off"/><span class="uk-text-muted">Administrative reference only. Never enter a password or recovery code.</span></label>
+		<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I confirm this organization and public management URL, and have arranged authorized vendor signing.</label>
+		<button class="uk-button uk-button-primary" type="submit">Generate CSR and store private key</button>
+		<p class="uk-text-muted">Requests expire after seven days. Up to five requests can be pending. Revoking a request removes its stored key without changing the active certificate.</p>
+	</form>
+	if len(requests)>0 {
+		<h3 class="text-lg font-semibold mt-6">Recent certificate requests</h3>
+		<p class="mt-2">For each request: download its public CSR, obtain a signed portal request from your authorized vendor, then open the Apple portal. Use the responsible account to create a certificate or renew the existing entry. Upload the resulting PEM certificate to that same request below.</p>
+		<p class="mt-2"><a class="underline" href="https://identity.apple.com/pushcert/" target="_blank" rel="noopener noreferrer">Open Apple Push Certificates Portal (new tab)</a></p>
+		for _,r:=range requests {
+			<article class="border rounded p-4 mt-4 grid gap-3">
+				<h4 class="font-semibold break-all">Request { r.ID }</h4>
+				<dl class="uk-description-list">
+					<dt>Status</dt><dd>{ r.State() }</dd>
+					<dt>Organization</dt><dd>{ r.Organization }</dd>
+					<dt>Public management URL</dt><dd class="break-all">{ r.PublicURL }</dd>
+					<dt>Responsible Apple account</dt><dd class="break-all">{ r.AppleAccount }</dd>
+					<dt>Request expires (UTC)</dt><dd>{ r.ExpiresAt.UTC().Format("2006-01-02 15:04") }</dd>
+					if r.ExpectedTopic!="" {
+						<dt>Renew this existing push topic</dt><dd class="break-all">{ r.ExpectedTopic }</dd>
+					}
+				</dl>
+				if r.Pending() {
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup/requests/"+r.ID+"/csr")) }>Download public CSR for vendor signing</a>
+					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup/requests/"+r.ID+"/certificate") } enctype="multipart/form-data" class="grid gap-3">
+						@CSRF(info)
+						<label>Apple-issued certificate for this request (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
+						<p class="uk-text-muted">Import checks the stored key, validity dates and MDM topic locally. It replaces the active certificate and supersedes other pending requests. An APNs connection test is not yet available.</p>
+						<button class="uk-button uk-button-primary" type="submit">Import certificate for this request</button>
+					</form>
+				}
+				if r.Status=="pending" {
+					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup/requests/"+r.ID+"/revoke") }>
+						@CSRF(info)
+						<button class="uk-button uk-button-danger" type="submit">Revoke request and remove stored key</button>
+					</form>
+				}
+			</article>
+		}
+	}
+}
+
+func pushAccount(settings *apple.Settings) string {
+	if settings == nil { return "" }
+	return settings.AppleAccount
+}

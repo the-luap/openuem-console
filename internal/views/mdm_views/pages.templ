@@ -80,10 +80,11 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 	}
 }
 
-templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings, setupError, message string, listener bool) {
+templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings, requests []apple.PushRequest, canManage bool, setupError, message string, listener bool) {
 	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-setup.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple setup", Url: partials.GetNavigationUrl(info, "/ios/setup")}}, info)
-		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+		<main id="apple-setup" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">Apple setup & enrollment</h1>
 				@Navigation(info)
@@ -103,7 +104,9 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 					if settings!=nil {
 						<dl class="uk-description-list"><dt>Push topic</dt><dd>{ settings.Topic }</dd><dt>Certificate expires</dt><dd>{ settings.PushExpiresAt.Format("2006-01-02") }</dd><dt>Public management URL</dt><dd>{ settings.PublicURL }</dd></dl>
 					}
-					if info.Can(access.ManageCertificates) {
+					if canManage {
+						@PushRequests(info, settings, requests)
+						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
 							@CSRF(info)
 							<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
@@ -111,8 +114,10 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 							<label>APNs certificate (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
 							<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
 							<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
+							<p class="uk-text-muted">Saving credentials supersedes all pending requests for this organization.</p>
 							<button class="uk-button uk-button-primary" type="submit">Save Apple credentials</button>
 						</form>
+						</details>
 					}
 				</div>
 			</section>

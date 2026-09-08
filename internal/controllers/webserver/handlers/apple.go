@@ -29,6 +29,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/ios", h.UnifiedDevices)
 		g.GET("/ios/setup", h.AppleSettings)
 		g.POST("/ios/setup", h.AppleSettings)
+		g.POST("/ios/setup/requests", h.AppleCreatePushRequest)
+		g.GET("/ios/setup/requests/:id/csr", h.ApplePushRequestCSR)
+		g.POST("/ios/setup/requests/:id/revoke", h.AppleRevokePushRequest)
+		g.POST("/ios/setup/requests/:id/certificate", h.AppleImportPushCertificate)
 		g.POST("/ios/enroll", h.AppleInvite)
 		g.GET("/ios/configurations", h.AppleProfiles)
 		g.POST("/ios/configurations", h.AppleSaveProfile)
@@ -221,12 +225,25 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 	}
 	var settings *apple.Settings
 	if h.Apple != nil {
-		settings, err = h.Apple.Settings(c.Request().Context(), scope.TenantID)
+		settings, err = h.Apple.SettingsMetadata(c.Request().Context(), scope.TenantID)
 		if err != nil && !errors.Is(err, apple.ErrNotFound) {
 			return err
 		}
+		if errors.Is(err, apple.ErrNotFound) {
+			settings = nil
+		}
 	}
-	return renderApple(c, mdm_views.Setup(c, info, settings, setupError, message, os.Getenv("APPLE_MDM_LISTEN_ADDR") != ""))
+	var requests []apple.PushRequest
+	canManage := info.Principal.Can(access.ManageCertificates, access.Scope{TenantID: scope.TenantID})
+	if h.Apple != nil && canManage {
+		requests, err = h.Apple.PushRequests(c.Request().Context(), scope.TenantID)
+		if err != nil {
+			return err
+		}
+	} else if settings != nil {
+		settings.AppleAccount = ""
+	}
+	return renderApple(c, mdm_views.Setup(c, info, settings, requests, canManage, setupError, message, os.Getenv("APPLE_MDM_LISTEN_ADDR") != ""))
 }
 
 func readAppleUpload(c echo.Context, name string, limit int64) ([]byte, error) {
