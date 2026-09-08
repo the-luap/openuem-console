@@ -4,9 +4,10 @@ The native Apple module accepts manual Mac Device Enrollment alongside iPhone an
 iPad enrollment. This implements part of MAC-01 and MAC-02 in the
 [roadmap ledger](implementation-status.md). Native and agent channels can share a
 verified Mac identity, and new enrollments support separately managed user
-channels. FileVault recovery-key management, broader Mac security workflows and
-physical-device acceptance remain open. See [channel linkage](macos-agent-mdm-linkage.md)
-and [Mac user management](macos-user-channels.md).
+channels. FileVault supports staged profiles, encrypted recovery escrow and
+audited retrieval; key validation and rotation, broader Mac security workflows
+and physical-device acceptance remain open. See [channel linkage](macos-agent-mdm-linkage.md),
+[Mac user management](macos-user-channels.md) and [FileVault](macos-filevault.md).
 
 ## Enroll and identify a Mac
 
@@ -55,6 +56,7 @@ These thresholds describe implemented protocol support, not hardware acceptance.
 | DDM software update identifier | iOS/iPadOS 18+ | macOS 15+, reported supervision |
 | Bootstrap-token exchange | Not implemented | macOS 10.15+, enrolled device identity |
 | User channel | Not implemented | macOS 10.7+, new per-user enrollment; user profile lifecycle |
+| FileVault profiles and recovery escrow | Not applicable | macOS 10.13+, device channel; user approval or supervision on 10.15+ |
 
 The version and channel thresholds follow Apple's pinned
 [profile command](https://github.com/apple/device-management/blob/67045e2fa06f528b196c01edee6a8bf88b844beb/mdm/commands/profile.install.yaml),
@@ -72,9 +74,10 @@ for Mac catalog matching; the marketing model is not substituted. ProvisioningUD
 is distinct evidence and is not treated as proof of agent/MDM linkage. See Apple's
 [device inventory schema](https://github.com/apple/device-management/blob/67045e2fa06f528b196c01edee6a8bf88b844beb/mdm/commands/information.device.yaml).
 
-Mac SecurityInfo responses retain only an explicit set of non-secret management
-and bootstrap capability fields, plus their collection time. They do not populate
-recovery keys into general inventory. Supervision distinguishes reported false
+Mac SecurityInfo responses retain only an explicit set of non-secret management,
+bootstrap and FileVault state fields, plus their collection time. Recovery
+material goes to the separate encrypted FileVault store, never general inventory.
+Supervision distinguishes reported false
 from not yet reported. An upgrade recovers the reporting flag only from a boolean
 in existing inventory, rather than inferring it from an enrollment label.
 

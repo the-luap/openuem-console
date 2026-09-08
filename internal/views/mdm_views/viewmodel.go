@@ -14,6 +14,8 @@ type DeviceRow struct {
 }
 
 type Detail struct {
+	FileVault        *apple.FileVault
+	FileVaultKeys    []apple.FileVaultKeyHistory
 	Users            []apple.UserChannel
 	AgentURL         string
 	Mac              *apple.MacDevice

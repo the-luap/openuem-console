@@ -20,6 +20,10 @@ func auditOutcome(ctx context.Context, tx *sql.Tx, tenant int, actor, action, re
 	site := 0
 	query, target := "", resource
 	switch {
+	case strings.HasPrefix(action, "apple.filevault.key."):
+		query = `SELECT e.site_id FROM mdm_apple_filevault_keys k JOIN mdm_apple_filevault_escrow e ON e.id=k.escrow_id WHERE k.tenant_id=$1 AND k.id::text=$2`
+	case strings.HasPrefix(action, "apple.filevault."):
+		query = `SELECT site_id FROM mdm_apple_filevault_policies WHERE tenant_id=$1 AND device_id::text=$2`
 	case action == "apple.mac.binding.request" || action == "apple.mac.channels.conflict":
 		query = `SELECT site_id FROM mdm_apple_mac_bindings WHERE tenant_id=$1 AND id::text=$2`
 	case action == "apple.mac.binding.cancel" || action == "apple.mac.binding.cleanup.request":

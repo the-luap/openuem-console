@@ -153,6 +153,19 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 	if !current.Capabilities().Profiles {
 		return errors.New("refresh inventory to identify the platform and OS version before assigning profiles")
 	}
+	if desired == "installed" {
+		for _, kind := range p.PayloadTypes {
+			if fileVaultPayloadType(kind) {
+				var owned bool
+				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_filevault_policies WHERE device_id=$1 AND phase<>'removed')`, d.ID).Scan(&owned); err != nil {
+					return err
+				}
+				if owned {
+					return errors.New("Remove and verify removal of the managed FileVault policy before assigning another FileVault profile")
+				}
+			}
+		}
+	}
 	// Cancel previous queued/sent work so stale responses cannot reverse the new
 	// desired state. A new assignment always replaces all commands for this pair.
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND profile_id=$2 AND status IN ('queued','sent','not_now')`, d.ID, p.ID); err != nil {

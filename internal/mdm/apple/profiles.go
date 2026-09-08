@@ -34,6 +34,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 		scope = value.(string)
 	}
 	id := stringValue(root, "PayloadIdentifier")
+	if reservedFileVaultIdentifier(id) {
+		return nil, errors.New("FileVault workflow identifiers are reserved")
+	}
 	if reservedMacBindingIdentifier(id) {
 		return nil, ErrMacBinding
 	}
@@ -59,6 +62,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 			return nil, errors.New("nested configuration and MDM enrollment payloads cannot be deployed as settings")
 		}
 		pid := stringValue(p, "PayloadIdentifier")
+		if reservedFileVaultIdentifier(pid) {
+			return nil, errors.New("FileVault workflow identifiers are reserved")
+		}
 		if reservedMacBindingIdentifier(pid) {
 			return nil, ErrMacBinding
 		}

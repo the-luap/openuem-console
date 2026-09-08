@@ -84,11 +84,20 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	pausedDetail.User = &pausedUser
 	mac.PerUserConnections = true
 	macDetail.Users = []apple.UserChannel{*user}
+	filevault := macDetail
+	filevault.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "active", KeyID: "e0000000-0000-4000-8000-000000000001", EscrowedAt: &now}
+	filevault.FileVaultKeys = []apple.FileVaultKeyHistory{{ID: filevault.FileVault.KeyID, Current: true, CreatedAt: now, ObservedAt: now}}
+	filevault.Commands = []apple.Command{{ID: "e0000000-0000-4000-8000-000000000002", FileVault: true, Status: "failed", RequestType: "InstallProfile"}}
+	filevaultFailure := filevault
+	filevaultFailure.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "failed", Error: "escrow_profile_missing"}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"mac-filevault", DeviceDetails(c, info, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume", "Retrieve recovery key", "Disk encryption remains enabled"}},
+		{"mac-filevault-reader", DeviceDetails(c, &reader, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume"}},
+		{"mac-filevault-failed", DeviceDetails(c, info, filevaultFailure), []string{"Encryption activation was not queued", "Enable FileVault with recovery escrow"}},
 		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", ""), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "Apple profiles"}},
 		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`, "Automatic renewal starts 30 days", "New push data received; awaiting command-channel confirmation", "New identity in use", strings.Repeat("2b", 32)}},
 		{"mac-device", DeviceDetails(c, info, macDetail), []string{"Design Mac", "Mac management readiness", "Apple silicon", "Not escrowed", "J313AP", "Wait for this Mac to escrow", "Remove update policy", "Device channel"}},
@@ -111,6 +120,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "mac-filevault-reader" && (strings.Contains(html, "Retrieve recovery key") || strings.Contains(html, "Remove management profiles")) {
+				t.Fatal("viewer has FileVault controls")
+			}
+			if tc.name == "mac-filevault" && strings.Contains(html, filevault.Commands[0].ID+"/retry") {
+				t.Fatal("FileVault command exposes generic retry")
+			}
 			if tc.name == "mac-user-reader" && (strings.Contains(html, `action="/tenant/1`+userDetail.Path()+`/`) || strings.Contains(html, "Apply to this user")) {
 				t.Fatal("viewer has user mutation controls")
 			}

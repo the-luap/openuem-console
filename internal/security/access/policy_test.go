@@ -15,12 +15,12 @@ func TestRolesEnforceScopeAndCapabilities(t *testing.T) {
 		p := Principal{UserID: "user", Grants: []Grant{grant}}
 		for _, scope := range scopes {
 			scopeAllowed := role == Administrator || scope.TenantID == 1 && (role == TenantAdmin || scope.SiteID == 11)
-			for _, capability := range []Capability{ReadDevices, ReadProfiles, EnrollDevices, RefreshDevices, AssignProfiles, ManageUpdates, ManageProfiles, ManageCertificates, RevokeDevices, ManageAccess, ReadAudit, ManageAuditRetention} {
+			for _, capability := range []Capability{ReadDevices, ReadProfiles, EnrollDevices, RefreshDevices, AssignProfiles, ManageUpdates, ManageProfiles, ManageCertificates, RevokeDevices, ManageAccess, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys} {
 				want := scopeAllowed
 				switch capability {
 				case ManageAccess:
 					want = role == Administrator
-				case ManageProfiles, ManageCertificates, RevokeDevices, ReadAudit, ManageAuditRetention:
+				case ManageProfiles, ManageCertificates, RevokeDevices, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys:
 					want = scopeAllowed && (role == TenantAdmin || role == Administrator)
 				case EnrollDevices, RefreshDevices, AssignProfiles, ManageUpdates:
 					want = scopeAllowed && role != Viewer

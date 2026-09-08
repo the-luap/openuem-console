@@ -54,6 +54,9 @@ func (s *Store) expireCommands(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET payload='\x' WHERE filevault AND status NOT IN ('queued','sent','not_now') AND octet_length(payload)>0`); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

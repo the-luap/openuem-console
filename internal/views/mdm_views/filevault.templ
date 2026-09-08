@@ -1,0 +1,105 @@
+package mdm_views
+
+import (
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"time"
+)
+
+templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
+	<section class="uk-card uk-card-default">
+		<div class="uk-card-header"><h2 class="uk-card-title">FileVault disk encryption</h2></div>
+		<div class="uk-card-body grid gap-4">
+			<dl class="uk-description-list">
+				<dt>Encryption</dt>
+				<dd>{ FileVaultEncryption(detail.Device) }</dd>
+				<dt>Security report</dt>
+				<dd>{ When(detail.Device.SecurityAt) }</dd>
+				<dt>Management policy</dt>
+				<dd>
+					if detail.FileVault==nil {
+						Not configured
+					} else {
+						{ FileVaultState(detail.FileVault.Phase) }
+					}
+				</dd>
+				<dt>Recovery key escrow</dt>
+				<dd>
+					if detail.FileVault==nil || detail.FileVault.EscrowedAt==nil {
+						No recovery key stored
+					} else {
+						{ "Stored " + When(detail.FileVault.EscrowedAt) }
+					}
+				</dd>
+				<dt>Recovery key validation</dt>
+				<dd>
+					if detail.FileVault!=nil && detail.FileVault.VerifiedAt!=nil {
+						{ "Validated on " + When(detail.FileVault.VerifiedAt) }
+					} else {
+						Not yet validated against the Mac volume
+					}
+				</dd>
+			</dl>
+			if detail.FileVault!=nil {
+				if detail.FileVault.Error!="" {
+					<p role="status" class="uk-alert uk-alert-warning">{ FileVaultHelp(detail.FileVault.Error) }</p>
+				}
+				if detail.FileVault.RecoveryError!="" {
+					<p role="status" class="uk-alert uk-alert-warning">{ FileVaultHelp(detail.FileVault.RecoveryError) }</p>
+				}
+			}
+			<p>OpenUEM installs and confirms the recovery escrow profile before requesting FileVault activation. The Mac user completes deferred activation at login or logout, with up to three login deferrals, and is shown their recovery key.</p>
+			<p>Already encrypted Macs may need a recovery key rotation before they report a key for this escrow destination. A stored key is not proof that it unlocks the volume.</p>
+			if info.Can(access.ManageDeviceSecurity) && detail.Device.Status=="enrolled" {
+				if detail.FileVault==nil || detail.FileVault.Phase=="failed" || detail.FileVault.Phase=="removed" || detail.FileVault.Phase=="not_managed" {
+					if reason:=detail.Device.FileVaultReason(time.Now()); reason!="" {
+						<p role="status" class="uk-text-muted">{ reason }</p>
+					} else {
+						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/filevault") }>
+							@CSRF(info)
+							<input type="hidden" name="desired" value="enabled"/>
+							<button class="uk-button uk-button-primary" type="submit">Enable FileVault with recovery escrow</button>
+						</form>
+					}
+				}
+				if detail.FileVault!=nil && detail.FileVault.Phase!="removed" {
+					<details>
+						<summary>Remove FileVault management profiles</summary>
+						<p class="mt-4">This removes the activation and escrow profiles. Disk encryption remains enabled and stored recovery keys are retained.</p>
+						<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/filevault") }>
+							@CSRF(info)
+							<input type="hidden" name="desired" value="removed"/>
+							<button class="uk-button uk-button-default" type="submit">Remove management profiles</button>
+						</form>
+					</details>
+				}
+			}
+			if info.Can(access.RetrieveRecoveryKeys) && len(detail.FileVaultKeys)>0 {
+				<details>
+					<summary>Recovery key history and retrieval</summary>
+					<p class="mt-4">Each retrieval is audited and opens the selected key in a separate tab. Previous keys are retained for recovery; they may no longer unlock the current volume.</p>
+					<ul class="uk-list uk-list-divider mt-4">
+						for _,key:=range detail.FileVaultKeys {
+							<li>
+								<p>
+									<strong>
+										if key.Current {
+											Latest escrowed key
+										} else {
+											Previous escrowed key
+										}
+									</strong>{ " · " + When(&key.CreatedAt) }
+								</p>
+								<p class="mt-2">{ "Last received: " + When(&key.ObservedAt) }</p>
+								<form class="mt-2" method="post" target="_blank" rel="noopener noreferrer" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/filevault/keys/"+key.ID+"/reveal") }>
+									@CSRF(info)
+									<button class="uk-button uk-button-default" type="submit">Retrieve recovery key</button>
+								</form>
+							</li>
+						}
+					</ul>
+				</details>
+			}
+		</div>
+	</section>
+}

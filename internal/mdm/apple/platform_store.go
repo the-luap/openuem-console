@@ -34,6 +34,11 @@ func (s *Store) saveSecurityInventory(ctx context.Context, tx *sql.Tx, d *Device
 	// Recovery material belongs in encrypted escrow, never a generic inventory
 	// JSON document. Keep only explicit non-secret capability evidence here.
 	safe := map[string]any{}
+	for _, key := range []string{"FDE_Enabled", "FDE_HasPersonalRecoveryKey", "FDE_HasInstitutionalRecoveryKey"} {
+		if value, ok := info[key].(bool); ok {
+			safe[key] = value
+		}
+	}
 	if management, ok := info["ManagementStatus"].(map[string]any); ok {
 		values := map[string]any{}
 		for _, key := range []string{"UserApprovedEnrollment", "EnrolledViaDEP", "IsUserEnrollment"} {
@@ -53,6 +58,8 @@ func (s *Store) saveSecurityInventory(ctx context.Context, tx *sql.Tx, d *Device
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET security_inventory=$2,security_at=clock_timestamp() WHERE id=$1`, d.ID, data)
-	return err
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET security_inventory=$2,security_at=clock_timestamp() WHERE id=$1`, d.ID, data); err != nil {
+		return err
+	}
+	return s.ingestFileVaultRecovery(ctx, tx, d, info, stringValue(message, "CommandUUID"))
 }

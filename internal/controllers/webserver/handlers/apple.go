@@ -55,6 +55,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/refresh", h.AppleRefresh)
 		g.POST("/ios/:id/revoke", h.AppleRevoke)
 		g.POST("/ios/:id/update", h.AppleUpdate)
+		g.POST("/ios/:id/filevault", h.AppleFileVault)
+		g.POST("/ios/:id/filevault/keys/:key/reveal", h.AppleFileVaultKey)
 		g.POST("/ios/:id/commands/:command/retry", h.AppleRetryCommand)
 	}
 }
@@ -411,6 +413,16 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 		}
 	}
 	if d.Family() == apple.PlatformMacOS {
+		detail.FileVault, err = h.Apple.FileVault(c.Request().Context(), scope, id)
+		if err != nil {
+			return err
+		}
+		if info.Can(access.RetrieveRecoveryKeys) {
+			detail.FileVaultKeys, err = h.Apple.FileVaultKeyHistory(c.Request().Context(), scope, id)
+			if err != nil {
+				return err
+			}
+		}
 		detail.Users, err = h.Apple.Users(c.Request().Context(), scope, id)
 		if err != nil {
 			return err

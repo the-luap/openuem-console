@@ -34,7 +34,7 @@ protect database backups containing permission records.
 | --- | --- | --- |
 | Viewer | One organization or one site | Device inventory/details and profile metadata |
 | Operator | One organization or one site | Viewer actions plus invitations, inventory refresh, assignment/removal of existing profiles, command retry and OS update policies |
-| Organization administrator | One entire organization | Operator actions plus APNs credentials, profile content/create/revision/delete/download and enrollment revocation |
+| Organization administrator | One entire organization | Operator actions plus APNs credentials, profile content/create/revision/delete/download, enrollment revocation, FileVault policy management and recovery key retrieval |
 | Server administrator | Global | All native Apple actions, installation settings, desktop administration and user access assignments |
 
 Grants are additive. A grant for an organization covers every site in that
@@ -44,6 +44,14 @@ organization. Profile contents and APNs credentials always require organization
 authority even if their URL includes a site. Site-scoped operators may assign
 existing organization profiles only to their permitted devices. Raw profile
 downloads require organization administration because payloads can contain secrets.
+
+[FileVault](macos-filevault.md) uses separate `devices.security.manage` and
+`devices.recovery.retrieve` capabilities. Both require organization or server
+administration. Policy changes and recovery retrieval recheck permissions inside
+their database transaction, serialized with permission replacement. A recovery
+key is returned only after its read audit commits, through a non-cacheable
+CSRF-protected POST response. Profile-assignment authority does not grant access
+to the dedicated FileVault workflow or its keys.
 
 The organization/site selectors display only permitted scopes. A site-scoped user
 cannot select **All sites**. Explicit foreign organization/site URLs are rejected;

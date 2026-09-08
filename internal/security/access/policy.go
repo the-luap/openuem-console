@@ -23,6 +23,8 @@ const (
 	ManageProfiles       Capability = "profiles.manage"
 	AssignProfiles       Capability = "profiles.assign"
 	ManageUpdates        Capability = "updates.manage"
+	ManageDeviceSecurity Capability = "devices.security.manage"
+	RetrieveRecoveryKeys Capability = "devices.recovery.retrieve"
 	ManageCertificates   Capability = "certificates.manage"
 	ReadAudit            Capability = "audit.read"
 	ManageAuditRetention Capability = "audit.retention.manage"
@@ -83,7 +85,7 @@ func roleAllows(role Role, capability Capability) bool {
 		return role == Viewer || role == Operator || role == TenantAdmin || role == Administrator
 	case RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates:
 		return role == Operator || role == TenantAdmin || role == Administrator
-	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention:
+	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys:
 		return role == TenantAdmin || role == Administrator
 	case ManageAccess:
 		return role == Administrator

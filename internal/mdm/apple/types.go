@@ -135,6 +135,7 @@ type Assignment struct {
 }
 
 type Command struct {
+	FileVault       bool       `json:"filevault"`
 	MacBinding      bool       `json:"mac_binding"`
 	IdentityRenewal bool       `json:"identity_renewal"`
 	ID              string     `json:"id"`
