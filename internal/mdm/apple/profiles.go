@@ -88,6 +88,11 @@ func ParseProfile(data []byte) (*Profile, error) {
 			return nil, errors.New("each payload needs PayloadVersion 1")
 		}
 		types[kind] = true
+		if kind == "com.apple.security.firewall" {
+			if err := validateFirewallPayload(p, scope, nil); err != nil {
+				return nil, err
+			}
+		}
 		if scope == "User" {
 			if err := validateUserPayload(p, nil); err != nil {
 				return nil, err
@@ -139,7 +144,7 @@ func numberValue(v any) uint64 {
 	return 0
 }
 
-// BuildProfile provides native editors for common iOS configurations while the
+// BuildProfile provides native editors for common Apple configurations while the
 // upload path supports additional Apple payloads without a server release.
 func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byte, error) {
 	scope := "System"
@@ -154,6 +159,10 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	}
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	switch kind {
+	case "macos-firewall":
+		if err := buildFirewallPayload(payload, settings, scope); err != nil {
+			return nil, err
+		}
 	case "passcode":
 		payload["PayloadType"] = "com.apple.mobiledevice.passwordpolicy"
 		payload["forcePIN"] = true

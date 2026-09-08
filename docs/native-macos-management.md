@@ -156,5 +156,7 @@ Rendered Mac enrollment, Mac detail and the shared device list were checked at
 390, 768 and 1440 pixels, including disabled update enforcement and keyboard help.
 The native macOS/Safari installation prompts, actual token escrow, update/reboot
 continuity and agent/MDM linkage still need hardware acceptance
-as recorded in the roadmap. FileVault recovery escrow, Recovery Lock, broader profile
-templates and Mac security templates are not supplied by this change.
+as recorded in the roadmap. Subsequent changes add
+[FileVault escrow and validation](macos-filevault.md) and a
+[firewall profile editor](macos-firewall.md). Recovery Lock, key rotation and
+broader profile/security templates remain open.

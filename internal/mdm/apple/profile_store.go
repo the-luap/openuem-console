@@ -154,6 +154,9 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 		return errors.New("refresh inventory to identify the platform and OS version before assigning profiles")
 	}
 	if desired == "installed" {
+		if err := validateFirewallProfile(p, current); err != nil {
+			return err
+		}
 		for _, kind := range p.PayloadTypes {
 			if fileVaultPayloadType(kind) {
 				var owned bool

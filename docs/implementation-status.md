@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Mac firewall profiles](macos-firewall.md) add a System-scope editor with
+  explicit firewall settings and bounded app rules. The editor and uploaded
+  profiles enforce field types, device platform and version-specific settings.
+  PostgreSQL tests cover atomic mixed-target rejection, incompatible revision
+  rollback and verified installation/removal; real-router tests cover roles,
+  CSRF and form ambiguity. Browser checks cover three roles at 390/768/1440 px,
+  keyboard operation and repaired profile-page overflow. Effective firewall
+  behavior on a Mac and broader template/conflict coverage remain open.
+
 - [Scoped audit logging](audit-log.md) queries available original Apple, agent,
   access, release, audit access and retention sources with exact scope/filter
   enforcement and stable pagination. CSV/JSON exports exclude secret payloads

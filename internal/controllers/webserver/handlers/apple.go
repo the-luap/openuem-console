@@ -560,6 +560,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 				settings[key] = c.FormValue(key) == "true"
 			}
 		}
+		if c.FormValue("editor") == "macos-firewall" {
+			if err = appleFirewallSettings(c, settings); err != nil {
+				return err
+			}
+		}
 		data, err = apple.BuildProfile(c.FormValue("name"), c.FormValue("identifier"), c.FormValue("editor"), settings)
 	}
 	if err != nil {
