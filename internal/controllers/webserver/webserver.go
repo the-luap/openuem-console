@@ -52,6 +52,7 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 	w.Handler = handlers.NewHandler(m, natsServers, s, ts, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey, reEnableCertAuth, reEnablePasswdAuth, authLogger)
 	w.Handler.Register(w.Router, registerRateLimit)
 	w.initApple(encryptionMasterKey)
+	w.initDesktop(encryptionMasterKey)
 
 	// Add the session manager
 	w.SessionManager = s

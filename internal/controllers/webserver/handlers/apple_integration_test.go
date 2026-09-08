@@ -237,4 +237,5 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal("revocation not persisted", d, err)
 	}
 	exerciseConsolePermissions(t, h, e, ctx, tenant.ID, site.ID, profiles[0].ID)
+	exerciseDesktopConsolePermissions(t, h, e, ctx, tenant.ID, site.ID)
 }

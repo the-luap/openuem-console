@@ -13,6 +13,7 @@ import (
 
 func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	h.RegisterApple(e)
+	h.RegisterDesktop(e)
 	h.RegisterAccess(e)
 	e.GET("/", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant", h.Dashboard, h.IsAuthenticated)

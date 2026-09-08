@@ -3,9 +3,9 @@
 This is the active implementation design for ENR-01, the desktop portion of
 ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
 claim. Shared proof, durable registry, broker authorization, gateway transport and
-worker request boundaries and service runtimes now have automated evidence. Console
-issuance, service provisioning, native-agent storage, installers and production
-deployment remain open.
+worker request boundaries, service runtimes and scoped console administration now
+have automated evidence. New installation invitations, native-agent storage,
+installers and production deployment wiring remain open.
 
 ## Source baselines
 
@@ -40,7 +40,8 @@ worker pins published library commit `2af211c88d57` using the Go module replacem
 for that exact commit. Later library commit `7462b7bd9e56` adds the bounded
 authorization service, durable disconnect batches and protected key-file loading.
 Its [CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34171176156),
-including native Windows ACL tests. The console pins that published commit.
+including native Windows ACL tests. The console authorization executable was
+introduced with that dependency; later pins are recorded below.
 
 The console now includes the private `openuem-agent-auth` executable with separate
 authorization/revocation NKeys, verified TLS, loopback readiness and graceful
@@ -90,7 +91,15 @@ revocation, site moves, expiry, leases, stale completions and periodic recovery.
 at `b46d0913482e`; the console now pins this version. The executable
 `openuem-agent-commands` passes its local PostgreSQL/TLS race test, including
 broker-state repair and revocation deletion. See [command service operations](agent-command-operations.md).
-Console issuance, endpoint storage/bootstrap and reference deployment wiring remain open.
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34174306948)
+for commit `a39a21f`, including both isolated service lifecycles and both platform builds.
+
+The console now initializes the registry and exposes scoped public metadata,
+organization-authority setup/import, invitation revocation and identity revocation
+with confirmation and CSRF. Its real-router PostgreSQL tests and browser fixture
+cover these actions. See [desktop administration](desktop-console.md).
+Signed artifact selection, new console invitations, endpoint storage/bootstrap
+and reference deployment wiring remain open.
 
 ## Required boundaries
 

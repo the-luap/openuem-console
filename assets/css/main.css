@@ -9502,6 +9502,11 @@ th.uk-text-break, td.uk-text-break {
   margin-bottom: 0.5rem;
 }
 
+.my-3 {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .my-4 {
   margin-top: 1rem;
   margin-bottom: 1rem;
@@ -9571,6 +9576,10 @@ th.uk-text-break, td.uk-text-break {
 
 .mt-2 {
   margin-top: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
 }
 
 .mt-4 {
@@ -9833,6 +9842,10 @@ th.uk-text-break, td.uk-text-break {
   min-width: 0px;
 }
 
+.min-w-\[48rem\] {
+  min-width: 48rem;
+}
+
 .max-w-full {
   max-width: 100%;
 }
@@ -9959,12 +9972,20 @@ th.uk-text-break, td.uk-text-break {
   scroll-behavior: auto;
 }
 
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
 .whitespace-pre-wrap {
   white-space: pre-wrap;
 }
 
 .text-nowrap {
   text-wrap: nowrap;
+}
+
+.break-words {
+  overflow-wrap: break-word;
 }
 
 .break-all {
@@ -10379,6 +10400,10 @@ th.uk-text-break, td.uk-text-break {
 .text-blue-700 {
   --tw-text-opacity: 1;
   color: rgb(29 78 216 / var(--tw-text-opacity));
+}
+
+.text-foreground {
+  color: hsl(var(--foreground));
 }
 
 .text-gray-300 {

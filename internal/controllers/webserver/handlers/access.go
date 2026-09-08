@@ -99,6 +99,11 @@ func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc)
 		// before any domain call. No legacy resource handler is implicitly admitted.
 		return next(c)
 	}
+	if _, ok := desktopCapability(c.Request().Method, c.Path()); ok {
+		// Desktop handlers resolve and authorize the exact selected scope before
+		// reading registry metadata or performing enrollment actions.
+		return next(c)
+	}
 	if c.Path() == "/myaccount" && c.Request().Method == http.MethodGet {
 		return next(c)
 	}

@@ -1,0 +1,86 @@
+package handlers
+
+import (
+	"context"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/invopop/ctxi18n"
+	"github.com/labstack/echo/v4"
+	consolemiddleware "github.com/open-uem/openuem-console/internal/controllers/router/middleware"
+)
+
+// This opt-in loopback TLS fixture shares the isolated database created by the
+// console integration test. Authentication is supplied by the fixture; forms use
+// production handlers and the real cookie/Origin CSRF middleware. Creating the
+// private <path>.stop file closes the server and permits schema cleanup.
+func runDesktopBrowserFixture(t *testing.T, h *Handler, ctx context.Context) {
+	t.Helper()
+	path := os.Getenv("OPENUEM_DESKTOP_BROWSER_FIXTURE")
+	if path == "" {
+		return
+	}
+	tenant, err := h.Model.Client.Tenant.Create().SetDescription("Browser acceptance organization").Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = h.Model.CloneGlobalSettings(tenant.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = h.Model.Client.Site.Create().SetDescription("Browser acceptance site").SetTenantID(tenant.ID).SetIsDefault(true).Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			requestCtx, err := ctxi18n.WithLocale(c.Request().Context(), "en")
+			if err != nil {
+				return err
+			}
+			requestCtx, err = h.SessionManager.Manager.Load(requestCtx, "")
+			if err != nil {
+				return err
+			}
+			h.SessionManager.Manager.Put(requestCtx, "uid", "apple-console-admin")
+			c.SetRequest(c.Request().WithContext(requestCtx))
+			return next(c)
+		}
+	}, consolemiddleware.CSRF())
+	assets, err := filepath.Abs("../../../../assets")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Static("/assets", assets)
+	h.Register(e, 3)
+	server := httptest.NewTLSServer(e)
+	previous := h.PublicOrigin
+	h.PublicOrigin = server.URL
+	defer func() {
+		// Stop and join HTTP handlers before restoring shared configuration.
+		server.Close()
+		h.PublicOrigin = previous
+	}()
+	if err = os.WriteFile(path, []byte(server.URL+"/tenant/"+strconv.Itoa(tenant.ID)+"/desktop/enrollment"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(path); _ = os.Remove(path + ".stop") }()
+	t.Log("Desktop browser fixture is ready; its loopback URL is in the configured file")
+	deadline := time.NewTimer(8 * time.Minute)
+	defer deadline.Stop()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			t.Fatal("desktop browser fixture timed out; its isolated schema will be removed")
+		case <-ticker.C:
+			if _, err := os.Stat(path + ".stop"); err == nil {
+				return
+			}
+		}
+	}
+}

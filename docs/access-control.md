@@ -50,11 +50,16 @@ cannot select **All sites**. Explicit foreign organization/site URLs are rejecte
 object lookups are additionally scoped on the server. Invitation and bulk-action
 form fields cannot expand the selected URL scope.
 
-The unified inventory includes scoped desktop rows, but desktop detail, software
-deployment, remote actions and other legacy administration routes currently
-require a server administrator. Individual desktop permissions remain expanded
-roadmap work. A new route is not implicitly enabled for a scoped role because it
-shares a URL prefix or uses GET.
+The [individual desktop enrollment page](desktop-console.md) allows scoped
+metadata reads, operator invitation revocation, and organization-administrator
+authority setup and identity revocation. Its action routes are explicitly mapped
+to capabilities and verify the selected scope before using the registry.
+
+The unified inventory includes scoped desktop rows, but legacy desktop detail,
+software deployment, remote actions and other legacy administration routes still
+require a server administrator. Those individual desktop permissions remain
+expanded roadmap work. A new route is not implicitly enabled for a scoped role
+because it shares a URL prefix or uses GET.
 
 ## Concurrent changes and audit
 
