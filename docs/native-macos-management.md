@@ -130,6 +130,15 @@ compliance.
 
 ## Verification and remaining acceptance
 
+The [agent hardware evidence protocol](macos-agent-mdm-linkage.md) now supplies
+separate authenticated observations for future channel association. Console
+startup migrates its registry table and the broker scopes the new operation to
+each individual identity. The agent preserves platform UUID and provisioning
+UDID, reads a protected system managed-preferences proof and negotiates worker
+support without changing ordinary inventory JSON. The worker rechecks scope,
+certificate expiry and revocation, then stores only the proof hash. MDM challenge
+issuance, association reconciliation and one-device navigation remain open.
+
 Automated PostgreSQL, SCEP and HTTP/TLS tests cover Mac enrollment and instructions,
 platform filters, minimal-inventory discovery, profile install/remove verification,
 version gates, DDM update identifiers and catalog isolation. Bootstrap tests cover
