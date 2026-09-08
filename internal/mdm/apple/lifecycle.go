@@ -45,6 +45,9 @@ func (s *Store) RevokeEnrollment(ctx context.Context, scope Scope, id, actor str
 	if err = s.reconcileFileVault(ctx, tx, &Device{ID: id, TenantID: scope.TenantID, Status: "revoked"}); err != nil {
 		return err
 	}
+	if err = s.reconcileRecoveryLock(ctx, tx, &Device{ID: id, TenantID: scope.TenantID}, false); err != nil {
+		return err
+	}
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.enrollment.revoke", id); err != nil {
 		return err
 	}

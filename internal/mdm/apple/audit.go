@@ -20,6 +20,12 @@ func auditOutcome(ctx context.Context, tx *sql.Tx, tenant int, actor, action, re
 	site := 0
 	query, target := "", resource
 	switch {
+	case strings.HasPrefix(action, "apple.recovery_lock.command."):
+		query = `SELECT a.site_id FROM mdm_apple_recovery_lock_commands c JOIN mdm_apple_recovery_lock_attempts a ON a.id=c.attempt_id WHERE c.tenant_id=$1 AND c.command_id::text=$2`
+	case action == "apple.recovery_lock.password.reveal":
+		query = `SELECT d.site_id FROM mdm_apple_recovery_lock_keys k JOIN mdm_apple_devices d ON d.id=k.device_id AND d.tenant_id=k.tenant_id WHERE k.tenant_id=$1 AND k.id::text=$2`
+	case strings.HasPrefix(action, "apple.recovery_lock."):
+		query = `SELECT site_id FROM mdm_apple_recovery_lock_attempts WHERE tenant_id=$1 AND id::text=$2`
 	case strings.HasPrefix(action, "apple.filevault.validation."):
 		query = `SELECT site_id FROM mdm_apple_filevault_validations WHERE tenant_id=$1 AND id::text=$2`
 	case strings.HasPrefix(action, "apple.filevault.key."):

@@ -149,6 +149,7 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 			return
 		}
 		response, err := s.Connect(r.Context(), d, message)
+		defer clear(response)
 		if err != nil {
 			protocolError(w, err, logger)
 			return

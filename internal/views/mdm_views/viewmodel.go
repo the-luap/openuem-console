@@ -14,6 +14,8 @@ type DeviceRow struct {
 }
 
 type Detail struct {
+	RecoveryLock     *apple.RecoveryLock
+	RecoveryLockKeys []apple.RecoveryLockKey
 	FileVault        *apple.FileVault
 	FileVaultKeys    []apple.FileVaultKeyHistory
 	Users            []apple.UserChannel

@@ -211,6 +211,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 			if detail.Device.Family()==apple.PlatformMacOS {
 				@MacBindingPanel(info, detail)
 				@FileVaultPanel(info, detail)
+				@RecoveryLockPanel(info,detail)
 			}
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Inventory</h2></div>
@@ -399,7 +400,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
 									<td>
 										{ cmd.Error }
-										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
+										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
 											if info.Can(access.AssignProfiles) {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
 													@CSRF(info)

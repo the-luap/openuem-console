@@ -137,6 +137,7 @@ type Assignment struct {
 }
 
 type Command struct {
+	RecoveryLock    bool       `json:"recovery_lock"`
 	FileVault       bool       `json:"filevault"`
 	MacBinding      bool       `json:"mac_binding"`
 	IdentityRenewal bool       `json:"identity_renewal"`

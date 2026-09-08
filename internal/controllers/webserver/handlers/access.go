@@ -69,9 +69,9 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/ios/:id/revoke", "/ios/:id/users/:user/pause":
 			return access.RevokeDevices, true
-		case "/ios/:id/filevault", "/ios/:id/filevault/keys/:key/verify", "/ios/:id/filevault/keys/:key/rotate":
+		case "/ios/:id/filevault", "/ios/:id/filevault/keys/:key/verify", "/ios/:id/filevault/keys/:key/rotate", "/ios/:id/recovery-lock":
 			return access.ManageDeviceSecurity, true
-		case "/ios/:id/filevault/keys/:key/reveal":
+		case "/ios/:id/filevault/keys/:key/reveal", "/ios/:id/recovery-lock/passwords/:key/reveal":
 			return access.RetrieveRecoveryKeys, true
 		case "/ios/:id/update":
 			return access.ManageUpdates, true

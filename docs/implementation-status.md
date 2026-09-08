@@ -42,7 +42,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px | Shared platform navigation/components, locale keys/preferences, pagination/filter/export/bulk consistency, dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
 | MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping; per-user enrollment, separate encrypted push/command/profile state, capability-gated user profiles, renewal staging, pause/resume and scoped console controls | Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
-| MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; staged FileVault profiles, per-device encrypted recovery escrow/history, authenticated agent validation, journaled rotation, explicit uncertainty resolution and audited retrieval; PostgreSQL/HTTP/browser tests | Physical FileVault rotation/recovery acceptance, escrow certificate rotation, complete Mac security workflows and hardware update/reboot acceptance |
+| MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; staged FileVault profiles, per-device encrypted recovery escrow/history, authenticated agent validation, journaled rotation, explicit uncertainty resolution and audited retrieval; opt-in native Recovery Lock with encrypted password history and conservative result reconciliation; PostgreSQL/HTTP/browser tests | Physical FileVault rotation/recovery acceptance, escrow certificate rotation, complete Mac security workflows and hardware update/reboot acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
@@ -61,12 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
-- [Recovery Lock enrollment permission](macos-recovery-lock.md) adds an explicit,
-  security-authorized Mac invitation option and separate owner confirmation.
-  Database guards preserve the original access rights across migration, browser
-  retries, SCEP identity renewal and layout recovery. Tests cover role/scope
-  restrictions, revoked access, malformed forms, CSRF and atomic audit rollback.
-  Password operations and hardware acceptance remain open.
+- [Recovery Lock](macos-recovery-lock.md) adds explicit enrollment rights and
+  owner confirmation, encrypted password history, native creation/import/checks,
+  rotation/removal, and separately authorized, audited password retrieval.
+  Delivery consumes each mutation once; distinct candidate verification and
+  explicit stopping evidence govern uncertain results. Superseded or expired
+  preflight responses cannot authorize another change. Local protocol, handler,
+  rendered-view checks and vet pass; PostgreSQL and browser validation for this
+  workflow are pending in this change. Physical recoveryOS/password acceptance
+  and the broader MAC-02 package remain open.
 
 - [Mac firewall profiles](macos-firewall.md) add a System-scope editor with
   explicit firewall settings and bounded app rules. The editor and uploaded

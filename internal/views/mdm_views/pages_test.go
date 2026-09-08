@@ -113,11 +113,53 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		d.FileVault.ValidationReady = status != "queued"
 		return d
 	}
+	recoveryDetail := func(status string) Detail {
+		d := lockDetail
+		r := &apple.RecoveryLock{Evidence: "unknown"}
+		d.RecoveryLock = r
+		if status != "new" {
+			r.CurrentKeyID = "f0000000-0000-4000-8000-000000000001"
+			r.Evidence = "verified"
+			r.Attempt = &apple.RecoveryLockAttempt{ID: "f0000000-0000-4000-8000-000000000002", Operation: "rotate", Status: status, PreviousKeyID: r.CurrentKeyID, CandidateKeyID: "f0000000-0000-4000-8000-000000000003", CreatedAt: now}
+			d.RecoveryLockKeys = []apple.RecoveryLockKey{{ID: r.CurrentKeyID, Source: "generated", Current: true, CreatedAt: now, VerifiedAt: &now}}
+		}
+		if status == "stopped" {
+			r.Attempt.Status = "uncertain"
+			r.Attempt.CanCheckPrevious = true
+		}
+		if status == "removal-uncertain" {
+			r.Attempt.Status = "uncertain"
+			r.Attempt.Operation = "remove"
+			r.Attempt.CandidateKeyID = ""
+			r.Attempt.Error = "awaiting_removal_result"
+		}
+		if status == "removed" {
+			r.Evidence = "removal_acknowledged"
+			r.CurrentKeyID = ""
+			d.RecoveryLockKeys[0].Current = false
+		}
+		if status == "stale" {
+			r.Attempt.Status = "verified"
+			r.Reason = "Refresh device and security inventory before managing Recovery Lock."
+		}
+		d.Commands = []apple.Command{{ID: "f0000000-0000-4000-8000-000000000004", RecoveryLock: true, RequestType: "SetRecoveryLock", Status: "failed"}}
+		return d
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"mac-recovery-new", DeviceDetails(c, info, recoveryDetail("new")), []string{"Set a Recovery Lock password", "Import an existing Recovery Lock password", "confirm_recovery_lock"}},
+		{"mac-recovery-verified", DeviceDetails(c, info, recoveryDetail("verified")), []string{"Rotate the Recovery Lock password", "Remove the Recovery Lock password", "Retrieve Recovery Lock password"}},
+		{"mac-recovery-checking", DeviceDetails(c, info, recoveryDetail("checking")), []string{"verify the current password before changing it"}},
+		{"mac-recovery-uncertain", DeviceDetails(c, info, recoveryDetail("uncertain")), []string{"Another password change remains blocked", "Check proposed password"}},
+		{"mac-recovery-stopped", DeviceDetails(c, info, recoveryDetail("stopped")), []string{"Check retained previous password"}},
+		{"mac-recovery-removal-uncertain", DeviceDetails(c, info, recoveryDetail("removal-uncertain")), []string{"has not confirmed whether the password was removed"}},
+		{"mac-recovery-removed", DeviceDetails(c, info, recoveryDetail("removed")), []string{"Absence of a password has not been independently verified", "Set a Recovery Lock password"}},
+		{"mac-recovery-stale", DeviceDetails(c, info, recoveryDetail("stale")), []string{"Refresh device and security inventory"}},
+		{"mac-recovery-reader", DeviceDetails(c, &reader, recoveryDetail("verified")), []string{"Stored password verified by the Mac"}},
+		{"mac-recovery-operator", DeviceDetails(c, &operator, recoveryDetail("verified")), []string{"Stored password verified by the Mac"}},
 		{"setup-device-lock-admin", Setup(c, info, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Allow Recovery Lock and device lock management", `name="allow_mac_device_lock"`, "Existing enrollments cannot gain these rights through renewal"}},
 		{"setup-device-lock-operator", Setup(c, &operator, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Create enrollment invitation"}},
 		{"setup-device-lock-reader", Setup(c, &reader, &apple.Settings{Organization: "Example organization", PublicURL: "https://mdm.example.test", PushExpiresAt: now.AddDate(1, 0, 0)}, nil, true, true, "", "", true), []string{"Apple setup"}},
@@ -156,6 +198,25 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if strings.HasPrefix(tc.name, "mac-recovery-") {
+				if strings.Contains(html, "f0000000-0000-4000-8000-000000000004/retry") {
+					t.Fatal("password command exposes generic retry")
+				}
+				if tc.name == "mac-recovery-reader" || tc.name == "mac-recovery-operator" {
+					if strings.Contains(html, "/recovery-lock") {
+						t.Fatal("unprivileged Recovery Lock form")
+					}
+				}
+				if tc.name == "mac-recovery-checking" || tc.name == "mac-recovery-uncertain" || tc.name == "mac-recovery-removal-uncertain" || tc.name == "mac-recovery-stale" {
+					if strings.Contains(html, `name="operation" value="rotate"`) || strings.Contains(html, `name="operation" value="remove"`) || strings.Contains(html, `name="operation" value="import"`) {
+						t.Fatal("blocked password change offered")
+					}
+				}
+				if tc.name == "mac-recovery-uncertain" && strings.Contains(html, "Check retained previous password") {
+					t.Fatal("old password check lacks stopping proof")
+				}
+			}
+
 			if (tc.name == "setup-device-lock-operator" || tc.name == "setup-device-lock-reader") && strings.Contains(html, `name="allow_mac_device_lock"`) {
 				t.Fatal("lock rights offered without device security permission")
 			}

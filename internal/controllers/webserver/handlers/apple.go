@@ -29,6 +29,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/devices", h.UnifiedDevices)
 		g.GET("/ios", h.UnifiedDevices)
 		g.GET("/ios/setup", h.AppleSettings)
+		g.POST("/ios/:id/recovery-lock", h.AppleRecoveryLock)
+		g.POST("/ios/:id/recovery-lock/passwords/:key/reveal", h.AppleRecoveryLockPassword)
 		g.POST("/ios/setup", h.AppleSettings)
 		g.POST("/ios/setup/requests", h.AppleCreatePushRequest)
 		g.GET("/ios/setup/requests/:id/csr", h.ApplePushRequestCSR)
@@ -67,7 +69,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
-			if appleRoute(c.Path()) == "/desktop/invitations" {
+			if appleRoute(c.Path()) == "/desktop/invitations" || strings.Contains(appleRoute(c.Path()), "/recovery-lock") {
 				limit = 8192
 			}
 			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
@@ -430,6 +432,16 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 		}
 	}
 	if d.Family() == apple.PlatformMacOS {
+		detail.RecoveryLock, err = h.Apple.RecoveryLock(c.Request().Context(), scope, id)
+		if err != nil {
+			return err
+		}
+		if info.Can(access.RetrieveRecoveryKeys) {
+			detail.RecoveryLockKeys, err = h.Apple.RecoveryLockKeys(c.Request().Context(), scope, id)
+			if err != nil {
+				return err
+			}
+		}
 		detail.FileVault, err = h.Apple.FileVault(c.Request().Context(), scope, id)
 		if err != nil {
 			return err
