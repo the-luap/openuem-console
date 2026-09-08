@@ -121,7 +121,18 @@ withdrawal. Shared-library tests cover key rotation, expiry, strict target/conte
 binding and bounded readers; native Windows CI covers the manifest parser and
 credential ACL implementation.
 
-The console's public enrollment portal, per-invitation release binding, package
-HTTP handler, signed bootstrap configuration/installer flow and native release
-signing jobs are the next integration steps. Test package bytes are non-executable
-fixtures and provide no physical installation or native signing evidence.
+The store now atomically binds each installer invitation to an exact release and
+target, and rejects an invitation expiry beyond the release's expiry. Canonical origin,
+scope, target and release mismatches roll the entire invitation back. Native claim
+transactions verify both endpoint keys and hold a shared release-checkpoint lock
+through issuance. A concurrent withdrawal waits for already authorized issuance;
+later requests fail. Unbound registry-only invitations and superseded releases
+cannot issue through this installer path. Existing issued identities are not
+revoked by withdrawing a release. A pending installation whose release has been
+superseded or withdrawn needs a new invitation; retries require its selected
+release to remain current and active.
+
+The console's public enrollment portal, invitation-creation UI, package HTTP
+handler, signed bootstrap configuration/installer flow and native release signing
+jobs are the next integration steps. Test package bytes are non-executable fixtures
+and provide no physical installation or native signing evidence.

@@ -110,6 +110,16 @@ The console now pins that version and adds a persisted installer catalog and
 `openuem-agent-releases` administration command. Local PostgreSQL race checks cover
 concurrent admission, rollback/sequence reuse, restart, withdrawal and verified
 file descriptors. See [release admission operations](agent-release-operations.md).
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34177682716)
+for that catalog and administration command at `9ea4162`.
+
+Library commit `b589b84da570` adds caller-owned invitation/claim transactions while
+retaining the existing convenience APIs and key-proof checks. Its
+[CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34178488009).
+The console pins this version and uses those transactions for exact installer
+release binding and canonical-origin checks. PostgreSQL tests observe actual lock
+dependencies to prove that withdrawal serializes after already authorized issuance
+and prevents later claims. Failed bindings leave no orphan invitations or uses.
 Signed artifact selection, new console invitations, endpoint storage/bootstrap
 and reference deployment wiring remain open.
 

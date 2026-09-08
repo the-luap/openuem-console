@@ -76,6 +76,10 @@ the table's package summaries do not remove any detail from the roadmap.
   sequence/digest checkpoint, concurrent approval protection, withdrawal and
   database-independent candidate inspection. Native signing and public download
   integration are still separate unfinished work.
+- Installer invitation/claim store methods now bind the exact approved release,
+  target, origin and expiry in transactions. PostgreSQL lock-observation tests
+  verify issuance/withdrawal ordering and rollback of related state. The public
+  handler, invitation UI and bootstrap consumer are not wired to these methods yet.
 
 ## Verification record
 
