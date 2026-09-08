@@ -7,8 +7,10 @@ worker request boundaries, service runtimes, scoped console administration and
 the public HTTPS claim/download protocol now have automated evidence. Protected
 Windows/macOS storage and durable HTTPS claim recovery also pass native CI. The
 console now creates scoped release-bound invitations for the native enrollment
-command and serves administrator-assisted public installation instructions. Native service activation, installers
-and production deployment wiring remain open.
+command and serves administrator-assisted public installation instructions.
+The agent also has a separate Windows activation command for completed protected
+identities. macOS activation, finished installers and production deployment wiring
+remain open.
 
 ## Source baselines
 
@@ -26,7 +28,12 @@ an exact gateway allowlist, bounded bodies/rates/concurrency/deadlines and joine
 shutdown. PostgreSQL/TLS race tests cover scanner safety, strict claims, retries,
 revocation, changed files, source-header trust and public administrator denial.
 The native command integration below connects this configuration protocol to
-protected credentials; finished installers and service activation remain open.
+protected credentials. [Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md)
+adds private operational configuration, exact automatic Local System registration
+and local readiness after enrollment. It retains identity state and registration
+on startup failure. The admitted executable hash is stored with the identity and
+checked again by the runtime. Unbound-record migration, authorized binary updates,
+macOS activation and finished installer integration remain open.
 
 Library commit `d6129ce9fe9b` adds a bounded HTTPS claim client and strict returned
 certificate/key/device/origin validation, with generic errors and no redirects,
@@ -203,8 +210,8 @@ The console pins this version and uses those transactions for exact installer
 release binding and canonical-origin checks. PostgreSQL tests observe actual lock
 dependencies to prove that withdrawal serializes after already authorized issuance
 and prevents later claims. Failed bindings leave no orphan invitations or uses.
-The later console form and public instructions now use these transactions. Native
-service activation and reference deployment wiring remain open.
+The later console form and public instructions now use these transactions.
+macOS service activation and reference deployment wiring remain open.
 
 ## Required boundaries
 

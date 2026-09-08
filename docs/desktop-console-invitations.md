@@ -5,7 +5,9 @@ for the explicitly selected organization and site. This connects console operato
 to the [native agent enrollment command](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
 It is an administrator workflow with a [public installation page](desktop-public-protocol.md)
 for each created link. Finished signed end-user installers, guided native consent
-and automatic service activation remain open.
+and installer-driven activation remain open. Administrators can use the separate
+[Windows activation command](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md)
+after completed enrollment; macOS service registration is still outstanding.
 
 ## Availability and scope
 
