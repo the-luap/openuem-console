@@ -116,6 +116,21 @@ the table's package summaries do not remove any detail from the roadmap.
   identities. Its saved HTML fits mobile/tablet/desktop widths in light/dark
   rendering. Finished native installers and automatic activation remain outstanding.
 
+  Console `90d811e` passed both [protocol/console CI](https://github.com/the-luap/openuem-console/actions/runs/34196986096)
+  and [build CI](https://github.com/the-luap/openuem-console/actions/runs/34196982995)
+  with the public installation page and invitation-file routes.
+
+- Agent `6d66ea5` now reports service readiness after local identity/configuration
+  validation and job registration, schedules initial inventory asynchronously,
+  returns startup errors, handles Unix signals during initialization and joins
+  admitted work before releasing credentials or closing the logger. Windows keeps
+  its control loop available during startup/cleanup and reports actual pending
+  states. [Linux, macOS and Windows CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34198267075),
+  including actual temporary Local System SCM services, isolated SIGTERM
+  subprocesses, scheduler timeout/ownership tests and the existing native identity
+  checks. Automatic service registration/activation and complete OS execution
+  bounds remain open. See [service lifecycle details](https://github.com/the-luap/openuem-agent/blob/6d66ea5988aacd8190efe4479db8312eb21fb0ef/docs/service-lifecycle.md).
+
 - `internal/security/clientidentity`: explicit gateway leaf pins, direct TLS mode,
   strict RFC 9440 decoding, backend enforcement and header replacement.
 - `internal/gateway` and `cmd/openuem-gateway`: HTTPS reverse proxy, public route
