@@ -328,6 +328,10 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 		return appleFailure(err)
 	}
 	detail := mdm_views.Detail{Device: d}
+	detail.IdentityRenewals, err = h.Apple.IdentityRenewals(c.Request().Context(), scope, id)
+	if err != nil {
+		return err
+	}
 	detail.Commands, err = h.Apple.Commands(c.Request().Context(), scope, id)
 	if err != nil {
 		return err

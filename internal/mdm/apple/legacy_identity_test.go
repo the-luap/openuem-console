@@ -80,11 +80,62 @@ func TestLegacyPKCS12EnrollmentSurvivesSCEPMigration(t *testing.T) {
 	if err = s.CheckIn(ctx, d, map[string]any{"MessageType": "TokenUpdate", "UDID": "legacy-device", "Topic": c.Topic, "Token": []byte("token"), "PushMagic": "magic"}); err != nil {
 		t.Fatal(err)
 	}
+	d, err = s.AuthenticateCertificate(ctx, d.ID, cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testIdentityDue(t, s, d)
+	if err = s.ScheduleIdentityRenewals(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var renewalError string
+	if err = s.db.QueryRow(`SELECT identity_renewal_error FROM mdm_apple_devices WHERE id=$1`, d.ID).Scan(&renewalError); err != nil || renewalError != "profile_inventory_required" {
+		t.Fatal("legacy enrollment guessed unknown profile UUIDs", renewalError, err)
+	}
+	reported := InstalledProfile{Identifier: root["PayloadIdentifier"].(string), UUID: root["PayloadUUID"].(string)}
+	for _, value := range root["PayloadContent"].([]any) {
+		payload := value.(map[string]any)
+		reported.Payloads = append(reported.Payloads, InstalledPayload{Identifier: payload["PayloadIdentifier"].(string), UUID: payload["PayloadUUID"].(string), Type: payload["PayloadType"].(string)})
+	}
+	drainCommands(t, s, d, []InstalledProfile{reported})
+	if err = s.ScheduleIdentityRenewals(ctx); err != nil {
+		t.Fatal(err)
+	}
+	renewal := testIdentityGeneration(t, s, d)
+	replacement := testIdentityDelivery(t, s, d, renewal)
+	var next map[string]any
+	if _, err = plist.Unmarshal(replacement, &next); err != nil {
+		t.Fatal(err)
+	}
+	oldMDM := root["PayloadContent"].([]any)[1].(map[string]any)
+	newMDM := next["PayloadContent"].([]any)[2].(map[string]any)
+	if next["PayloadUUID"] != root["PayloadUUID"] || newMDM["PayloadUUID"] != oldMDM["PayloadUUID"] {
+		t.Fatal("legacy migration replaced immutable profile metadata")
+	}
+	a, err := s.scepRenewalAuthority(ctx, d.ID, renewal.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, csr := testSCEPDeviceRequest(t, d.ID, testSCEPProfile(t, replacement)["Challenge"].(string), a.ca, a.ra)
+	request, err := parseSCEPRequest(testSCEPWire(t, f, csr, scepWireOptions{}), a.ra, a.key, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, newCert := testIdentityIssue(t, s, a, f, request)
+	testIdentityPin(t, s, d, cert, "token")
+	testIdentityToken(t, s, candidate)
+	if _, err = s.Connect(ctx, candidate, map[string]any{"UDID": d.UDID, "Status": "Idle"}); err != nil {
+		t.Fatal(err)
+	}
+	testIdentityPin(t, s, d, newCert, "renewed-push-token")
 	if err = s.RevokeEnrollment(ctx, Scope{TenantID: 1, SiteID: 1}, d.ID, "admin"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.AuthenticateCertificate(ctx, d.ID, cert); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal("legacy revocation bypassed", err)
+	}
+	if _, err = s.AuthenticateCertificate(ctx, d.ID, newCert); !errors.Is(err, ErrUnauthorized) {
+		t.Fatal("migrated identity bypassed revocation", err)
 	}
 }
 

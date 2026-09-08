@@ -42,6 +42,9 @@ type Settings struct {
 }
 
 type Device struct {
+	// Set only by certificate authentication, never by a console read or JSON.
+	peerFingerprint      string
+	peerExpiresAt        time.Time
 	ID                   string             `json:"id"`
 	TenantID             int                `json:"tenant_id"`
 	SiteID               int                `json:"site_id"`
@@ -59,6 +62,7 @@ type Device struct {
 	ProfilesAt           *time.Time         `json:"profiles_at"`
 	EnrolledAt           *time.Time         `json:"enrolled_at"`
 	CertificateExpiresAt time.Time          `json:"certificate_expires_at"`
+	IdentityRenewalError string             `json:"identity_renewal_error"`
 	Inventory            map[string]any     `json:"inventory"`
 	Apps                 []Application      `json:"apps"`
 	InstalledProfiles    []InstalledProfile `json:"installed_profiles"`
@@ -88,12 +92,19 @@ type Application struct {
 	BundleSize       uint64 `plist:"BundleSize" json:"bundle_size"`
 }
 
-type InstalledProfile struct {
+type InstalledPayload struct {
 	Identifier string `plist:"PayloadIdentifier" json:"identifier"`
 	UUID       string `plist:"PayloadUUID" json:"uuid"`
-	Name       string `plist:"PayloadDisplayName" json:"name"`
-	Version    uint64 `plist:"PayloadVersion" json:"version"`
-	Managed    bool   `plist:"IsManaged" json:"managed"`
+	Type       string `plist:"PayloadType" json:"type"`
+}
+
+type InstalledProfile struct {
+	Payloads   []InstalledPayload `plist:"PayloadContent" json:"payloads,omitempty"`
+	Identifier string             `plist:"PayloadIdentifier" json:"identifier"`
+	UUID       string             `plist:"PayloadUUID" json:"uuid"`
+	Name       string             `plist:"PayloadDisplayName" json:"name"`
+	Version    uint64             `plist:"PayloadVersion" json:"version"`
+	Managed    bool               `plist:"IsManaged" json:"managed"`
 }
 
 type Profile struct {
@@ -120,15 +131,16 @@ type Assignment struct {
 }
 
 type Command struct {
-	ID          string     `json:"id"`
-	DeviceID    string     `json:"device_id"`
-	RequestType string     `json:"request_type"`
-	Status      string     `json:"status"`
-	Attempts    int        `json:"attempts"`
-	Error       string     `json:"error"`
-	CreatedAt   time.Time  `json:"created_at"`
-	CompletedAt *time.Time `json:"completed_at"`
-	Payload     []byte     `json:"-"`
+	IdentityRenewal bool       `json:"identity_renewal"`
+	ID              string     `json:"id"`
+	DeviceID        string     `json:"device_id"`
+	RequestType     string     `json:"request_type"`
+	Status          string     `json:"status"`
+	Attempts        int        `json:"attempts"`
+	Error           string     `json:"error"`
+	CreatedAt       time.Time  `json:"created_at"`
+	CompletedAt     *time.Time `json:"completed_at"`
+	Payload         []byte     `json:"-"`
 }
 
 type UpdatePolicy struct {

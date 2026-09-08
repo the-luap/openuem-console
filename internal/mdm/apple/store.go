@@ -115,14 +115,14 @@ func (s *Store) Settings(ctx context.Context, tenant int) (*Settings, error) {
 	return &c, nil
 }
 
-const deviceColumns = `id,tenant_id,site_id,COALESCE(udid,''),name,serial_number,model,os_version,build_version,supervised,status,last_seen,inventory_at,apps_at,profiles_at,enrolled_at,certificate_expires_at,inventory,apps,installed_profiles,ddm_status,push_status,push_error`
+const deviceColumns = `id,tenant_id,site_id,COALESCE(udid,''),name,serial_number,model,os_version,build_version,supervised,status,last_seen,inventory_at,apps_at,profiles_at,enrolled_at,certificate_expires_at,inventory,apps,installed_profiles,ddm_status,push_status,push_error,identity_renewal_error`
 
 type scanner interface{ Scan(...any) error }
 
 func scanDevice(row scanner) (*Device, error) {
 	var d Device
 	var inventory, apps, profiles []byte
-	err := row.Scan(&d.ID, &d.TenantID, &d.SiteID, &d.UDID, &d.Name, &d.SerialNumber, &d.Model, &d.OSVersion, &d.BuildVersion, &d.Supervised, &d.Status, &d.LastSeen, &d.InventoryAt, &d.AppsAt, &d.ProfilesAt, &d.EnrolledAt, &d.CertificateExpiresAt, &inventory, &apps, &profiles, &d.DDMStatus, &d.PushStatus, &d.PushError)
+	err := row.Scan(&d.ID, &d.TenantID, &d.SiteID, &d.UDID, &d.Name, &d.SerialNumber, &d.Model, &d.OSVersion, &d.BuildVersion, &d.Supervised, &d.Status, &d.LastSeen, &d.InventoryAt, &d.AppsAt, &d.ProfilesAt, &d.EnrolledAt, &d.CertificateExpiresAt, &inventory, &apps, &profiles, &d.DDMStatus, &d.PushStatus, &d.PushError, &d.IdentityRenewalError)
 	if err != nil {
 		return nil, notFound(err)
 	}

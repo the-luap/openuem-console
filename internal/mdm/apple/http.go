@@ -40,13 +40,22 @@ func (s *Store) ProtocolHandlerWithIdentity(logger *slog.Logger, identity client
 			return
 		}
 		scepParts := strings.Split(path, "/")
-		if len(scepParts) == 2 && scepParts[1] == "scep" {
+		if (len(scepParts) == 2 || len(scepParts) == 3) && scepParts[1] == "scep" {
 			id, err := uuid.Parse(scepParts[0])
 			if err != nil || id.String() != scepParts[0] {
 				http.NotFound(w, r)
 				return
 			}
-			s.scepHTTP(w, r, scepParts[0], scepLimits, identity)
+			renewalID := ""
+			if len(scepParts) == 3 {
+				renewal, err := uuid.Parse(scepParts[2])
+				if err != nil || renewal.String() != scepParts[2] {
+					http.NotFound(w, r)
+					return
+				}
+				renewalID = scepParts[2]
+			}
+			s.handleSCEPHTTP(w, r, scepParts[0], renewalID, scepLimits, identity)
 			return
 		}
 		if r.Method != http.MethodPut {

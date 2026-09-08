@@ -81,7 +81,7 @@ func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 }
 
 func (s *Store) DeclarativeManagement(ctx context.Context, d *Device, message map[string]any) (any, error) {
-	if d.Status != "enrolled" || d.UDID == "" || stringValue(message, "UDID") != d.UDID {
+	if d.Status != "enrolled" || d.UDID == "" || stringValue(message, "UDID") != d.UDID || stringValue(message, "UserID") != "" || stringValue(message, "EnrollmentID") != "" {
 		return nil, ErrUnauthorized
 	}
 	endpoint := stringValue(message, "Endpoint")
@@ -96,11 +96,33 @@ func (s *Store) DeclarativeManagement(ctx context.Context, d *Device, message ma
 		}
 		return nil, s.saveStatus(ctx, d, report)
 	}
-	p, err := s.UpdatePolicy(ctx, Scope{TenantID: d.TenantID, SiteID: d.SiteID}, d.ID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	current, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 FOR SHARE`, d.ID))
+	if err != nil {
+		return nil, err
+	}
+	if current.Status != "enrolled" || current.UDID != d.UDID {
+		return nil, ErrUnauthorized
+	}
+	if err = s.requireActiveIdentity(ctx, tx, d); err != nil {
+		return nil, err
+	}
+	p, err := scanPolicy(tx.QueryRowContext(ctx, `SELECT `+policyColumns+` FROM mdm_apple_update_policies WHERE device_id=$1`, d.ID))
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	return DeclarationResponse(Declarations(*d, p), endpoint)
+	response, err := DeclarationResponse(Declarations(*current, p), endpoint)
+	if err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport) error {
@@ -112,6 +134,9 @@ func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport)
 	var old []byte
 	var state string
 	if err = tx.QueryRowContext(ctx, `SELECT ddm_status,status FROM mdm_apple_devices WHERE id=$1 FOR UPDATE`, d.ID).Scan(&old, &state); err != nil {
+		return err
+	}
+	if err = s.requireActiveIdentity(ctx, tx, d); err != nil {
 		return err
 	}
 	if state != "enrolled" {

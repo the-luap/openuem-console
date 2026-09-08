@@ -126,11 +126,12 @@ The adapter uses pinned smallstep SCEP/PKCS7 libraries with additional validatio
   ID and a 16-byte request nonce. Responses echo the recipient nonce and generate
   a fresh sender nonce.
 
-The service does not advertise `SCEPStandard` or `Renewal`. It implements the
-initial enrollment subset, not all [RFC 8894](https://www.rfc-editor.org/rfc/rfc8894.html)
-operations or BER encodings. RenewalReq parsing is tested but does not authorize
-renewal. Automatic profile replacement, candidate-certificate confirmation,
-legacy-device migration and safe retirement of the previous identity remain open.
+The service does not advertise `SCEPStandard` or `Renewal`; it does not implement
+all [RFC 8894](https://www.rfc-editor.org/rfc/rfc8894.html) operations or BER encodings.
+This initial enrollment endpoint never authorizes RenewalReq. A separate,
+generation-bound [automatic identity renewal](apple-identity-renewal.md) flow
+delivers a replacement profile, confirms candidate use and retires the previous
+identity. It also supports recovery of known legacy enrollment metadata.
 
 Tests cover real PostgreSQL transactions and rollback, concurrent retries,
 scope/challenge/expiry/revocation, CA expiry caps, rejected CSR privileges, corrupt
@@ -142,5 +143,5 @@ continue to work; the legacy profile generator is now a test fixture only.
 
 These are synthetic protocol and persistence tests. Physical iPhone/iPad SCEP
 installation, Safari interaction, private-CA trust provisioning, actual APNs and
-device continuity are still required acceptance evidence. Until automatic renewal
-is implemented and verified, plan fresh enrollment before a device identity expires.
+device continuity are still required acceptance evidence. Monitor the device's
+identity renewal state and follow the renewal guide when it cannot complete.

@@ -14,14 +14,15 @@ type DeviceRow struct {
 }
 
 type Detail struct {
-	Device      *apple.Device
-	Commands    []apple.Command
-	Assignments []apple.Assignment
-	Profiles    []apple.Profile
-	Policy      *apple.UpdatePolicy
-	Compliance  string
-	Releases    []apple.OSRelease
-	CatalogAt   *time.Time
+	Device           *apple.Device
+	IdentityRenewals []apple.IdentityRenewal
+	Commands         []apple.Command
+	Assignments      []apple.Assignment
+	Profiles         []apple.Profile
+	Policy           *apple.UpdatePolicy
+	Compliance       string
+	Releases         []apple.OSRelease
+	CatalogAt        *time.Time
 }
 
 func When(t *time.Time) string {

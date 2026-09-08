@@ -101,7 +101,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	if _, err := s.Device(ctx, scope, id); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at,EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.command_id=mdm_apple_commands.id) FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	list := []Command{}
 	for rows.Next() {
 		var c Command
-		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt); err != nil {
+		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt, &c.IdentityRenewal); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -134,6 +134,13 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	if err != nil {
 		return err
 	}
+	peer, err := s.deviceIdentityPeer(ctx, tx, d)
+	if err != nil {
+		return err
+	}
+	if peer.kind == "retired" {
+		return ErrUnauthorized
+	}
 	if current.Status != "authenticating" && current.Status != "enrolled" {
 		return ErrUnauthorized
 	}
@@ -141,6 +148,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 		return ErrUnauthorized
 	}
 	kind := stringValue(message, "MessageType")
+	if peer.kind == "candidate" && kind != "Authenticate" && kind != "TokenUpdate" {
+		return ErrUnauthorized
+	}
 	if kind == "Authenticate" || kind == "TokenUpdate" {
 		var topic string
 		if err = tx.QueryRowContext(ctx, `SELECT topic FROM mdm_apple_settings WHERE tenant_id=$1`, current.TenantID).Scan(&topic); err != nil {
@@ -169,6 +179,10 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 		if !ok || len(token) == 0 || len(token) > 512 || magic == "" || len(magic) > 1024 {
 			return errors.New("TokenUpdate requires a valid push token and PushMagic")
 		}
+		if peer.kind == "candidate" {
+			err = s.stageIdentityToken(ctx, tx, d, peer.renewalID, token, magic)
+			break
+		}
 		token, err = s.secrets.seal(token, secretPurpose(current.TenantID, current.ID, "push_token"))
 		if err != nil {
 			return err
@@ -177,7 +191,7 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET push_token=$1,push_magic=$2,status='enrolled',enrolled_at=COALESCE(enrolled_at,now()),last_seen=now(),next_push_at=now(),push_error='' WHERE id=$3`, token, magicEncrypted, current.ID)
+		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET push_token=$1,push_magic=$2,status='enrolled',enrolled_at=COALESCE(enrolled_at,now()),last_seen=now(),next_push_at=now(),push_status='pending',push_error='' WHERE id=$3`, token, magicEncrypted, current.ID)
 		if err != nil {
 			return err
 		}
@@ -204,6 +218,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 			return err
 		}
 		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status='not_managed',updated_at=now() WHERE device_id=$1`, current.ID)
+		if err == nil {
+			err = s.cancelDeviceRenewal(ctx, tx, current)
+		}
 	default:
 		return errors.New("unsupported check-in message")
 	}
@@ -245,7 +262,7 @@ func responseError(message map[string]any) string {
 // Connect serializes the device's result ingestion and next-command delivery in
 // a single transaction. Command IDs are checked against the authenticated device.
 func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) ([]byte, error) {
-	if stringValue(message, "UDID") != d.UDID || d.UDID == "" || stringValue(message, "UserID") != "" {
+	if stringValue(message, "UDID") != d.UDID || d.UDID == "" || stringValue(message, "UserID") != "" || stringValue(message, "EnrollmentID") != "" {
 		return nil, ErrUnauthorized
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -257,11 +274,45 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 	if err != nil {
 		return nil, err
 	}
-	if current.Status != "enrolled" {
+	if current.Status != "enrolled" || current.UDID != d.UDID {
 		return nil, ErrUnauthorized
 	}
+	peer, err := s.deviceIdentityPeer(ctx, tx, d)
+	if err != nil {
+		return nil, err
+	}
+	if peer.kind == "retired" {
+		return nil, s.acknowledgeRetiredIdentity(ctx, tx, d, peer, message)
+	}
+	if peer.kind == "candidate" {
+		candidateStatus := stringValue(message, "Status")
+		var commandID string
+		if candidateStatus != "Idle" {
+			if err = tx.QueryRowContext(ctx, `SELECT command_id FROM mdm_apple_identity_renewals WHERE id=$1 AND device_id=$2`, peer.renewalID, d.ID).Scan(&commandID); err != nil {
+				return nil, err
+			}
+			if stringValue(message, "CommandUUID") != commandID {
+				return nil, ErrUnauthorized
+			}
+		}
+		if candidateStatus == "Error" || candidateStatus == "CommandFormatError" {
+			if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='failed',error=$2,completed_at=clock_timestamp() WHERE id=$1`, commandID, responseError(message)); err != nil {
+				return nil, err
+			}
+			if err = s.finishIdentityRenewal(ctx, tx, d, peer.renewalID, "failed", "command_failed"); err != nil {
+				return nil, err
+			}
+			return nil, tx.Commit()
+		}
+		if !peer.tokenUpdated {
+			return nil, ErrUnauthorized
+		}
+		if candidateStatus != "Idle" && candidateStatus != "Acknowledged" && candidateStatus != "NotNow" {
+			return nil, ErrUnauthorized
+		}
+	}
 	status := stringValue(message, "Status")
-	stop := false
+	stop := peer.kind == "candidate" && status == "NotNow"
 	switch status {
 	case "Idle":
 	case "Acknowledged", "Error", "CommandFormatError", "NotNow":
@@ -276,8 +327,31 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 		if err != nil {
 			return nil, notFound(err)
 		}
+		if (previous == "verified" || (previous == "expired" && peer.kind == "candidate")) && status == "Acknowledged" {
+			if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='acknowledged',error='' WHERE id=$1`, id); err != nil {
+				return nil, err
+			}
+		}
 		if previous == "queued" {
 			return nil, errors.New("command has not been delivered")
+		}
+		if previous == "expired" && (status == "Error" || status == "CommandFormatError") {
+			// An already-issued candidate survives the command deadline so an
+			// offline device can confirm it. An explicit late installation failure
+			// still retires that candidate and preserves the working old identity.
+			var renewalID string
+			renewalErr := tx.QueryRowContext(ctx, `SELECT id FROM mdm_apple_identity_renewals WHERE command_id=$1 AND device_id=$2 AND status='issued'`, id, current.ID).Scan(&renewalID)
+			if renewalErr != nil && !errors.Is(renewalErr, sql.ErrNoRows) {
+				return nil, renewalErr
+			}
+			if renewalErr == nil {
+				if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='failed',error=$2 WHERE id=$1`, id, responseError(message)); err != nil {
+					return nil, err
+				}
+				if err = s.finishIdentityRenewal(ctx, tx, current, renewalID, "failed", "command_failed"); err != nil {
+					return nil, err
+				}
+			}
 		}
 		if previous == "sent" || previous == "not_now" {
 			next := "acknowledged"
@@ -292,6 +366,18 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status=$1,error=$2,available_at=CASE WHEN $1='not_now' THEN now()+interval '1 minute' ELSE available_at END,completed_at=CASE WHEN $1='not_now' THEN NULL ELSE now() END WHERE id=$3`, next, detail, id)
 			if err != nil {
 				return nil, err
+			}
+			if next == "failed" {
+				var renewalID string
+				renewalErr := tx.QueryRowContext(ctx, `SELECT id FROM mdm_apple_identity_renewals WHERE command_id=$1 AND device_id=$2 AND status IN ('queued','issued')`, id, current.ID).Scan(&renewalID)
+				if renewalErr != nil && !errors.Is(renewalErr, sql.ErrNoRows) {
+					return nil, renewalErr
+				}
+				if renewalErr == nil {
+					if err = s.finishIdentityRenewal(ctx, tx, current, renewalID, "failed", "command_failed"); err != nil {
+						return nil, err
+					}
+				}
 			}
 			if status == "Acknowledged" {
 				if err = s.ingestInventory(ctx, tx, current, kind, message); err != nil {
@@ -319,6 +405,11 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 		}
 	default:
 		return nil, errors.New("unsupported command response status")
+	}
+	if peer.kind == "candidate" && (status == "Idle" || status == "Acknowledged") {
+		if err = s.confirmIdentity(ctx, tx, d, peer.renewalID); err != nil {
+			return nil, err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET last_seen=now() WHERE id=$1`, current.ID); err != nil {
 		return nil, err
@@ -416,6 +507,9 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 			return err
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET installed_profiles=$1,profiles_at=now() WHERE id=$2`, data, d.ID); err != nil {
+			return err
+		}
+		if err := s.recoverEnrollmentLayout(ctx, tx, d, profiles); err != nil {
 			return err
 		}
 		return s.verifyProfiles(ctx, tx, d, profiles)

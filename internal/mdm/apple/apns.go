@@ -94,6 +94,7 @@ func (s *Store) PushPending(ctx context.Context) error {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
+		encryptedToken, encryptedMagic := token, magic
 		c, err := s.Settings(ctx, tenant)
 		if err == nil {
 			token, err = s.secrets.open(token, secretPurpose(tenant, id, "push_token"))
@@ -118,12 +119,18 @@ func (s *Store) PushPending(ctx context.Context) error {
 		if errors.As(err, &pushErr) && (pushErr.Status == 410 || pushErr.Reason == "BadDeviceToken" || pushErr.Reason == "DeviceTokenNotForTopic") {
 			status = "invalid_token"
 		}
-		_, saveErr := s.db.ExecContext(ctx, `UPDATE mdm_apple_devices SET push_status=$1,push_error=$2,next_push_at=CASE WHEN $1='invalid_token' THEN now()+interval '1 day' ELSE next_push_at END WHERE id=$3`, status, detail, id)
-		if saveErr != nil {
-			return saveErr
+		if err = s.recordPushOutcome(ctx, id, encryptedToken, encryptedMagic, status, detail); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// Network requests outlive the device row lock. A response for an earlier token
+// must not overwrite a later TokenUpdate, identity promotion, or revocation.
+func (s *Store) recordPushOutcome(ctx context.Context, id string, token, magic []byte, status, detail string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE mdm_apple_devices SET push_status=$1,push_error=$2,next_push_at=CASE WHEN $1='invalid_token' THEN now()+interval '1 day' ELSE next_push_at END WHERE id=$3 AND status='enrolled' AND push_token=$4 AND push_magic=$5`, status, detail, id, token, magic)
+	return err
 }
 
 func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
@@ -137,7 +144,7 @@ func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
 		if err := s.RefreshCatalog(work); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Error("Apple software catalog refresh failed", "error", err)
 		}
-		for _, task := range []func(context.Context) error{s.CleanupEnrollmentClaims, s.CleanupSCEPEnrollments, s.CleanupPushRequests, s.expireCommands, s.ScheduleInventory, s.ReconcileUpdateAvailability} {
+		for _, task := range []func(context.Context) error{s.CleanupEnrollmentClaims, s.CleanupSCEPEnrollments, s.CleanupPushRequests, s.expireCommands, s.ReconcileIdentityRenewals, s.ScheduleIdentityRenewals, s.ScheduleInventory, s.ReconcileUpdateAvailability} {
 			if err := task(work); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Error("Apple management maintenance failed", "error", err)
 			}

@@ -191,8 +191,9 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 
 templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: Show(detail.Device.Name), Url: partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID)}}, info)
-		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+		<main id="apple-device" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">{ Show(detail.Device.Name) }</h1>
 				<p class="uk-text-muted">{ detail.Device.Platform()+" · "+StateLabel(detail.Device.Status) }</p>
@@ -225,8 +226,6 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								<span role="status">{ " · "+detail.Device.PushError }</span>
 							}
 						</dd>
-						<dt>Device identity expires</dt>
-						<dd>{ detail.Device.CertificateExpiresAt.Format("2006-01-02") }</dd>
 					</dl>
 					if detail.Device.Status=="enrolled" {
 						if info.Can(access.RefreshDevices) {
@@ -251,6 +250,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 					}
 				</div>
 			</section>
+			@DeviceIdentity(detail)
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. iOS/iPadOS 17 or later enforces the update when Apple's installation conditions are met.</p></div>
 				<div class="uk-card-body">
@@ -298,7 +298,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 			</section>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Configuration profiles</h2><p>{ "Inventory collected: "+When(detail.Device.ProfilesAt) }</p></div>
-				<div class="uk-card-body">
+				<div class="uk-card-body overflow-x-auto">
 					<table class="uk-table uk-table-divider">
 						<thead><tr><th>Profile</th><th>Revision</th><th>Desired state</th><th>Device result</th><th>Action</th></tr></thead>
 						<tbody>
@@ -375,7 +375,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
 									<td>
 										{ cmd.Error }
-										if detail.Device.Status=="enrolled" && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
+										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
 											if info.Can(access.AssignProfiles) {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
 													@CSRF(info)

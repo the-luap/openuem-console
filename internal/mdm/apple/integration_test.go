@@ -115,6 +115,12 @@ func testSettings(t *testing.T, s *Store, tenant int) *Settings {
 
 func testEnroll(t *testing.T, s *Store, scope Scope, name string, existingUDID ...string) (*Device, *x509.Certificate) {
 	t.Helper()
+	d, cert, _ := testEnrollWithKey(t, s, scope, name, existingUDID...)
+	return d, cert
+}
+
+func testEnrollWithKey(t *testing.T, s *Store, scope Scope, name string, existingUDID ...string) (*Device, *x509.Certificate, *rsa.PrivateKey) {
+	t.Helper()
 	ctx := context.Background()
 	invite, err := s.Invite(ctx, scope, name, "test-admin")
 	if err != nil {
@@ -128,7 +134,7 @@ func testEnroll(t *testing.T, s *Store, scope Scope, name string, existingUDID .
 	if _, err = s.EnrollmentProfile(ctx, token); !errors.Is(err, ErrNotFound) {
 		t.Fatal("invitation reused", err)
 	}
-	_, cert := testSCEPEnrollProfile(t, s, invite.DeviceID, profile)
+	key, cert := testSCEPEnrollProfile(t, s, invite.DeviceID, profile)
 	d, err := s.AuthenticateCertificate(ctx, invite.DeviceID, cert)
 	if err != nil {
 		t.Fatal(err)
@@ -147,11 +153,11 @@ func testEnroll(t *testing.T, s *Store, scope Scope, name string, existingUDID .
 	if err = s.CheckIn(ctx, d, map[string]any{"MessageType": "TokenUpdate", "UDID": udid, "Topic": "com.apple.mgmt.test", "Token": []byte("test-apns-token"), "PushMagic": "magic"}); err != nil {
 		t.Fatal(err)
 	}
-	d, err = s.Device(ctx, scope, invite.DeviceID)
+	d, err = s.AuthenticateCertificate(ctx, invite.DeviceID, cert)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return d, cert
+	return d, cert, key
 }
 
 func TestNativeEnrollmentInventoryProfilesAndDDM(t *testing.T) {
@@ -176,7 +182,7 @@ func TestNativeEnrollmentInventoryProfilesAndDDM(t *testing.T) {
 	}
 
 	drainCommands(t, s, d, nil)
-	d, err := s.Device(ctx, scope, d.ID)
+	d, err := s.AuthenticateCertificate(ctx, d.ID, cert)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +239,7 @@ func TestNativeEnrollmentInventoryProfilesAndDDM(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err = s.Device(ctx, scope, d.ID)
+	d, err = s.AuthenticateCertificate(ctx, d.ID, cert)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,9 +406,9 @@ func TestUpdateStatusAndUnavailableReleaseReconciliation(t *testing.T) {
 	testSettings(t, s, 1)
 	ctx := context.Background()
 	scope := Scope{TenantID: 1, SiteID: 1}
-	d, _ := testEnroll(t, s, scope, "Updates")
+	d, cert := testEnroll(t, s, scope, "Updates")
 	drainCommands(t, s, d, nil)
-	d, err := s.Device(ctx, scope, d.ID)
+	d, err := s.AuthenticateCertificate(ctx, d.ID, cert)
 	if err != nil {
 		t.Fatal(err)
 	}

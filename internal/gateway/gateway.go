@@ -203,8 +203,19 @@ func canonicalPath(u *url.URL) bool {
 
 func appleDeviceRoute(r *http.Request) bool {
 	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) != 5 || parts[1] != "mdm" || parts[2] != "apple" {
+	if (len(parts) != 5 && len(parts) != 6) || parts[1] != "mdm" || parts[2] != "apple" {
 		return false
+	}
+	if len(parts) == 6 {
+		if parts[4] != "scep" || (r.Method != http.MethodGet && r.Method != http.MethodPost) {
+			return false
+		}
+		device, err := uuid.Parse(parts[3])
+		if err != nil || device.String() != parts[3] {
+			return false
+		}
+		renewal, err := uuid.Parse(parts[5])
+		return err == nil && renewal.String() == parts[5]
 	}
 	if parts[3] == "enroll" && (r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodPost) {
 		if len(parts[4]) != 43 {

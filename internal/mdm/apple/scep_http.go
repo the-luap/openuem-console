@@ -20,6 +20,10 @@ import (
 const scepCapabilities = "AES\r\nPOSTPKIOperation\r\nSHA-256\r\nSHA-512\r\n"
 
 func (s *Store) scepHTTP(w http.ResponseWriter, r *http.Request, deviceID string, limits *enrollmentLimiter, identity clientidentity.Policy) {
+	s.handleSCEPHTTP(w, r, deviceID, "", limits, identity)
+}
+
+func (s *Store) handleSCEPHTTP(w http.ResponseWriter, r *http.Request, deviceID, renewalID string, limits *enrollmentLimiter, identity clientidentity.Policy) {
 	if r.TLS == nil || !r.TLS.HandshakeComplete {
 		http.Error(w, "HTTPS is required", 400)
 		return
@@ -85,7 +89,12 @@ func (s *Store) scepHTTP(w http.ResponseWriter, r *http.Request, deviceID string
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	a, err := s.scepEnrollmentAuthority(ctx, deviceID, operation == "PKIOperation")
+	var a *scepAuthority
+	if renewalID == "" {
+		a, err = s.scepEnrollmentAuthority(ctx, deviceID, operation == "PKIOperation")
+	} else {
+		a, err = s.scepRenewalAuthority(ctx, deviceID, renewalID, operation == "PKIOperation")
+	}
 	if errors.Is(err, ErrNotFound) {
 		http.NotFound(w, r)
 		return
@@ -109,7 +118,11 @@ func (s *Store) scepHTTP(w http.ResponseWriter, r *http.Request, deviceID string
 			http.Error(w, "invalid SCEP request", 400)
 			return
 		}
-		response, err = s.scepEnroll(ctx, a, request)
+		if renewalID == "" {
+			response, err = s.scepEnroll(ctx, a, request)
+		} else {
+			response, err = s.scepRenew(ctx, a, request)
+		}
 	}
 	if err != nil {
 		http.Error(w, "SCEP is temporarily unavailable", 503)

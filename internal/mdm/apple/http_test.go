@@ -203,6 +203,74 @@ func testPublicProtocolIdentity(t *testing.T, proxied bool) {
 		t.Fatal("browser did not observe completed enrollment", response.StatusCode)
 	}
 	savePortalArtifact(t, "enrolled", body)
+	testPublicIdentityRenewal(t, s, server.URL, invite.DeviceID, cert, client, authenticated)
+}
+
+func testPublicIdentityRenewal(t *testing.T, s *Store, origin, id string, oldCert *x509.Certificate, public, active *http.Client) {
+	t.Helper()
+	ctx := context.Background()
+	d, err := s.AuthenticateCertificate(ctx, id, oldCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainCommands(t, s, d, nil)
+	testIdentityDue(t, s, d)
+	if err = s.ScheduleIdentityRenewals(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := testIdentityGeneration(t, s, d)
+	send := func(client *http.Client, endpoint string, message map[string]any, want int) []byte {
+		t.Helper()
+		payload, err := plist.Marshal(message, plist.XMLFormat)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request, err := http.NewRequest(http.MethodPut, origin+"/mdm/apple/"+id+"/"+endpoint, bytes.NewReader(payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(response.Body)
+		response.Body.Close()
+		if err != nil || response.StatusCode != want {
+			t.Fatalf("renewal %s: got %d, want %d: %s (%v)", endpoint, response.StatusCode, want, body, err)
+		}
+		return body
+	}
+	idle := map[string]any{"UDID": d.UDID, "Status": "Idle"}
+	commandData := send(active, "connect", idle, 200)
+	var command map[string]any
+	if _, err = plist.Unmarshal(commandData, &command); err != nil || command["CommandUUID"] != r.CommandID {
+		t.Fatal("renewal command missing over TLS", err)
+	}
+	profile := command["Command"].(map[string]any)["Payload"].([]byte)
+	key, cert := testSCEPEnrollHTTP(t, public, id, profile)
+	transport := public.Transport.(*http.Transport).Clone()
+	transport.TLSClientConfig = transport.TLSClientConfig.Clone()
+	transport.TLSClientConfig.Certificates = []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}}
+	candidate := &http.Client{Transport: transport}
+	defer candidate.CloseIdleConnections()
+	send(candidate, "connect", idle, 401)
+	message := map[string]any{"MessageType": "TokenUpdate", "UDID": d.UDID, "Topic": "com.apple.mgmt.test", "Token": []byte("renewed-push-token"), "PushMagic": "renewed-magic"}
+	send(candidate, "checkin", message, 200)
+	testIdentityPin(t, s, d, oldCert, "test-token")
+	if body := send(candidate, "connect", idle, 200); len(body) != 0 {
+		t.Fatal("confirmed profile was redelivered over TLS")
+	}
+	testIdentityPin(t, s, d, cert, "renewed-push-token")
+	send(active, "checkin", message, 401)
+	send(active, "connect", idle, 401)
+	if body := send(active, "connect", map[string]any{"UDID": d.UDID, "Status": "Acknowledged", "CommandUUID": r.CommandID}, 200); len(body) != 0 {
+		t.Fatal("retired TLS identity received another command")
+	}
+	if _, err = s.db.Exec(`UPDATE mdm_apple_identity_renewals SET grace_until=clock_timestamp()-interval '1 second' WHERE id=$1`, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	send(active, "connect", map[string]any{"UDID": d.UDID, "Status": "Acknowledged", "CommandUUID": r.CommandID}, 401)
+	send(candidate, "connect", idle, 200)
 }
 
 func TestAPNsRequestAndErrorSemantics(t *testing.T) {

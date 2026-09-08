@@ -14,6 +14,7 @@ fork are still outstanding. Treat this branch as a pilot until those checks pass
 | Area | Implemented behavior |
 | --- | --- |
 | Enrollment | Per-organization APNs settings, one-hour single-use invitations, device-generated SCEP identity, checkout and server-access revocation |
+| Identity renewal | Automatic replacement within 30 days of expiry, candidate key confirmation, atomic push/identity activation, bounded retired acknowledgement and scoped history |
 | Inventory | OS version/build, model, serial, supervision, last contact, installed apps and configuration profiles |
 | Refresh | On enrollment, manually, and every six hours; separate observation timestamps |
 | Profiles | Unsigned XML/binary `.mobileconfig` upload; passcode, personal Wi-Fi and restriction builders; revisions; bulk assignment/removal; result verification |
@@ -201,8 +202,11 @@ to avoid stranding devices. The enrollment CA remains unchanged. Changing the
 public origin is also rejected while active enrollments use it.
 
 Device identities last up to one year, capped at CA expiry. Their expiry appears
-in device details. New enrollments use SCEP, but automatic identity renewal is not
-implemented; plan removal and fresh enrollment before expiry. Export/restore the whole database and retain
+in device details. [Automatic identity renewal](apple-identity-renewal.md) queues
+a replacement profile within 30 days of expiry and waits for the device to prove
+use of its new SCEP identity. Older records need verified profile metadata; the
+device page shows missing prerequisites and renewal history. Physical-device
+continuity remains an acceptance check. Export/restore the whole database and retain
 the original encryption master key in a separate secure backup. Changing that key
 without re-encryption makes stored Apple keys and commands unreadable; there is
 no key-rotation workflow yet.

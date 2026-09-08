@@ -23,10 +23,10 @@ import (
 var errSCEPAuthority = errors.New("SCEP authority is unavailable")
 
 type scepAuthority struct {
-	id, deviceID string
-	tenant       int
-	ca, ra       *x509.Certificate
-	key          crypto.PrivateKey
+	id, deviceID, renewalID string
+	tenant                  int
+	ca, ra                  *x509.Certificate
+	key                     crypto.PrivateKey
 }
 
 func enrollmentCA(c *Settings, now time.Time) (*x509.Certificate, crypto.PrivateKey, error) {
@@ -55,7 +55,7 @@ func validateSCEPAuthority(caDER, raDER []byte, now time.Time) (*x509.Certificat
 
 // The caller holds both the device row and organization setup lock. No public
 // GetCACert request can create a key or replace an authority under an enrollment.
-func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settings, deviceID string) ([]byte, error) {
+func (s *Store) ensureSCEPAuthority(ctx context.Context, tx *sql.Tx, c *Settings) (*scepAuthority, error) {
 	now := time.Now()
 	ca, caKey, err := enrollmentCA(c, now)
 	if err != nil {
@@ -101,7 +101,16 @@ func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settin
 			return nil, err
 		}
 	}
-	if _, _, err = validateSCEPAuthority(ca.Raw, authorityDER, now); err != nil {
+	_, ra, err := validateSCEPAuthority(ca.Raw, authorityDER, now)
+	if err != nil {
+		return nil, err
+	}
+	return &scepAuthority{id: authorityID, tenant: c.TenantID, ca: ca, ra: ra}, nil
+}
+
+func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settings, deviceID string) ([]byte, error) {
+	authority, err := s.ensureSCEPAuthority(ctx, tx, c)
+	if err != nil {
 		return nil, err
 	}
 	challenge, err := randomToken()
@@ -110,13 +119,27 @@ func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settin
 	}
 	// This window starts at browser claim, independently of the invitation's
 	// remaining lifetime. It never renews on download or a SCEP retry.
-	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_scep_enrollments(device_id,tenant_id,authority_id,challenge_hash,expires_at) VALUES($1,$2,$3,$4,clock_timestamp()+interval '1 hour')`, deviceID, c.TenantID, authorityID, digest([]byte(challenge))); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_scep_enrollments(device_id,tenant_id,authority_id,challenge_hash,expires_at) VALUES($1,$2,$3,$4,clock_timestamp()+interval '1 hour')`, deviceID, c.TenantID, authority.id, digest([]byte(challenge))); err != nil {
 		return nil, err
 	}
-	return scepEnrollmentProfile(c, deviceID, challenge)
+	layout := newEnrollmentLayout(c)
+	data, err := scepEnrollmentProfile(c, deviceID, challenge, "/mdm/apple/"+deviceID+"/scep", layout)
+	if err != nil {
+		return nil, err
+	}
+	if err = saveEnrollmentLayout(ctx, tx, c.TenantID, deviceID, layout); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
-func scepEnrollmentProfile(c *Settings, deviceID, challenge string) ([]byte, error) {
+func scepEnrollmentProfile(c *Settings, deviceID, challenge, endpoint string, layout enrollmentLayout) ([]byte, error) {
+	if err := layout.validate(); err != nil {
+		return nil, err
+	}
+	if layout.publicURL != c.PublicURL || layout.topic != c.Topic {
+		return nil, ErrConflict
+	}
 	if err := validatePushOrganization(c); err != nil {
 		return nil, err
 	}
@@ -129,17 +152,17 @@ func scepEnrollmentProfile(c *Settings, deviceID, challenge string) ([]byte, err
 		return nil, errSCEPAuthority
 	}
 	prefix := "eu.openuem.enrollment." + deviceID
-	identityID := uuid.NewString()
+	identityID := layout.identityUUID
 	// The device also needs the issuing CA in its trust anchors for SCEP. This
 	// public certificate is installed with the enrollment; it contains no key.
-	trust := map[string]any{"PayloadType": "com.apple.security.root", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".ca", "PayloadUUID": uuid.NewString(), "PayloadDisplayName": "OpenUEM enrollment authority", "PayloadContent": ca.Raw}
+	trust := map[string]any{"PayloadType": "com.apple.security.root", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".ca", "PayloadUUID": layout.caUUID, "PayloadDisplayName": "OpenUEM enrollment authority", "PayloadContent": ca.Raw}
 	// HTTPS authenticates GetCACert and capabilities. Apple's documented legacy
 	// fingerprint field supports SHA-1/MD5; do not invent a SHA-256 interpretation
 	// or weaken CMS signatures to support those hashes.
-	content := map[string]any{"URL": c.PublicURL + "/mdm/apple/" + deviceID + "/scep", "Challenge": challenge, "Key Type": "RSA", "Keysize": 2048, "Key Usage": 5, "KeyIsExtractable": false, "AllowAllAppsAccess": false, "Subject": []any{[]any{[]any{"CN", deviceID}}}}
+	content := map[string]any{"URL": c.PublicURL + endpoint, "Challenge": challenge, "Key Type": "RSA", "Keysize": 2048, "Key Usage": 5, "KeyIsExtractable": false, "AllowAllAppsAccess": false, "Subject": []any{[]any{[]any{"CN", deviceID}}}}
 	identity := map[string]any{"PayloadType": "com.apple.security.scep", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".identity", "PayloadUUID": identityID, "PayloadDisplayName": "OpenUEM device identity", "PayloadContent": content}
-	mdm := map[string]any{"PayloadType": "com.apple.mdm", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".mdm", "PayloadUUID": uuid.NewString(), "PayloadDisplayName": "OpenUEM management", "IdentityCertificateUUID": identityID, "Topic": c.Topic, "ServerURL": c.PublicURL + "/mdm/apple/" + deviceID + "/connect", "CheckInURL": c.PublicURL + "/mdm/apple/" + deviceID + "/checkin", "CheckOutWhenRemoved": true, "SignMessage": false, "AccessRights": 1 | 2 | 16 | 256 | 512 | 1024 | 2048 | 4096}
-	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{trust, identity, mdm}}
+	mdm := map[string]any{"PayloadType": "com.apple.mdm", "PayloadVersion": 1, "PayloadIdentifier": prefix + ".mdm", "PayloadUUID": layout.mdmUUID, "PayloadDisplayName": "OpenUEM management", "IdentityCertificateUUID": identityID, "Topic": c.Topic, "ServerURL": c.PublicURL + "/mdm/apple/" + deviceID + "/connect", "CheckInURL": c.PublicURL + "/mdm/apple/" + deviceID + "/checkin", "CheckOutWhenRemoved": true, "SignMessage": false, "AccessRights": layout.accessRights}
+	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": layout.profileUUID, "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{trust, identity, mdm}}
 	return plist.Marshal(profile, plist.XMLFormat)
 }
 
@@ -162,25 +185,33 @@ func (s *Store) scepEnrollmentAuthority(ctx context.Context, deviceID string, pr
 		return nil, err
 	}
 	if private {
-		var encrypted []byte
-		if err = s.db.QueryRowContext(ctx, `SELECT encrypted_key FROM mdm_apple_scep_authorities WHERE id=$1 AND tenant_id=$2`, a.id, a.tenant).Scan(&encrypted); err != nil {
+		if err = s.loadSCEPAuthorityKey(ctx, &a); err != nil {
 			return nil, err
-		}
-		keyDER, err := s.secrets.open(encrypted, secretPurpose(a.tenant, a.id, "scep_ra_key"))
-		if err != nil {
-			return nil, errSCEPAuthority
-		}
-		a.key, err = x509.ParsePKCS8PrivateKey(keyDER)
-		signer, ok := a.key.(crypto.Signer)
-		if err != nil || !ok {
-			return nil, errSCEPAuthority
-		}
-		publicDER, err := x509.MarshalPKIXPublicKey(signer.Public())
-		if err != nil || !bytes.Equal(publicDER, a.ra.RawSubjectPublicKeyInfo) {
-			return nil, errSCEPAuthority
 		}
 	}
 	return &a, nil
+}
+
+func (s *Store) loadSCEPAuthorityKey(ctx context.Context, a *scepAuthority) error {
+	var err error
+	var encrypted []byte
+	if err = s.db.QueryRowContext(ctx, `SELECT encrypted_key FROM mdm_apple_scep_authorities WHERE id=$1 AND tenant_id=$2`, a.id, a.tenant).Scan(&encrypted); err != nil {
+		return err
+	}
+	keyDER, err := s.secrets.open(encrypted, secretPurpose(a.tenant, a.id, "scep_ra_key"))
+	if err != nil {
+		return errSCEPAuthority
+	}
+	a.key, err = x509.ParsePKCS8PrivateKey(keyDER)
+	signer, ok := a.key.(crypto.Signer)
+	if err != nil || !ok {
+		return errSCEPAuthority
+	}
+	publicDER, err := x509.MarshalPKIXPublicKey(signer.Public())
+	if err != nil || !bytes.Equal(publicDER, a.ra.RawSubjectPublicKeyInfo) {
+		return errSCEPAuthority
+	}
+	return nil
 }
 
 func (s *Store) scepEnroll(ctx context.Context, a *scepAuthority, request *scepRequest) ([]byte, error) {

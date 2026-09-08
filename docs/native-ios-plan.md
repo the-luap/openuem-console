@@ -110,7 +110,8 @@ complete while requirements remain unverified.
   builds share a version. Avoided duplicate inventory immediately after enrollment.
 - Remaining release gate: the real-hardware acceptance
   checklist in `native-ios-operations.md`. Manual enrollment is implemented;
-  ADE/ABM, identity renewal and iOS app deployment remain open. Subsequent
-  [expanded roadmap work](implementation-status.md) adds initial SCEP enrollment, persisted roles and
+  ADE/ABM and iOS app deployment remain open. Subsequent
+  [expanded roadmap work](implementation-status.md) adds initial SCEP enrollment,
+  automatic identity renewal with synthetic protocol evidence, persisted roles and
   scoped native Apple permissions; the original implementation record above
   predates those changes.

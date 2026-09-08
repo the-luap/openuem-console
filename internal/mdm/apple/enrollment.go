@@ -343,13 +343,14 @@ func (s *Store) AuthenticateCertificate(ctx context.Context, id string, cert *x5
 	if cert == nil || time.Now().Before(cert.NotBefore) || !time.Now().Before(cert.NotAfter) {
 		return nil, ErrUnauthorized
 	}
-	d, err := scanDevice(s.db.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND certificate_fingerprint=$2 AND certificate_expires_at>now() AND status IN ('authenticating','enrolled')`, id, digest(cert.Raw)))
+	d, err := scanDevice(s.db.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND status IN ('authenticating','enrolled') AND ((certificate_fingerprint=$2 AND certificate_expires_at>clock_timestamp()) OR (status='enrolled' AND EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.device_id=mdm_apple_devices.id AND r.status='issued' AND r.base_fingerprint=mdm_apple_devices.certificate_fingerprint AND r.certificate_fingerprint=$2 AND r.certificate_expires_at>clock_timestamp())) OR (status='enrolled' AND EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.device_id=mdm_apple_devices.id AND r.status='confirmed' AND r.certificate_fingerprint=mdm_apple_devices.certificate_fingerprint AND r.base_fingerprint=$2 AND r.grace_until>clock_timestamp() AND r.base_expires_at>clock_timestamp())))`, id, digest(cert.Raw)))
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, ErrUnauthorized
 		}
 		return nil, err
 	}
+	d.peerFingerprint, d.peerExpiresAt = digest(cert.Raw), cert.NotAfter
 	// Pinning the exact individually issued certificate is stronger than merely
 	// trusting any certificate from the organization's CA.
 	return d, nil

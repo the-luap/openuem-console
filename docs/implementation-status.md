@@ -6,8 +6,10 @@ Its original reviewed code is `c19a58b`; implementation started from worktree co
 scope is proven. A passing protocol simulator is not physical-device acceptance.
 
 New [SCEP enrollment](apple-scep-enrollment.md) moves initial iPhone/iPad keys to
-the device. It does not yet implement automatic renewal, legacy migration, or
-hardware acceptance. Those remain within ENR-01 and PKI-01.
+the device. [Automatic identity renewal](apple-identity-renewal.md) now schedules
+replacement profiles, verifies new-key use and preserves existing device records,
+including tested server-side legacy metadata recovery. Hardware acceptance,
+CA/master-key rotation and the remaining ENR-01/PKI-01 requirements stay open.
 
 ## Package ledger
 
@@ -23,7 +25,7 @@ hardware acceptance. Those remain within ENR-01 and PKI-01.
 | MAC-02 | No native Mac update/security workflow | Catalog/DDM compatibility and authorization, bootstrap tokens, FileVault escrow/verification and hardware update acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
-| PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Automatic device renewal, CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
+| PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | No ADE integration | Apple Business/ADE tokens, device assignments, setup/re-enrollment, groups/rings and directory associations |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
@@ -38,6 +40,17 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Apple device identity renewal](apple-identity-renewal.md) schedules replacement
+  enrollment profiles without changing immutable MDM fields. One-use SCEP
+  authorization, staged encrypted push data and a new-key command request gate
+  activation; retired keys can acknowledge only the exact replacement command
+  during a bounded grace. PostgreSQL tests cover retries, rollback, restart,
+  offline confirmation, late failure, revocation, scope, stale credentials and
+  known legacy PKCS#12 metadata recovery. Real TLS tests exercise direct and
+  gateway routes. Rendered English device views were checked at 390/768/1440 px
+  with expanded fingerprints and keyboard disclosure. Hardware continuity and
+  other certificate lifecycle work remain open.
 
 - [Apple push requests](apple-push-requests.md) add a local external-vendor CSR
   workflow with encrypted request keys, bounded history, administrative account
