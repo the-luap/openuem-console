@@ -46,6 +46,9 @@ var ikev2FlagVersions = map[string][2]string{
 
 func validateIKEv2Configuration(c map[string]any, scope string, d *Device, advance func(string, string)) error {
 	advance("10.11", "8.0")
+	if err := validateIKEv2OnDemand(c); err != nil {
+		return err
+	}
 	if !vpnServerAddress(c["RemoteAddress"]) || !certificateText(c["LocalIdentifier"], 255, false) || !certificateText(c["RemoteIdentifier"], 255, false) {
 		return errors.New("IKEv2 requires a server hostname or IP address and bounded local and remote identifiers")
 	}

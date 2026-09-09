@@ -71,6 +71,10 @@ the table's package summaries do not remove any detail from the roadmap.
   The subsequent exception validator checks service actions, app/captive bundle
   identifiers, UDP limits, duplicate/unknown fields and property versions;
   isolated tests pass, while its PostgreSQL regression cases await full CI.
+  IKEv2 on-demand rules add ordered action/evaluation structure, field placement,
+  bounded match lists, SSID byte limits and DNS/probe validation. Isolated tests
+  pass; five persistence/assignment paths await full CI. Broader provider rules
+  and an on-demand editor remain open.
   A typed IKEv2 generator copies certificate configurations into System/User
   profiles with local bindings and machine/EAP-TLS authentication. Protected
   composition uses exact encrypted certificate revisions and atomic audit

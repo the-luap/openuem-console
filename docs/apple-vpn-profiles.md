@@ -119,9 +119,32 @@ Post-quantum pre-shared keys require data and a key identifier together, from
 macOS 15/iOS 18. The key admission bound is 1–4096 bytes and does not prove the
 server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
-No cryptographic exchange is performed by saving a profile. Complete on-demand
-rules, provider schemas, further protocol options
-and additional console editors remain open.
+No cryptographic exchange is performed by saving a profile. Provider schemas,
+further protocol options and additional console editors remain open.
+
+## IKEv2 on-demand rules
+
+Regular and App-Layer IKEv2 dictionaries, and flat IKEv2 settings in Always On
+tunnels, validate `OnDemandRules` even when `OnDemandEnabled` is zero. Rules accept
+Allow (deprecated but retained), Connect, Disconnect, EvaluateConnection and Ignore.
+`ActionParameters` is accepted only for EvaluateConnection, and each evaluation
+requires a nonempty domain list and ConnectIfNeeded or NeverConnect. Required DNS
+servers and URL probes are restricted to ConnectIfNeeded. DNS servers must be IP
+literals; probes use HTTP/HTTPS URLs without credentials or fragments.
+
+Rule order, duplicate match strings, wildcard text, optional omissions and
+explicit empty optional arrays are preserved. Domain and DNS-match patterns are
+bounded strings interpreted by the device; the server does not simulate wildcard
+matching, reachability or rule selection. Interface choices are Ethernet, WiFi or
+Cellular. SSIDs preserve whitespace and accept 1–32 UTF-8 bytes. Unknown rule or
+evaluation fields are rejected to catch misspelled conditions. List limits of 64,
+domain/match text limits of 254 bytes, probe URL limits of 2048 bytes and nonempty
+required domain/DNS lists are OpenUEM admission rules.
+
+These checks use the existing IKEv2 platform floor. They do not yet extend to the
+separate provider VPN, IPSec or TransparentProxy dictionaries, supply an on-demand
+editor or establish real connection behavior. Always On tunnel fields remain
+subject to the existing supervised mobile target checks.
 
 ## Certificate profile generator
 
@@ -246,6 +269,15 @@ fields and invalid ignored captive lists. PostgreSQL regression cases cover thre
 exception-version upgrades across two assigned devices, atomic rejected revisions
 and restoration, and removal after a malformed encrypted historical payload.
 Full CI for this extension remains pending.
+
+The IKEv2 on-demand extension passes an isolated run of 27 unchanged
+production/test files (0.443 seconds). Cases cover plist order/value preservation,
+explicit disabled/empty rules, all actions, field placement, required DNS/probe
+conditions, malformed types, UTF-8 SSID byte limits and error redaction.
+PostgreSQL cases cover five System/User, regular/App-Layer and Always On paths:
+upload, rejected revision without catalog/history/command changes, valid replacement
+and encrypted legacy assignment rejection with removal retained. Their full CI is
+pending; the console templates and browser suites are unchanged.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an
