@@ -8,6 +8,7 @@ import (
 )
 
 type ADEPlatformSSOStatus struct {
+	BindingRevisionID, PackageID                                     string
 	ID, ProfileID, ProfileRevisionID, ProfileName, ProfileIdentifier string
 	ProfileRevision                                                  int
 	ApplicationVersionID, ApplicationName, ApplicationVersion        string
@@ -28,16 +29,16 @@ func (s *Store) ADEPlatformSSOStatus(ctx context.Context, scope Scope, device st
 		return nil, err
 	}
 	var r ADEPlatformSSOStatus
-	err := s.db.QueryRowContext(ctx, `SELECT r.id,r.profile_id,r.profile_revision_id,p.name,p.identifier,p.revision,r.application_version_id,v.name,v.version,b.approved_by,b.approval_reason,r.error,r.created_at,r.updated_at,d.profiles_at,
- COALESCE(a.revision=p.revision AND a.desired='installed' AND a.status='verified' AND d.profiles_query_at>=r.created_at AND d.profiles_at>=clock_timestamp()-interval '24 hours' AND d.profiles_at<=clock_timestamp(),false),
- COALESCE(d.status='enrolled' AND e.awaiting_configuration AND e.setup_state IN ('awaiting','releasing') AND NOT EXISTS(SELECT 1 FROM mdm_apple_commands c WHERE c.tenant_id=e.tenant_id AND c.device_id=e.device_id AND c.ade_setup AND c.attempts>0),false)
+	err := s.db.QueryRowContext(ctx, `SELECT r.id,r.profile_id,b.profile_revision_id,p.name,p.identifier,p.revision,b.application_version_id,v.name,v.version,b.actor,b.reason,r.error,b.created_at,r.updated_at,d.profiles_at,
+ COALESCE(a.revision=p.revision AND a.desired='installed' AND a.status='verified' AND d.profiles_query_at>=b.created_at AND d.profiles_at>=clock_timestamp()-interval '24 hours' AND d.profiles_at<=clock_timestamp(),false),
+ COALESCE(d.status='enrolled' AND e.awaiting_configuration AND e.setup_state IN ('awaiting','releasing') AND NOT EXISTS(SELECT 1 FROM mdm_apple_commands c WHERE c.tenant_id=e.tenant_id AND c.device_id=e.device_id AND c.ade_setup AND c.attempts>0),false),b.id,r.package_id
  FROM mdm_apple_ade_device_sso r JOIN mdm_apple_devices d ON d.id=r.device_id AND d.tenant_id=r.tenant_id
- JOIN mdm_apple_profile_revisions p ON p.id=r.profile_revision_id AND p.tenant_id=r.tenant_id
- JOIN uem_software_versions v ON v.id=r.application_version_id AND v.tenant_id=r.tenant_id
- JOIN mdm_apple_ade_profile_sso b ON b.ade_profile_id=r.ade_profile_id AND b.tenant_id=r.tenant_id
+ JOIN mdm_apple_ade_sso_revisions b ON b.id=r.current_revision_id
+ JOIN mdm_apple_profile_revisions p ON p.id=b.profile_revision_id AND p.tenant_id=r.tenant_id
+ JOIN uem_software_versions v ON v.id=b.application_version_id AND v.tenant_id=r.tenant_id
  JOIN mdm_apple_ade_admissions e ON e.device_id=r.device_id AND e.tenant_id=r.tenant_id
  LEFT JOIN mdm_apple_profile_assignments a ON a.device_id=r.device_id AND a.tenant_id=r.tenant_id AND a.profile_id=r.profile_id
- WHERE r.tenant_id=$1 AND r.device_id=$2 AND ($3=0 OR d.site_id=$3)`, scope.TenantID, device, scope.SiteID).Scan(&r.ID, &r.ProfileID, &r.ProfileRevisionID, &r.ProfileName, &r.ProfileIdentifier, &r.ProfileRevision, &r.ApplicationVersionID, &r.ApplicationName, &r.ApplicationVersion, &r.ApprovedBy, &r.ApprovalReason, &r.Error, &r.CreatedAt, &r.UpdatedAt, &r.ProfileObservedAt, &r.ProfileVerified, &r.CanRepair)
+ WHERE r.tenant_id=$1 AND r.device_id=$2 AND ($3=0 OR d.site_id=$3)`, scope.TenantID, device, scope.SiteID).Scan(&r.ID, &r.ProfileID, &r.ProfileRevisionID, &r.ProfileName, &r.ProfileIdentifier, &r.ProfileRevision, &r.ApplicationVersionID, &r.ApplicationName, &r.ApplicationVersion, &r.ApprovedBy, &r.ApprovalReason, &r.Error, &r.CreatedAt, &r.UpdatedAt, &r.ProfileObservedAt, &r.ProfileVerified, &r.CanRepair, &r.BindingRevisionID, &r.PackageID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

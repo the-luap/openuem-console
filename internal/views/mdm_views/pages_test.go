@@ -238,7 +238,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	profileDeleted.CurrentRevision = 0
 	profileMigrated := profileRevision
 	profileMigrated.Origin, profileMigrated.Actor = "migration", ""
-	ssoRequirement := apple.ADEPlatformSSOStatus{ID: "a0000000-0000-4000-8000-000000000032", ProfileID: p.ID, ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileIdentifier: p.Identifier, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: appVersion.Version, ApprovedBy: "Operator <A>", ApprovalReason: "Reviewed <provider> extension", Error: "profile_attention_required", CanRepair: true}
+	ssoRequirement := apple.ADEPlatformSSOStatus{BindingRevisionID: "a0000000-0000-4000-8000-000000000032", PackageID: appVersion.PackageID, ID: "a0000000-0000-4000-8000-000000000032", ProfileID: p.ID, ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileIdentifier: p.Identifier, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: appVersion.Version, ApprovedBy: "Operator <A>", ApprovalReason: "Reviewed <provider> extension", Error: "profile_attention_required", CanRepair: true}
 	ssoState := func(state string) Detail {
 		r := ssoRequirement
 		d := Detail{Device: &appDevice, ADE: &apple.ADEDeviceEnrollment{SetupState: "awaiting"}, ADEPlatformSSO: &r}
@@ -259,15 +259,17 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		return d
 	}
 	ssoRepairs := []apple.ADEPlatformSSORepair{{ID: "a0000000-0000-4000-8000-000000000033", ProfileRevisionID: profileRevision.ID, Actor: "Operator <A>", Reason: "Repair <profile> delivery", CreatedAt: now}}
+	ssoRevisions := []apple.ADEPlatformSSORevision{{ID: ssoRequirement.BindingRevisionID, PreviousID: "a0000000-0000-4000-8000-000000000034", ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileRevision: 2, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: "43.0", Actor: "Operator <A>", Reason: "Reviewed <correction>", CreatedAt: now}, {ID: "a0000000-0000-4000-8000-000000000034", ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: "42.0", Actor: "Original reviewer", Reason: "Original provider review", CreatedAt: now}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"ade-sso-revisions", ADEPlatformSSORevisions(c, info, &appDevice, &ssoRequirement, ssoRevisions, ssoRevisions[1].ID), []string{"Original enrollment requirement", "Current required pair", "Reviewed &lt;correction&gt;", "Older provider revisions"}},
 		{"ade-sso-attention", DeviceDetails(c, info, ssoState("attention")), []string{"Platform SSO setup requirement", "installation needs attention", "Send retained profile revision", "Reviewed &lt;provider&gt; extension", "Profile repair history"}},
 		{"ade-sso-verified", DeviceDetails(c, info, ssoState("verified")), []string{"retained profile revision is verified by current inventory", "Send retained profile revision"}},
 		{"ade-sso-released", DeviceDetails(c, info, ssoState("released")), []string{"Platform SSO setup requirement", "registration starts after release"}},
-		{"ade-sso-complete", DeviceDetails(c, info, ssoState("complete")), []string{"The Mac reported that the MDM setup hold ended", "original enrollment requirement"}},
+		{"ade-sso-complete", DeviceDetails(c, info, ssoState("complete")), []string{"The Mac reported that the MDM setup hold ended", "reviewed enrollment requirement"}},
 		{"ade-sso-reader", DeviceDetails(c, &reader, ssoState("attention")), []string{"Platform SSO setup requirement", "Profile repair history"}},
 		{"ade-sso-history", ADEPlatformSSORepairs(c, &reader, &appDevice, &ssoRequirement, ssoRepairs, ssoRepairs[0].ID), []string{"Platform SSO profile repairs", "Repair &lt;profile&gt; delivery", "Operator &lt;A&gt;", "Older profile repairs"}},
 		{"ade-sso-history-empty", ADEPlatformSSORepairs(c, &reader, &appDevice, &ssoRequirement, nil, ""), []string{"No recorded profile repairs on this page"}},
@@ -362,7 +364,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			}
 			html := b.String()
 			if tc.name == "ade-sso-released" || tc.name == "ade-sso-complete" || tc.name == "ade-sso-reader" {
-				if strings.Contains(html, "Send retained profile revision") {
+				if strings.Contains(html, "Send retained profile revision") || strings.Contains(html, "Apply reviewed provider revisions") {
 					t.Fatal("repair exposed after release or without permission")
 				}
 			}

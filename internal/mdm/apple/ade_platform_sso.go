@@ -107,7 +107,7 @@ func (s *Store) admitADEPlatformSSO(ctx context.Context, tx *sql.Tx, tenant int,
 	if p.PlatformSSO == nil {
 		return nil
 	}
-	result, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_device_sso(id,tenant_id,device_id,ade_profile_id,profile_id,profile_revision_id,package_id,application_version_id) SELECT $1,tenant_id,$2,ade_profile_id,profile_id,profile_revision_id,package_id,application_version_id FROM mdm_apple_ade_profile_sso WHERE tenant_id=$3 AND ade_profile_id=$4`, uuid.NewString(), device, tenant, p.ID)
+	result, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_device_sso(id,tenant_id,device_id,ade_profile_id,profile_id,profile_revision_id,package_id,application_version_id,current_revision_id) SELECT $1,tenant_id,$2,ade_profile_id,profile_id,profile_revision_id,package_id,application_version_id,$1 FROM mdm_apple_ade_profile_sso WHERE tenant_id=$3 AND ade_profile_id=$4`, uuid.NewString(), device, tenant, p.ID)
 	if err != nil {
 		return err
 	}
@@ -115,12 +115,16 @@ func (s *Store) admitADEPlatformSSO(ctx context.Context, tx *sql.Tx, tenant int,
 	if err == nil && n != 1 {
 		return ErrADEPlatformSSO
 	}
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_sso_revisions(id,tenant_id,device_id,requirement_id,profile_id,package_id,profile_revision_id,application_version_id,actor,reason,created_at) SELECT r.id,r.tenant_id,r.device_id,r.id,r.profile_id,r.package_id,r.profile_revision_id,r.application_version_id,p.approved_by,p.approval_reason,r.created_at FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_profile_sso p ON p.tenant_id=r.tenant_id AND p.ade_profile_id=r.ade_profile_id WHERE r.tenant_id=$1 AND r.device_id=$2`, tenant, device)
 	return err
 }
 
 func activeADEProfileRequirement(ctx context.Context, tx *sql.Tx, tenant int, device, profile string) (string, string, error) {
 	var id, revision string
-	err := tx.QueryRowContext(ctx, `SELECT r.id,r.profile_revision_id FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2 AND r.profile_id=$3 AND a.setup_state<>'complete'`, tenant, device, profile).Scan(&id, &revision)
+	err := tx.QueryRowContext(ctx, `SELECT r.id,b.profile_revision_id FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_sso_revisions b ON b.id=r.current_revision_id JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2 AND r.profile_id=$3 AND a.setup_state<>'complete'`, tenant, device, profile).Scan(&id, &revision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil
 	}
@@ -129,7 +133,7 @@ func activeADEProfileRequirement(ctx context.Context, tx *sql.Tx, tenant int, de
 
 func guardADEProviderApplication(ctx context.Context, tx *sql.Tx, d *Device, v SoftwareVersion, operation string) error {
 	var expected string
-	err := tx.QueryRowContext(ctx, `SELECT r.application_version_id FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2 AND r.package_id=$3 AND a.setup_state<>'complete'`, d.TenantID, d.ID, v.PackageID).Scan(&expected)
+	err := tx.QueryRowContext(ctx, `SELECT b.application_version_id FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_sso_revisions b ON b.id=r.current_revision_id JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2 AND r.package_id=$3 AND a.setup_state<>'complete'`, d.TenantID, d.ID, v.PackageID).Scan(&expected)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -173,13 +177,13 @@ func (s *Store) repairADEPlatformSSO(ctx context.Context, scope Scope, device, e
 	if err != nil {
 		return err
 	}
-	var requirement, revision, release string
+	var requirement, revision, binding, release string
 	var eligible bool
-	err = tx.QueryRowContext(ctx, `SELECT r.id,r.profile_revision_id,COALESCE(a.setup_command_id::text,''),COALESCE(a.awaiting_configuration AND a.setup_state IN ('awaiting','releasing') AND NOT EXISTS(SELECT 1 FROM mdm_apple_commands c WHERE c.tenant_id=a.tenant_id AND c.device_id=a.device_id AND c.ade_setup AND c.attempts>0),false) FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2`, scope.TenantID, device).Scan(&requirement, &revision, &release, &eligible)
+	err = tx.QueryRowContext(ctx, `SELECT r.id,b.profile_revision_id,b.id,COALESCE(a.setup_command_id::text,''),COALESCE(a.awaiting_configuration AND a.setup_state IN ('awaiting','releasing') AND NOT EXISTS(SELECT 1 FROM mdm_apple_commands c WHERE c.tenant_id=a.tenant_id AND c.device_id=a.device_id AND c.ade_setup AND c.attempts>0),false) FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_sso_revisions b ON b.id=r.current_revision_id JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2`, scope.TenantID, device).Scan(&requirement, &revision, &binding, &release, &eligible)
 	if err != nil {
 		return notFound(err)
 	}
-	if !eligible || expected != revision || d.Status != "enrolled" {
+	if !eligible || expected != binding || d.Status != "enrolled" {
 		return ErrConflict
 	}
 	p, err := s.profileRevisionPayload(ctx, tx, scope.TenantID, revision)
@@ -203,7 +207,7 @@ func (s *Store) repairADEPlatformSSO(ctx context.Context, scope Scope, device, e
 	// Keep the operator's reason in its own retained receipt, not in a command
 	// payload or an unstructured audit message that might expose profile secrets.
 	id := uuid.NewString()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_sso_repairs(id,tenant_id,device_id,requirement_id,profile_revision_id,actor,reason) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, scope.TenantID, device, requirement, revision, actor, reason); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_sso_repairs(id,tenant_id,device_id,requirement_id,profile_revision_id,actor,reason,binding_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, id, scope.TenantID, device, requirement, revision, actor, reason, binding); err != nil {
 		return err
 	}
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.ade.platform_sso.repair", id); err != nil {
@@ -215,7 +219,7 @@ func (s *Store) repairADEPlatformSSO(ctx context.Context, scope Scope, device, e
 func (s *Store) reconcileADEPlatformSSO(ctx context.Context, tx *sql.Tx, d *Device) (bool, error) {
 	var requirement, revision, application string
 	var created time.Time
-	err := tx.QueryRowContext(ctx, `SELECT id,profile_revision_id,application_version_id,created_at FROM mdm_apple_ade_device_sso WHERE tenant_id=$1 AND device_id=$2`, d.TenantID, d.ID).Scan(&requirement, &revision, &application, &created)
+	err := tx.QueryRowContext(ctx, `SELECT r.id,b.profile_revision_id,b.application_version_id,b.created_at FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_sso_revisions b ON b.id=r.current_revision_id WHERE r.tenant_id=$1 AND r.device_id=$2`, d.TenantID, d.ID).Scan(&requirement, &revision, &application, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return true, nil
 	}

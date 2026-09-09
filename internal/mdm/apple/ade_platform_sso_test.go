@@ -235,7 +235,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 			t.Fatal("provider repair history crossed scope", err)
 		}
 	}
-	if err = s.RepairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "Repair synthetic drift", "admin", nil); !errors.Is(err, access.ErrDenied) {
+	if err = s.RepairADEPlatformSSO(t.Context(), scope, d.ID, status.BindingRevisionID, "Repair synthetic drift", "admin", nil); !errors.Is(err, access.ErrDenied) {
 		t.Fatal("repair accepted missing authority", err)
 	}
 	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, uuid.NewString(), "Stale requirement", "admin", nil); !errors.Is(err, ErrConflict) {
@@ -246,7 +246,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 		t.Fatal(err)
 	}
 	adeExec(t, s, `CREATE FUNCTION reject_sso_repair_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='apple.ade.platform_sso.repair' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_sso_repair_audit BEFORE INSERT ON mdm_apple_audit FOR EACH ROW EXECUTE FUNCTION reject_sso_repair_audit()`)
-	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "Rejected synthetic repair", "admin", nil); err == nil {
+	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, status.BindingRevisionID, "Rejected synthetic repair", "admin", nil); err == nil {
 		t.Fatal("repair committed without audit")
 	}
 	adeExec(t, s, `DROP TRIGGER reject_sso_repair_audit ON mdm_apple_audit; DROP FUNCTION reject_sso_repair_audit()`)
@@ -256,7 +256,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 	if err = s.db.QueryRow(`SELECT count(*) FROM mdm_apple_ade_sso_repairs WHERE device_id=$1`, d.ID).Scan(&repairs); err != nil || commandsBefore != commandsAfter || repairs != 0 {
 		t.Fatal("rejected repair leaked command or receipt", err)
 	}
-	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "Repair synthetic drift", "admin", nil); err != nil {
+	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, status.BindingRevisionID, "Repair synthetic drift", "admin", nil); err != nil {
 		t.Fatal(err)
 	}
 	_, history, more, err := s.ADEPlatformSSORepairs(t.Context(), scope, d.ID, "")
@@ -267,7 +267,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 		t.Fatal("foreign repair cursor accepted", err)
 	}
 	for range 100 {
-		adeExec(t, s, `INSERT INTO mdm_apple_ade_sso_repairs(id,tenant_id,device_id,requirement_id,profile_revision_id,actor,reason,created_at) VALUES($1,1,$2,$3,$4,'admin','Historical synthetic repair',clock_timestamp()-interval '1 day')`, uuid.NewString(), d.ID, status.ID, snapshot.ID)
+		adeExec(t, s, `INSERT INTO mdm_apple_ade_sso_repairs(id,tenant_id,device_id,requirement_id,profile_revision_id,binding_revision_id,actor,reason,created_at) VALUES($1,1,$2,$3,$4,$3,'admin','Historical synthetic repair',clock_timestamp()-interval '1 day')`, uuid.NewString(), d.ID, status.ID, snapshot.ID)
 	}
 	_, history, more, err = s.ADEPlatformSSORepairs(t.Context(), scope, d.ID, "")
 	if err != nil || len(history) != 100 || more == "" {
@@ -289,7 +289,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 	if err != nil || status == nil || !status.ProfileVerified || status.CanRepair {
 		t.Fatal("status did not reflect verified profile and dispatched release", err)
 	}
-	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "After release delivery", "admin", nil); !errors.Is(err, ErrConflict) {
+	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, status.BindingRevisionID, "After release delivery", "admin", nil); !errors.Is(err, ErrConflict) {
 		t.Fatal("repair modified a dispatched setup release", err)
 	}
 	adeConnect(t, s, d, "Error", wire["CommandUUID"].(string), map[string]any{"ErrorChain": []any{map[string]any{"LocalizedDescription": "Synthetic release failure"}}})
@@ -305,7 +305,7 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 	if err != nil || status == nil || status.CanRepair || adeSetupState(t, s, d).CanChangeApplications {
 		t.Fatal("retry forgot earlier release dispatch", err)
 	}
-	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "After release retry", "admin", nil); !errors.Is(err, ErrConflict) {
+	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, status.BindingRevisionID, "After release retry", "admin", nil); !errors.Is(err, ErrConflict) {
 		t.Fatal("release retry reopened provider repair", err)
 	}
 	wire = driver.drive(nil, "DeviceConfigured")

@@ -41,6 +41,9 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/setup/applications/:requirement/replace", h.ReplaceADEApplication)
 		g.GET("/ios/:id/setup/platform-sso/repairs", h.ADEPlatformSSORepairs)
 		g.POST("/ios/:id/setup/platform-sso/repair", h.RepairADEPlatformSSO)
+		g.GET("/ios/:id/setup/platform-sso/profiles", h.ADEPlatformSSORevisionChoices)
+		g.GET("/ios/:id/setup/platform-sso/history", h.ADEPlatformSSORevisions)
+		g.POST("/ios/:id/setup/platform-sso/correct", h.CorrectADEPlatformSSO)
 		g.POST("/ios/:id/applications/:assignment/action", h.ChangeMacApp)
 		g.GET("/devices", h.UnifiedDevices)
 		g.GET("/ios", h.UnifiedDevices)
@@ -102,7 +105,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/ios/:id/setup/platform-sso/repair", "/ios/configurations/:id/revisions/:revision/restore", "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
+			case "/ios/:id/setup/platform-sso/correct", "/ios/:id/setup/platform-sso/repair", "/ios/configurations/:id/revisions/:revision/restore", "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
 				// CSRF reads the form before the endpoint. Apply its bound here
 				// as well so a cached PostForm cannot bypass the endpoint limit.
 				limit = 128 << 10

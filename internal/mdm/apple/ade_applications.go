@@ -46,6 +46,7 @@ func (s *Store) approvedADEApplications(ctx context.Context, tx *sql.Tx, tenant 
 
 type ADEApplication struct {
 	ID, OriginalVersionID, Error string
+	PlatformSSO                  bool
 	Version                      SoftwareVersion
 	Assignment                   *MacAppAssignment
 }
@@ -54,13 +55,13 @@ func (r ADEApplication) Ready(now time.Time) bool {
 	return adeApplicationVerified(r.Assignment, r.Version, now)
 }
 
-const adeApplicationColumns = `r.id,r.original_version_id,r.error,` + softwareVersionColumns
+const adeApplicationColumns = `r.id,r.original_version_id,r.error,EXISTS(SELECT 1 FROM mdm_apple_ade_device_sso sso WHERE sso.tenant_id=r.tenant_id AND sso.device_id=r.device_id AND sso.package_id=r.package_id),` + softwareVersionColumns
 const adeApplicationFrom = ` FROM mdm_apple_ade_device_apps r JOIN uem_software_versions v ON v.tenant_id=r.tenant_id AND v.id=r.version_id JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id `
 
 func scanADEApplication(row scanner) (*ADEApplication, error) {
 	var a ADEApplication
 	v := &a.Version
-	err := row.Scan(&a.ID, &a.OriginalVersionID, &a.Error, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
+	err := row.Scan(&a.ID, &a.OriginalVersionID, &a.Error, &a.PlatformSSO, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
 	return &a, notFound(err)
 }
 
@@ -250,6 +251,15 @@ func (s *Store) replaceADEApplication(ctx context.Context, scope Scope, device, 
 	if err != nil {
 		return err
 	}
+	if err = s.replaceADEApplicationTx(ctx, tx, d, requirement, version, reason, actor, true); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) replaceADEApplicationTx(ctx context.Context, tx *sql.Tx, d *Device, requirement, version, reason, actor string, restart bool) error {
+	scope, device := Scope{TenantID: d.TenantID, SiteID: d.SiteID}, d.ID
+	var err error
 	var state, command string
 	var awaiting bool
 	var sent int
@@ -297,22 +307,26 @@ func (s *Store) replaceADEApplication(ctx context.Context, scope Scope, device, 
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_ade_device_apps SET version_id=$2,current_change_id=$3,error='application_pending',updated_at=clock_timestamp() WHERE id=$1`, r.ID, version, change); err != nil {
 		return err
 	}
-	if command != "" {
-		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',payload='\x',completed_at=clock_timestamp() WHERE id=$1 AND attempts=0`, command); err != nil {
+	if restart {
+		if command != "" {
+			if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',payload='\x',completed_at=clock_timestamp() WHERE id=$1 AND attempts=0`, command); err != nil {
+				return err
+			}
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_ade_admissions SET setup_state='awaiting',setup_command_id=NULL,setup_error='application_pending',setup_verify_after=clock_timestamp(),setup_updated_at=clock_timestamp(),next_setup_at=clock_timestamp() WHERE device_id=$1`, device); err != nil {
 			return err
 		}
-	}
-	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_ade_admissions SET setup_state='awaiting',setup_command_id=NULL,setup_error='application_pending',setup_verify_after=clock_timestamp(),setup_updated_at=clock_timestamp(),next_setup_at=clock_timestamp() WHERE device_id=$1`, device); err != nil {
-		return err
 	}
 	if err = s.installMacAppTx(ctx, tx, d, version, actor, MacAppInstallOptions{}); err != nil {
 		return err
 	}
-	if _, err = s.enqueue(ctx, tx, d, "DeviceInformation", map[string]any{"Queries": inventoryQueriesFor(*d)}, nil, nil); err != nil {
-		return err
+	if restart {
+		if _, err = s.enqueue(ctx, tx, d, "DeviceInformation", map[string]any{"Queries": inventoryQueriesFor(*d)}, nil, nil); err != nil {
+			return err
+		}
 	}
 	if err = audit(ctx, tx, scope.TenantID, actor, "apple.ade.application.replace", change); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }

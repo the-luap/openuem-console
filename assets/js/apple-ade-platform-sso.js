@@ -6,9 +6,11 @@
       container.dataset.initialized = "yes";
       const enable = container.querySelector("[data-sso-enable]");
       const fields = container.querySelector("[data-sso-fields]");
-      function toggle() { fields.hidden = fields.disabled = !enable.checked; }
-      enable.addEventListener("change", toggle);
-      toggle();
+      if (enable && fields) {
+        function toggle() { fields.hidden = fields.disabled = !enable.checked; }
+        enable.addEventListener("change", toggle);
+        toggle();
+      }
       const root = container.querySelector(".ade-sso-picker");
       const input = root.querySelector("[data-sso-search]");
       const status = root.querySelector("[data-sso-status]");
@@ -34,7 +36,7 @@
         selectedList.replaceChildren();
         if (selected) {
           const li = row(selected.label), hidden = document.createElement("input");
-          hidden.type = "hidden"; hidden.name = "sso_profile_revision"; hidden.value = selected.id;
+          hidden.type = "hidden"; hidden.name = root.dataset.input || "sso_profile_revision"; hidden.value = selected.id;
           removeButton = button("Remove selection", () => { selected = undefined; render(); input.focus(); status.textContent = "Profile selection removed."; });
           removeButton.setAttribute("aria-label", `Remove ${selected.label}`);
           li.append(hidden, removeButton); selectedList.append(li);

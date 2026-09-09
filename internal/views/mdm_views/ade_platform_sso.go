@@ -4,7 +4,7 @@ import "github.com/open-uem/openuem-console/internal/mdm/apple"
 
 func adePlatformSSOMessage(r *apple.ADEPlatformSSOStatus, setup string) string {
 	if setup == "complete" {
-		return "The Mac reported that the MDM setup hold ended. This panel retains the original enrollment requirement."
+		return "The Mac reported that the MDM setup hold ended. This panel retains the reviewed enrollment requirement."
 	}
 	if r.Error == "provider_application_mismatch" {
 		return "The required provider application differs from the reviewed version. Setup release remains held."
