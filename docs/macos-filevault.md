@@ -150,7 +150,9 @@ kernel boot-session UUID at admission and signs this proof after reaping its
 exact command or observing a different kernel boot. During same-boot intent-only
 recovery it waits without repeating the mutation. No reboot is performed
 automatically. Legacy intents or uncertainty receipts without this evidence
-cannot authorize automatic resolution. The console authenticates the stop proof
+cannot authorize automatic resolution. A previously queued v1 resolution check
+is rejected without updating the key validation timestamp, and cannot stall
+subsequent reconciliation batches. The console authenticates the stop proof
 before displaying the validation action. Only the
 explicitly selected subsequent `valid` proof, independently accepted by the
 console against its current key and association, resolves the attempt. Invalid,

@@ -218,6 +218,46 @@ func TestFileVaultRotationValidationRequiresAuthenticStoppingEvidence(t *testing
 	}
 }
 
+func TestFileVaultRotationUpgradeRejectsAlreadyQueuedLegacyResolution(t *testing.T) {
+	f := newFileVaultRotationFixture(t)
+	task := queueFileVaultRotation(t, f)
+	stopped := reportFileVaultRotation(t, f, task, "uncertain", nil, true)
+	if err := f.s.checkFileVaultRotation(t.Context(), f.scope, f.d.ID, task.Context.Binding.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	proof := f.queue(t)
+	// Only this disposable fixture replaces a receipt to reproduce a proof
+	// admitted by a v1 console before the stopping requirement was introduced.
+	legacy, err := enrollment.NewRotationResult(task.Context, "uncertain", stopped.Nonce, nil, f.cert, f.keys.Certificate, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire, _ := json.Marshal(legacy)
+	if _, err = f.s.db.Exec(`UPDATE uem_agent_rotation_tasks SET result=$2 WHERE id=$1`, task.Context.Binding.TaskID, wire); err != nil {
+		t.Fatal(err)
+	}
+	var verified time.Time
+	if err = f.s.db.QueryRow(`SELECT verified_at FROM mdm_apple_filevault_keys WHERE id=$1`, f.keyID).Scan(&verified); err != nil {
+		t.Fatal(err)
+	}
+	f.report(t, "valid")
+	for range 2 {
+		if err = f.s.ReconcileFileVaultValidations(t.Context()); err != nil {
+			t.Fatal("legacy proof blocked reconciliation", err)
+		}
+	}
+	rotationState(t, f, task.Context.Binding.TaskID, "uncertain")
+	var rejected, retained bool
+	if err = f.s.db.QueryRow(`SELECT v.status='rejected' AND k.verified_at=$3,t.status='uncertain' AND t.result=$4 AND t.resolved_at IS NULL
+ FROM mdm_apple_filevault_validations v JOIN mdm_apple_filevault_keys k ON k.id=v.key_id JOIN uem_agent_rotation_tasks t ON t.id=v.rotation_id
+ WHERE v.id=$1 AND t.id=$2`, proof, task.Context.Binding.TaskID, verified, wire).Scan(&rejected, &retained); err != nil || !rejected || !retained {
+		t.Fatal("upgrade accepted legacy proof or erased evidence", err)
+	}
+	if err = f.s.requestFileVaultRotation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil); err == nil {
+		t.Fatal("legacy proof unblocked another mutation")
+	}
+}
+
 func TestFileVaultRotationReceiptRejectsIndependentContextAndSignatureChanges(t *testing.T) {
 	for _, mode := range []string{"nonce", "signature", "native_context", "same_key"} {
 		t.Run(mode, func(t *testing.T) {

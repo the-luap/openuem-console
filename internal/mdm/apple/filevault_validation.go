@@ -356,9 +356,6 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 		return finish("rejected")
 	}
 	if receipt.Outcome == "valid" {
-		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_keys SET verified_at=GREATEST(verified_at,$2) WHERE id=$1 AND tenant_id=$3 AND device_id=$4`, c.KeyID, *completed, d.TenantID, d.ID); err != nil {
-			return err
-		}
 		if e.RotationID != "" {
 			rotation, err := loadFileVaultRotation(ctx, tx, d, e.RotationID)
 			if err != nil || rotation.Status != "uncertain" || rotation.EntityID != e.EntityID {
@@ -369,11 +366,20 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 				return err
 			}
 			if err = registryAccess.ResolveRotation(ctx, tx, rotation.Context, *c, e.NonceHash, e.Actor); err != nil {
+				// A v1 console may have queued this check without proof that the
+				// old mutation stopped. Finish the rejected check without stamping
+				// the key valid or starving the bounded reconciliation batch.
+				if errors.Is(err, registry.ErrDenied) {
+					return finish("rejected")
+				}
 				return ErrFileVault
 			}
 			if err = s.finishFileVaultRotation(ctx, tx, d, rotation, "resolved", c.KeyID, *completed, true); err != nil {
 				return err
 			}
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_keys SET verified_at=GREATEST(verified_at,$2) WHERE id=$1 AND tenant_id=$3 AND device_id=$4`, c.KeyID, *completed, d.TenantID, d.ID); err != nil {
+			return err
 		}
 	}
 	return s.finishFileVaultValidation(ctx, tx, e, receipt.Outcome, *completed)

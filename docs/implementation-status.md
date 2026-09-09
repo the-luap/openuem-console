@@ -67,7 +67,9 @@ the table's package summaries do not remove any detail from the roadmap.
   while its parent lease becomes free. The protected journal records the kernel
   boot-session UUID; same-boot intent recovery waits without repeating a mutation,
   and a subsequent boot can establish termination. Legacy receipts and intents
-  cannot acquire invented stopping evidence. Agent, worker and console use the
+  cannot acquire invented stopping evidence. Already queued legacy resolution
+  checks finish as rejected without advancing key validation or blocking later
+  reconciliation. Agent, worker and console use the
   same protocol v2 dependency. Local native process/journal/runtime race tests,
   console tests and vet pass; the shared registry's
   [PostgreSQL race CI](https://github.com/the-luap/openuem-nats/actions/runs/34294862275)
