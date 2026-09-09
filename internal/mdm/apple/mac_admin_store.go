@@ -78,7 +78,7 @@ func (a *MacAdminAccount) RotationReason(d Device, now time.Time) string {
 	if !macAdminDeviceReady(d, now) {
 		return "Refresh inventory on an enrolled, supervised ADE Mac with a valid management identity."
 	}
-	if a.CreationState != "accepted" || a.GUID == "" || a.InventoryState != "present" || a.ObservedAt == nil || a.ObservedAt.After(now) || a.ObservedAt.Before(now.Add(-24*time.Hour)) {
+	if a.CreationState != "accepted" || a.CurrentKeyID == "" || a.GUID == "" || a.InventoryState != "present" || a.ObservedAt == nil || a.ObservedAt.After(now) || a.ObservedAt.Before(now.Add(-24*time.Hour)) {
 		return "Wait for a current report of the administrator created by this enrollment."
 	}
 	if a.LatestStatus == "queued" || a.LatestStatus == "sent" || a.LatestStatus == "not_now" || a.LatestStatus == "uncertain" {

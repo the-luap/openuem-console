@@ -198,6 +198,9 @@ manual configuration/certificate steps do not meet simple onboarding.
    from Apple's schemas.
 5. Implement FileVault with escrowed and verified recovery keys; subsequently
    Recovery Lock, local administrator accounts/password rotation and Platform SSO.
+   Managed ADE administrator provisioning and password lifecycle are implemented;
+   validation and physical acceptance are tracked in
+   [apple-managed-administrator.md](apple-managed-administrator.md).
 6. Add PPPC/TCC, System Extensions, Firewall, Gatekeeper and certificate templates.
    Do not claim that MDM can bypass every user approval.
 7. Produce a signed, notarized agent package, English link-based installation and

@@ -183,8 +183,10 @@ access does not remove a nonremovable profile from the device.
 When requested, Setup Assistant's MDM hold waits for current DeviceInformation
 and ProfileList inventory and every currently assigned configuration profile to
 be verified in its desired state. An empty assignment set can proceed after the
-inventory checks. This workflow does not yet provide group-based setup policy or
-managed administrator account provisioning. The hold is not a promise to wait for
+inventory checks. When a managed administrator is requested, its account
+configuration must also be acknowledged before release. Account identity is
+verified separately after acceptance; see [managed administrators](apple-managed-administrator.md).
+Group-based setup policy is still outstanding. The hold is not a promise to wait for
 future assignments that an operator has not saved.
 
 OpenUEM queues DeviceConfigured only after these checks. NotNow preserves device
@@ -295,7 +297,8 @@ router/rendering and race evidence is recorded with the branch CI result.
 
 APP-02 remains open for groups/rings, directory associations, recipient-certificate
 rotation and production Apple/device acceptance. Native managed administrator
-accounts, Platform SSO enrollment, Apps & Books, physical Mac/iPhone/iPad setup
+implementation and its pending acceptance are tracked separately. Platform SSO
+enrollment, Apps & Books, physical Mac/iPhone/iPad setup
 and operational-scale acceptance remain outstanding. No real Apple account,
 device assignment, device lock, password or local account was mutated by the
 synthetic implementation tests.

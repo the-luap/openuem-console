@@ -35,7 +35,7 @@ templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
      <p role="status">{ macAdminError(a.Error) }</p>
     }
     if info.Can(access.ManageDeviceSecurity) && detail.Device.Status=="enrolled" {
-     if a.CreationState=="failed" || a.CreationState=="expired" {
+     if (a.CreationState=="failed" || a.CreationState=="expired") && detail.ADE!=nil && detail.ADE.SetupState!="complete" && detail.ADE.AwaitingConfiguration!=nil && *detail.ADE.AwaitingConfiguration {
       @MacAdminAction(info,detail,"retry_creation","Retry account configuration")
      }
      if reason:=a.RotationReason(*detail.Device,time.Now());reason=="" && detail.ADE!=nil && detail.ADE.SetupState=="complete" {

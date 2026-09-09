@@ -186,6 +186,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	failedAdmin.LatestStatus = "failed"
 	failedDetail := adminDetail
 	failedDetail.MacAdmin = &failedAdmin
+	adminAwaiting := true
+	failedDetail.ADE = &apple.ADEDeviceEnrollment{SetupState: "awaiting", AwaitingConfiguration: &adminAwaiting}
 	cases := []struct {
 		name      string
 		component templ.Component
