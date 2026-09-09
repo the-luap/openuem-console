@@ -242,14 +242,22 @@ func (s *Store) authorizeEnrollmentCredential(ctx context.Context, tx *sql.Tx, c
 	}
 	// Recheck the database clock after any wait for the row lock. A transaction
 	// start timestamp or a predicate evaluated before waiting can be stale.
-	var active bool
-	if err := tx.QueryRowContext(ctx, `SELECT created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND consumed_at IS NULL FROM mdm_windows_invitations WHERE id=$1`, id).Scan(&active); err != nil {
+	if err := activeEnrollmentInvitation(ctx, tx, id); err != nil {
 		return nil, err
 	}
-	if !active {
-		return nil, ErrCredential
-	}
 	return current, nil
+}
+
+// The invitation and its scope/permissions must already be locked by the caller.
+func activeEnrollmentInvitation(ctx context.Context, tx *sql.Tx, id string) error {
+	var active bool
+	if err := tx.QueryRowContext(ctx, `SELECT created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND consumed_at IS NULL FROM mdm_windows_invitations WHERE id=$1`, id).Scan(&active); err != nil {
+		return err
+	}
+	if !active {
+		return ErrCredential
+	}
+	return nil
 }
 
 // Keep private until the WSTEP issuer persists a verified CSR and its complete

@@ -4,12 +4,12 @@ WIN-02 is in progress. The first native protocol component is discovery in
 [`internal/mdm/windows`](../internal/mdm/windows). It is separate from the existing
 OpenUEM agent. The package currently contains a bounded SOAP/XML decoder, a
 discovery response builder, an immutable HTTPS discovery handler, an OnPremise
-XCEP request decoder and a PostgreSQL enrollment credential store. These components
+XCEP request decoder, a PostgreSQL enrollment credential store, protected
+organization CAs and an authenticated XCEP policy handler. These components
 are not registered in a production listener, gateway or console flow.
 
 This does not yet enroll Windows, issue a device certificate or apply a CSP.
-XCEP policy responses and service integration, WSTEP issuance, durable device
-identities, provisioning,
+WSTEP issuance, durable device identities, provisioning,
 SyncML commands and results, policy/update workflows, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
@@ -82,7 +82,7 @@ Tests use synthetic accounts and local TLS servers. They cover wire namespaces,
 version and policy negotiation, endpoint binding, parser/HTTP rejection cases,
 exact body limits, complete HTTP/1.1 responses, SOAP faults, read-only probes and
 24 concurrent request correlations. Response XML is decoded independently with
-Go's standard namespace resolver. No certificate is issued or installed, no
+Go's standard namespace resolver. No device certificate is issued or installed, no
 Windows account/settings are changed and no external enrollment service is used.
 
 The discovery-only local race baseline passes with 97.0% statement coverage.
@@ -99,8 +99,11 @@ and policy request parsing at `2dd103a`
 [pull request](https://github.com/the-luap/openuem-console/actions/runs/34387105197)).
 These runs include native Windows protocol checks, Linux race/fuzz tests,
 the existing PostgreSQL/console/browser regressions and both platform builds.
-Physical Windows enrollment has not been tested. The subsequent credential-store
-change has its own local evidence below; earlier CI runs do not cover that change.
+Both complete workflows also pass for the credential store at `72f2535`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34389496218),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34389505923)).
+Physical Windows enrollment has not been tested. The subsequent CA/policy service
+change has separate evidence below; earlier CI runs do not cover that change.
 
 ## OnPremise certificate policy request
 
@@ -129,7 +132,8 @@ still never log individual fields or the original SOAP request.
 
 The decoder does not validate a password or return an enrollment policy.
 `Store.CheckPolicyCredential` provides the separate durable credential check
-described below. Service integration must call it before returning a policy.
+described below. `Store.EnrollmentPolicyResponse` and `NewPolicyHandler` now
+perform the credential and CA checks together before returning a policy.
 Certificate issuance must recheck the credential, current permissions,
 expiry/revocation and CSR binding in its own transaction; a previously parsed
 request or successful policy lookup must not authorize later issuance.
@@ -210,8 +214,82 @@ Each test creates and removes its own random schema. It rejects other endpoints;
 GitHub Actions uses its declared disposable PostgreSQL service on port 5432.
 The Linux CI step now supplies this variable. The native Windows job runs the
 portable protocol tests without PostgreSQL, so it does not prove database
-execution on Windows. Physical enrollment, credential UI/service integration,
-CA issuance and public-route admission limits remain open.
+execution on Windows. Physical enrollment, credential UI integration, device
+certificate issuance and public-route admission limits remain open.
+
+## Protected organization CA and authenticated policy service
+
+`NewStoreWithMasterKey` accepts a canonical base64 encoding of 32 random bytes.
+It enables the native Windows CA backend with a separate cryptographic context
+from Apple and agent credentials. No environment variable or production startup
+configuration is connected implicitly. Losing this key makes the stored CA
+unusable; a different key never creates a replacement automatically.
+
+`InitializeAuthority` requires `certificates.manage` over the whole organization
+inside the transaction. The organization row serializes concurrent initialization.
+Exactly one immutable CA is created per organization, with a separate UUID,
+RSA-3072 key and SHA-256 self-signed root. The root has a 1,825-day lifetime,
+five minutes of clock skew allowance, CA signing/CRL key usage and no subordinate
+CA path. Its subject and key identifiers bind the stored organization and key.
+These are OpenUEM choices, not Microsoft enrollment requirements.
+
+The PKCS#8 private key is encrypted with AES-256-GCM, a fresh nonce and a versioned
+envelope. A purpose-specific HMAC-SHA-256 derivation separates the encryption key.
+Authenticated associated data binds the CA UUID, organization ID/name, exact root
+certificate and device key/lifetime/renewal options. Copied, altered or incorrectly
+keyed records cannot yield a signer. Public CA metadata and scoped audit events
+contain no private key or encrypted-key field. Metadata reads require the same
+whole-organization capability and commit their audit before returning data.
+
+Initial device key floors are RSA 2,048, 3,072 or 4,096 bits. Certificate validity
+is 1–365 days; the configured renewal period is at least one hour and shorter
+than validity. Configuration and initial CA rows reject update/deletion. Root
+rotation, master-key rotation, import, backup/restore acceptance and device
+certificate renewal are still unfinished lifecycle operations; they must preserve
+existing issuer/device bindings rather than replacing this row silently.
+
+`EnrollmentPolicyResponse` holds the current invitation's permission, scope and
+row locks while authenticating its organization's CA. It checks the root's
+identity, signature, constraints and remaining issuance window, authenticates
+the encrypted private key and verifies its public-key match. Only then does it
+build and audit a complete XCEP policy. A final database-clock check suppresses
+the response and rolls back its event if the invitation expires while waiting.
+No policy read consumes the invitation or authorizes a later certificate request.
+
+The response uses policy schema 3, explicit required nil elements, immutable
+policy revision 1.0, the configured key/lifetime values and distinct references
+for the enrollment object, SHA-256 hash and RSA public key. Their XCEP OID groups
+are 9, 1 and 3. The enrollment object uses the CA UUID's unsigned integer under
+ITU-T's `2.25` arc. CA collections remain nil for the MDE2 flow; discovery supplies
+the enrollment endpoint. No private key, account hint, auto-enrollment permission,
+key archival or attestation requirement is advertised. The issuance/provisioning
+phase must enforce this policy and supply the certificate chain.
+
+`NewPolicyHandler` binds POST to one configured HTTPS URL, validates HTTP Host,
+SOAP destination/action and the bounded UsernameToken request, then calls this
+transactional service. GET/HEAD return 405 with `Allow: POST`; discovery owns the
+availability probes. SOAP responses and faults use explicit lengths. All invalid,
+expired, revoked and consumed credentials receive the same MDE2 authentication
+fault. Internal failures use a fixed enrollment-server fault without database,
+key, account or request details. The handler still needs production gateway,
+admission/timeouts and console configuration wiring once WSTEP/provisioning are
+implemented; the existing public route is not enabled by this backend change.
+
+Synthetic tests cover encrypted-key tampering/context substitution, root/key
+validation and issuance windows, scoped CA creation/read, restart, eight concurrent
+initializations, immutable SQL constraints, upgrade from the credential schema,
+audit rollback, credential expiry while policy audit waits, complete XCEP element
+order/namespaces/OID references, bounded HTTP rejection and real loopback HTTPS
+policy requests against PostgreSQL. Parallel requests preserve their individual
+correlations and produce read audits without consuming an invitation. Root
+certificates are generated only for isolated tests; none are installed and no
+device certificate is issued. The final local PostgreSQL 17 race suite passes in
+11.614 seconds with 91.9% combined package statement coverage. `go vet`, formatting,
+local documentation links and whitespace checks also pass. The current CA/policy
+change still needs its own complete CI execution evidence; the green credential
+runs above cover the preceding commit. CI runs the portable CA/protocol tests on native Windows and the
+complete database suite with race detection on Linux. Real Windows enrollment,
+WSTEP/CSR proof, provisioning, SyncML/CSP and physical acceptance remain open.
 
 ## Sources
 
@@ -228,3 +306,10 @@ requirements. Its old sample cryptography is not a configuration recommendation.
 XML namespace checks follow
 [Namespaces in XML 1.0](https://www.w3.org/TR/REC-xml-names/) and
 [XML 1.0](https://www.w3.org/TR/xml/).
+
+The authenticated response follows Microsoft's
+[MS-XCEP schema](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-xcep/b34957ab-54c0-4b23-bebc-92ee150cf5ee),
+[MDE2 GetPoliciesResponse requirements](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/6e74dcdb-c3d9-4044-af10-536224904e72),
+[OID groups](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-xcep/161aab9f-d159-4df3-85c9-f732ed2a8445)
+and [enrollment fault codes](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/0a78f419-5fd7-4ddb-bc76-1c0f7e11da23).
+UUID-derived OIDs follow [ITU-T X.667](https://www.itu.int/en/ITU-T/asn1/Pages/UUID/uuids.aspx).

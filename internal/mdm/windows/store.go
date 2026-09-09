@@ -23,6 +23,7 @@ var (
 type Store struct {
 	db          *sql.DB
 	permissions *access.Store
+	secrets     *authoritySecretBox
 }
 
 func NewStore(db *sql.DB) (*Store, error) {
@@ -34,6 +35,21 @@ func NewStore(db *sql.DB) (*Store, error) {
 		return nil, err
 	}
 	return &Store{db: db, permissions: permissions}, nil
+}
+
+// NewStoreWithMasterKey enables protected CA operations. The key is a canonical
+// base64 encoding of 32 random bytes, independent of enrollment passwords.
+func NewStoreWithMasterKey(db *sql.DB, masterKey string) (*Store, error) {
+	s, err := NewStore(db)
+	if err != nil {
+		return nil, err
+	}
+	box, err := newAuthoritySecretBox(masterKey)
+	if err != nil {
+		return nil, err
+	}
+	s.secrets = box
+	return s, nil
 }
 
 //go:embed migrations/*.sql

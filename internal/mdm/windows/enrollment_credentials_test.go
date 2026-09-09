@@ -24,6 +24,19 @@ var credentialTestScope = access.Scope{TenantID: 1, SiteID: 11}
 
 func credentialTestStore(t *testing.T) *Store {
 	t.Helper()
+	s := credentialTestStoreBeforeMigration(t)
+	ctx := context.Background()
+	if err := s.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Migrate(ctx); err != nil {
+		t.Fatal("migration is not idempotent", err)
+	}
+	return s
+}
+
+func credentialTestStoreBeforeMigration(t *testing.T) *Store {
+	t.Helper()
 	dsn := os.Getenv("WINDOWS_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set WINDOWS_MDM_TEST_DATABASE_URL for isolated native Windows PostgreSQL tests")
@@ -94,12 +107,6 @@ func credentialTestStore(t *testing.T) *Store {
 		if err := s.permissions.ReplaceGrants(ctx, "admin", actor, 0, []access.Grant{grant}); err != nil {
 			t.Fatal(err)
 		}
-	}
-	if err := s.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Migrate(ctx); err != nil {
-		t.Fatal("migration is not idempotent", err)
 	}
 	return s
 }
