@@ -41,6 +41,12 @@ prerequisites change. A verified profile assignment means the configuration was
 reported installed. It does not establish provider registration, account
 creation, credential synchronization or successful sign-in.
 
+[Retained profile revisions](apple-profile-revisions.md) provide separately
+encrypted immutable history, protected downloads and confirmed restoration as a
+new revision. Restoration rechecks current Mac compatibility and queues fresh
+UUID verification for active assignments. Deleting an unused catalog entry keeps
+its protected history, including any historical provider credentials.
+
 ## Validation and remaining acceptance
 
 Tests cover typed payload placement, invalid URL and
@@ -68,7 +74,8 @@ focused parser check.
 No real identity-provider registration, account creation or profile deployment
 was performed. Physical-device and provider-specific acceptance remain open.
 
-Unattended ADE still needs an immutable SSO profile requirement bound to the
+The immutable profile storage foundation is implemented. Unattended ADE still
+needs an explicit SSO profile requirement bound to the
 required extension application, managed administrator policy and setup sequence.
 The extension and profile must be installed before `DeviceConfigured`; silent
 provider registration begins afterwards. Cross-profile URL collision checks,

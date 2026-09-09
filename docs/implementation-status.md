@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
+  encrypted immutable System/User snapshots, protected history/downloads and
+  confirmed restoration with stale-write protection and fresh UUID deployment.
+  All 29 migrations, 190 prepared production statements, actual migration and
+  immutability checks, and 21 responsive browser scenarios pass. Complete push
+  and PR CI pass at `bee0145`. Assigned historical snapshot verification and Mac
+  responses without `IsManaged` also pass complete push/PR CI at `9d17f4b`.
+  Nine further browser scenarios cover the corrected Mac user pages at `913fbaa`,
+  whose complete push workflow passes. Inventory ordering at `08029fd` additionally
+  protects newer device/user snapshots from late queries; all 30 migrations, 250
+  prepared SQL statements and actual query execution pass, with its full CI pending.
+  ADE pin ownership, profile prerequisites and physical acceptance remain open.
+
 - [Mac application reenrollment recovery](apple-application-reenrollment.md) now
   guards creation and delivery across earlier enrollment identities, retains
   immutable per-attempt stopping evidence, exposes scoped/organization review

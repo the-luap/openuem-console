@@ -31,6 +31,11 @@ identifier. A stale, duplicated, superseded or different user's response cannot
 verify the assignment. Failed and expired commands can be retried only while they
 still represent current desired state. A retry receives a new command UUID.
 
+The query creation time also orders accepted inventory snapshots. A delayed older
+query cannot overwrite a newer profile list, change its receipt time or reverse
+its verification result. Migration 030 starts recording this boundary with the
+next accepted report when historical query provenance is unavailable.
+
 **Pause this user** clears push credentials and cancels pending commands. It does
 not remove installed profiles. Remove profiles and verify their absence first if
 they should stop applying. **Resume user management** prepares current assignments
