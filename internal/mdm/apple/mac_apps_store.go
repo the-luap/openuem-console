@@ -243,7 +243,17 @@ func (s *Store) installMacApp(ctx context.Context, scope Scope, device, version,
 	if err != nil {
 		return err
 	}
-	if err = s.reconcileMacAppExpiry(ctx, tx, d); err != nil {
+	if err = s.installMacAppTx(ctx, tx, d, version, actor, options); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// The caller holds the device row and has checked the stored enrollment policy
+// or transaction authorization. ADE uses the same artifact and mutation guards.
+func (s *Store) installMacAppTx(ctx context.Context, tx *sql.Tx, d *Device, version, actor string, options MacAppInstallOptions) error {
+	scope := Scope{TenantID: d.TenantID, SiteID: d.SiteID}
+	if err := s.reconcileMacAppExpiry(ctx, tx, d); err != nil {
 		return err
 	}
 	v, input, err := s.macAppArtifactTx(ctx, tx, scope.TenantID, version)
@@ -258,7 +268,7 @@ func (s *Store) installMacApp(ctx context.Context, scope Scope, device, version,
 		return err
 	}
 	var assignment, state string
-	err = tx.QueryRowContext(ctx, `SELECT id,status FROM mdm_apple_app_assignments WHERE device_id=$1 AND package_id=$2`, device, v.PackageID).Scan(&assignment, &state)
+	err = tx.QueryRowContext(ctx, `SELECT id,status FROM mdm_apple_app_assignments WHERE device_id=$1 AND package_id=$2`, d.ID, v.PackageID).Scan(&assignment, &state)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -267,14 +277,14 @@ func (s *Store) installMacApp(ctx context.Context, scope Scope, device, version,
 	}
 	if assignment == "" {
 		assignment = uuid.NewString()
-		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status) VALUES($1,$2,$3,$4,$5,'present','queued')`, assignment, scope.TenantID, device, v.PackageID, version); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status) VALUES($1,$2,$3,$4,$5,'present','queued')`, assignment, scope.TenantID, d.ID, v.PackageID, version); err != nil {
 			return err
 		}
 	}
 	if err = s.createMacAppAttempt(ctx, tx, d, assignment, *v, "install", options, args, actor); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (s *Store) createMacAppAttempt(ctx context.Context, tx *sql.Tx, d *Device, assignment string, v SoftwareVersion, operation string, options MacAppInstallOptions, args map[string]any, actor string) error {

@@ -210,6 +210,12 @@ func (s *Store) admitADE(ctx context.Context, selector string, info *ade.Machine
 		clear(profile)
 		return nil, err
 	}
+	for _, version := range p.RequiredApplications {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_device_apps(id,tenant_id,device_id,profile_id,package_id,original_version_id,version_id) SELECT $1,tenant_id,$2,profile_id,package_id,version_id,version_id FROM mdm_apple_ade_profile_apps WHERE tenant_id=$3 AND profile_id=$4 AND version_id=$5`, uuid.NewString(), deviceID, tenant, p.ID, version); err != nil {
+			clear(profile)
+			return nil, err
+		}
+	}
 	if p.MacAdmin != nil {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_mac_admin_accounts(device_id,tenant_id,options) SELECT $1,tenant_id,admin_options FROM mdm_apple_ade_profiles WHERE id=$2 AND tenant_id=$3`, deviceID, p.ID, tenant); err != nil {
 			clear(profile)

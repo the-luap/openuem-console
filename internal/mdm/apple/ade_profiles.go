@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 var ErrADEProfile = errors.New("invalid Automated Device Enrollment profile or transition")
 
 type ADEProfileOptions struct {
+	RequiredApplications                                                             []string
 	MacAdmin                                                                         *MacAdminOptions
 	SiteID                                                                           int
 	Platform                                                                         Platform
@@ -26,6 +28,7 @@ type ADEProfileOptions struct {
 }
 
 type ADEEnrollmentProfile struct {
+	RequiredApplications                             []string
 	MacAdmin                                         *MacAdminOptions
 	ID, ServerID, Name, Status, RemoteID, Error      string
 	SiteID                                           int
@@ -35,15 +38,22 @@ type ADEEnrollmentProfile struct {
 	AttemptedAt                                      *time.Time
 }
 
-const adeProfileColumns = `id,server_id,site_id,platform,name,status,COALESCE(remote_id,''),error,removable,await_configuration,device_lock_allowed,created_at,updated_at,next_attempt_at,attempted_at,admin_options`
+const adeProfileColumns = `id,server_id,site_id,platform,name,status,COALESCE(remote_id,''),error,removable,await_configuration,device_lock_allowed,created_at,updated_at,next_attempt_at,attempted_at,admin_options,COALESCE((SELECT jsonb_agg(version_id ORDER BY version_id) FROM mdm_apple_ade_profile_apps WHERE profile_id=mdm_apple_ade_profiles.id),'[]'::jsonb)`
 
 func scanADEProfile(row scanner) (ADEEnrollmentProfile, error) {
 	var p ADEEnrollmentProfile
 	var admin []byte
-	err := row.Scan(&p.ID, &p.ServerID, &p.SiteID, &p.Platform, &p.Name, &p.Status, &p.RemoteID, &p.Error, &p.Removable, &p.AwaitConfiguration, &p.DeviceLockAllowed, &p.CreatedAt, &p.UpdatedAt, &p.NextAttemptAt, &p.AttemptedAt, &admin)
+	var applications []byte
+	err := row.Scan(&p.ID, &p.ServerID, &p.SiteID, &p.Platform, &p.Name, &p.Status, &p.RemoteID, &p.Error, &p.Removable, &p.AwaitConfiguration, &p.DeviceLockAllowed, &p.CreatedAt, &p.UpdatedAt, &p.NextAttemptAt, &p.AttemptedAt, &admin, &applications)
 	if err == nil && len(admin) > 0 {
 		err = json.Unmarshal(admin, &p.MacAdmin)
 		if err == nil && (p.MacAdmin == nil || p.MacAdmin.Validate() != nil || p.Platform != PlatformMacOS || !p.AwaitConfiguration) {
+			err = ErrADEProfile
+		}
+	}
+	if err == nil {
+		err = json.Unmarshal(applications, &p.RequiredApplications)
+		if err == nil && len(p.RequiredApplications) > 0 && (p.Platform != PlatformMacOS || !p.AwaitConfiguration || len(p.RequiredApplications) > 16) {
 			err = ErrADEProfile
 		}
 	}
@@ -67,7 +77,7 @@ func (s *Store) ADEProfiles(ctx context.Context, tenant int, server string) ([]A
 	return list, rows.Err()
 }
 
-func adeEnrollmentPermission(p *access.Store, tenant, site int, actor string, deviceLock bool) func(context.Context, *sql.Tx) error {
+func adeEnrollmentPermission(p *access.Store, tenant, site int, actor string, deviceLock bool, software ...bool) func(context.Context, *sql.Tx) error {
 	return func(ctx context.Context, tx *sql.Tx) error {
 		if err := adePermission(p, tenant, actor)(ctx, tx); err != nil {
 			return err
@@ -76,7 +86,12 @@ func adeEnrollmentPermission(p *access.Store, tenant, site int, actor string, de
 			return err
 		}
 		if deviceLock {
-			return p.AuthorizeTransaction(ctx, tx, actor, access.ManageDeviceSecurity, access.Scope{TenantID: tenant, SiteID: site})
+			if err := p.AuthorizeTransaction(ctx, tx, actor, access.ManageDeviceSecurity, access.Scope{TenantID: tenant, SiteID: site}); err != nil {
+				return err
+			}
+		}
+		if len(software) > 0 && software[0] {
+			return p.AuthorizeTransaction(ctx, tx, actor, access.AssignSoftware, access.Scope{TenantID: tenant, SiteID: site})
 		}
 		return nil
 	}
@@ -88,10 +103,15 @@ type adeProfileDefinition struct {
 }
 
 func (s *Store) CreateADEProfile(ctx context.Context, tenant int, server string, options ADEProfileOptions, actor string, permissions *access.Store) (string, error) {
-	return s.createADEProfile(ctx, tenant, server, options, actor, adeEnrollmentPermission(permissions, tenant, options.SiteID, actor, options.AllowDeviceLock || options.MacAdmin != nil))
+	return s.createADEProfile(ctx, tenant, server, options, actor, adeEnrollmentPermission(permissions, tenant, options.SiteID, actor, options.AllowDeviceLock || options.MacAdmin != nil, len(options.RequiredApplications) > 0))
 }
 
 func (s *Store) createADEProfile(ctx context.Context, tenant int, server string, o ADEProfileOptions, actor string, authorize func(context.Context, *sql.Tx) error) (string, error) {
+	var err error
+	o.RequiredApplications, err = adeRequiredApplicationIDs(o.RequiredApplications)
+	if err != nil || len(o.RequiredApplications) > 0 && (o.Platform != PlatformMacOS || !o.AwaitConfiguration) {
+		return "", ErrADEProfile
+	}
 	if o.SiteID <= 0 || (o.Platform != PlatformMacOS && o.Platform != PlatformIOS && o.Platform != PlatformIPadOS) || o.Platform != PlatformMacOS && (o.AllowDeviceLock || o.AutoAdvance) {
 		return "", ErrADEProfile
 	}
@@ -134,6 +154,10 @@ func (s *Store) createADEProfile(ctx context.Context, tenant int, server string,
 	if count >= 256 {
 		return "", ErrADEProfile
 	}
+	applications, err := s.approvedADEApplications(ctx, tx, tenant, o.RequiredApplications)
+	if err != nil {
+		return "", err
+	}
 	selector, err := randomToken()
 	if err != nil {
 		return "", err
@@ -164,6 +188,11 @@ func (s *Store) createADEProfile(ctx context.Context, tenant int, server string,
 	if err != nil {
 		return "", err
 	}
+	for _, v := range applications {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_ade_profile_apps(tenant_id,server_id,profile_id,package_id,version_id) VALUES($1,$2,$3,$4,$5)`, tenant, server, id, v.PackageID, v.ID); err != nil {
+			return "", err
+		}
+	}
 	if err = audit(ctx, tx, tenant, actor, "apple.ade.profile.create", id); err != nil {
 		return "", err
 	}
@@ -190,7 +219,7 @@ func (s *Store) openADEProfile(ctx context.Context, tx *sql.Tx, tenant int, p AD
 	}
 	o, profile := definition.Options, definition.Profile
 	selector := strings.TrimPrefix(profile.URL, origin+"/mdm/apple/ade/")
-	if !validEnrollmentToken(selector) || digest([]byte(selector)) != selectorHash || o.SiteID != p.SiteID || o.Platform != p.Platform || o.Name != p.Name || o.Removable != p.Removable || o.AwaitConfiguration != p.AwaitConfiguration || o.AllowDeviceLock != p.DeviceLockAllowed || !reflect.DeepEqual(o.MacAdmin, p.MacAdmin) || profile.Name != p.Name || profile.Removable != p.Removable || profile.AwaitDeviceConfigured != p.AwaitConfiguration || !profile.Supervised || !profile.Mandatory || profile.Validate() != nil {
+	if !validEnrollmentToken(selector) || digest([]byte(selector)) != selectorHash || o.SiteID != p.SiteID || o.Platform != p.Platform || o.Name != p.Name || o.Removable != p.Removable || o.AwaitConfiguration != p.AwaitConfiguration || o.AllowDeviceLock != p.DeviceLockAllowed || !reflect.DeepEqual(o.MacAdmin, p.MacAdmin) || !slices.Equal(o.RequiredApplications, p.RequiredApplications) || profile.Name != p.Name || profile.Removable != p.Removable || profile.AwaitDeviceConfigured != p.AwaitConfiguration || !profile.Supervised || !profile.Mandatory || profile.Validate() != nil {
 		return ade.EnrollmentProfile{}, ErrADEProfile
 	}
 	return profile, nil
