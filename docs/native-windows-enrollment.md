@@ -89,8 +89,9 @@ Each device receives independent random 256-bit secrets and initial nonces for
 both SyncML directions. CLIENT authenticates the server to the device; APPSRV
 authenticates the device to the server. Both use the protocol's DIGEST type.
 These are SyncML credentials, separate from the enrollment invitation and TLS
-client certificate. The future SyncML service must implement digest/nonces and
-certificate binding before this handler is exposed publicly. The required
+client certificate. [Direct TLS identity and digest primitives](native-windows-management.md)
+are now implemented; the future SyncML service must integrate them with durable
+nonce/session state before this handler is exposed publicly. The required
 directions and parameter semantics are specified by the
 [w7 APPLICATION CSP](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/426201f4-2c7f-4ffe-843d-0deb3fad0a09).
 

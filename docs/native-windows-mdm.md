@@ -6,7 +6,8 @@ OpenUEM agent. The package currently contains a bounded SOAP/XML decoder, a
 discovery response builder, an immutable HTTPS discovery handler, an OnPremise
 XCEP request decoder, a PostgreSQL enrollment credential store, protected
 organization CAs, an authenticated XCEP policy handler and the [initial WSTEP
-issuance/provisioning service](native-windows-enrollment.md). These components
+issuance/provisioning service](native-windows-enrollment.md), plus [direct TLS
+device identity and OMA DM digest verification](native-windows-management.md). These components
 are not registered in a production listener, gateway or console flow.
 
 Initial certificate issuance and bootstrap provisioning are implemented and
