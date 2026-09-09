@@ -28,6 +28,8 @@ jobs:
         run: go test -count=1 -run TestSCEP ./internal/mdm/apple
       - name: Automated Device Enrollment signatures and service protocol
         run: go test -count=1 ./internal/mdm/ade
+      - name: Native Windows enrollment discovery and TLS boundaries
+        run: go test -count=1 ./internal/mdm/windows
   test:
     runs-on: ubuntu-latest
     services:
@@ -50,6 +52,10 @@ jobs:
         with:
           go-version: '1.26.8'
           cache: true
+      - name: Native Windows enrollment discovery and TLS boundaries
+        run: go test -race -count=1 ./internal/mdm/windows
+      - name: Bounded Windows discovery parser fuzzing
+        run: go test -run '^$' -fuzz=FuzzDiscovery -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - run: go tool templ generate
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
