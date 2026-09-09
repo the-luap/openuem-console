@@ -55,7 +55,7 @@ func validateVPNPayload(payload map[string]any, scope string, d *Device) error {
 	}
 	macMinimum, phoneMinimum := "10.7", "4.0"
 	advance := func(mac, phone string) {
-		if CompareVersions(macMinimum, mac) < 0 {
+		if mac != "" && CompareVersions(macMinimum, mac) < 0 {
 			macMinimum = mac
 		}
 		if CompareVersions(phoneMinimum, phone) < 0 {
@@ -74,6 +74,11 @@ func validateVPNPayload(payload map[string]any, scope string, d *Device) error {
 	}
 	if dns, exists := payload["DNS"].(map[string]any); exists {
 		if err := validateVPNDNS(dns, advance); err != nil {
+			return err
+		}
+	}
+	if ike, exists := payload["IKEv2"].(map[string]any); exists {
+		if err := validateIKEv2Configuration(ike, scope, d, advance); err != nil {
 			return err
 		}
 	}

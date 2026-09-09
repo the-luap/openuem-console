@@ -17,6 +17,9 @@ func vpnSettings(protocol string) map[string]any {
 		delete(p, protocol)
 		p["PPP"] = map[string]any{}
 	}
+	if protocol == "IKEv2" {
+		p[protocol] = map[string]any{"RemoteAddress": "vpn.example.test", "LocalIdentifier": "device.example.test", "RemoteIdentifier": "vpn.example.test", "AuthenticationMethod": "Certificate"}
+	}
 	if protocol == "AlwaysOn" {
 		p[protocol] = map[string]any{"TunnelConfigurations": []any{map[string]any{"ProtocolType": "IKEv2", "Interfaces": []any{"WiFi", "Cellular"}}}}
 	}

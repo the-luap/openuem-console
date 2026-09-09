@@ -64,8 +64,10 @@ the table's package summaries do not remove any detail from the roadmap.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.
+  IKEv2 adds authentication, TLS/integer types, property versions, security
+  association parameters, post-quantum settings and removed-algorithm checks.
   Isolated production tests pass; PostgreSQL and full CI execution are pending.
-  Protocol-specific schemas, complete editors and physical acceptance remain open.
+  Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend
   local identity binding checks to regular/App-Layer VPN, IPsec, IKEv2 and
