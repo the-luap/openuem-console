@@ -134,7 +134,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 					if len(detail.Assignments)==0 {
 						<p class="uk-text-muted">No profiles assigned to this user.</p>
 					}
-					<p class="uk-text-muted">Acknowledgement starts verification. A later user ProfileList must report the current managed profile UUID, or confirm its absence after removal.</p>
+					<p class="uk-text-muted">After acknowledgement, a new inventory report must contain the assigned profile UUID. Removal requires a new report without that profile.</p>
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
@@ -145,13 +145,6 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 							<h3 class="font-semibold">{ Show(p.Name) }</h3>
 							<p>{ p.Identifier }</p>
 							<p class="uk-text-muted">{ "Profile UUID: "+Show(p.UUID) }</p>
-							<p>
-								if p.Managed {
-									{ "Managed profile" }
-								} else {
-									{ "Not reported as managed" }
-								}
-							</p>
 						</article>
 					}
 					if len(detail.User.InstalledProfiles)==0 {

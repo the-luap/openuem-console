@@ -80,7 +80,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	cleanup.MacBinding = &apple.MacBinding{Status: "consumed", ExpiresAt: now.Add(time.Hour), InstalledAt: &now, CompletedAt: &now, CleanupAttempts: 1, CleanupStatus: "queued"}
 	cleanup.Commands = []apple.Command{{ID: "90000000-0000-4000-8000-000000000001", RequestType: "RemoveProfile", Status: "failed", MacBinding: true}}
 
-	user := &apple.UserChannel{ID: "a0000000-0000-4000-8000-000000000001", DeviceID: mac.ID, UserID: "b0000000-0000-4000-8000-000000000001", ShortName: "alice", LongName: "Alice Example", Status: "enrolled", PushStatus: "accepted", LastSeen: now, ProfilesAt: &now, InstalledProfiles: []apple.InstalledProfile{{Identifier: "com.example.user", UUID: "c0000000-0000-4000-8000-000000000001", Name: "User preferences", Managed: true}}}
+	user := &apple.UserChannel{ID: "a0000000-0000-4000-8000-000000000001", DeviceID: mac.ID, UserID: "b0000000-0000-4000-8000-000000000001", ShortName: "alice", LongName: "Alice Example", Status: "enrolled", PushStatus: "accepted", LastSeen: now, ProfilesAt: &now, InstalledProfiles: []apple.InstalledProfile{{Identifier: "com.example.user", UUID: "c0000000-0000-4000-8000-000000000001", Name: "User preferences"}}}
 	userProfile := p
 	userProfile.Scope = "User"
 	userDetail := UserDetail{Device: &mac, User: user, Profiles: []apple.Profile{p, userProfile}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: "User preferences", Revision: 2, Desired: "installed", Status: "verified"}}, Commands: []apple.Command{{ID: "d0000000-0000-4000-8000-000000000001", RequestType: "ProfileList", Status: "failed", CreatedAt: now}}}
@@ -424,6 +424,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			}
 			if tc.name == "mac-user-reader" && (strings.Contains(html, `action="/tenant/1`+userDetail.Path()+`/`) || strings.Contains(html, "Apply to this user")) {
 				t.Fatal("viewer has user mutation controls")
+			}
+			if strings.HasPrefix(tc.name, "mac-user") && (strings.Contains(html, "Not reported as managed") || !strings.Contains(html, "a new inventory report must contain the assigned profile UUID")) {
+				t.Fatal("Mac user inventory misrepresents the absent IsManaged field")
 			}
 			if tc.name == "user-profiles" && strings.Contains(html, "Target devices") {
 				t.Fatal("user profile exposes a device assignment")
