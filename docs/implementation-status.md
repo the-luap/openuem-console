@@ -61,14 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Mac System Extensions profiles](macos-system-extensions.md) add typed team/bundle
+  approvals, extension types and removal rules with platform, channel, OS and fresh
+  management approval checks. Potentially installed revisions retain conflict
+  reservations until fresh replacement/removal evidence. Parser checks, all 34
+  migrations and 291 prepared production statements pass locally; full native,
+  console and browser checks for this change are pending.
+
 - [Mac Gatekeeper profiles](macos-gatekeeper.md) now provide typed application
   assessment, Finder exception and malware-submission prompt settings. The editor
   separates Apple's payloads, omits unchanged defaults and checks macOS versions
-  for direct assignment and revision updates. Local core checks pass; full native,
-  console validation is still running. Nine cases using the actual CI-rendered
+  for direct assignment and revision updates. Local core and console checks pass.
+  Full native CI is rerunning after correcting the older-Mac inventory fixture. Nine cases using the actual CI-rendered
   page pass at 390/768/1440 pixels, including policy values, confirmation and
-  keyboard submission without overflow. PPPC/TCC, System Extensions and
-  certificate templates remain separate work.
+  keyboard submission without overflow. PPPC/TCC and certificate templates remain
+  separate work.
 
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
   encrypted immutable System/User snapshots, protected history/downloads and

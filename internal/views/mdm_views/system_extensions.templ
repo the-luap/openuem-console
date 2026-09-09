@@ -1,0 +1,50 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ SystemExtensionsEditor(info *partials.CommonInfo) {
+	<script src="/assets/js/apple-system-extensions.js" defer></script>
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a Mac System Extensions profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="system-extensions-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="macos-system-extensions"/>
+			<input type="hidden" name="payload_scope" value="System"/>
+			<p>Approve system extensions on macOS 10.15 or later with user-approved MDM. This policy applies to the whole Mac.</p>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company system extensions"/></label>
+			<label>Identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.system-extensions"/></label>
+			<label>Approval policy<select class="uk-select" name="approval_mode" required><option value="listed">Approve listed extensions</option><option value="team">Approve a developer team</option><option value="block">Block additional user approvals</option></select></label>
+			<noscript><p>Enable JavaScript to change the approval policy. The listed-extension policy is available without it.</p></noscript>
+			<p>Team approval includes all valid system extensions signed by that developer, subject to the selected types. Blocking additional user approvals still allows extensions approved by other installed profiles.</p>
+			<fieldset data-extension-approvals class="grid gap-4" style="min-width:0">
+				<legend class="font-medium">Developer and extension rules</legend>
+				<label>Developer team identifier<input class="uk-input" name="team_identifier" pattern="[A-Z0-9]{10}" maxlength="10" required/></label>
+				<fieldset data-extension-bundles style="min-width:0">
+					<legend>Approved extension bundle identifiers</legend>
+					<label>One identifier per line<textarea class="uk-textarea" name="bundle_identifiers" rows="3" maxlength="16384" required placeholder="com.vendor.product.extension"></textarea></label>
+				</fieldset>
+				<label>Additional user approvals<select class="uk-select" name="user_overrides" required><option value="true">Allow users to approve additional extensions</option><option value="false">Block additional user approvals</option></select></label>
+				<fieldset class="grid gap-2" style="min-width:0">
+					<legend>Allowed extension types for this team</legend>
+					<label><input class="uk-checkbox" type="checkbox" name="driver_extensions" value="yes" checked/> Driver extensions</label>
+					<label><input class="uk-checkbox" type="checkbox" name="network_extensions" value="yes" checked/> Network extensions</label>
+					<label><input class="uk-checkbox" type="checkbox" name="security_extensions" value="yes" checked/> Endpoint security extensions</label>
+				</fieldset>
+				<p>Clearing every type allows no extension types for this team in this profile. Approvals and types from installed profiles combine; any profile blocking additional user approvals keeps that restriction in effect.</p>
+				<details>
+					<summary class="cursor-pointer">Removal rules for this developer team</summary>
+					<div class="grid gap-4 mt-4">
+						<p>Enter up to 128 bundle identifiers per list, one per line. Leave a list empty to omit its rule.</p>
+						<label>Allow application removal without administrator approval (macOS 12 or later)<textarea class="uk-textarea" name="removable_identifiers" rows="2" maxlength="16384"></textarea></label>
+						<label>Prevent disabling or uninstalling while SIP is enabled (macOS 15 or later)<textarea class="uk-textarea" name="protected_identifiers" rows="2" maxlength="16384"></textarea></label>
+						<label>Prevent removal from System Settings and Finder (macOS 15 or later)<textarea class="uk-textarea" name="protected_ui_identifiers" rows="2" maxlength="16384"></textarea></label>
+						<p>An extension cannot allow application removal and prevent removal under SIP. Preventing removal from System Settings and Finder can coexist with application removal.</p>
+					</div>
+				</details>
+			</fieldset>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the developer, approval and removal rules.</label>
+			<p>Installing this profile can activate pending extensions; removing it can deactivate extensions. Saving creates a profile to assign below. Installation status confirms delivery; verify extension behavior on the Mac.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create System Extensions profile</button>
+		</form>
+	</details>
+}

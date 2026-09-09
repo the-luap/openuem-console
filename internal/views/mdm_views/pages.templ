@@ -481,6 +481,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						@FirewallEditor(info)
 						@PlatformSSOEditor(info)
 						@GatekeeperEditor(info)
+						@SystemExtensionsEditor(info)
 						if info.Can(access.ManageProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4">
 								@CSRF(info)

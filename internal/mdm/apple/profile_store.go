@@ -214,6 +214,9 @@ func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Dev
 		}
 	}
 	if desired == "installed" {
+		if err = s.reserveSystemExtensions(ctx, tx, current, p); err != nil {
+			return err
+		}
 		if err = s.reserveSSORoutes(ctx, tx, current, "", p); err != nil {
 			return err
 		}

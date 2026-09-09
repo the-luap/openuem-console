@@ -787,6 +787,9 @@ func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, creat
 			return err
 		}
 		if r.status == "verified" {
+			if err = releaseSystemExtensions(ctx, tx, d.TenantID, d.ID, r.id); err != nil {
+				return err
+			}
 			if err = releaseSSORoutes(ctx, tx, d.TenantID, d.ID, "", r.id); err != nil {
 				return err
 			}

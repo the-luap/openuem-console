@@ -107,6 +107,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 			}
 		}
 	}
+	if _, err := systemExtensionRootRules(root, scope, nil); err != nil {
+		return nil, err
+	}
 	if _, err := extensibleSSORootRoutes(root); err != nil {
 		return nil, err
 	}
@@ -171,6 +174,10 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	var additional []any
 	switch kind {
+	case "macos-system-extensions":
+		if err := buildSystemExtensionsPayload(payload, settings, scope); err != nil {
+			return nil, err
+		}
 	case "macos-gatekeeper":
 		var err error
 		additional, err = buildGatekeeperPayload(payload, settings, scope)
