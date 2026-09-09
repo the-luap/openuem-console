@@ -82,6 +82,11 @@ receipt and audit event together. History is scoped to the device and organizati
 and paginated at 100 records. An installation observation or a repair request does
 not establish successful identity-provider registration.
 
+An earlier setup-release dispatch keeps prerequisite changes and profile repairs
+closed even when a failed release is explicitly retried. The checks consult all
+retained release attempts for the enrollment, because retrying replaces the current
+command pointer. Retrying release with the same prerequisites remains supported.
+
 ## Validation and remaining acceptance
 
 Tests cover typed payload placement, invalid URL and

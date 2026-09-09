@@ -175,7 +175,7 @@ func (s *Store) repairADEPlatformSSO(ctx context.Context, scope Scope, device, e
 	}
 	var requirement, revision, release string
 	var eligible bool
-	err = tx.QueryRowContext(ctx, `SELECT r.id,r.profile_revision_id,COALESCE(a.setup_command_id::text,''),COALESCE(a.awaiting_configuration AND a.setup_state IN ('awaiting','releasing') AND COALESCE(c.attempts,0)=0,false) FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id LEFT JOIN mdm_apple_commands c ON c.id=a.setup_command_id WHERE r.tenant_id=$1 AND r.device_id=$2`, scope.TenantID, device).Scan(&requirement, &revision, &release, &eligible)
+	err = tx.QueryRowContext(ctx, `SELECT r.id,r.profile_revision_id,COALESCE(a.setup_command_id::text,''),COALESCE(a.awaiting_configuration AND a.setup_state IN ('awaiting','releasing') AND NOT EXISTS(SELECT 1 FROM mdm_apple_commands c WHERE c.tenant_id=a.tenant_id AND c.device_id=a.device_id AND c.ade_setup AND c.attempts>0),false) FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.tenant_id=r.tenant_id AND a.device_id=r.device_id WHERE r.tenant_id=$1 AND r.device_id=$2`, scope.TenantID, device).Scan(&requirement, &revision, &release, &eligible)
 	if err != nil {
 		return notFound(err)
 	}

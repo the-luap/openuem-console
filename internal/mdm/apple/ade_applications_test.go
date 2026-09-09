@@ -125,6 +125,25 @@ func TestADERequiredApplicationWaitsForExactManagedVersion(t *testing.T) {
 	if err = s.replaceADEApplication(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, r.ID, v2.ID, "Upgrade during setup", "admin", nil); !errors.Is(err, ErrConflict) {
 		t.Fatal("a sent setup release permitted a new prerequisite", err)
 	}
+	adeConnect(t, s, d, "Error", wire["CommandUUID"].(string), map[string]any{"ErrorChain": []any{map[string]any{"LocalizedDescription": "Synthetic release failure"}}})
+	tx, err := s.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.retryADESetupTx(t.Context(), tx, Scope{TenantID: 1, SiteID: 1}, d.ID, "admin"); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+	if adeSetupState(t, s, d).CanChangeApplications {
+		t.Fatal("retry forgot the previous release dispatch")
+	}
+	if err = s.replaceADEApplication(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, r.ID, v2.ID, "After release retry", "admin", nil); !errors.Is(err, ErrConflict) {
+		t.Fatal("release retry reopened required application changes", err)
+	}
+	wire = adeAppReports(t, s, d, nil, "42.0")
+	if wire == nil {
+		t.Fatal("unchanged requirements could not retry setup release")
+	}
 	adeConnect(t, s, d, "Acknowledged", wire["CommandUUID"].(string), nil)
 	if adeSetupState(t, s, d).SetupState == "complete" {
 		t.Fatal("release ACK was confused with observed setup completion")

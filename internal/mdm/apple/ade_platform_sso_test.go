@@ -292,6 +292,26 @@ func TestADEPlatformSSORetainsProfileAndAppUntilObservedSetupExit(t *testing.T) 
 	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "After release delivery", "admin", nil); !errors.Is(err, ErrConflict) {
 		t.Fatal("repair modified a dispatched setup release", err)
 	}
+	adeConnect(t, s, d, "Error", wire["CommandUUID"].(string), map[string]any{"ErrorChain": []any{map[string]any{"LocalizedDescription": "Synthetic release failure"}}})
+	tx, err := s.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.retryADESetupTx(t.Context(), tx, scope, d.ID, "admin"); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+	status, err = s.ADEPlatformSSOStatus(t.Context(), scope, d.ID)
+	if err != nil || status == nil || status.CanRepair || adeSetupState(t, s, d).CanChangeApplications {
+		t.Fatal("retry forgot earlier release dispatch", err)
+	}
+	if err = s.repairADEPlatformSSO(t.Context(), scope, d.ID, snapshot.ID, "After release retry", "admin", nil); !errors.Is(err, ErrConflict) {
+		t.Fatal("release retry reopened provider repair", err)
+	}
+	wire = driver.drive(nil, "DeviceConfigured")
+	if wire == nil {
+		t.Fatal("unchanged provider could not retry setup release")
+	}
 	next := testMacAppPackage()
 	next.Version = "43.0"
 	v2, err := s.publishMacAppPackage(t.Context(), Scope{TenantID: 1}, next, "admin", nil)

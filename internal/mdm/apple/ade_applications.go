@@ -253,7 +253,9 @@ func (s *Store) replaceADEApplication(ctx context.Context, scope Scope, device, 
 	var state, command string
 	var awaiting bool
 	var sent int
-	if err = tx.QueryRowContext(ctx, `SELECT a.setup_state,COALESCE(a.awaiting_configuration,false),COALESCE(a.setup_command_id::text,''),COALESCE(c.attempts,0) FROM mdm_apple_ade_admissions a LEFT JOIN mdm_apple_commands c ON c.id=a.setup_command_id WHERE a.tenant_id=$1 AND a.device_id=$2 FOR UPDATE OF a`, scope.TenantID, device).Scan(&state, &awaiting, &command, &sent); err != nil {
+	// Retrying setup clears its current command pointer. Earlier release
+	// dispatches still prohibit changes to this admission's prerequisites.
+	if err = tx.QueryRowContext(ctx, `SELECT a.setup_state,COALESCE(a.awaiting_configuration,false),COALESCE(a.setup_command_id::text,''),(SELECT count(*) FROM mdm_apple_commands c WHERE c.tenant_id=a.tenant_id AND c.device_id=a.device_id AND c.ade_setup AND c.attempts>0) FROM mdm_apple_ade_admissions a WHERE a.tenant_id=$1 AND a.device_id=$2 FOR UPDATE OF a`, scope.TenantID, device).Scan(&state, &awaiting, &command, &sent); err != nil {
 		return notFound(err)
 	}
 	if !awaiting || state != "awaiting" && state != "releasing" || sent != 0 {
