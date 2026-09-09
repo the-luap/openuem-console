@@ -172,26 +172,51 @@ The Always On extension also passes isolated tests for multiple flat tunnels,
 identity types and ambiguity, malformed structures, integer switches, nested TLS
 versions and the iOS 14.2 group boundary. PostgreSQL cases cover a retained
 legacy group, its modern replacement, rejected restoration without command or
-history changes, and removal after an invalid historical reference. Their full CI
-is pending.
+history changes, and removal after an invalid historical reference. Both complete
+workflows at `babeb2d` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34376612081) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34376620726).
 
 The generator passes isolated tests for both scopes, four identity kinds, machine
 and EAP-TLS modes, unchanged source credentials, new local bindings, omitted
 settings and invalid input. PostgreSQL tests cover encrypted persistence,
 System/User assignment, ACME ownership across copied profiles and AD target
-restrictions. Full CI for the generator is pending.
+restrictions. Both complete workflows at `0b2e60c` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34377321097) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34377327909).
 
 The store composition tests cover both scopes, source update/deletion, exact
 retained credentials, permission denial, cross-organization and malformed-source
 rejection, typed option mapping, encrypted storage and audit-failure rollback.
 The existing Wi-Fi composition regression tests cover the shared transaction.
 Production SQL text is unchanged; extraction still identifies 306 statements.
-Full CI for the store composition change is pending.
+Both complete workflows at `04fe0cd` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34377717017) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34377722460).
 
 Scoped console tests add permission and CSRF denial, strict form parsing, exact
 retained revision selection, scope/algorithm checks, System/User and machine/EAP
 modes, trust selection and credential/download privacy. Template generation
-passes; full CI and actual browser checks for the form are pending.
+passes. Both complete workflows at `e20074e` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34378307726) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34378312007).
+
+The rendered CI artifact at `e20074e` passes 27 actual Chrome cases: System/User,
+machine/EAP-TLS, existing/copied trust and reader states at 390/768/1440 pixels.
+Checks include required algorithm/review, clearing incompatible selections,
+exact revision and form values, keyboard confirmation/submission, repeated
+initialization, reset and horizontal overflow. The narrow IKEv2 view was also
+visually inspected. The same artifact passes the existing 39 Wi-Fi and 15 AD
+certificate browser cases, giving 81 passing cases across the three editors.
+Select values use change events; these checks do not exercise operating-system
+select menus, Safari or physical devices. Form submissions are captured locally.
+
+The [repository browser runner](../tests/browser/README.md) now retains all three
+suites with shared lifecycle, request isolation, time limits and machine-readable
+results. Its local run passes all 81 cases against the same `e20074e` artifact.
+A disposable fixture with the required VPN algorithm attribute removed fails at
+the expected assertion, returns exit status 1 and saves a failure screenshot.
+The added CI browser step and artifact retention still await their first run.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

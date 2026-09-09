@@ -65,6 +65,24 @@ jobs:
           path: ${{ runner.temp }}/apple-mdm-ui
           if-no-files-found: ignore
           retention-days: 7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Certificate and network forms in Chrome
+        timeout-minutes: 5
+        run: node tests/browser/run.mjs
+        env:
+          APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui
+          BROWSER_TEST_ARTIFACTS: ${{ runner.temp }}/apple-mdm-browser
+      - name: Preserve browser regression results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-mdm-browser
+          path: ${{ runner.temp }}/apple-mdm-browser
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Scoped console routes and response privacy
         run: go test -race -count=1 ./internal/controllers/webserver/handlers
       - name: Protocol, persistence and TLS

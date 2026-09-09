@@ -1,0 +1,62 @@
+# Certificate and network form browser regression
+
+Run the real rendered console templates and repository assets in a disposable
+headless Chrome session. The runner covers 81 cases:
+
+| Form | Case matrix | Cases |
+| --- | --- | ---: |
+| Enterprise Wi-Fi | System/User × existing/copied trust × three TLS ranges × three widths; reader at each width | 39 |
+| Active Directory certificates | System/User × omitted/explicit options × three widths; reader at each width | 15 |
+| IKEv2 certificate VPN | System/User × machine/EAP-TLS × existing/copied trust × three widths; reader at each width | 27 |
+
+Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
+incompatible certificate selections, exact form values, required review, keyboard
+confirmation/submission, repeated JavaScript initialization, reset, reader access
+and horizontal overflow. Each suite captures a narrow screenshot. Assertions use
+actual browser state; they do not replace the production scripts or mock the DOM.
+
+## Run locally
+
+Use Node.js 22.4 or newer and an installed Chrome/Chromium on macOS or Linux.
+The CI workflow selects Node.js 24 and uses the runner's installed Chrome.
+The runner uses Node's built-in WebSocket; no npm dependencies are needed.
+Set `CHROME_BIN` when Chrome is outside the usual macOS or Linux locations.
+
+From the repository root, render the synthetic states using the existing Go test:
+
+```sh
+go tool templ generate
+APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui go test -count=1 ./internal/views/mdm_views
+APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui node tests/browser/run.mjs
+```
+
+Alternatively, extract the `apple-mdm-ui` artifact from the same commit as the
+checkout and pass that directory as `APPLE_MDM_UI_ARTIFACTS`. No database is
+required for these rendered-view/browser checks. The separate protocol and
+handler integration tests exercise persistence, authorization and actual routes.
+
+`BROWSER_TEST_ARTIFACTS` optionally selects the result directory. Otherwise the
+runner creates a temporary directory and prints its path. `results.json` records
+the browser/Node version, timestamps, each completed case and the overall result.
+A failure exits nonzero and attempts to save `failure.png`. The workflow preserves
+results and screenshots as `apple-mdm-browser`, including on failure.
+
+## Isolation and limits
+
+The runner starts a loopback server on a free port, serves only the allowlisted
+synthetic pages and repository assets, and creates a temporary browser profile.
+Page requests outside that read-only origin are blocked and fail the run; form
+submissions are captured and prevented. Startup, protocol commands, navigation and
+the overall run have time limits. Cleanup terminates only the spawned browser
+process group and removes its temporary profile, including after test failures.
+The browser sandbox is not disabled.
+
+The suite uses native keyboard events for review and submission. Select values
+are assigned with change events, so operating-system select menus are not covered.
+These tests do not establish Safari, assistive-technology, provider or physical
+device acceptance. They do not install profiles or contact a CA or VPN service.
+Screenshots support visual review; they are not image-difference assertions.
+
+Implementation references: [Node WebSocket](https://nodejs.org/api/globals.html#class-websocket),
+[Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/),
+[GitHub's Ubuntu runner inventory](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md).

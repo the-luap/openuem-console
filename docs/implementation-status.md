@@ -72,9 +72,14 @@ the table's package summaries do not remove any detail from the roadmap.
   profiles with local bindings and machine/EAP-TLS authentication. Protected
   composition uses exact encrypted certificate revisions and atomic audit
   provenance; its console editor enforces scope/algorithm choices and review.
-  Isolated production tests and both full target/DNS and IKEv2 validation workflows
-  pass. Full CI for later Always On, generator, composition and form changes,
-  plus actual browser checks for the form, is pending.
+  Isolated production tests and both full workflows for target/DNS, IKEv2,
+  Always On, generator, composition and form changes pass. At `e20074e`, 27 IKEv2,
+  39 Wi-Fi and 15 AD certificate cases pass against the same rendered CI artifact
+  in Chrome, including scope changes, exact form values, keyboard review,
+  reset, reader restrictions and three window widths.
+  The [portable browser suites](../tests/browser/README.md) reproduce all 81
+  cases locally and detect an intentionally broken fixture; the newly added
+  automatic CI step is awaiting its first run.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend
@@ -82,7 +87,7 @@ the table's package summaries do not remove any detail from the roadmap.
   transparent proxy configurations. Isolated tests and both full workflows pass,
   including 14 System/User PostgreSQL variants. The subsequent DNS reference
   extension also passes both complete workflows. Always On references pass
-  isolated tests and remain pending in full CI. Complete VPN templates and physical tunnel
+  isolated tests and both complete workflows. Complete VPN templates and physical tunnel
   acceptance remain open.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks

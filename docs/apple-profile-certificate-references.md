@@ -84,7 +84,10 @@ identity. [VPN target and DNS validation](apple-vpn-profiles.md) adds property
 version and configuration checks. The subsequent Always On extension passes
 isolated flat-tunnel binding tests for all four identity types, ambiguous UUIDs,
 multiple tunnels and malformed structures. PostgreSQL cases cover rejected
-uploads/revisions, legacy reference checks and removal; their full CI is pending.
+uploads/revisions, legacy reference checks and removal. Both complete workflows
+at `babeb2d` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34376612081) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34376620726).
 No VPN client/provider or
 physical tunnel authentication has been exercised by these tests.
 
