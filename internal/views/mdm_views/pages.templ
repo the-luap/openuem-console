@@ -470,6 +470,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 			<div>
 				<h1 class="text-2xl font-semibold">Apple configuration profiles</h1>
 				<p>Manage system profiles for iPhone, iPad and Mac, and user profiles for managed Mac users. Assign user profiles from the user's page on a Mac.</p>
+				<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info,"/ios/configurations/history")) }>All profile revision history</a>
 				@Navigation(info)
 			</div>
 			if info.Can(access.ManageProfiles) {
@@ -528,6 +529,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ p.Name }</h2><p>{ p.Identifier+" · "+p.Scope+" scope · Revision "+Number(p.Revision) }</p></div>
 					<div class="uk-card-body grid gap-4">
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,ProfileRevisionHistoryPath(p.ID))) }>View revision history</a>
 						<p>
 							{ "Payloads: " }
 							for _,kind:=range p.PayloadTypes {

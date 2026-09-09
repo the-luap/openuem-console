@@ -65,6 +65,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/setup/requests/:id/certificate", h.AppleImportPushCertificate)
 		g.POST("/ios/enroll", h.AppleInvite)
 		g.GET("/ios/configurations", h.AppleProfiles)
+		g.GET("/ios/configurations/history", h.AppleProfileRevisionHistory)
+		g.GET("/ios/configurations/:id/history", h.AppleProfileRevisionHistory)
+		g.GET("/ios/configurations/:id/revisions/:revision/download", h.AppleDownloadProfileRevision)
+		g.POST("/ios/configurations/:id/revisions/:revision/restore", h.AppleRestoreProfileRevision)
 		g.POST("/ios/configurations", h.AppleSaveProfile)
 		g.GET("/ios/configurations/:id/download", h.AppleDownloadProfile)
 		g.POST("/ios/configurations/:id/assign", h.AppleAssignProfile)
@@ -95,7 +99,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
+			case "/ios/configurations/:id/revisions/:revision/restore", "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
 				// CSRF reads the form before the endpoint. Apply its bound here
 				// as well so a cached PostForm cannot bypass the endpoint limit.
 				limit = 128 << 10

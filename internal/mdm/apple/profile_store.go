@@ -81,57 +81,72 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 		p.ID = id
 		p.Revision = old.Revision + 1
 	}
-	encrypted, err := s.secrets.seal(p.Payload, secretPurpose(tenant, p.ID, "profile"))
-	if err != nil {
-		return nil, err
-	}
-	types, err := json.Marshal(p.PayloadTypes)
-	if err != nil {
-		return nil, err
-	}
-	if id == "" {
-		err = tx.QueryRowContext(ctx, `INSERT INTO mdm_apple_profiles(id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,payload_scope) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING updated_at`, p.ID, tenant, p.Name, p.Identifier, p.UUID, p.Revision, types, encrypted, p.Scope).Scan(&p.UpdatedAt)
-	} else {
-		err = tx.QueryRowContext(ctx, `UPDATE mdm_apple_profiles SET name=$1,payload_uuid=$2,revision=$3,payload_types=$4,payload=$5,updated_at=now() WHERE tenant_id=$6 AND id=$7 RETURNING updated_at`, p.Name, p.UUID, p.Revision, types, encrypted, tenant, p.ID).Scan(&p.UpdatedAt)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if id != "" {
-		rows, err := tx.QueryContext(ctx, `SELECT d.id,d.site_id FROM mdm_apple_devices d JOIN mdm_apple_profile_assignments a ON a.device_id=d.id WHERE a.profile_id=$1 AND a.desired='installed' AND d.status='enrolled' ORDER BY d.id`, p.ID)
-		if err != nil {
-			return nil, err
-		}
-		devices := []Device{}
-		for rows.Next() {
-			d := Device{TenantID: tenant}
-			if err = rows.Scan(&d.ID, &d.SiteID); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			devices = append(devices, d)
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, err
-		}
-		for i := range devices {
-			if err = s.assign(ctx, tx, &devices[i], p, "installed"); err != nil {
-				return nil, err
-			}
-		}
-		if err = s.updateUserProfileAssignments(ctx, tx, p); err != nil {
-			return nil, err
-		}
-	}
-	if err = audit(ctx, tx, tenant, actor, "apple.profile.save", p.ID); err != nil {
+	if err = s.saveProfileRevisionTx(ctx, tx, p, id != "", actor, "", ""); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+// The snapshot, current catalog, assignment commands and audit share one commit.
+func (s *Store) saveProfileRevisionTx(ctx context.Context, tx *sql.Tx, p *Profile, updating bool, actor, restoredFrom, reason string) error {
+	snapshot, err := s.appendProfileRevision(ctx, tx, p, actor, restoredFrom, reason)
+	if err != nil {
+		return err
+	}
+	encrypted, err := s.secrets.seal(p.Payload, secretPurpose(p.TenantID, p.ID, "profile"))
+	if err != nil {
+		return err
+	}
+	types, err := json.Marshal(p.PayloadTypes)
+	if err != nil {
+		return err
+	}
+	if !updating {
+		err = tx.QueryRowContext(ctx, `INSERT INTO mdm_apple_profiles(id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,payload_scope,revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING updated_at`, p.ID, p.TenantID, p.Name, p.Identifier, p.UUID, p.Revision, types, encrypted, p.Scope, snapshot).Scan(&p.UpdatedAt)
+	} else {
+		err = tx.QueryRowContext(ctx, `UPDATE mdm_apple_profiles SET name=$1,payload_uuid=$2,revision=$3,payload_types=$4,payload=$5,updated_at=now(),revision_id=$8 WHERE tenant_id=$6 AND id=$7 RETURNING updated_at`, p.Name, p.UUID, p.Revision, types, encrypted, p.TenantID, p.ID, snapshot).Scan(&p.UpdatedAt)
+	}
+	if err != nil {
+		return err
+	}
+	if updating {
+		rows, err := tx.QueryContext(ctx, `SELECT d.id,d.site_id FROM mdm_apple_devices d JOIN mdm_apple_profile_assignments a ON a.device_id=d.id WHERE a.profile_id=$1 AND a.desired='installed' AND d.status='enrolled' ORDER BY d.id`, p.ID)
+		if err != nil {
+			return err
+		}
+		devices := []Device{}
+		for rows.Next() {
+			d := Device{TenantID: p.TenantID}
+			if err = rows.Scan(&d.ID, &d.SiteID); err != nil {
+				rows.Close()
+				return err
+			}
+			devices = append(devices, d)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		for i := range devices {
+			if err = s.assign(ctx, tx, &devices[i], p, "installed"); err != nil {
+				return err
+			}
+		}
+		if err = s.updateUserProfileAssignments(ctx, tx, p); err != nil {
+			return err
+		}
+	}
+	action := "apple.profile.save"
+	resource := p.ID
+	if restoredFrom != "" {
+		action = "apple.profile.restore"
+		resource = snapshot
+	}
+	return audit(ctx, tx, p.TenantID, actor, action, resource)
 }
 
 func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired string) error {

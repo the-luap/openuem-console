@@ -228,11 +228,26 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		return d
 	}
 	adeAppChanges := []apple.ADEApplicationChange{{ID: "90000000-0000-4000-8000-000000000026", PreviousVersionID: appHistory[1].Version.ID, PreviousVersion: "41.0", VersionID: appVersion.ID, Version: appVersion.Version, Actor: "Operator <A>", Reason: "Correct <version> for setup", CreatedAt: now}}
+	profileRevision := apple.ProfileRevision{ID: "a0000000-0000-4000-8000-000000000030", ProfileID: p.ID, Name: "Identity <configuration>", Identifier: p.Identifier, UUID: p.UUID, Scope: "System", Revision: 1, CurrentRevision: 2, PayloadTypes: []string{"com.apple.extensiblesso"}, Origin: "save", Actor: "Operator <A>", CreatedAt: now}
+	profileRestored := profileRevision
+	profileRestored.ID = "a0000000-0000-4000-8000-000000000031"
+	profileRestored.Revision, profileRestored.CurrentRevision = 3, 3
+	profileRestored.Origin, profileRestored.RestoredFrom, profileRestored.Reason = "restore", profileRevision.ID, "Restore <approved> identity settings"
+	profileDeleted := profileRevision
+	profileDeleted.CurrentRevision = 0
+	profileMigrated := profileRevision
+	profileMigrated.Origin, profileMigrated.Actor = "migration", ""
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"profile-history-restore", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileRevision}, profileRevision.ID, true), []string{"Identity &lt;configuration&gt;", "Restore and deploy revision", "Download stored revision", "Older revisions"}},
+		{"profile-history-current", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileRestored}, "", true), []string{"Restored as a new revision", "Restore &lt;approved&gt; identity settings", "Current catalog revision"}},
+		{"profile-history-deleted", ProfileRevisionHistory(c, info, "", []apple.ProfileRevision{profileDeleted}, "", true), []string{"catalog entry was deleted", "Download stored revision", "View this profile's history"}},
+		{"profile-history-migrated", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileMigrated}, "", true), []string{"Existing revision captured during migration", "Earlier versions and their authors were not retained"}},
+		{"profile-history-reader", ProfileRevisionHistory(c, &reader, p.ID, []apple.ProfileRevision{profileRevision}, "", false), []string{"Profile revision history", "Identity &lt;configuration&gt;"}},
+		{"profile-history-empty", ProfileRevisionHistory(c, info, "", nil, "", true), []string{"No stored profile revisions"}},
 		{"software-prior-unresolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, priorApp.ID), []string{"Earlier &lt;Site&gt;", "Record stopping evidence", `name="confirmed"`, "Older operations"}},
 		{"software-prior-resolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{}, []apple.MacAppPriorAttempt{resolvedApp}, ""), []string{"Stopping evidence recorded", "Synthetic erase &lt;evidence&gt;", "Operator &lt;A&gt;", "Old outcome unknown"}},
 		{"software-prior-duplicate", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{ActiveIdentity: true, Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, ""), []string{"Another enrollment with this Mac identity is still active"}},
@@ -317,6 +332,14 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "profile-history-current" || tc.name == "profile-history-deleted" || tc.name == "profile-history-reader" || tc.name == "profile-history-empty" {
+				if strings.Contains(html, "Restore and deploy revision") {
+					t.Fatal("unavailable historical restoration is exposed")
+				}
+			}
+			if tc.name == "profile-history-reader" && strings.Contains(html, "Download stored revision") {
+				t.Fatal("reader sees protected revision download")
+			}
 			if tc.name == "software-prior-resolved" || tc.name == "software-prior-duplicate" || tc.name == "software-prior-risk-reader" {
 				if strings.Contains(html, `name="evidence"`) {
 					t.Fatal("blocked or resolved operation exposes evidence mutation")

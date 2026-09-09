@@ -1,0 +1,82 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ProfileRevisionHistory(c echo.Context, info *partials.CommonInfo, profile string, items []apple.ProfileRevision, next string, canRestore bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Revision history", Url: partials.GetNavigationUrl(info, ProfileRevisionHistoryPath(profile))}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Profile revision history</h1><p class="uk-text-muted mt-2">Stored profile versions in this organization, including deleted catalog entries. Profile contents and credentials are available only through authorized downloads.</p><a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Back to current profiles</a></div>
+			if profile!="" {
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/history")) }>All profile history</a>
+			}
+			if len(items)==0 {
+				<p>No stored profile revisions in this organization.</p>
+			}
+			for _,v:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">{ v.Name } · Revision { Number(v.Revision) }</h2><p>{ ProfileRevisionOrigin(v.Origin) }</p></div>
+					<div class="uk-card-body">
+						<dl class="uk-description-list">
+							<dt>Profile identity</dt>
+							<dd>{ v.Identifier } · { v.Scope } scope</dd>
+							<dt>Recorded</dt>
+							<dd>{ When(&v.CreatedAt) } · { Show(v.Actor) }</dd>
+							<dt>Payload types</dt>
+							<dd>
+								for _,kind:=range v.PayloadTypes {
+									<code class="mr-2">{ kind }</code>
+								}
+							</dd>
+							<dt>Stored revision identifier</dt>
+							<dd>{ v.ID }</dd>
+						</dl>
+						if v.Origin=="migration" {
+							<p class="uk-alert mt-4">This was the available current revision when history was enabled. Earlier versions and their authors were not retained.</p>
+						}
+						if v.RestoredFrom!="" {
+							<p class="mt-4">Restored from { v.RestoredFrom }.</p>
+							<p class="mt-2">{ v.Reason }</p>
+						}
+						if v.CurrentRevision==0 {
+							<p class="uk-alert mt-4">The catalog entry was deleted. This historical version remains available for review; it cannot be restored into that deleted entry.</p>
+						} else if v.Revision==v.CurrentRevision {
+							<p class="uk-alert mt-4">Current catalog revision. Assigned devices still need to report this version before installation is verified.</p>
+						} else {
+							<p class="mt-4">Current catalog revision: { Number(v.CurrentRevision) }.</p>
+						}
+						if profile=="" {
+							<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, ProfileRevisionHistoryPath(v.ProfileID))) }>View this profile's history</a>
+						}
+						if info.Can(access.ManageProfiles) {
+							<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/"+v.ProfileID+"/revisions/"+v.ID+"/download")) }>Download stored revision</a>
+						}
+						if canRestore && v.CurrentRevision>v.Revision {
+							<details class="mt-4">
+								<summary>Restore this configuration as a new revision</summary>
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+v.ProfileID+"/revisions/"+v.ID+"/restore") } class="mt-4">
+									@CSRF(info)
+									<input type="hidden" name="expected_revision" value={ Number(v.CurrentRevision) }/>
+									<p>Review the old settings and credentials first. Restoring creates a new revision and queues it for every active device or user channel still assigned this profile, across all sites. Current compatibility is checked; a rejected assignment cancels the entire change.</p>
+									<label class="block mt-4">Reason for restoration<textarea class="uk-textarea" name="reason" rows="3" maxlength="1000" required></textarea></label>
+									<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Restore these settings as a new revision and redeploy to all current assignments in the organization.</label>
+									<button class="uk-button uk-button-primary" type="submit">Restore and deploy revision</button>
+								</form>
+							</details>
+						}
+					</div>
+				</section>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, ProfileRevisionHistoryPath(profile)+"?before="+next)) }>Older revisions</a>
+			}
+		</main>
+	}
+}
