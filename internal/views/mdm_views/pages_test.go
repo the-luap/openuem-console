@@ -216,6 +216,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	appHistory := append(appState("verified"), appState("cancelled")...)
 	appHistory[1].Version.Version = "41.0"
 	appHistory[1].AttemptID = "90000000-0000-4000-8000-000000000024"
+	priorApp := apple.MacAppPriorAttempt{ID: "90000000-0000-4000-8000-000000000030", PreviousDeviceID: "90000000-0000-4000-8000-000000000031", PreviousName: "Earlier <Site>", PreviousStatus: "unenrolled", Operation: "install", Status: "uncertain", Version: appVersion, CreatedAt: now, DispatchedAt: &now}
+	resolvedApp := priorApp
+	resolvedApp.Recovery = &apple.MacAppRecovery{ID: "90000000-0000-4000-8000-000000000032", DeviceID: appDevice.ID, Evidence: "device_erased", Reason: "Synthetic erase <evidence>", Actor: "Operator <A>", CreatedAt: now}
 	adeProfile.RequiredApplications = []string{appVersion.ID}
 	adeEnrollment.Profiles[0] = adeProfile
 	adeAppState := func(status string, changeable bool) Detail {
@@ -230,6 +233,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		component templ.Component
 		required  []string
 	}{
+		{"software-prior-unresolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, priorApp.ID), []string{"Earlier &lt;Site&gt;", "Record stopping evidence", `name="confirmed"`, "Older operations"}},
+		{"software-prior-resolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{}, []apple.MacAppPriorAttempt{resolvedApp}, ""), []string{"Stopping evidence recorded", "Synthetic erase &lt;evidence&gt;", "Operator &lt;A&gt;", "Old outcome unknown"}},
+		{"software-prior-duplicate", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{ActiveIdentity: true, Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, ""), []string{"Another enrollment with this Mac identity is still active"}},
+		{"software-prior-risk-reader", MacApplications(c, &reader, &appDevice, nil, "", apple.MacAppEnrollmentRisk{Unresolved: true}), []string{"An earlier enrollment"}},
 		{"ade-app-queued", DeviceDetails(c, info, adeAppState("queued", true)), []string{"Required setup applications", "Replace required revision", "Select approved application revisions", "Editor &lt;Suite&gt;"}},
 		{"ade-app-uncertain", DeviceDetails(c, info, adeAppState("uncertain", true)), []string{"Required setup applications", "Outcome unknown"}},
 		{"ade-app-release-sent", DeviceDetails(c, info, adeAppState("verified", false)), []string{"Required setup applications", "Expected managed app version reported"}},
@@ -310,6 +317,14 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "software-prior-resolved" || tc.name == "software-prior-duplicate" || tc.name == "software-prior-risk-reader" {
+				if strings.Contains(html, `name="evidence"`) {
+					t.Fatal("blocked or resolved operation exposes evidence mutation")
+				}
+			}
+			if tc.name == "software-prior-risk-reader" && (strings.Contains(html, "Review previous enrollments") || strings.Contains(html, priorApp.ID)) {
+				t.Fatal("reader sees cross-site history")
+			}
 			if tc.name == "ade-app-uncertain" || tc.name == "ade-app-release-sent" || tc.name == "ade-app-reader" {
 				if strings.Contains(html, "Replace required revision") || strings.Contains(html, "data-app-search") {
 					t.Fatal("blocked required revision exposes correction form")

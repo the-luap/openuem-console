@@ -15,6 +15,8 @@ import (
 
 func softwareFailure(err error) error {
 	switch {
+	case errors.Is(err, apple.ErrMacAppPriorEnrollment):
+		return echo.NewHTTPError(409, "An earlier enrollment has an unresolved application operation or an active duplicate identity. Review previous enrollments on the Mac's managed applications page before requesting another mutation.")
 	case errors.Is(err, access.ErrDenied):
 		return echo.NewHTTPError(403, "Software permission denied")
 	case errors.Is(err, apple.ErrNotFound):
@@ -206,7 +208,11 @@ func (h *Handler) MacApplications(c echo.Context) error {
 	if err = h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "software.inventory.read", id); err != nil {
 		return softwareFailure(err)
 	}
-	return RenderView(c, mdm_views.MacApplications(c, info, d, items, next))
+	risk, err := h.Apple.MacAppEnrollmentRisk(c.Request().Context(), scope, id)
+	if err != nil {
+		return softwareFailure(err)
+	}
+	return RenderView(c, mdm_views.MacApplications(c, info, d, items, next, risk))
 }
 
 func (h *Handler) MacApplicationHistory(c echo.Context) error {

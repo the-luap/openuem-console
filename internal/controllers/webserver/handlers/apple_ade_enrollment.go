@@ -15,6 +15,8 @@ import (
 
 func adeWorkflowFailure(err error) error {
 	switch {
+	case errors.Is(err, apple.ErrMacAppPriorEnrollment):
+		return softwareFailure(err)
 	case errors.Is(err, access.ErrDenied):
 		return echo.NewHTTPError(403, "Automated enrollment permission denied for this organization or site")
 	case errors.Is(err, apple.ErrNotFound):

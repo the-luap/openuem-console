@@ -288,6 +288,9 @@ func (s *Store) installMacAppTx(ctx context.Context, tx *sql.Tx, d *Device, vers
 }
 
 func (s *Store) createMacAppAttempt(ctx context.Context, tx *sql.Tx, d *Device, assignment string, v SoftwareVersion, operation string, options MacAppInstallOptions, args map[string]any, actor string) error {
+	if err := s.guardMacAppEnrollment(ctx, tx, d, v.PackageID); err != nil {
+		return err
+	}
 	// A new approved intent supersedes only read-only probes of older attempts.
 	// An unresolved mutation was rejected by the caller while holding the device.
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands c SET status='cancelled',payload='\x',completed_at=clock_timestamp() FROM mdm_apple_app_commands m JOIN mdm_apple_app_attempts t ON t.id=m.attempt_id WHERE m.command_id=c.id AND t.assignment_id=$1 AND m.kind IN ('managed','installed') AND c.status IN ('queued','sent','not_now')`, assignment); err != nil {

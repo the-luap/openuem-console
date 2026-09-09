@@ -4,6 +4,23 @@ import "github.com/open-uem/openuem-console/internal/mdm/apple"
 
 type SoftwareDeviceSearch struct{ Query, Next string }
 
+func MacAppPriorState(a apple.MacAppPriorAttempt) string {
+	if a.Recovery != nil {
+		return "Old outcome unknown; stopping evidence recorded"
+	}
+	return MacAppState(apple.MacAppAssignment{Status: a.Status, Operation: a.Operation})
+}
+
+func MacAppEvidenceLabel(evidence string) string {
+	if evidence == "device_erased" {
+		return "Mac erased after dispatch"
+	}
+	if evidence == "installer_stopped" {
+		return "Earlier operation confirmed stopped"
+	}
+	return "Evidence unavailable"
+}
+
 func YesNo(value bool) string {
 	if value {
 		return "Yes"
@@ -34,6 +51,9 @@ func MacAppObservationLabel(value string) string {
 }
 
 func MacAppError(value string) string {
+	if value == "previous_enrollment_unresolved" {
+		return "Delivery was cancelled because an earlier enrollment has an unresolved operation or an active duplicate identity. Review previous enrollments before explicitly requesting another installation."
+	}
 	if value == "ade_revision_replaced" {
 		return "The previous attempt was cancelled by an explicit correction of the required setup revision."
 	}

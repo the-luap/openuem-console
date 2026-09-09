@@ -139,7 +139,7 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 	}
 }
 
-templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device, items []apple.MacAppAssignment, next string) {
+templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device, items []apple.MacAppAssignment, next string, risks ...apple.MacAppEnrollmentRisk) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: d.Name, Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}, {Title: "Managed applications", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications")}}, info)
@@ -149,6 +149,12 @@ templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device
 				<p class="uk-text-muted mt-2">Requested package versions and the latest application observations for this enrollment.</p>
 				@Navigation(info)
 			</div>
+			if len(risks)>0 && risks[0].Blocked() {
+				<p role="status" class="uk-alert uk-alert-warning">An earlier enrollment has an unresolved application operation or an active duplicate identity. Application changes remain blocked for the affected package until an organization administrator reviews the previous enrollment.</p>
+			}
+			if info.Can(access.ManageCertificates) && info.Can(access.ManageSoftware) && info.Can(access.EnrollDevices) && info.Can(access.AssignSoftware) {
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications/previous")) }>Review previous enrollments</a>
+			}
 			if !apple.MacAppManagementReady(*d,time.Now()) && d.Status=="enrolled" {
 				<p role="status" class="uk-alert uk-alert-warning">Refresh inventory on this Mac before requesting installation, removal or application observations. Queued operations can still be cancelled.</p>
 			}
@@ -177,7 +183,7 @@ templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device
 									@MacAppAction(info, d.ID, a.ID, "cancel", "Cancel queued operation", false)
 								}
 							</div>
-							if a.CanRemove(time.Now()) && apple.MacAppManagementReady(*d,time.Now()) {
+							if a.CanRemove(time.Now()) && apple.MacAppManagementReady(*d,time.Now()) && (len(risks)==0 || !risks[0].Blocked()) {
 								<details class="mt-4">
 									<summary>Remove this managed app</summary>
 									<p class="mt-4">Removal deletes the managed app and its app data. Additional files or services installed by a package may remain.</p>

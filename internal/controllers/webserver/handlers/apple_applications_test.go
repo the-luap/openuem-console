@@ -138,6 +138,7 @@ func exerciseAppleApplications(t *testing.T, h *Handler, ctx context.Context, te
 	if rec = request("organization-admin", "GET", foreign, nil); rec.Code != 404 {
 		t.Fatal("history crossed device scope", rec.Code)
 	}
+	exerciseAppleAppRecovery(t, h, ctx, tenant, site, sibling, device, version, request)
 	if rec = request("scoped-operator", "POST", scoped+"/software/catalog/"+version+"/withdraw", url.Values{"confirmed": {"yes"}}); rec.Code != 403 {
 		t.Fatal("operator withdrew organization approval", rec.Code)
 	}

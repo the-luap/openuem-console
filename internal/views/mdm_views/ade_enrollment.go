@@ -80,14 +80,15 @@ func adeApplicationMessage(r apple.ADEApplication, a *apple.ADEDeviceEnrollment)
 		return "Required application verification is pending."
 	}
 	labels := map[string]string{
-		"":                              "Required revision verified for setup release.",
-		"application_pending":           "Waiting for the exact managed application version.",
-		"inventory_required":            "A current compatible Mac inventory report is required before installation.",
-		"revision_mismatch":             "The active application revision differs from this setup requirement.",
-		"operator_action_required":      "The previous attempt needs an explicit operator action. Setup polling does not rerun the installer.",
-		"approval_withdrawn":            "The required approval was withdrawn. Select another approved revision before setup can continue.",
-		"device_incompatible":           "The required revision is incompatible with this Mac. Select a compatible approved revision.",
-		"approved_artifact_unavailable": "The approved artifact could not be queued. Check approval and device prerequisites.",
+		"previous_enrollment_unresolved": "An earlier enrollment has an unresolved app operation or an active duplicate identity. Review previous enrollments from the managed applications page before setup can continue.",
+		"":                               "Required revision verified for setup release.",
+		"application_pending":            "Waiting for the exact managed application version.",
+		"inventory_required":             "A current compatible Mac inventory report is required before installation.",
+		"revision_mismatch":              "The active application revision differs from this setup requirement.",
+		"operator_action_required":       "The previous attempt needs an explicit operator action. Setup polling does not rerun the installer.",
+		"approval_withdrawn":             "The required approval was withdrawn. Select another approved revision before setup can continue.",
+		"device_incompatible":            "The required revision is incompatible with this Mac. Select a compatible approved revision.",
+		"approved_artifact_unavailable":  "The approved artifact could not be queued. Check approval and device prerequisites.",
 	}
 	if label, ok := labels[r.Error]; ok {
 		return label

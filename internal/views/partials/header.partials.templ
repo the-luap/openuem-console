@@ -51,7 +51,7 @@ func (info *CommonInfo) Can(capability access.Capability) bool {
 	if site < 0 {
 		site = 0
 	}
-	if capability == access.ManageProfiles || capability == access.ManageCertificates {
+	if capability == access.ManageProfiles || capability == access.ManageCertificates || capability == access.ManageSoftware {
 		site = 0
 	}
 	return info.Principal.Can(capability, access.Scope{TenantID: tenant, SiteID: site})

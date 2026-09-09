@@ -121,6 +121,16 @@ func (s *Store) prepareMacAppDelivery(ctx context.Context, tx *sql.Tx, d *Device
 		return false, err
 	}
 	ready := err == nil && (a.Status == "queued" || a.Status == "not_now")
+	detail := "delivery_prerequisites_changed"
+	if ready {
+		if err = s.guardMacAppEnrollment(ctx, tx, current, a.Version.PackageID); err != nil {
+			if !errors.Is(err, ErrMacAppPriorEnrollment) {
+				return false, err
+			}
+			ready = false
+			detail = "previous_enrollment_unresolved"
+		}
+	}
 	if ready && kind == "install" {
 		// Lock the approval against concurrent withdrawal until delivery commits.
 		var withdrawn *time.Time
@@ -130,7 +140,7 @@ func (s *Store) prepareMacAppDelivery(ctx context.Context, tx *sql.Tx, d *Device
 		ready = withdrawn == nil && macAppCompatible(*current, a.Version)
 	}
 	if !ready {
-		if err = s.finishMacApp(ctx, tx, attempt, "cancelled", "delivery_prerequisites_changed"); err != nil {
+		if err = s.finishMacApp(ctx, tx, attempt, "cancelled", detail); err != nil {
 			return false, err
 		}
 		return false, auditOutcome(ctx, tx, d.TenantID, "system", "apple.software.delivery.cancel", attempt, "cancelled")

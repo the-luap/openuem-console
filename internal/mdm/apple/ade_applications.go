@@ -199,10 +199,13 @@ func (s *Store) reconcileADEApplications(ctx context.Context, tx *sql.Tx, d *Dev
 				if _, rollbackErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT ade_app_enqueue`); rollbackErr != nil {
 					return false, rollbackErr
 				}
-				if !errors.Is(err, ErrConflict) && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrMacApp) {
+				if !errors.Is(err, ErrConflict) && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrMacApp) && !errors.Is(err, ErrMacAppPriorEnrollment) {
 					return false, err
 				}
 				state = "approved_artifact_unavailable"
+				if errors.Is(err, ErrMacAppPriorEnrollment) {
+					state = "previous_enrollment_unresolved"
+				}
 			}
 			if _, err = tx.ExecContext(ctx, `RELEASE SAVEPOINT ade_app_enqueue`); err != nil {
 				return false, err
