@@ -112,7 +112,7 @@ func TestSystemExtensionPayloadSchemaAndCompatibility(t *testing.T) {
 			t.Fatal("malformed extension policy accepted")
 		}
 	}
-	for _, change := range []map[string]any{{"ApprovalMode": "unknown"}, {"TeamIdentifier": "bad"}, {"AllowUserOverrides": "true"}, {"BundleIdentifiers": ""}, {"BundleIdentifiers": strings.Repeat("x", 16385)}, {"AllowedTypes": []any{"bad"}}, {"RemovableBundleIdentifiers": true}, {"PayloadScope": "User"}} {
+	for _, change := range []map[string]any{{"ApprovalMode": "unknown"}, {"TeamIdentifier": "bad"}, {"AllowUserOverrides": "true"}, {"BundleIdentifiers": ""}, {"BundleIdentifiers": false}, {"BundleIdentifiers": strings.Repeat("x", 16385)}, {"AllowedTypes": []any{"bad"}}, {"RemovableBundleIdentifiers": true}, {"PayloadScope": "User"}} {
 		s := systemExtensionTestSettings("listed")
 		scope := "System"
 		for k, v := range change {
@@ -174,5 +174,25 @@ func TestSystemExtensionCombinedPoliciesAndRemovalDistinctions(t *testing.T) {
 				t.Fatal("single payload validation differs", e)
 			}
 		})
+	}
+}
+
+func TestSystemExtensionEmptyVersionedDictionariesKeepTheirVersionGate(t *testing.T) {
+	now := time.Now().Add(-time.Minute)
+	for _, test := range []struct{ key, old, current string }{{"RemovableSystemExtensions", "11.7", "12.0"}, {"NonRemovableSystemExtensions", "14.7", "15.0"}, {"NonRemovableFromUISystemExtensions", "14.7", "15.0"}} {
+		p := map[string]any{"PayloadType": systemExtensionPayloadType, test.key: map[string]any{}}
+		d := &Device{Model: "Mac16,1", OSVersion: test.old, SecurityAt: &now, SecurityInventory: map[string]any{"ManagementStatus": map[string]any{"UserApprovedEnrollment": true}}}
+		if _, err := parseSystemExtensionPayload(p, "System", d); err == nil {
+			t.Fatal("empty dictionary bypassed version gate", test.key)
+		}
+		d.OSVersion = test.current
+		if _, err := parseSystemExtensionPayload(p, "System", d); err != nil {
+			t.Fatal("supported empty dictionary rejected", test.key, err)
+		}
+	}
+	s := systemExtensionTestSettings("team")
+	s["BundleIdentifiers"] = ""
+	if err := buildSystemExtensionsPayload(map[string]any{}, s, "System"); err == nil {
+		t.Fatal("team builder accepted an inactive bundle field")
 	}
 }

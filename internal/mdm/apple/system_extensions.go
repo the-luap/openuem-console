@@ -97,6 +97,11 @@ func buildSystemExtensionsPayload(payload, settings map[string]any, scope string
 		return errors.New("select whether users may approve additional system extensions")
 	}
 	payload["AllowUserOverrides"] = allow
+	if raw, exists := settings["BundleIdentifiers"]; exists {
+		if _, ok := raw.(string); !ok {
+			return errors.New("system extension bundle identifiers must be text")
+		}
+	}
 	switch mode {
 	case "listed":
 		bundles, err := systemExtensionBundleLines(stringValue(settings, "BundleIdentifiers"))
@@ -108,7 +113,7 @@ func buildSystemExtensionsPayload(payload, settings map[string]any, scope string
 		}
 		payload["AllowedSystemExtensions"] = map[string]any{team: bundles}
 	case "team":
-		if stringValue(settings, "BundleIdentifiers") != "" {
+		if _, exists := settings["BundleIdentifiers"]; exists {
 			return errors.New("team approval cannot also select individual extensions")
 		}
 		payload["AllowedTeamIdentifiers"] = []any{team}

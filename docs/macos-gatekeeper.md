@@ -48,7 +48,9 @@ bootstrap checks, console rendering and scoped route tests pass in the
 The native Apple race suite found that the shared inventory fixture reported
 macOS 15 instead of the intended 14.7 in the revision rollback case. The fixture
 now reports 14.7 explicitly and asserts the persisted version before that check.
-A full rerun is required; the remaining downstream checks were skipped.
+The corrected [`bd6bcc6` push workflow](https://github.com/the-luap/openuem-console/actions/runs/34349544513)
+passes all jobs, including native Apple race tests (515.450 s), console handlers
+(10.868 s) and desktop lifecycles (26.677 s). The PR workflow is still running.
 
 Nine browser cases use that workflow's actual rendered profile page at 390, 768
 and 1440 pixels. They cover all three source policies, omitted defaults, explicit

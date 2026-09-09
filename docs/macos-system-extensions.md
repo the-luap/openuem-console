@@ -70,7 +70,16 @@ macOS 15 revision rollback, concurrent conflicting assignments, audit rollback,
 retained sent revisions, fresh replacement/removal and legacy migration recovery.
 Console cases cover permissions, CSRF, strict forms, all approval modes, no allowed
 types, removal distinctions and escaped labels. Template generation and JavaScript
-syntax checks pass. Full CI and browser checks for this change are pending.
+syntax checks pass. Linux/Windows builds, native Windows checks, scoped console handlers and rendering
+pass in the [`c4fb18d` push workflow](https://github.com/the-luap/openuem-console/actions/runs/34350292179);
+the full native suite is still running. Twelve browser cases use its actual
+rendered page at 390/768/1440 pixels. They cover all three approval modes and
+empty type selection, mandatory fields, inactive-field omission, retained input
+after mode changes, keyboard checkbox selection and submission, reset, CSRF and
+scoped routes. No horizontal overflow occurred; the narrow layout was inspected.
+The harness sets native select values directly, so native dropdown arrow-key
+behavior is not independently verified. A follow-up also rejects inactive or
+non-text bundle fields in the builder and tests empty version-specific dictionaries.
 
 These synthetic checks do not install a profile or activate/deactivate extensions
 on the development host. Physical Mac acceptance must verify provider signatures,

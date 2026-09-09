@@ -65,14 +65,16 @@ the table's package summaries do not remove any detail from the roadmap.
   approvals, extension types and removal rules with platform, channel, OS and fresh
   management approval checks. Potentially installed revisions retain conflict
   reservations until fresh replacement/removal evidence. Parser checks, all 34
-  migrations and 291 prepared production statements pass locally; full native,
-  console and browser checks for this change are pending.
+  migrations and 291 prepared production statements pass locally. Builds and scoped
+  console checks pass, as do 12 cases on the actual CI-rendered page across three
+  widths. Full native CI and the strict-builder follow-up are pending.
 
 - [Mac Gatekeeper profiles](macos-gatekeeper.md) now provide typed application
   assessment, Finder exception and malware-submission prompt settings. The editor
   separates Apple's payloads, omits unchanged defaults and checks macOS versions
   for direct assignment and revision updates. Local core and console checks pass.
-  Full native CI is rerunning after correcting the older-Mac inventory fixture. Nine cases using the actual CI-rendered
+  The corrected push workflow passes all jobs, including the older-Mac revision
+  rollback case; the PR workflow remains in progress. Nine cases using the actual CI-rendered
   page pass at 390/768/1440 pixels, including policy values, confirmation and
   keyboard submission without overflow. PPPC/TCC and certificate templates remain
   separate work.
