@@ -148,8 +148,8 @@ The Mac console follow-up at `913fbaa` also passes the complete
 including the 443.070-second native Apple race suite.
 
 The additional inventory-ordering change at `08029fd` passes the local migration,
-preparation and actual SQL execution checks above. Its complete
+preparation and actual SQL execution checks above. Both complete workflows pass
+all four jobs in
 [push CI](https://github.com/the-luap/openuem-console/actions/runs/34336312494) and
-[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34336316609) remain
-pending. This distinction keeps earlier verified behavior separate from the
-latest validation still in progress.
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34336316609),
+including the extended native protocol tests for late query completion.

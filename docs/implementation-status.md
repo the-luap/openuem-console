@@ -71,7 +71,8 @@ the table's package summaries do not remove any detail from the roadmap.
   Nine further browser scenarios cover the corrected Mac user pages at `913fbaa`,
   whose complete push workflow passes. Inventory ordering at `08029fd` additionally
   protects newer device/user snapshots from late queries; all 30 migrations, 250
-  prepared SQL statements and actual query execution pass, with its full CI pending.
+  prepared SQL statements and actual query execution pass, as do all four jobs in
+  both complete CI workflows.
   ADE pin ownership, profile prerequisites and physical acceptance remain open.
 
 - [Mac application reenrollment recovery](apple-application-reenrollment.md) now
