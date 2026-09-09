@@ -1,8 +1,7 @@
 # Mac Platform SSO profiles
 
-Implementation and validation are in progress. The profile editor creates a
-System-scoped Extensible SSO configuration using the modern `PlatformSSO`
-dictionary. It requires macOS 14 or later, an installed provider extension,
+The profile editor creates a System-scoped Extensible SSO configuration using
+the modern `PlatformSSO` dictionary. It requires macOS 14 or later, an installed provider extension,
 provider support for the selected authentication method, and fresh user-approved
 MDM security inventory before assignment.
 
@@ -42,13 +41,32 @@ prerequisites change. A verified profile assignment means the configuration was
 reported installed. It does not establish provider registration, account
 creation, credential synchronization or successful sign-in.
 
-## Remaining work and acceptance
+## Validation and remaining acceptance
 
-Full CI, browser acceptance and physical/provider verification are pending for
-this implementation. Tests cover typed payload placement, invalid URL and
+Tests cover typed payload placement, invalid URL and
 account-policy combinations, legacy/modern/version boundaries, user-channel
 restrictions, bounded provider JSON, encrypted storage, rejected assignment
 batches, revision rollback and console permissions.
+
+At [`a1d9a4a`](https://github.com/the-luap/openuem-console/commit/a1d9a4affbf04250b32454e1c7ba96d09d3e2935),
+both complete workflows passed all four jobs in
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34325631687) and
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34325627197).
+This includes Linux/Windows builds, native Windows checks, synthetic console
+renderings, scoped console routes, the native Apple race suite, gateway and
+authorization checks, existing model tests and desktop agent regression.
+
+Browser checks used the actual CI-rendered profile page at 390, 768 and 1440
+pixels. All three passed expanded-form layout, keyboard validation and
+confirmation, exact provider values, System scope and CSRF checks without page
+overflow. An isolated fuzz harness copied the unchanged production provider
+parser, text validator and fuzz property, recorded source SHA-256 values, and
+passed 28,837 inputs in 21.414 seconds. Accepted dictionaries were encoded and
+decoded as plist. Full native integration tests remain distinct from this
+focused parser check.
+
+No real identity-provider registration, account creation or profile deployment
+was performed. Physical-device and provider-specific acceptance remain open.
 
 Unattended ADE still needs an immutable SSO profile requirement bound to the
 required extension application, managed administrator policy and setup sequence.

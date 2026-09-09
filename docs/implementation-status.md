@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Platform SSO profiles](apple-platform-sso.md) now have a typed Mac editor,
+  encrypted registration-token storage, bounded provider data, shared editor and
+  upload validation, and platform/MDM approval checks for assignment. Console and
+  native protocol tests, three responsive browser scenarios and 28,837 isolated
+  parser fuzz inputs pass. Immutable ADE profile prerequisites, provider-specific
+  registration, cross-profile URL collision checks and hardware acceptance remain
+  open.
+
 - [ADE required applications](apple-ade-required-applications.md) now include
   immutable approved revisions inherited at admission, native app observations
   that gate setup release, a bounded searchable console picker, and explicit
