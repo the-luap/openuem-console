@@ -1,11 +1,14 @@
 package apple
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"time"
 
@@ -18,10 +21,11 @@ import (
 // FileVaultRotation is public lifecycle metadata. Return keys, nonces, signed
 // receipts and encrypted envelopes are never serialized into device inventory.
 type FileVaultRotation struct {
-	ID          string     `json:"id"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	CompletedAt *time.Time `json:"completed_at"`
+	ID               string     `json:"id"`
+	Status           string     `json:"status"`
+	CreatedAt        time.Time  `json:"created_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+	ExecutionStopped bool       `json:"execution_stopped"`
 }
 
 func rotationSchemaReady(ctx context.Context, q fileVaultQuery) bool {
@@ -210,10 +214,11 @@ func (s *Store) fileVaultRotationMetadata(ctx context.Context, d *Device, v *Fil
 			v.ValidationReady = false
 			return nil
 		}
-		var stopped bool
-		if err = s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_agent_rotation_tasks WHERE id=$1 AND status='uncertain' AND result IS NOT NULL)`, v.Rotation.ID).Scan(&stopped); err != nil {
+		stopped, err := s.fileVaultRotationStopped(ctx, d, v.Rotation.ID)
+		if err != nil {
 			return err
 		}
+		v.Rotation.ExecutionStopped = stopped
 		v.ValidationReady = v.ValidationReady && stopped
 		return nil
 	}
@@ -229,4 +234,43 @@ func (s *Store) fileVaultRotationMetadata(ctx context.Context, d *Device, v *Fil
 	a, b, conflict := fileVaultProfileEvidence(d.InstalledProfiles, fileVaultDomain+"."+d.ID+".escrow", fileVaultDomain+"."+d.ID+".enable", escrow, enable)
 	v.RotationReady = a && b && !conflict && !d.ProfilesAt.Before(updated)
 	return nil
+}
+
+// This read-only hint authenticates stopping evidence for the displayed attempt.
+// QueueRotationValidation rechecks authority and the complete proof under locks.
+func (s *Store) fileVaultRotationStopped(ctx context.Context, d *Device, id string) (bool, error) {
+	var wire, bound, raw []byte
+	var nonceHash string
+	err := s.db.QueryRowContext(ctx, `SELECT t.result,r.context,r.nonce_hash,i.certificate
+ FROM mdm_apple_filevault_rotations r
+ JOIN uem_agent_rotation_tasks t ON t.id=r.id AND t.device_id=r.agent_id AND t.native_id=r.device_id AND t.tenant_id=r.tenant_id AND t.site_id=r.site_id AND t.context=r.context AND t.nonce_hash=r.nonce_hash
+ JOIN uem_agent_identities i ON i.id=t.device_id AND i.certificate_hash=t.certificate_hash AND i.tenant_id=t.tenant_id AND i.site_id=t.site_id
+ WHERE r.id=$1 AND r.device_id=$2 AND r.tenant_id=$3 AND r.site_id=$4 AND r.status='uncertain' AND t.status='uncertain'
+ AND t.delivered_at>=t.created_at AND t.delivered_at<t.expires_at
+ AND octet_length(t.result) BETWEEN 1 AND $5 AND octet_length(r.context) BETWEEN 1 AND $5
+ AND octet_length(i.certificate) BETWEEN 1 AND $5 AND i.revoked_at IS NULL AND i.certificate_expires_at>clock_timestamp()`, id, d.ID, d.TenantID, d.SiteID, enrollment.MaxRecoveryMessage).Scan(&wire, &bound, &nonceHash, &raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var result enrollment.RotationResult
+	if json.Unmarshal(wire, &result) != nil || result.Outcome != "uncertain" || !result.ExecutionStopped {
+		return false, nil
+	}
+	canonical, _ := json.Marshal(result)
+	contextWire, _ := json.Marshal(result.Context)
+	b := result.Context.Binding
+	if !bytes.Equal(canonical, wire) || !bytes.Equal(contextWire, bound) || b.TaskID != id || b.NativeID != d.ID || b.Identity.TenantID != d.TenantID || b.Identity.SiteID != d.SiteID || digest(result.Nonce) != nonceHash {
+		return false, nil
+	}
+	if block, rest := pem.Decode(raw); block != nil {
+		if block.Type != "CERTIFICATE" || len(bytes.TrimSpace(rest)) != 0 {
+			return false, nil
+		}
+		raw = block.Bytes
+	}
+	cert, err := x509.ParseCertificate(raw)
+	return err == nil && enrollment.VerifyRotationResult(result, cert, time.Now()) == nil, nil
 }

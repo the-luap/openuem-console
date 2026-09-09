@@ -110,7 +110,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		d := validationDetail("valid")
 		d.FileVault.Rotation = &apple.FileVaultRotation{ID: "e0000000-0000-4000-8000-000000000004", Status: status, CreatedAt: now, CompletedAt: &now}
 		d.FileVault.RotationReady = status == "rotated" || status == "resolved"
-		d.FileVault.ValidationReady = status != "queued"
+		d.FileVault.ValidationReady = status != "queued" && status != "awaiting-stop"
+		d.FileVault.Rotation.ExecutionStopped = status == "uncertain"
+		if status == "awaiting-stop" {
+			d.FileVault.Rotation.Status = "uncertain"
+		}
 		return d
 	}
 	recoveryDetail := func(status string) Detail {
@@ -166,6 +170,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-device-lock-allowed", DeviceDetails(c, info, lockDetail), []string{"Included in this enrollment", "does not indicate whether a Recovery Lock password is set"}},
 		{"mac-filevault-rotation-ready", DeviceDetails(c, info, rotationDetail("rotated")), []string{"New recovery key stored and validated", "Rotate current recovery key", "/rotate"}},
 		{"mac-filevault-rotation-queued", DeviceDetails(c, info, rotationDetail("queued")), []string{"Waiting for the Mac to replace its recovery key"}},
+		{"mac-filevault-rotation-awaiting-stop", DeviceDetails(c, info, rotationDetail("awaiting-stop")), []string{"has not confirmed that the command stopped", "Key validation and another rotation remain blocked"}},
 		{"mac-filevault-rotation-uncertain", DeviceDetails(c, info, rotationDetail("uncertain")), []string{"Another rotation remains blocked", "Validate current recovery key"}},
 		{"mac-filevault-rotation-unverified", DeviceDetails(c, info, rotationDetail("unverified")), []string{"New recovery key stored; validate it"}},
 		{"mac-filevault-rotation-resolved", DeviceDetails(c, info, rotationDetail("resolved")), []string{"uncertain attempt is resolved", "Rotate current recovery key"}},
@@ -198,6 +203,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "mac-filevault-rotation-awaiting-stop" && (strings.Contains(html, "Validate current recovery key") || strings.Contains(html, "Rotate current recovery key")) {
+				t.Fatal("FileVault recovery actions offered without stopping evidence")
+			}
 			if strings.HasPrefix(tc.name, "mac-recovery-") {
 				if strings.Contains(html, "f0000000-0000-4000-8000-000000000004/retry") {
 					t.Fatal("password command exposes generic retry")

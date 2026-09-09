@@ -114,7 +114,10 @@ func FileVaultRotationState(v *apple.FileVault) string {
 	case "unverified":
 		return "New recovery key stored; validate it against the Mac volume"
 	case "uncertain":
-		return "The result is uncertain. Refresh security inventory, then validate the latest stored key once the agent finishes recovery. Another rotation remains blocked."
+		if !v.Rotation.ExecutionStopped {
+			return "The result is uncertain and the agent has not confirmed that the command stopped. Key validation and another rotation remain blocked. After an interrupted agent, recovery may require a Mac restart and a report from the current agent. Retained recovery keys remain available."
+		}
+		return "The command has stopped, but its result is uncertain. Refresh security inventory, then validate the latest stored key. Another rotation remains blocked."
 	case "resolved":
 		return "Current recovery key independently validated; the uncertain attempt is resolved"
 	case "invalid":

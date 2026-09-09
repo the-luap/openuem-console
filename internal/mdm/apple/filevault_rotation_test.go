@@ -91,7 +91,7 @@ func TestFileVaultRotationQueueEncryptsBothDirectionsAndIsIdempotent(t *testing.
 	if _, err = f.s.secrets.open(sealed, secretPurpose(f.d.TenantID, f.d.ID+"/"+uuid.NewString(), "filevault_rotation_reply_key")); err == nil {
 		t.Fatal("return key moved between tasks")
 	}
-	reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
+	reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
 	if err != nil || reply.Task == nil || reply.Task.Context != c {
 		t.Fatal("authorized task not delivered", err)
 	}

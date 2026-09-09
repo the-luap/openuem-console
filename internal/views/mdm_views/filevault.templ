@@ -52,7 +52,7 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 				if detail.FileVault.RotationReady && !FileVaultRotationPending(detail.FileVault) {
 					<details>
 						<summary>Replace the current recovery key</summary>
-						<p class="mt-4">The linked Mac agent validates the current key, replaces it, and returns the new key to encrypted escrow. Previous keys remain in history. The request expires within five minutes; an uncertain result blocks another rotation until the current key is independently validated.</p>
+						<p class="mt-4">The linked Mac agent validates the current key, replaces it, and returns the new key to encrypted escrow. Previous keys remain in history. The request expires within five minutes; an uncertain result blocks another rotation until the command has stopped and the current key is independently validated.</p>
 						<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/filevault/keys/"+detail.FileVault.KeyID+"/rotate") }>
 							@CSRF(info)
 							<button class="uk-button uk-button-default" type="submit">Rotate current recovery key</button>
@@ -68,7 +68,7 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 							<p class="mb-4">The linked Mac agent checks the latest stored key without changing disk encryption. The request expires within 15 minutes.</p>
 							<button class="uk-button uk-button-default" type="submit">Validate current recovery key</button>
 						</form>
-					} else {
+					} else if !FileVaultRotationPending(detail.FileVault) {
 						<p class="uk-text-muted">Validation requires a current individual Mac agent, its verified MDM association and recent hardware inventory.</p>
 					}
 				}

@@ -70,7 +70,7 @@ func exerciseFileVaultRotation(t *testing.T, h *Handler, ctx context.Context, sc
 		t.Fatal("queued rotation state or blocked controls incorrect", rec.Code)
 	}
 	artifact("filevault-rotation-queued", rec)
-	reply, err := access.HandleRotation(ctx, *identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: identity.ID, Action: "poll", RecipientID: recipient.ID})
+	reply, err := access.HandleRotation(ctx, *identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: identity.ID, Action: "poll", RecipientID: recipient.ID})
 	if err != nil || reply.Task == nil {
 		t.Fatal("private rotation unavailable", err)
 	}
@@ -83,7 +83,7 @@ func exerciseFileVaultRotation(t *testing.T, h *Handler, ctx context.Context, sc
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = access.HandleRotation(ctx, *identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: identity.ID, Action: "result", Result: result}); err != nil {
+	if _, err = access.HandleRotation(ctx, *identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: identity.ID, Action: "result", Result: result}); err != nil {
 		t.Fatal(err)
 	}
 	if err = h.Apple.ReconcileFileVaultRotations(ctx); err != nil {

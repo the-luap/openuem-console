@@ -16,14 +16,14 @@ func queueFileVaultRotation(t *testing.T, f *validationFixture) *enrollment.Rota
 	if err := f.s.requestFileVaultRotation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil); err != nil {
 		t.Fatal(err)
 	}
-	reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
+	reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
 	if err != nil || reply.Task == nil {
 		t.Fatal("rotation delivery failed", err)
 	}
 	return reply.Task
 }
 
-func reportFileVaultRotation(t *testing.T, f *validationFixture, task *enrollment.RotationTask, outcome string, key []byte) *enrollment.RotationResult {
+func reportFileVaultRotation(t *testing.T, f *validationFixture, task *enrollment.RotationTask, outcome string, key []byte, stopped ...bool) *enrollment.RotationResult {
 	t.Helper()
 	secret, err := f.private.OpenRotationTask(*task, f.recipient.Identity, f.recipient.ID, time.Now())
 	if err != nil {
@@ -31,10 +31,13 @@ func reportFileVaultRotation(t *testing.T, f *validationFixture, task *enrollmen
 	}
 	defer secret.Close()
 	result, err := enrollment.NewRotationResult(task.Context, outcome, secret.Nonce(), key, f.cert, f.keys.Certificate, time.Now())
+	if len(stopped) == 1 && stopped[0] {
+		result, err = enrollment.NewStoppedRotationResult(task.Context, secret.Nonce(), f.cert, f.keys.Certificate, time.Now())
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "result", Result: result}); err != nil {
+	if _, err = f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "result", Result: result}); err != nil {
 		t.Fatal(err)
 	}
 	return result
@@ -151,7 +154,7 @@ func TestFileVaultRotationReceiptsRetainKeysAndRespectNativeEscrowOrdering(t *te
 func TestFileVaultRotationUncertaintyNeedsIndependentCurrentKeyProof(t *testing.T) {
 	f := newFileVaultRotationFixture(t)
 	task := queueFileVaultRotation(t, f)
-	reportFileVaultRotation(t, f, task, "uncertain", nil)
+	reportFileVaultRotation(t, f, task, "uncertain", nil, true)
 	if err := f.s.checkFileVaultRotation(t.Context(), f.scope, f.d.ID, task.Context.Binding.TaskID); err != nil {
 		t.Fatal(err)
 	}
@@ -176,6 +179,42 @@ func TestFileVaultRotationUncertaintyNeedsIndependentCurrentKeyProof(t *testing.
 	}
 	if next := queueFileVaultRotation(t, f); next.Context.Ordinal != 2 {
 		t.Fatal("resolution reused attempt")
+	}
+}
+
+func TestFileVaultRotationValidationRequiresAuthenticStoppingEvidence(t *testing.T) {
+	for _, mode := range []string{"legacy", "forged-flag", "forged-signature", "stopped"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFileVaultRotationFixture(t)
+			task := queueFileVaultRotation(t, f)
+			result := reportFileVaultRotation(t, f, task, "uncertain", nil, mode == "stopped" || mode == "forged-signature")
+			if err := f.s.checkFileVaultRotation(t.Context(), f.scope, f.d.ID, task.Context.Binding.TaskID); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "forged-flag" || mode == "forged-signature" {
+				if mode == "forged-flag" {
+					result.ExecutionStopped = true
+				} else {
+					result.Signature[0] ^= 1
+				}
+				wire, _ := json.Marshal(result)
+				if _, err := f.s.db.Exec(`UPDATE uem_agent_rotation_tasks SET result=$2 WHERE id=$1`, task.Context.Binding.TaskID, wire); err != nil {
+					t.Fatal(err)
+				}
+			}
+			v, err := f.s.FileVault(t.Context(), f.scope, f.d.ID)
+			ready := mode == "stopped"
+			if err != nil || v.Rotation == nil || v.Rotation.ExecutionStopped != ready || v.ValidationReady != ready || v.RotationReady {
+				t.Fatal("unsafe stopping metadata", err)
+			}
+			err = f.s.requestFileVaultValidation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil)
+			if (err == nil) != ready {
+				t.Fatal("old-key resolution ignored stopping evidence", err)
+			}
+			if err := f.s.requestFileVaultRotation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil); err == nil {
+				t.Fatal("stopping receipt alone unblocked mutation")
+			}
+		})
 	}
 }
 
@@ -239,7 +278,7 @@ func TestFileVaultRotationDeliveryStopsWhenNativeAuthorityChanges(t *testing.T) 
 			if err := f.s.db.QueryRow(`SELECT status='cancelled' AND octet_length(envelope)=0 AND delivered_at IS NULL FROM uem_agent_rotation_tasks WHERE device_id=$1`, f.identity.ID).Scan(&cancelled); err != nil || !cancelled {
 				t.Fatal("authority change left mutation deliverable", err)
 			}
-			reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
+			reply, err := f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "poll", RecipientID: f.recipient.ID})
 			if err != nil || reply.Task != nil || reply.Receipt != nil {
 				t.Fatal("invalidated mutation delivered", err)
 			}
@@ -272,7 +311,7 @@ func TestFileVaultRotationLateReceiptAndHistoricalCapacityPreserveCandidate(t *t
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: 1, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "result", Result: result}); err != nil {
+			if _, err = f.access.HandleRotation(t.Context(), *f.identity, enrollment.RotationRequest{Version: enrollment.RotationVersion, Protocol: enrollment.RotationProtocol, AgentID: f.identity.ID, Action: "result", Result: result}); err != nil {
 				t.Fatal("late receipt rejected", err)
 			}
 			var removable string

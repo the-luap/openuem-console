@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [FileVault rotation recovery](macos-filevault.md) now requires a signed process
+  stopping claim before an uncertain attempt can admit an old-key resolution check.
+  A synthetic parent/child regression confirms that a child can outlive the agent
+  while its parent lease becomes free. The protected journal records the kernel
+  boot-session UUID; same-boot intent recovery waits without repeating a mutation,
+  and a subsequent boot can establish termination. Legacy receipts and intents
+  cannot acquire invented stopping evidence. Agent, worker and console use the
+  same protocol v2 dependency. Local native process/journal/runtime race tests,
+  console tests and vet pass; the shared registry's
+  [PostgreSQL race CI](https://github.com/the-luap/openuem-nats/actions/runs/34294862275)
+  also passes. Six browser cases cover waiting and stopped uncertainty at
+  390/768/1440 px, blocked actions, retained history and keyboard POST submission,
+  without horizontal overflow. These tests perform no real FileVault operation;
+  physical rotation/recovery acceptance and broader MAC-02 work remain open.
+
 - [Recovery Lock](macos-recovery-lock.md) adds explicit enrollment rights and
   owner confirmation, encrypted password history, native creation/import/checks,
   rotation/removal, and separately authorized, audited password retrieval.

@@ -112,7 +112,8 @@ be current. The retained native escrow private key must open successfully, match
 its certificate, and remain valid through the execution and receipt reserve.
 The agent uses macOS 10.14 or later PRK authentication on APFS.
 
-Native migration 017 stores independent console expectations and an encrypted
+Rotation requires protocol version 2 on both the agent and worker; read-only
+validation remains version 1. Native migration 017 stores independent console expectations and an encrypted
 per-attempt X25519 return key. The old PRK is HPKE-encrypted for the agent's
 protected recipient; a returned candidate is independently HPKE-encrypted for
 the console. The worker can decrypt neither direction. The console reserves
@@ -121,7 +122,7 @@ current-key, escrow and channel checks remain locked through the queue/audit com
 Concurrent duplicate submissions reuse the same queued attempt.
 
 The root Mac agent holds a private OS lease, durably records one immutable intent,
-validates the old key, and invokes a bounded `fdesetup changerecovery` with plist
+including its kernel boot-session UUID, validates the old key, and invokes a bounded `fdesetup changerecovery` with plist
 stdin. Keys never become command arguments, log output or temporary plaintext
 files. It retains a returned candidate even after timeout or a process error,
 validates the candidate when possible, then signs, encrypts and durably saves its
@@ -143,7 +144,14 @@ triggers, including writes by older replicas.
 another mutation and profile removal. Refresh security inventory to obtain native
 escrow, then validate the latest stored key. The registry admits this read-only
 recovery check only after the agent's immutable signed uncertainty receipt proves
-that leased execution ended; deadline expiry alone is insufficient. Only the
+`execution_stopped: true`. A freed parent lease, agent reconnect or elapsed
+deadline does not prove that a launched child stopped. The v2 agent records the
+kernel boot-session UUID at admission and signs this proof after reaping its
+exact command or observing a different kernel boot. During same-boot intent-only
+recovery it waits without repeating the mutation. No reboot is performed
+automatically. Legacy intents or uncertainty receipts without this evidence
+cannot authorize automatic resolution. The console authenticates the stop proof
+before displaying the validation action. Only the
 explicitly selected subsequent `valid` proof, independently accepted by the
 console against its current key and association, resolves the attempt. Invalid,
 unavailable or replaced proofs keep rotation blocked. Resolution retains the
