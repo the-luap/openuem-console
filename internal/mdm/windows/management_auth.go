@@ -138,7 +138,7 @@ func (s *Store) authorizeManagementDevice(ctx context.Context, tx *sql.Tx, certi
 		return nil, ErrManagementIdentity
 	}
 	// Reparse here too: this transaction helper must not trust caller-mutated
-	// x509 fields when it is reused by the future SyncML session service.
+	// x509 fields when it is reused by the SyncML session service.
 	device.certificate, err = x509.ParseCertificate(der)
 	if err != nil {
 		return nil, ErrManagementIdentity

@@ -3,9 +3,10 @@
 The Windows backend now has a direct TLS device identity verifier, bounded
 OMA DM digest primitives and a [SyncML XML codec](native-windows-syncml.md).
 They build on [initial certificate enrollment and
-encrypted provisioning](native-windows-enrollment.md). Durable SyncML sessions,
-nonce transitions, command/result processing and production gateway registration
-remain open. These authentication components do not report a managed device,
+encrypted provisioning](native-windows-enrollment.md). The subsequent
+[session service](native-windows-sessions.md) persists authentication, nonces and
+a read-only probe. Administrative command/result processing and production gateway
+registration remain open. These authentication primitives do not report a managed device,
 create a session or execute a CSP operation.
 
 ## Direct TLS identity
@@ -45,7 +46,7 @@ bootstrap secret. It returns public identity only, with no account/device hints,
 raw certificate, invitation credential or SyncML secret.
 
 The returned `ManagementDeviceIdentity` is a point-in-time result, not a reusable
-authorization token. Future session/command operations must call the private
+authorization token. Session/command operations must call the private
 `authorizeManagementDevice` inside their own transaction and call
 `checkManagementDeviceTime` after any session/audit waits before commit. The
 transaction holds scope and revocation locks throughout the operation. No public
@@ -73,10 +74,9 @@ Whitespace aliases, URL-safe encodings, invalid padding and noncanonical pad bit
 are rejected, and digest comparison uses constant-time equality. Errors are fixed
 English strings without supplied values.
 
-These primitives do not prove a complete authentication exchange. The next
-implementation must persist per-device nonce state, handle bounded resynchronization,
-authenticate the server to the device, distinguish session-level acceptance from
-per-message credentials, and enforce ordered messages with durable exact retries.
+These primitives do not prove a complete authentication exchange. The
+[session service](native-windows-sessions.md) persists per-device nonces, bounded
+resynchronization, server authentication and ordered messages with exact retries.
 The [Windows OMA DM protocol description](https://learn.microsoft.com/en-us/windows/client-management/oma-dm-protocol-support)
 defines the different nonce/credential transitions associated with status 200
 and 212. Those transitions are not inferred from a successful digest comparison.
@@ -101,8 +101,8 @@ bounded digest fuzz step. Both complete workflows pass for management-authentica
 commit `3fa2827`: [push run](https://github.com/the-luap/openuem-console/actions/runs/34400008541)
 and [pull-request run](https://github.com/the-luap/openuem-console/actions/runs/34400012109).
 These runs precede the separate codec change. No profile or certificate is installed on the host;
-no actual Windows enrollment, authenticated SyncML exchange, applied CSP or
-physical acceptance has been performed.
+no physical Windows enrollment, authenticated device exchange, applied CSP or
+hardware acceptance has been performed.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows
@@ -111,7 +111,6 @@ go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=30s -parallel=2 ./internal/md
 
 Set the database environment variable according to the
 [reserved fixture instructions](native-windows-mdm.md#scoped-enrollment-credentials).
-Remaining work includes integration of the bounded SyncML codec with durable session state,
-encrypted secret/nonce access, CSP commands/results, update workflows, enrollment
+Remaining work includes administrative CSP commands/results, update workflows, enrollment
 console and gateway wiring, certificate renewal/unenrollment, key rotation,
 backup/restore and physical Windows acceptance. WIN-02 remains in progress.

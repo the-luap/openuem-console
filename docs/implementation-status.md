@@ -48,7 +48,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
-| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity verification, OMA DM digest primitives and a bounded SyncML XML codec, with protocol/TLS/PostgreSQL/race/fuzz tests; production route not registered | Credential/CA/device console and gateway integration, durable authenticated SyncML sessions/nonces, SyncML/CSP policies/results, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
+| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; production route not registered | Credential/CA/device console and gateway integration, administrative SyncML/CSP policies/results, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
@@ -94,8 +94,9 @@ the table's package summaries do not remove any detail from the roadmap.
   ciphertext tampering and full rollback after audit, cancellation or expiry errors.
   Separate 30-second WSTEP and CSR fuzz runs pass; both complete workflows pass
   for WSTEP commit `be418e8`.
-  SyncML sessions/commands/results, gateway/console workflows, renewal/unenrollment
-  and physical Windows acceptance remain open.
+  The subsequent session implementation is recorded below. Administrative
+  commands/results, gateway/console workflows, renewal/unenrollment and physical
+  Windows acceptance remain open.
 - [Native Windows management authentication](native-windows-management.md) verifies
   the exact enrolled TLS leaf against stored certificate/device scope and a
   private organization root pool. Current revocation, site ownership and database
@@ -104,9 +105,9 @@ the table's package summaries do not remove any detail from the roadmap.
   device identity. Bounded OMA DM digest primitives use independent test vectors
   and constant-time comparison. The full local PostgreSQL/race suite passes in
   27.625 seconds at 90.9% package coverage; vet and 824,941 digest fuzz executions
-  also pass. Durable sessions,
-  nonce transitions, command results, production wiring and physical acceptance
-  remain open; this component does not report a successful management session.
+  also pass. Session and nonce processing is recorded separately below; this
+  identity primitive does not report a successful management session. Administrative
+  command results, production wiring and physical acceptance remain open.
   Both complete workflows pass for management-authentication commit `3fa2827`.
 - [Native Windows SyncML XML](native-windows-syncml.md) adds typed headers,
   commands, status/results, digest challenges, metadata and incomplete-object
@@ -115,8 +116,20 @@ the table's package summaries do not remove any detail from the roadmap.
   Independent XML decoding and payload-preservation fuzz targets verify the codec.
   The full local PostgreSQL/race suite passes in 28.448 seconds at 91.3% coverage,
   with 499,328 message and 202,307 constructed-data fuzz executions passing.
-  Durable authenticated sessions, nonce transitions and actual CSP execution/results
-  remain open. No production management route is registered.
+  Both complete workflows pass for codec commit `a3f5487`. No production
+  management route is registered.
+- [Native Windows SyncML sessions](native-windows-sessions.md) persist separate
+  client/server nonce transitions, ordered exchanges, exact encrypted responses
+  and scoped audit. A read-only DevId probe verifies command/result correlation;
+  session UUIDs in command IDs prevent stale results after wire-session-ID reuse.
+  PostgreSQL tests cover concurrency, restart, challenged authentication, upgrade,
+  scope/revocation, ciphertext corruption and atomic rollback. Real loopback TLS
+  tests verify response framing and revocation on resumed connections. Bounded
+  text chunks validate their declared size before completion. The final local
+  PostgreSQL/race suite passes in 33.144 seconds at 89.4% coverage; vet and 325,599
+  transition fuzz executions pass. Full CI for this session change is pending. Administrative
+  policy/update commands, console/gateway wiring, lifecycle and physical Windows
+  acceptance remain open; exchange completion does not prove policy compliance.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

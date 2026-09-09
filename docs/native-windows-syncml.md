@@ -3,9 +3,10 @@
 `ParseSyncML` and `EncodeSyncML` provide the bounded XML wire format for the
 native Windows management service. They complement [TLS device identity and
 digest verification](native-windows-management.md) and [WSTEP provisioning](native-windows-enrollment.md).
-The durable session service, nonce transitions, command delivery and result
-correlation are still being implemented. A parsed or encoded message alone never
-authenticates a session, updates inventory, executes a command or proves compliance.
+The [durable session service](native-windows-sessions.md) now uses these primitives
+for authentication, nonce transitions and an initial read-only probe. A parsed or
+encoded message alone never authenticates a session, updates inventory, executes
+a command or proves compliance.
 
 ## Representation and message boundaries
 
@@ -98,7 +99,9 @@ group ordering, separate namespaces, independent XML decoding, exact input/data
 limits, output suppression, invalid-character rejection and redacted diagnostics.
 Separate fuzz targets exercise complete messages and byte-for-byte preservation
 of constructed text payloads. CI includes both targets on Linux and portable
-codec tests on native Windows. This change's complete CI evidence is pending.
+codec tests on native Windows. Both complete workflows pass for codec commit
+`a3f5487`: [push](https://github.com/the-luap/openuem-console/actions/runs/34402932832)
+and [pull request](https://github.com/the-luap/openuem-console/actions/runs/34402938583).
 
 The normative references are [OMA DM Representation 1.2](https://www.openmobilealliance.org/release/dm/V1_2-20070209-A/OMA-TS-DM_RepPro-V1_2-20070209-A.pdf)
 and the [SyncML Representation 1.2.2 DTD](https://www.openmobilealliance.org/release/Common/V1_2_2-20090724-A/OMA-TS-SyncML-RepPro-V1_2_2-20090724-A.pdf),
@@ -106,8 +109,9 @@ together with the Windows-specific definitions above. The codec supports the
 configured XML path; it does not advertise WBXML or newer application protocol
 versions. No Windows profile/certificate has been installed on the host, no
 physical SyncML exchange has been accepted, and no production management route
-has been registered. Durable authenticated sessions and CSP execution/results
-remain the next integration work; WIN-02 stays in progress.
+has been registered. The subsequent [session implementation](native-windows-sessions.md)
+records its own evidence. Administrative CSP execution/results and production
+integration remain open; WIN-02 stays in progress.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows
