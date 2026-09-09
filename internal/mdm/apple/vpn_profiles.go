@@ -221,6 +221,9 @@ func validateAlwaysOnStructure(always map[string]any, scope string, d *Device, a
 	if err != nil {
 		return err
 	}
+	if err := validateAlwaysOnExceptions(always, advance); err != nil {
+		return err
+	}
 	for _, key := range []string{"UIToggleEnabled", "AllowCaptiveWebSheet", "AllowAllCaptiveNetworkPlugins"} {
 		if value, exists := always[key]; exists {
 			flag, ok := certificateInteger(value)

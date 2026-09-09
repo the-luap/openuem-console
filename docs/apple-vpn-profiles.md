@@ -59,9 +59,26 @@ required flat fields. Each tunnel now receives IKEv2 authentication, type, versi
 and certificate-reference checks. On iOS/iPadOS 14.2 or later, both IKE and child
 security association Diffie-Hellman groups must be 14 or greater. Omitted child
 settings retain their documented inheritance. The UI-toggle and captive-network
-switches use integer 0/1. Exceptions, routing, additional captive-network settings
-and a complete Always On editor remain open; this does not establish a working
-Always On connection.
+switches use integer 0/1. Routing and a complete Always On editor remain open;
+this does not establish a working Always On connection.
+
+Always On service exceptions accept VoiceMail, AirPrint, CellularServices and
+DeviceCommunication with an explicit Allow/Drop action. CellularServices requires
+iOS/iPadOS 11.3; DeviceCommunication requires 17.4. Application exceptions require
+13.6, including an explicitly empty list. Their optional protocol limit supports
+UDP only. Omitting that limit retains Apple's unrestricted app exception.
+Captive-network plugin entries name an exact app bundle identifier. A specific
+plugin list is validated even when the allow-all switch makes Apple ignore it;
+validation preserves both fields as supplied.
+
+Exception arrays allow zero to 64 dictionaries. OpenUEM requires unique services,
+unique bundle identifiers ignoring case, reverse-DNS bundle identifiers of at
+most 255 bytes, and exactly one UDP entry when a protocol limit is supplied.
+These size, uniqueness and nonempty-limit rules are admission policies. Unsupported
+fields inside exception entries are rejected to catch misspelled routing limits.
+No wildcard identifier, conflicting service action or invalid ignored list is
+accepted, and errors do not echo submitted values. Real traffic exclusions still
+require device testing.
 
 ## IKEv2 authentication and cryptography
 
@@ -103,7 +120,7 @@ macOS 15/iOS 18. The key admission bound is 1–4096 bytes and does not prove th
 server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
 No cryptographic exchange is performed by saving a profile. Complete on-demand
-rules, provider schemas, Always On exceptions, further protocol options
+rules, provider schemas, further protocol options
 and additional console editors remain open.
 
 ## Certificate profile generator
@@ -216,7 +233,19 @@ suites with shared lifecycle, request isolation, time limits and machine-readabl
 results. Its local run passes all 81 cases against the same `e20074e` artifact.
 A disposable fixture with the required VPN algorithm attribute removed fails at
 the expected assertion, returns exit status 1 and saves a failure screenshot.
-The added CI browser step and artifact retention still await their first run.
+Both new CI browser steps at `b41e647` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34380299127) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34380304160).
+The downloaded push artifact records all 81 cases passing on Linux; complete
+protocol/persistence workflows for this test-runner commit remain in progress.
+
+The subsequent Always On exception validator passes isolated tests using 25
+unchanged production/test files (0.454 seconds), including plist preservation,
+iPhone/iPad version boundaries, empty arrays, ambiguous/oversized lists, unsupported
+fields and invalid ignored captive lists. PostgreSQL regression cases cover three
+exception-version upgrades across two assigned devices, atomic rejected revisions
+and restoration, and removal after a malformed encrypted historical payload.
+Full CI for this extension remains pending.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

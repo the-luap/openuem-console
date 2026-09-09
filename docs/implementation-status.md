@@ -68,6 +68,9 @@ the table's package summaries do not remove any detail from the roadmap.
   association parameters, post-quantum settings and removed-algorithm checks.
   Always On applies these checks and local certificate bindings to every flat
   tunnel, including the iOS 14.2 minimum Diffie-Hellman group.
+  The subsequent exception validator checks service actions, app/captive bundle
+  identifiers, UDP limits, duplicate/unknown fields and property versions;
+  isolated tests pass, while its PostgreSQL regression cases await full CI.
   A typed IKEv2 generator copies certificate configurations into System/User
   profiles with local bindings and machine/EAP-TLS authentication. Protected
   composition uses exact encrypted certificate revisions and atomic audit
@@ -78,8 +81,8 @@ the table's package summaries do not remove any detail from the roadmap.
   in Chrome, including scope changes, exact form values, keyboard review,
   reset, reader restrictions and three window widths.
   The [portable browser suites](../tests/browser/README.md) reproduce all 81
-  cases locally and detect an intentionally broken fixture; the newly added
-  automatic CI step is awaiting its first run.
+  cases locally and detect an intentionally broken fixture. Both automatic
+  CI browser steps at `b41e647` pass; their full workflows remain in progress.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend
