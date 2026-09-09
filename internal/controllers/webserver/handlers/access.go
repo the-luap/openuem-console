@@ -47,7 +47,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
-		case "/ios/configurations", "/ios/configurations/history", "/ios/configurations/:id/history":
+		case "/ios/configurations", "/ios/configurations/history", "/ios/configurations/:id/history", "/ios/:id/setup/platform-sso/repairs":
 			return access.ReadProfiles, true
 		case "/ios/:id/applications/previous", "/ios/ade", "/ios/ade/software", "/ios/ade/platform-sso/profiles", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
 			return access.ManageCertificates, true
@@ -57,7 +57,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace":
+		case "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/ios/:id/setup/platform-sso/repair":
 			return access.ManageCertificates, true
 		case "/software/catalog", "/software/catalog/:version/withdraw":
 			return access.ManageSoftware, true

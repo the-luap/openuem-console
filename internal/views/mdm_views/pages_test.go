@@ -238,11 +238,39 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	profileDeleted.CurrentRevision = 0
 	profileMigrated := profileRevision
 	profileMigrated.Origin, profileMigrated.Actor = "migration", ""
+	ssoRequirement := apple.ADEPlatformSSOStatus{ID: "a0000000-0000-4000-8000-000000000032", ProfileID: p.ID, ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileIdentifier: p.Identifier, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: appVersion.Version, ApprovedBy: "Operator <A>", ApprovalReason: "Reviewed <provider> extension", Error: "profile_attention_required", CanRepair: true}
+	ssoState := func(state string) Detail {
+		r := ssoRequirement
+		d := Detail{Device: &appDevice, ADE: &apple.ADEDeviceEnrollment{SetupState: "awaiting"}, ADEPlatformSSO: &r}
+		if state == "verified" {
+			r.ProfileVerified = true
+			r.Error = ""
+			r.ProfileObservedAt = &now
+		}
+		if state == "released" {
+			r.CanRepair = false
+			r.ProfileVerified = true
+			d.ADE.SetupState = "releasing"
+		}
+		if state == "complete" {
+			r.CanRepair = false
+			d.ADE.SetupState = "complete"
+		}
+		return d
+	}
+	ssoRepairs := []apple.ADEPlatformSSORepair{{ID: "a0000000-0000-4000-8000-000000000033", ProfileRevisionID: profileRevision.ID, Actor: "Operator <A>", Reason: "Repair <profile> delivery", CreatedAt: now}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"ade-sso-attention", DeviceDetails(c, info, ssoState("attention")), []string{"Platform SSO setup requirement", "installation needs attention", "Send retained profile revision", "Reviewed &lt;provider&gt; extension", "Profile repair history"}},
+		{"ade-sso-verified", DeviceDetails(c, info, ssoState("verified")), []string{"retained profile revision is verified by current inventory", "Send retained profile revision"}},
+		{"ade-sso-released", DeviceDetails(c, info, ssoState("released")), []string{"Platform SSO setup requirement", "registration starts after release"}},
+		{"ade-sso-complete", DeviceDetails(c, info, ssoState("complete")), []string{"The Mac reported that the MDM setup hold ended", "original enrollment requirement"}},
+		{"ade-sso-reader", DeviceDetails(c, &reader, ssoState("attention")), []string{"Platform SSO setup requirement", "Profile repair history"}},
+		{"ade-sso-history", ADEPlatformSSORepairs(c, &reader, &appDevice, &ssoRequirement, ssoRepairs, ssoRepairs[0].ID), []string{"Platform SSO profile repairs", "Repair &lt;profile&gt; delivery", "Operator &lt;A&gt;", "Older profile repairs"}},
+		{"ade-sso-history-empty", ADEPlatformSSORepairs(c, &reader, &appDevice, &ssoRequirement, nil, ""), []string{"No recorded profile repairs on this page"}},
 		{"profile-history-restore", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileRevision}, profileRevision.ID, true), []string{"Identity &lt;configuration&gt;", "Restore and deploy revision", "Download stored revision", "Older revisions"}},
 		{"profile-history-current", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileRestored}, "", true), []string{"Restored as a new revision", "Restore &lt;approved&gt; identity settings", "Current catalog revision"}},
 		{"profile-history-deleted", ProfileRevisionHistory(c, info, "", []apple.ProfileRevision{profileDeleted}, "", true), []string{"catalog entry was deleted", "Download stored revision", "View this profile's history"}},
@@ -333,6 +361,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "ade-sso-released" || tc.name == "ade-sso-complete" || tc.name == "ade-sso-reader" {
+				if strings.Contains(html, "Send retained profile revision") {
+					t.Fatal("repair exposed after release or without permission")
+				}
+			}
 			if tc.name == "profile-history-current" || tc.name == "profile-history-deleted" || tc.name == "profile-history-reader" || tc.name == "profile-history-empty" {
 				if strings.Contains(html, "Restore and deploy revision") {
 					t.Fatal("unavailable historical restoration is exposed")
