@@ -21,8 +21,12 @@ change when editing a saved profile. A new revision queues current assignments
 on active channels; resuming a paused channel also uses the latest revision.
 
 Installation acknowledgement changes the assignment to **Verifying on device**.
-A subsequent user ProfileList must report the current UUID and `IsManaged` before
-installation is verified. Removal requires a later inventory without that profile
+A subsequent user ProfileList must report the assigned revision's UUID before
+installation is verified. The query must follow the assignment acknowledgement;
+an older retained revision is checked against its own immutable snapshot. Apple's
+[ProfileList schema](https://github.com/apple/device-management/blob/release/mdm/commands/profile.list.yaml)
+does not return `IsManaged` on macOS, so this field is not required. Removal
+requires a later inventory without that profile
 identifier. A stale, duplicated, superseded or different user's response cannot
 verify the assignment. Failed and expired commands can be retried only while they
 still represent current desired state. A retry receives a new command UUID.

@@ -192,7 +192,7 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND profile_id=$2 AND status IN ('queued','sent','not_now')`, d.ID, p.ID); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_profile_assignments(tenant_id,profile_id,device_id,revision,desired) VALUES($1,$2,$3,$4,$5) ON CONFLICT(profile_id,device_id) DO UPDATE SET revision=excluded.revision,desired=excluded.desired,status='pending',error='',updated_at=now()`, d.TenantID, p.ID, d.ID, p.Revision, desired)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_profile_assignments(tenant_id,profile_id,device_id,revision,desired,updated_at) VALUES($1,$2,$3,$4,$5,clock_timestamp()) ON CONFLICT(profile_id,device_id) DO UPDATE SET revision=excluded.revision,desired=excluded.desired,status='pending',error='',updated_at=clock_timestamp()`, d.TenantID, p.ID, d.ID, p.Revision, desired)
 	if err != nil {
 		return err
 	}

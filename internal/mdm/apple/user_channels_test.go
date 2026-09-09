@@ -391,7 +391,7 @@ func TestMacUserProfileRevisionAndLateResponses(t *testing.T) {
 		t.Fatal("stale profile inventory used", list, kind)
 	}
 	ack := userReply(d, u, "Acknowledged", list)
-	ack["ProfileList"] = []any{map[string]any{"PayloadIdentifier": p.Identifier, "PayloadUUID": strings.ToUpper(p.UUID), "IsManaged": true}}
+	ack["ProfileList"] = []any{map[string]any{"PayloadIdentifier": p.Identifier, "PayloadUUID": strings.ToUpper(p.UUID)}}
 	userCommand(t, s, d, u, ack)
 	assignments, err := s.UserAssignments(t.Context(), scope, d.ID, u.ID)
 	if err != nil || len(assignments) != 1 || assignments[0].Status != "verified" {

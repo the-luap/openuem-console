@@ -37,7 +37,7 @@ func (s *Store) enqueue(ctx context.Context, tx *sql.Tx, d *Device, kind string,
 	if err != nil {
 		return "", err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_commands(id,tenant_id,device_id,request_type,payload,profile_id,profile_revision) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, d.TenantID, d.ID, kind, data, profileID, revision)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_commands(id,tenant_id,device_id,request_type,payload,profile_id,profile_revision,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp())`, id, d.TenantID, d.ID, kind, data, profileID, revision)
 	if err != nil {
 		return "", err
 	}
@@ -385,7 +385,8 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 		var binding, filevault, recoveryLock, adeSetup, macAdmin, managedApp bool
 		var profileID sql.NullString
 		var revision sql.NullInt64
-		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock,ade_setup,mac_admin,managed_app FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock, &adeSetup, &macAdmin, &managedApp)
+		var created time.Time
+		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock,ade_setup,mac_admin,managed_app,created_at FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock, &adeSetup, &macAdmin, &managedApp, &created)
 		if err != nil {
 			return nil, notFound(err)
 		}
@@ -487,7 +488,7 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 				}
 			}
 			if status == "Acknowledged" {
-				if err = s.ingestInventory(ctx, tx, current, kind, message); err != nil {
+				if err = s.ingestInventory(ctx, tx, current, kind, created, message); err != nil {
 					return nil, err
 				}
 			}
@@ -514,7 +515,7 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 				if next == "not_now" {
 					assignmentStatus = "deferred"
 				}
-				_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status=$1,error=$2,updated_at=now() WHERE device_id=$3 AND profile_id=$4 AND revision=$5`, assignmentStatus, detail, current.ID, profileID.String, revision.Int64)
+				_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status=$1,error=$2,updated_at=clock_timestamp() WHERE device_id=$3 AND profile_id=$4 AND revision=$5`, assignmentStatus, detail, current.ID, profileID.String, revision.Int64)
 				if err != nil {
 					return nil, err
 				}
@@ -626,7 +627,7 @@ func decodePlistValue(value any, target any) error {
 	return err
 }
 
-func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind string, message map[string]any) error {
+func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind string, created time.Time, message map[string]any) error {
 	switch kind {
 	case "DeviceInformation":
 		info, ok := message["QueryResponses"].(map[string]any)
@@ -726,7 +727,7 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 				return err
 			}
 		}
-		return s.verifyProfiles(ctx, tx, d, profiles)
+		return s.verifyProfiles(ctx, tx, d, created, profiles)
 	case "AvailableOSUpdates":
 		v, ok := message["AvailableOSUpdates"]
 		if !ok {
@@ -742,8 +743,11 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 	return nil
 }
 
-func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, installed []InstalledProfile) error {
-	rows, err := tx.QueryContext(ctx, `SELECT a.profile_id,a.desired,p.identifier,p.payload_uuid FROM mdm_apple_profile_assignments a JOIN mdm_apple_profiles p ON p.id=a.profile_id WHERE a.device_id=$1 AND a.revision=p.revision AND a.status IN ('verifying','verified','missing')`, d.ID)
+func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, created time.Time, installed []InstalledProfile) error {
+	// An older catalog revision can remain assigned. Only its retained identity
+	// and an inventory request created after the latest assignment result can
+	// verify that state; a delayed pre-installation report is not evidence.
+	rows, err := tx.QueryContext(ctx, `SELECT a.profile_id,a.desired,p.identifier,p.payload_uuid FROM mdm_apple_profile_assignments a JOIN mdm_apple_profile_revisions p ON p.tenant_id=a.tenant_id AND p.profile_id=a.profile_id AND p.revision=a.revision WHERE a.device_id=$1 AND a.tenant_id=$2 AND a.status IN ('verifying','verified','missing') AND a.updated_at<=$3`, d.ID, d.TenantID, created)
 	if err != nil {
 		return err
 	}
@@ -759,7 +763,7 @@ func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, insta
 		for _, p := range installed {
 			if p.Identifier == identifier {
 				present = true
-				exact = p.UUID == profileUUID
+				exact = strings.EqualFold(p.UUID, profileUUID)
 			}
 		}
 		status := "missing"
@@ -774,7 +778,7 @@ func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, insta
 		return err
 	}
 	for _, r := range results {
-		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status=$1,error='',updated_at=now() WHERE device_id=$2 AND profile_id=$3`, r.status, d.ID, r.id); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status=$1,error='',updated_at=clock_timestamp() WHERE device_id=$2 AND profile_id=$3`, r.status, d.ID, r.id); err != nil {
 			return err
 		}
 	}

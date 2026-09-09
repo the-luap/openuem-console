@@ -243,7 +243,7 @@ func (s *Store) ingestUserProfiles(ctx context.Context, tx *sql.Tx, u *UserChann
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_users SET installed_profiles=$2,profiles_at=clock_timestamp(),next_inventory_at=clock_timestamp()+interval '6 hours' WHERE id=$1`, u.ID, data); err != nil {
 		return err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT a.profile_id,a.desired,p.identifier,p.payload_uuid FROM mdm_apple_user_assignments a JOIN mdm_apple_profiles p ON p.id=a.profile_id WHERE a.user_channel_id=$1 AND a.revision=p.revision AND a.status IN ('verifying','verified','drifted') AND a.updated_at<=$2`, u.ID, created)
+	rows, err := tx.QueryContext(ctx, `SELECT a.profile_id,a.desired,p.identifier,p.payload_uuid FROM mdm_apple_user_assignments a JOIN mdm_apple_profile_revisions p ON p.tenant_id=a.tenant_id AND p.profile_id=a.profile_id AND p.revision=a.revision WHERE a.user_channel_id=$1 AND a.tenant_id=$3 AND a.status IN ('verifying','verified','drifted') AND a.updated_at<=$2`, u.ID, created, u.TenantID)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,9 @@ func (s *Store) ingestUserProfiles(ctx context.Context, tx *sql.Tx, u *UserChann
 		for _, p := range profiles {
 			if p.Identifier == identifier {
 				present = true
-				exact = p.Managed && strings.EqualFold(p.UUID, profileUUID)
+				// Apple's ProfileList schema does not return IsManaged on macOS.
+				// The acknowledged assignment and exact UUID establish this match.
+				exact = strings.EqualFold(p.UUID, profileUUID)
 			}
 		}
 		status := "drifted"
