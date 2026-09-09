@@ -1,11 +1,10 @@
 # Managed Mac applications
 
-Implementation is in progress. The native backend now has an approved artifact
-catalog and a device-channel installation/removal lifecycle. Console approval,
-assignment and paginated history workflows are implemented, with their full CI
-and browser checks in progress. The complete acceptance matrix, ADE application
-prerequisites and Platform SSO integration are still being implemented. This is not yet a completed software
-distribution or self-service feature.
+Native macOS PKG distribution includes an approved artifact catalog, scoped
+installation/removal, device observations and console operation history.
+Automated protocol, database, route and browser checks pass. ADE application
+prerequisites, Platform SSO, declarative app management, unified platform adapters,
+Apps & Books, self-service and physical-device acceptance remain roadmap work.
 
 ## Approved artifacts
 
@@ -59,7 +58,8 @@ After one day without verification, an accepted operation becomes uncertain even
 when the Mac sends no observations. Status queries continue; new mutations remain
 blocked. Fresh reports can subsequently establish the requested state.
 Old terminal replies cannot reverse a newer operation. Queued/deferred operations
-can be cancelled even when device inventory is stale; cancellation does not claim that an accepted installer stopped.
+can be cancelled even when device inventory is stale; cancellation does not claim
+that an accepted installer stopped.
 Checkout stops management and preserves attempt history and uncertain outcomes.
 
 ## Console workflows
@@ -68,8 +68,8 @@ Open **Approved software** from device management to publish or inspect revision
 Publishing and permanent withdrawal are organization-level actions; scoped
 operators can search by name or serial number, select a compatible Mac and request
 an approved revision. Device selection reads at most 101 small metadata records
-per page and escapes search wildcards; it does not load full device inventories. Publishing,
-installation and removal require explicit confirmation and a valid CSRF token.
+per page and escapes search wildcards; it does not load full device inventories.
+Publishing, installation and removal require explicit confirmation and a valid CSRF token.
 The server rejects duplicate form fields, query-based mutation input and unapproved
 command or download parameters. Download credentials never appear on read pages.
 
@@ -82,28 +82,37 @@ enrollments retain history. Catalog and history pages use scoped bounded cursors
 
 ## Validation status
 
-Local protocol tests cover package validation, pinned manifests, management
-options, credential exclusion and conservative observation parsing. URL fuzzing
-completed 183,084 inputs. All 26 actual Apple migrations and all 59 SQL statements
-in the application backend and console reads passed an isolated PostgreSQL migration and
-parameter-inference check. These checks roll back their temporary schema.
+Both complete CI runs for `3bfc0c9` passed all four jobs:
+[push validation](https://github.com/the-luap/openuem-console/actions/runs/34319452738)
+and [pull request validation](https://github.com/the-luap/openuem-console/actions/runs/34319456432).
+They include Linux and Windows builds, native Windows protocol checks, PostgreSQL
+and race tests, scoped console routes, response privacy, gateway/authentication,
+existing deployment/SMTP models and desktop service regressions. The native Apple
+suite completed in 488.929 seconds and console route tests in 10.703 seconds in
+the pull request run.
 
-PostgreSQL integration tests exercise catalog authorization, immutable approvals,
-withdrawal, pagination, failed-audit rollback, installation/observation/removal,
-late responses, concurrent requests, scope and checkout. The initial backend commit `b0c90af` passed both complete CI runs, including Linux
-and Windows builds, native Windows protocol checks and PostgreSQL/race tests.
-The subsequent console/history/timeout changes add route authorization, CSRF,
-stale-inventory cancellation, read isolation and missing-report recovery tests;
-their complete CI is pending. The initial console commit `7777f5a` passed
-39 synthetic browser checks across 13 states at 390, 768 and 1440 pixels, including
-keyboard confirmation, scoped reader controls and horizontal overflow. The
-bounded device search at `f48f2c0` also passed all 39 browser checks, including GET
-search submission and cursor navigation. The `7777f5a` PostgreSQL native Apple
-suite passed in 499.212 seconds; its route test identified the shared renderer
-weakening endpoint `no-store` to `no-cache`. The renderer now preserves explicit
-cache policies, with a reproducing regression test covering all eight rendering
-helpers. Complete CI for that fix and the added negative tests is still pending. Actual signed-package
-installation on an explicitly authorized Mac remains open.
+Integration cases cover immutable approvals, withdrawal before delivery,
+transactional authorization and audit rollback, concurrent requests, exact-version
+verification, removal, deferred delivery, late responses, missing-report timeout
+and recovery, malformed response redaction, stale-inventory cancellation, scoped
+readers, strict mutation forms and checkout. Pagination tests include 103 attempts
+with equal historical timestamps and 102 matching devices, plus literal wildcard
+searches and site isolation. All eight shared HTML render helpers preserve an
+endpoint's explicit cache policy, including `no-store`.
+
+Local protocol tests cover pinned manifests, management options, credential
+exclusion and conservative observation parsing. URL fuzzing completed 183,084
+inputs. All 26 actual Apple migrations and all 59 application SQL statements
+passed an isolated PostgreSQL migration and parameter-inference check; the
+temporary schema was rolled back.
+
+Browser acceptance passed 39 checks across 13 states at 390, 768 and 1440 pixels,
+including keyboard confirmation, GET device search, cursor links, reader controls,
+unknown outcomes and horizontal overflow. Screenshots were inspected. The final
+browser fixtures came from `f48f2c0`; templates and styles were unchanged through
+`3bfc0c9`, whose route tests also cover the subsequent HTTP cache-policy fix.
+
+Actual signed-package installation on an explicitly authorized Mac remains open.
 No package is downloaded or executed by these synthetic tests.
 
 ## Platform references
