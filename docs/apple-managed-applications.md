@@ -2,9 +2,12 @@
 
 Native macOS PKG distribution includes an approved artifact catalog, scoped
 installation/removal, device observations and console operation history.
-Automated protocol, database, route and browser checks pass. ADE application
-prerequisites, Platform SSO, declarative app management, unified platform adapters,
-Apps & Books, self-service and physical-device acceptance remain roadmap work.
+Automated protocol, database, route and browser checks pass. See the separate
+[ADE application prerequisites](apple-ade-required-applications.md) and
+[cross-enrollment operation recovery](apple-application-reenrollment.md) milestones.
+Unattended Platform SSO integration, declarative app management, unified platform
+adapters, Apps & Books, self-service and physical-device acceptance remain roadmap
+work.
 
 ## Approved artifacts
 
@@ -61,6 +64,10 @@ Old terminal replies cannot reverse a newer operation. Queued/deferred operation
 can be cancelled even when device inventory is stale; cancellation does not claim
 that an accepted installer stopped.
 Checkout stops management and preserves attempt history and uncertain outcomes.
+The same package remains blocked across replacement enrollments of that Mac.
+An organization administrator can record explicit
+[stopping evidence](apple-application-reenrollment.md) for a retired attempt;
+the receipt does not rewrite its unknown outcome or prove installation success.
 
 ## Console workflows
 
@@ -127,5 +134,6 @@ No package is downloaded or executed by these synthetic tests.
 Declarative management is the preferred subsequent macOS 26 path. A Mac custom
 package needs a separate package declaration and app management by composed
 identifier; `AppManaged.ManifestURL` is not supported on macOS. Apps & Books
-licensing, DDM configuration/status composition, provider registration and verified
-ADE setup prerequisites remain part of the original roadmap.
+licensing, DDM configuration/status composition, provider registration and the
+additional unattended Platform SSO prerequisites remain part of the original
+roadmap.

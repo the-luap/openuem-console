@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Mac application reenrollment recovery](apple-application-reenrollment.md) now
+  guards creation and delivery across earlier enrollment identities, retains
+  immutable per-attempt stopping evidence, exposes scoped/organization review
+  views and resumes ADE prerequisites without treating the receipt as installation
+  success. All 28 migrations, 164 prepared production SQL statements, actual
+  recovery-trigger execution and 12 responsive browser scenarios pass. Complete
+  push and PR CI pass at `9e898d6`; physical stopping/reenrollment acceptance remains
+  open.
+
 - [Platform SSO profiles](apple-platform-sso.md) now have a typed Mac editor,
   encrypted registration-token storage, bounded provider data, shared editor and
   upload validation, and platform/MDM approval checks for assignment. Console and
@@ -74,8 +83,8 @@ the table's package summaries do not remove any detail from the roadmap.
   that gate setup release, a bounded searchable console picker, and explicit
   per-device revision correction retaining original intent and change history.
   Migration/preparation, console, native protocol and 18 browser scenarios pass.
-  Physical acceptance, cross-enrollment installer recovery and the additional
-  Platform SSO sequence remain open.
+  Cross-enrollment installer recovery is covered by the separate milestone above.
+  Physical acceptance and the additional Platform SSO sequence remain open.
 
 - [Managed Mac applications](apple-managed-applications.md) now have an approved
   immutable artifact catalog, native installation/removal and scoped console
@@ -83,9 +92,9 @@ the table's package summaries do not remove any detail from the roadmap.
   distinct from observed managed state and exact app version. Unknown outcomes
   block further mutations; source credentials remain encrypted and absent from
   read pages. Both complete CI runs at `3bfc0c9` passed, as did 39 browser checks,
-  URL fuzzing and actual-schema SQL checks. Physical acceptance, ADE application
-  prerequisites, unified platform adapters, Apps & Books, DDM applications and
-  Platform SSO integration remain open.
+  URL fuzzing and actual-schema SQL checks. ADE application prerequisites have
+  their own subsequent milestone above. Physical acceptance, unified platform
+  adapters, Apps & Books, DDM applications and Platform SSO integration remain open.
 
 - [ADE enrollment protocol primitives](apple-automated-enrollment.md#enrollment-protocol-primitives)
   add bounded profile definition/retrieval, per-device assignment/removal outcomes

@@ -86,8 +86,10 @@ change at `45441e6` was rerun against all 18 scenarios, including focus followin
 the selected revision and descriptive screen-reader button labels.
 
 Synthetic tests do not install packages or configure real Apple devices.
-Installer ambiguity across retired and replacement enrollments still needs
-explicit recovery and lifecycle coverage before reenrollment acceptance.
+Installer ambiguity across retired and replacement enrollments now has explicit
+[stopping-evidence recovery](apple-application-reenrollment.md), with a named ADE
+waiting state and resumed exact-version verification. Physical reenrollment
+acceptance remains open.
 Unattended Platform SSO additionally requires its extension app and SSO profile
 before `DeviceConfigured`; provider registration begins after that command.
 [Apple's unattended Platform SSO sequence](https://developer.apple.com/documentation/devicemanagement/implementing-platform-sso-for-unattended-device-enrollment)
