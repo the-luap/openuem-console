@@ -56,6 +56,8 @@ jobs:
         run: go test -race -count=1 ./internal/mdm/windows
       - name: Bounded Windows discovery parser fuzzing
         run: go test -run '^$' -fuzz=FuzzDiscovery -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows enrollment policy parser fuzzing
+        run: go test -run '^$' -fuzz=FuzzPolicyRequest -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - run: go tool templ generate
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views

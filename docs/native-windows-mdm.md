@@ -3,8 +3,8 @@
 WIN-02 is in progress. The first native protocol component is discovery in
 [`internal/mdm/windows`](../internal/mdm/windows). It is separate from the existing
 OpenUEM agent. The package currently contains a bounded SOAP/XML decoder, a
-discovery response builder and an immutable HTTPS discovery handler. It is not
-registered in a production listener or gateway.
+discovery response builder, an immutable HTTPS discovery handler and an OnPremise
+XCEP request decoder. It is not registered in a production listener or gateway.
 
 This does not yet enroll Windows, issue a device certificate or apply a CSP.
 Authenticated XCEP/WSTEP enrollment, durable scoped identities, provisioning,
@@ -72,6 +72,7 @@ Run the self-contained package without a database or device:
 ```sh
 go test -race -count=1 ./internal/mdm/windows
 go test -run '^$' -fuzz=FuzzDiscovery -fuzztime=30s -parallel=2 ./internal/mdm/windows
+go test -run '^$' -fuzz=FuzzPolicyRequest -fuzztime=30s -parallel=2 ./internal/mdm/windows
 ```
 
 Tests use synthetic accounts and local TLS servers. They cover wire namespaces,
@@ -81,7 +82,8 @@ exact body limits, complete HTTP/1.1 responses, SOAP faults, read-only probes an
 Go's standard namespace resolver. No certificate is issued or installed, no
 Windows account/settings are changed and no external enrollment service is used.
 
-Local race tests pass with 97.0% statement coverage. An initial 30-second parser
+The discovery-only local race baseline passes with 97.0% statement coverage.
+An initial 30-second parser
 fuzz run completed 1,380,623 executions without a failure; the subsequent final
 race run also covers literal whitespace outside the root and bracketed-host
 rejections added during review. The existing CI workflow now includes this package on
@@ -89,12 +91,51 @@ Linux with race detection and on native Windows, plus a bounded Linux fuzz run.
 Those added workflow steps are not remote execution evidence until their runs
 complete. Physical Windows enrollment has not been tested.
 
+## OnPremise certificate policy request
+
+`ParsePolicyRequest` parses the MS-MDE2 variant of XCEP `GetPolicies`. It checks
+the SOAP action and configured destination, the `client` fields `lastUpdate` and
+`preferredLanguage`, and `requestFilter`. All three fields must carry a true
+`xsi:nil` marker as specified for this enrollment flow. General XCEP policy
+queries are not accepted through this decoder.
+
+Exactly one WS-Security `UsernameToken` is accepted. It requires one username,
+one `PasswordText` password and a bounded XML-name `u:Id` label. The published
+fixed token label is accepted; an alternative label cannot establish authority
+or replay protection. Both qualified `wsse:Type` from Microsoft's examples and
+unqualified `Type` are recognized, while duplicate or conflicting attributes
+are rejected. Additional authentication mechanisms, signatures and timestamps
+are rejected by this OnPremise decoder; they cannot silently become password
+authentication. Federated and certificate-authentication flows remain separate
+unfinished work.
+
+Passwords retain their exact decoded XML text, including leading and trailing
+whitespace. XML entity and line-ending processing still applies. Usernames are
+bounded to 512 bytes and passwords to 1,024 bytes; these are OpenUEM admission
+limits. Returned credential objects redact their default Go formatting and omit
+their username/password fields from JSON/XML/YAML serialization. Callers must
+still never log individual fields or the original SOAP request.
+
+This decoder does not validate a password or return an enrollment policy.
+A durable organization/site-scoped credential store must authorize policy
+retrieval. Certificate issuance must recheck the credential, current permissions,
+expiry/revocation and CSR binding in its own transaction; a previously parsed
+request or successful policy lookup must not authorize later issuance.
+
+Synthetic tests cover the published message shape, namespace variants, nil
+markers, credential ambiguity, unsupported authentication, field/body limits,
+exact password handling and formatting privacy. The combined local package race
+run passes with 97.6% statement coverage; a 30-second policy parser fuzz run
+completed 155,226 executions without a failure. The CI
+package test includes these cases and has an additional bounded policy fuzz step;
+execution evidence is recorded separately from merely editing the workflow.
+
 ## Sources
 
 The protocol grammar is based on Microsoft's
 [MS-MDE2 specification](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/4d7eadd5-3951-4f1c-8159-c39e07cbe692),
 current PDF version **20260811**, released **August 11, 2026**, sections
-3.1.4.1 and 4.1. The downloaded PDF SHA-256 is
+3.1.4.1, 3.3.4.1.1.1.3, 4.1 and 4.2.1.3. The downloaded PDF SHA-256 is
 `2beb94ede0ad88d1f15df7cd1f9065cfd263acb4d7773d408e7bd07ccece0660`.
 Do not confuse this release with the older date shown by cached landing-page
 tables. Microsoft's
