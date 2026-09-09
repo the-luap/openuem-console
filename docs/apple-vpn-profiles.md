@@ -53,9 +53,15 @@ with iOS/iPadOS 8 or later and reported supervision. OpenUEM additionally requir
 device inventory from the preceding 24 hours and rejects future timestamps.
 Tunnel configuration arrays contain 1–64 dictionaries selecting IKEv2. Optional
 interfaces select WiFi, Cellular or both, without duplicate entries. The count is
-an OpenUEM admission bound. Nested tunnel authentication and certificate references,
-exceptions, routing, captive networking and a complete Always On editor remain
-open; this change does not establish a working Always On connection.
+an OpenUEM admission bound. IKEv2 fields reside directly in each tunnel, alongside
+`ProtocolType` and `Interfaces`; a nested `IKEv2` dictionary cannot replace the
+required flat fields. Each tunnel now receives IKEv2 authentication, type, version
+and certificate-reference checks. On iOS/iPadOS 14.2 or later, both IKE and child
+security association Diffie-Hellman groups must be 14 or greater. Omitted child
+settings retain their documented inheritance. The UI-toggle and captive-network
+switches use integer 0/1. Exceptions, routing, additional captive-network settings
+and a complete Always On editor remain open; this does not establish a working
+Always On connection.
 
 ## IKEv2 authentication and cryptography
 
@@ -97,7 +103,7 @@ macOS 15/iOS 18. The key admission bound is 1–4096 bytes and does not prove th
 server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
 No cryptographic exchange is performed by saving a profile. Complete on-demand
-rules, provider schemas, Always On tunnel dictionaries, further protocol options
+rules, provider schemas, Always On exceptions, further protocol options
 and a certificate composer/editor remain open.
 
 ## Validation evidence
@@ -118,6 +124,19 @@ post-quantum parameters, strict selection, child inheritance and removed
 algorithms. PostgreSQL regression cases add eight System/User property upgrades,
 failed revision rollback, modern replacements and rejected legacy restoration.
 Full CI for this extension is pending.
+
+The Always On extension also passes isolated tests for multiple flat tunnels,
+identity types and ambiguity, malformed structures, integer switches, nested TLS
+versions and the iOS 14.2 group boundary. PostgreSQL cases cover a retained
+legacy group, its modern replacement, rejected restoration without command or
+history changes, and removal after an invalid historical reference. Their full CI
+is pending.
+
+The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
+2019-03-25, page 103, preserved as an
+[archived Apple PDF](https://raw.githubusercontent.com/ProfileCreator/Configuration-Profile-Reference/8f17394e05c3e58282ed5197e8fc230215b756c4/pdf/Configuration-Profile-Reference-2019-03-25.pdf).
+The current Apple schema lists the tunnel protocol/interfaces but omits the
+inherited IKEv2 fields; the historical primary document provides that detail.
 
 Sources: [Apple VPN schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.vpn.managed.yaml),
 [Apple App-Layer schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.vpn.managed.applayer.yaml),

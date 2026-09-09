@@ -67,6 +67,19 @@ func validateProfileCertificateReferences(root map[string]any) error {
 					}
 				}
 			}
+			if value, exists := payload["AlwaysOn"]; exists {
+				tunnels, err := vpnAlwaysOnTunnels(value)
+				if err != nil {
+					return err
+				}
+				for _, tunnel := range tunnels {
+					if reference, exists := tunnel["PayloadCertificateUUID"]; exists {
+						if err := resolve(reference, true); err != nil {
+							return err
+						}
+					}
+				}
+			}
 			continue
 		}
 		if stringValue(payload, "PayloadType") != "com.apple.wifi.managed" {

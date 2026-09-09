@@ -21,7 +21,7 @@ func vpnSettings(protocol string) map[string]any {
 		p[protocol] = map[string]any{"RemoteAddress": "vpn.example.test", "LocalIdentifier": "device.example.test", "RemoteIdentifier": "vpn.example.test", "AuthenticationMethod": "Certificate"}
 	}
 	if protocol == "AlwaysOn" {
-		p[protocol] = map[string]any{"TunnelConfigurations": []any{map[string]any{"ProtocolType": "IKEv2", "Interfaces": []any{"WiFi", "Cellular"}}}}
+		p[protocol] = map[string]any{"TunnelConfigurations": []any{map[string]any{"ProtocolType": "IKEv2", "Interfaces": []any{"WiFi", "Cellular"}, "RemoteAddress": "vpn.example.test", "LocalIdentifier": "device.example.test", "RemoteIdentifier": "vpn.example.test", "AuthenticationMethod": "Certificate"}}}
 	}
 	return p
 }

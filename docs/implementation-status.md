@@ -66,6 +66,8 @@ the table's package summaries do not remove any detail from the roadmap.
   transparent proxy Mac versions and fresh mobile supervision for Always On.
   IKEv2 adds authentication, TLS/integer types, property versions, security
   association parameters, post-quantum settings and removed-algorithm checks.
+  Always On applies these checks and local certificate bindings to every flat
+  tunnel, including the iOS 14.2 minimum Diffie-Hellman group.
   Isolated production tests pass; PostgreSQL and full CI execution are pending.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
@@ -73,7 +75,7 @@ the table's package summaries do not remove any detail from the roadmap.
   local identity binding checks to regular/App-Layer VPN, IPsec, IKEv2 and
   transparent proxy configurations. Isolated tests and both full workflows pass,
   including 14 System/User PostgreSQL variants. The subsequent DNS reference
-  extension is pending in full CI. Complete VPN templates, Always On references and physical tunnel
+  and Always On extensions are pending in full CI. Complete VPN templates and physical tunnel
   acceptance remain open.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks

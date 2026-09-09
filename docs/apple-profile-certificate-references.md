@@ -15,8 +15,10 @@ checks for `PayloadCertificateUUID` inside their `VPN`, `IPSec`, `IKEv2` and
 Each present configuration must be a dictionary, and each
 present identity reference must identify a local identity payload. A VPN without
 such a reference does not acquire a new certificate requirement. This extension
-does not validate every VPN setting, require an identity for every authentication
-mode, or cover nested Always On tunnel configurations yet. App-Layer VPN's
+does not validate every VPN setting or require an identity for every authentication
+mode. Each Always On tunnel's flat `PayloadCertificateUUID` receives the same
+binding check; a valid first tunnel cannot mask an invalid later tunnel.
+App-Layer VPN's
 `VPNUUID` identifies the connection and does not replace a local certificate
 payload UUID. The reference check does not establish per-app mapping or provider
 installation.
@@ -76,7 +78,11 @@ The subsequent DNS extension adds four System/User and regular/App-Layer variant
 its full CI execution is pending. DNS references resolve independently of the
 tunnel identity, and a valid tunnel identity cannot mask an invalid resolver
 identity. [VPN target and DNS validation](apple-vpn-profiles.md) adds property
-version and configuration checks. No VPN client/provider or
+version and configuration checks. The subsequent Always On extension passes
+isolated flat-tunnel binding tests for all four identity types, ambiguous UUIDs,
+multiple tunnels and malformed structures. PostgreSQL cases cover rejected
+uploads/revisions, legacy reference checks and removal; their full CI is pending.
+No VPN client/provider or
 physical tunnel authentication has been exercised by these tests.
 
 References: [Apple Wi-Fi payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.wifi.managed.yaml),

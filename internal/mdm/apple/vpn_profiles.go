@@ -95,7 +95,7 @@ func validateVPNPayload(payload map[string]any, scope string, d *Device) error {
 			return errors.New("Always On VPN requires a System device profile")
 		}
 		advance("10.7", "8.0")
-		if err := validateAlwaysOnStructure(payload["AlwaysOn"].(map[string]any)); err != nil {
+		if err := validateAlwaysOnStructure(payload["AlwaysOn"].(map[string]any), scope, d, advance); err != nil {
 			return err
 		}
 	}
@@ -196,15 +196,58 @@ func validateVPNDNS(dns map[string]any, advance func(string, string)) error {
 	return nil
 }
 
-func validateAlwaysOnStructure(always map[string]any) error {
-	tunnels, ok := always["TunnelConfigurations"].([]any)
-	if !ok || len(tunnels) == 0 || len(tunnels) > 64 {
-		return errors.New("Always On VPN requires 1 to 64 tunnel dictionaries")
+func vpnAlwaysOnTunnels(value any) ([]map[string]any, error) {
+	always, ok := value.(map[string]any)
+	if !ok {
+		return nil, errors.New("Always On VPN configuration must be a dictionary")
 	}
-	for _, value := range tunnels {
-		tunnel, ok := value.(map[string]any)
-		if !ok || stringValue(tunnel, "ProtocolType") != "IKEv2" {
+	items, ok := always["TunnelConfigurations"].([]any)
+	if !ok || len(items) == 0 || len(items) > 64 {
+		return nil, errors.New("Always On VPN requires 1 to 64 tunnel dictionaries")
+	}
+	tunnels := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		tunnel, ok := item.(map[string]any)
+		if !ok {
+			return nil, errors.New("Always On VPN tunnels must be dictionaries")
+		}
+		tunnels = append(tunnels, tunnel)
+	}
+	return tunnels, nil
+}
+
+func validateAlwaysOnStructure(always map[string]any, scope string, d *Device, advance func(string, string)) error {
+	tunnels, err := vpnAlwaysOnTunnels(always)
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"UIToggleEnabled", "AllowCaptiveWebSheet", "AllowAllCaptiveNetworkPlugins"} {
+		if value, exists := always[key]; exists {
+			flag, ok := certificateInteger(value)
+			if !ok || flag > 1 {
+				return errors.New("Always On VPN switches must be integer 0 or 1")
+			}
+		}
+	}
+	for _, tunnel := range tunnels {
+		if stringValue(tunnel, "ProtocolType") != "IKEv2" {
 			return errors.New("each Always On tunnel must select IKEv2")
+		}
+		// Apple's Configuration Profile Reference places IKEv2 settings
+		// directly in each tunnel, alongside ProtocolType and Interfaces.
+		if err := validateIKEv2Configuration(tunnel, scope, d, advance); err != nil {
+			return err
+		}
+		if d != nil && (d.Family() == PlatformIOS || d.Family() == PlatformIPadOS) && versionPattern.MatchString(d.OSVersion) && CompareVersions(d.OSVersion, "14.2") >= 0 {
+			for _, key := range []string{"IKESecurityAssociationParameters", "ChildSecurityAssociationParameters"} {
+				sa, _ := tunnel[key].(map[string]any)
+				if value, exists := sa["DiffieHellmanGroup"]; exists {
+					group, _ := certificateInteger(value)
+					if group < 14 {
+						return errors.New("Always On VPN requires Diffie-Hellman group 14 or greater on iOS/iPadOS 14.2 and later")
+					}
+				}
+			}
 		}
 		if value, exists := tunnel["Interfaces"]; exists {
 			interfaces, ok := value.([]any)
