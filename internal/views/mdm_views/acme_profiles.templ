@@ -20,7 +20,7 @@ templ ACMEEditor(info *partials.CommonInfo) {
 			<label>Key size in bits<input class="uk-input" type="number" name="key_size" min="192" max="4096" step="1" value="256" required/></label>
 			<p>Elliptic curve keys support 192, 256, 384 or 521 bits. RSA supports 1024–4096 bits in multiples of 8; choose a size approved by your issuer. Hardware-bound keys require elliptic curve with 256 or 384 bits.</p>
 			<label>Hardware-bound key<select class="uk-select" name="hardware_bound" required><option value="false">No hardware binding</option><option value="true">Require hardware binding</option></select></label>
-			<p>On a Mac, hardware binding requires macOS 14 or later and fresh inventory identifying Apple silicon or a supported T2 model.</p>
+			<p>On a Mac, hardware binding requires macOS 14 or later and fresh inventory identifying Apple silicon or a supported T2 model. Hardware-bound private keys cannot be exported, regardless of the key export option.</p>
 			<label>Request device attestation<select class="uk-select" name="attest"><option value="">Keep default</option><option value="false">Do not request attestation</option><option value="true">Request attestation</option></select></label>
 			<p>Attestation requires a hardware-bound key. T2 Macs ignore this request, and older iPhone/iPad hardware may also ignore it. Your issuer must enforce and verify its own attestation policy.</p>
 			<label>Subject attributes<textarea class="uk-textarea" name="subject" rows="4" maxlength="16384" placeholder="O=Company&#10;CN=Device identity"></textarea></label>

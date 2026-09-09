@@ -64,8 +64,8 @@ the table's package summaries do not remove any detail from the roadmap.
 - [ACME certificate profiles](apple-acme-profiles.md) add typed issuer, identity,
   hardware and key settings, durable encrypted client ownership across profile
   removal/deletion, and protected review of historical archive gaps. Parser and
-  schema checks pass; native transaction, scoped console and browser acceptance
-  are pending for this change. Issuance, renewal and attestation still require
+  schema checks, builds and 36 actual browser cases pass. Native transaction and
+  scoped console CI remain pending. Issuance, renewal and attestation still require
   the intended issuer and physical-device acceptance.
 
 - [PKCS12 identity profiles](apple-pkcs12-profiles.md) add bounded archive uploads,

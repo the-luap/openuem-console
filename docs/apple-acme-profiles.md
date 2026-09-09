@@ -31,7 +31,8 @@ ACME settings are properties of `com.apple.security.acme`, without a nested SCEP
 `PayloadContent` dictionary.
 
 Mac hardware binding requires macOS 14 or later, fresh inventory, and identified
-Apple silicon or an exact supported T2 model. The T2 lookup uses Apple's model
+Apple silicon or an exact supported T2 model. Hardware-bound private keys cannot
+be exported, regardless of the key export setting. The T2 lookup uses Apple's model
 identifiers rather than inferring capabilities from an arbitrary model prefix or
 generic SecureBoot inventory. T2 Macs ignore `Attest`; older iPhone/iPad hardware
 may also ignore it. The issuer must enforce and validate its attestation policy.
@@ -121,7 +122,17 @@ Native tests cover concurrent ownership, removal/deletion retention, atomic
 shared-revision rollback, System/User ownership, historical migration conflicts,
 missing-archive blocking and protected review evidence. Console tests exercise
 the actual scoped router, roles, forms, secret-safe failures and history review.
-Full CI execution and actual browser acceptance are pending for this change.
+Linux/Windows builds and protected Windows protocol checks pass. All 36 actual
+browser cases pass using the rendered artifact from commit `7d5d0b1`: System/User
+scope with minimal, advanced, hardware-bound and RSA settings, plus unresolved,
+reviewed, restricted and empty history states, each at 390/768/1440 pixels. Checks
+include required fields, native URL/size limits, password controls, preserved
+spaces/Unicode, zero/false/default values, multipart file/revision binding, scoped
+CSRF, keyboard confirmation/submission, and horizontal overflow. File inputs use
+synthetic DataTransfer files and selects are set directly; the OS file picker and
+native select-menu keyboard navigation were not tested. Screenshots were inspected.
+The historical read audit integration is corrected and covered by a persisted
+audit assertion. Full protocol/database CI remains pending.
 
 Physical iPhone, iPad, Apple silicon Mac and T2 Mac acceptance remains necessary
 against the intended issuer. Profile delivery alone does not prove issuance,

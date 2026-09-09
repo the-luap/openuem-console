@@ -177,6 +177,10 @@ func exerciseAppleACMEHistory(t *testing.T, h *Handler, ctx context.Context, ten
 	if rec := request("organization-admin", "GET", base, nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "Record historical archive review") || rec.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("historical review unavailable or cacheable", rec.Code)
 	}
+	var reads int
+	if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_audit WHERE tenant_id=$1 AND action='acme.history.read' AND actor='organization-admin' AND resource_id='unresolved' AND details->>'result'='success'`, tenant).Scan(&reads); err != nil || reads != 1 {
+		t.Fatal("successful historical profile read was not audited", reads, err)
+	}
 	for _, bad := range []struct {
 		key    string
 		values []string
