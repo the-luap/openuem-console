@@ -568,7 +568,8 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						if info.Can(access.ManageProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/delete") }>
 								@CSRF(info)
-								<button class="uk-button uk-button-default" type="submit">Delete unassigned profile</button>
+								<p class="uk-text-muted mb-2">Deleting this catalog entry retains its encrypted revision history.</p>
+								<button class="uk-button uk-button-default" type="submit">Delete unassigned catalog entry</button>
 							</form>
 						}
 					</div>

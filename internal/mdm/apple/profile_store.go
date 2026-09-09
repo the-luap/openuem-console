@@ -69,7 +69,7 @@ func (s *Store) SaveProfile(ctx context.Context, tenant int, id string, expected
 		if err != nil {
 			return nil, err
 		}
-		if old.Revision != expectedRevision {
+		if old.Revision != expectedRevision || old.Revision >= 2147483647 {
 			return nil, ErrConflict
 		}
 		if old.Identifier != p.Identifier {
