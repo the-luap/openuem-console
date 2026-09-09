@@ -57,8 +57,20 @@ func exerciseAppleApplications(t *testing.T, h *Handler, ctx context.Context, te
 	}
 	for _, user := range []string{"scoped-viewer", "scoped-operator"} {
 		rec = request(user, "GET", scoped+"/software/catalog/"+version, nil)
-		if rec.Code != 200 || strings.Contains(rec.Body.String(), "route-download-secret") || strings.Contains(rec.Body.String(), "Withdraw approval") || !strings.Contains(rec.Body.String(), "Route &lt;Editor&gt;") || rec.Header().Get("Cache-Control") != "no-store" {
-			t.Fatal("catalog read exposed secrets or incorrect authority", user, rec.Code)
+		if rec.Code != 200 {
+			t.Fatal("catalog read failed", user, rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), "route-download-secret") {
+			t.Fatal("catalog read exposed source credentials")
+		}
+		if strings.Contains(rec.Body.String(), "Withdraw approval") {
+			t.Fatal("scoped reader sees organization mutation")
+		}
+		if !strings.Contains(rec.Body.String(), "Route &lt;Editor&gt;") {
+			t.Fatal("catalog did not escape approved display text")
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("catalog cache policy was weakened", rec.Header().Get("Cache-Control"))
 		}
 		if user == "scoped-viewer" && strings.Contains(rec.Body.String(), "Request installation") {
 			t.Fatal("viewer sees installation form")
