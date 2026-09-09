@@ -423,7 +423,7 @@ func TestMacAdminMaintenanceDoesNotStarveDueRotation(t *testing.T) {
 		id, serial := uuid.NewString(), fmt.Sprintf("IDLEADMIN%d", i)
 		adeExec(t, s, `INSERT INTO mdm_apple_ade_targets(tenant_id,server_id,serial,profile_id) VALUES(1,$1,$2,$3)`, server, serial, profile)
 		adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,model,os_version,enrollment_method,enrollment_platform,invite_expires_at,certificate_expires_at) VALUES($1,1,1,'Ended account setup','enrolled','Mac14,7','15.6','automated_device','macos',clock_timestamp(),clock_timestamp()+interval '1 year')`, id)
-		adeExec(t, s, `INSERT INTO mdm_apple_ade_admissions(device_id,tenant_id,server_id,serial,generation,profile_id,expected_udid,signer_fingerprint,expires_at,awaiting_configuration,setup_state) VALUES($1,1,$2,$3,1,$4,$1::text,repeat('d',64),clock_timestamp(),false,'complete')`, id, server, serial, profile)
+		adeExec(t, s, `INSERT INTO mdm_apple_ade_admissions(device_id,tenant_id,server_id,serial,generation,profile_id,expected_udid,signer_fingerprint,expires_at,awaiting_configuration,setup_state) VALUES($1,1,$2,$3,1,$4,$5,repeat('d',64),clock_timestamp(),false,'complete')`, id, server, serial, profile, id)
 		adeExec(t, s, `INSERT INTO mdm_apple_mac_admin_accounts(device_id,tenant_id,options,creation_state,next_check_at) SELECT $1,1,options,'cancelled',clock_timestamp()-interval '1 day' FROM mdm_apple_mac_admin_accounts WHERE device_id=$2`, id, d.ID)
 	}
 	adeExec(t, s, `UPDATE mdm_apple_mac_admin_accounts SET next_rotation_at=clock_timestamp()-interval '1 second',next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID)
