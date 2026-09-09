@@ -3,6 +3,7 @@ package apple
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"sync"
@@ -406,5 +407,30 @@ func TestMacAdminConcurrentRotationKeepsOneCandidate(t *testing.T) {
 	keys, err := s.MacAdminKeys(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID)
 	if err != nil || len(keys) != 2 {
 		t.Fatal("duplicate password candidates persisted", err)
+	}
+}
+
+// Inactive accounts must not consume the maintenance batch ahead of a due
+// rotation. These ended setups are legitimate retained history without keys.
+func TestMacAdminMaintenanceDoesNotStarveDueRotation(t *testing.T) {
+	s, d := macAdminFixture(t)
+	macAdminEstablished(t, s, d)
+	var server, profile string
+	if err := s.db.QueryRow(`SELECT server_id,profile_id FROM mdm_apple_ade_admissions WHERE device_id=$1`, d.ID).Scan(&server, &profile); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 30 {
+		id, serial := uuid.NewString(), fmt.Sprintf("IDLEADMIN%d", i)
+		adeExec(t, s, `INSERT INTO mdm_apple_ade_targets(tenant_id,server_id,serial,profile_id) VALUES(1,$1,$2,$3)`, server, serial, profile)
+		adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,model,os_version,enrollment_method,enrollment_platform,invite_expires_at,certificate_expires_at) VALUES($1,1,1,'Ended account setup','enrolled','Mac14,7','15.6','automated_device','macos',clock_timestamp(),clock_timestamp()+interval '1 year')`, id)
+		adeExec(t, s, `INSERT INTO mdm_apple_ade_admissions(device_id,tenant_id,server_id,serial,generation,profile_id,expected_udid,signer_fingerprint,expires_at,awaiting_configuration,setup_state) VALUES($1,1,$2,$3,1,$4,$1::text,repeat('d',64),clock_timestamp(),false,'complete')`, id, server, serial, profile)
+		adeExec(t, s, `INSERT INTO mdm_apple_mac_admin_accounts(device_id,tenant_id,options,creation_state,next_check_at) SELECT $1,1,options,'cancelled',clock_timestamp()-interval '1 day' FROM mdm_apple_mac_admin_accounts WHERE device_id=$2`, id, d.ID)
+	}
+	adeExec(t, s, `UPDATE mdm_apple_mac_admin_accounts SET next_rotation_at=clock_timestamp()-interval '1 second',next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID)
+	if err := s.ReconcileMacAdmins(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if a := macAdminStateForTest(t, s, d); a.LatestStatus != "queued" || a.LatestOperation != "rotate" {
+		t.Fatal("idle accounts starved the due rotation")
 	}
 }

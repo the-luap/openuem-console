@@ -262,7 +262,9 @@ func (s *Store) ReconcileMacAdmins(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		d, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE status='enrolled' AND id IN (SELECT device_id FROM mdm_apple_mac_admin_accounts WHERE next_check_at<=clock_timestamp()) ORDER BY (SELECT next_check_at FROM mdm_apple_mac_admin_accounts WHERE device_id=mdm_apple_devices.id),id LIMIT 1 FOR UPDATE SKIP LOCKED`))
+		d, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE status='enrolled' AND id IN (SELECT device_id FROM mdm_apple_mac_admin_accounts WHERE creation_state='planned' AND next_check_at<=clock_timestamp()
+ UNION SELECT device_id FROM mdm_apple_mac_admin_accounts WHERE NOT rotation_paused AND next_rotation_at<=clock_timestamp() AND next_check_at<=clock_timestamp()
+ UNION SELECT k.device_id FROM mdm_apple_mac_admin_keys k JOIN mdm_apple_commands c ON c.id=k.command_id JOIN mdm_apple_mac_admin_accounts a ON a.device_id=k.device_id WHERE k.status IN ('queued','sent','not_now') AND (c.expires_at<=clock_timestamp() OR c.status IN ('expired','cancelled')) AND a.next_check_at<=clock_timestamp()) ORDER BY (SELECT next_check_at FROM mdm_apple_mac_admin_accounts WHERE device_id=mdm_apple_devices.id),id LIMIT 1 FOR UPDATE SKIP LOCKED`))
 		if errors.Is(err, ErrNotFound) {
 			tx.Rollback()
 			return nil
