@@ -283,6 +283,7 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	exerciseApplePlatformSSO(t, h, ctx, tenantID, siteID, request)
 	exerciseAppleGatekeeper(t, h, ctx, tenantID, siteID, request)
 	exerciseAppleSystemExtensions(t, h, ctx, tenantID, siteID, request)
+	exerciseApplePrivacy(t, h, ctx, tenantID, siteID, request)
 	exerciseADEPlatformSSORoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleProfileRevisions(t, h, ctx, tenantID, siteID, request)
 	runDesktopBrowserFixture(t, h, ctx)

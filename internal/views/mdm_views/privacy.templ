@@ -1,0 +1,52 @@
+package mdm_views
+
+import (
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ PrivacyEditor(info *partials.CommonInfo) {
+	<script src="/assets/js/apple-privacy.js" defer></script>
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a Mac privacy profile (PPPC/TCC)</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="privacy-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="macos-privacy"/>
+			<input type="hidden" name="payload_scope" value="System"/>
+			<p>Set one application's privacy rule on a Mac with user-approved MDM. Other installed policies may also apply; a denial takes precedence over an allowance.</p>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company privacy rule"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.privacy"/></label>
+			<label>
+				Privacy service
+				<select class="uk-select" name="service" required>
+					<option value="">Select a service</option>
+					for _, service := range apple.PrivacyServices() {
+						<option value={ service.Key } data-minimum={ service.Minimum } data-deny-only={ strconv.FormatBool(service.DenyOnly) } data-standard-user={ strconv.FormatBool(service.StandardUser) }>{ service.Name }</option>
+					}
+				</select>
+			</label>
+			<label>Application identity type<select class="uk-select" name="application_type" required><option value="bundleID">Application bundle identifier</option><option value="path">Absolute path to a nonbundled binary</option></select></label>
+			<label>Application identifier or binary path<input class="uk-input" name="application_identifier" maxlength="1024" required placeholder="com.vendor.application"/></label>
+			<p>Identifiers and paths are case-sensitive. Use a bundle identifier for an application bundle; embedded helpers inherit their enclosing application's permissions.</p>
+			<label>Application code requirement<textarea class="uk-textarea" name="code_requirement" rows="4" maxlength="8192" required spellcheck="false"></textarea></label>
+			<p>Obtain the designated code requirement from the signed target application or its vendor. Copy the requirement expression, without command output labels. The Mac evaluates this requirement; saving a profile does not verify the application's signature.</p>
+			<label>Permission policy<select class="uk-select" name="policy" required><option value="deny">Deny access</option><option value="allow">Allow access</option><option value="user">Let a standard user choose in System Settings</option></select></label>
+			<p>Camera, microphone, input monitoring and screen capture cannot be granted by a profile. Input monitoring and screen capture can let a standard user choose; this requires macOS 11 or later and does not grant access automatically.</p>
+			<p data-privacy-compatibility aria-live="polite">Select a privacy service to see its macOS requirements.</p>
+			<p data-privacy-policy-status aria-live="polite"></p>
+			<label><input class="uk-checkbox" type="checkbox" name="static_code" value="yes"/> Validate code statically when the application invalidates its dynamic signature</label>
+			<fieldset data-privacy-receiver class="grid gap-4" style="min-width:0" hidden disabled>
+				<legend class="font-medium">Apple Events receiver</legend>
+				<label>Receiver identity type<select class="uk-select" name="receiver_type" required><option value="bundleID">Application bundle identifier</option><option value="path">Absolute path to a nonbundled binary</option></select></label>
+				<label>Receiver identifier or binary path<input class="uk-input" name="receiver_identifier" maxlength="1024" required/></label>
+				<label>Receiver code requirement<textarea class="uk-textarea" name="receiver_requirement" rows="3" maxlength="8192" required spellcheck="false"></textarea></label>
+			</fieldset>
+			<noscript><p>Enable JavaScript for Apple Events receiver fields and service-specific choices. Other services can be saved with a supported policy; the server validates each choice.</p></noscript>
+			<label>Comment (optional)<input class="uk-input" name="comment" maxlength="1024"/></label>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the application identity, code requirement and privacy policy.</label>
+			<p>Saving creates a profile to assign below. Installed profile status confirms delivery. Verify the intended privacy behavior and any required user approval on the Mac.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create Mac privacy profile</button>
+		</form>
+	</details>
+}

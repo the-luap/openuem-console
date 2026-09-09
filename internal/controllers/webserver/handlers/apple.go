@@ -660,6 +660,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 				return err
 			}
 		}
+		if c.FormValue("editor") == "macos-privacy" {
+			if err = applePrivacySettings(c, settings); err != nil {
+				return err
+			}
+		}
 		if c.FormValue("editor") == "macos-system-extensions" {
 			if err = appleSystemExtensionsSettings(c, settings); err != nil {
 				return err

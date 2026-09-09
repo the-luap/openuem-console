@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Mac privacy profiles (PPPC/TCC)](macos-privacy.md) add typed application identities,
+  all 24 privacy services, Apple Events receivers, grant/deny/user-choice policies
+  and their version boundaries. Device/channel/approval checks also guard revision
+  changes. Core checks and template/JavaScript validation pass; full CI and browser
+  checks are pending. Application signature matching and privacy behavior remain
+  physical acceptance requirements.
+
 - [Mac System Extensions profiles](macos-system-extensions.md) add typed team/bundle
   approvals, extension types and removal rules with platform, channel, OS and fresh
   management approval checks. Potentially installed revisions retain conflict
@@ -74,10 +81,9 @@ the table's package summaries do not remove any detail from the roadmap.
   separates Apple's payloads, omits unchanged defaults and checks macOS versions
   for direct assignment and revision updates. Local core and console checks pass.
   The corrected push workflow passes all jobs, including the older-Mac revision
-  rollback case; the PR workflow remains in progress. Nine cases using the actual CI-rendered
+  rollback case; the matching PR workflow also passes every job. Nine cases using the actual CI-rendered
   page pass at 390/768/1440 pixels, including policy values, confirmation and
-  keyboard submission without overflow. PPPC/TCC and certificate templates remain
-  separate work.
+  keyboard submission without overflow. Certificate templates remain separate work.
 
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
   encrypted immutable System/User snapshots, protected history/downloads and
