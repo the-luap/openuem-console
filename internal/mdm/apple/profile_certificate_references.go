@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Apple Wi-Fi certificate references resolve payload UUIDs within the same
+// Apple network certificate references resolve payload UUIDs within the same
 // configuration profile. Catalog IDs, root UUIDs and identities in a separately
 // installed profile cannot satisfy these references. Resolve case-insensitively,
 // but reject an ambiguous UUID even when its duplicate has another payload type.
@@ -34,7 +34,7 @@ func validateProfileCertificateReferences(root map[string]any) error {
 		}
 		matches := byUUID[id]
 		if len(matches) != 1 {
-			return errors.New("Wi-Fi certificate references must identify one unique certificate payload in the same profile")
+			return errors.New("certificate references must identify one unique certificate payload in the same profile")
 		}
 		kind := stringValue(matches[0], "PayloadType")
 		if identity {
@@ -42,7 +42,7 @@ func validateProfileCertificateReferences(root map[string]any) error {
 			case "com.apple.security.acme", "com.apple.security.scep", "com.apple.security.pkcs12", "com.apple.ADCertificate.managed":
 				return nil
 			}
-			return errors.New("Wi-Fi client credentials must reference an ACME, SCEP, PKCS12 or Active Directory certificate identity payload")
+			return errors.New("client credentials must reference an ACME, SCEP, PKCS12 or Active Directory certificate identity payload")
 		}
 		switch kind {
 		case "com.apple.security.root", "com.apple.security.pem", "com.apple.security.pkcs1":
@@ -52,6 +52,22 @@ func validateProfileCertificateReferences(root map[string]any) error {
 	}
 	for _, item := range items {
 		payload := item.(map[string]any)
+		if stringValue(payload, "PayloadType") == "com.apple.vpn.managed" {
+			for _, key := range []string{"VPN", "IPSec", "IKEv2"} {
+				if value, exists := payload[key]; exists {
+					configuration, ok := value.(map[string]any)
+					if !ok {
+						return errors.New("VPN protocol configuration must be a dictionary")
+					}
+					if reference, exists := configuration["PayloadCertificateUUID"]; exists {
+						if err := resolve(reference, true); err != nil {
+							return err
+						}
+					}
+				}
+			}
+			continue
+		}
 		if stringValue(payload, "PayloadType") != "com.apple.wifi.managed" {
 			continue
 		}

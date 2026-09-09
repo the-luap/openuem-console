@@ -61,19 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [VPN certificate references](apple-profile-certificate-references.md) extend
+  local identity binding checks to regular VPN, IPsec and IKEv2 configurations.
+  Isolated tests pass; System/User PostgreSQL regression execution is pending.
+  Complete VPN templates, App-Layer/Always On references and physical tunnel
+  acceptance remain open.
+
 - [Active Directory certificate validation](apple-ad-certificates.md) checks
   uploaded and composed AD identities, typed values, Mac property versions and
   manual-prompt/automatic-renewal restrictions. The dedicated creation form
   preserves omitted options and restricts enabled renewal to computer identities.
-  Isolated payload tests pass; full CI and browser checks for the form are pending.
+  Isolated payload tests, scoped form tests and 15 browser cases pass; full
+  regression CI for the form is pending.
   Physical AD/CA acceptance remains open.
 
 - [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted
   identity/trust certificate revisions with new local payload bindings, explicit
   TLS and trust settings, and System/User target checks. Isolated payload tests
   and 306 production SQL preparations against 35 migrations pass. All 39 actual
-  browser cases pass. Full CI is pending after a fixture correction; physical
-  RADIUS authentication remains open.
+  browser cases and both complete CI workflows pass after a fixture correction.
+  Physical RADIUS authentication remains open.
 
 - [Certificate references in Apple profiles](apple-profile-certificate-references.md)
   check that Wi-Fi identities and EAP anchors resolve to unique, correctly typed

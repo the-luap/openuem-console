@@ -55,7 +55,11 @@ private-key export protection, certificate issuance or renewal on physical Macs.
 The isolated production payload tests pass for serialized types, absent options,
 zero/false values, hostname and value limits, prompt/renewal scope restrictions
 and exact version boundaries. The combined certificate/composition payload tests
-also pass. Database regression, scoped form tests, full CI and browser checks for
-the new form are pending. Physical AD/CA and Mac acceptance remain required.
+also pass. The scoped form tests and all 15 actual Chrome cases pass at `b0e5134`:
+System/User scope, omitted/advanced options, three viewport widths and reader
+views. Browser checks cover notification bounds, renewal scope changes, retained
+zero/false values, confirmation, keyboard submission, reset and page overflow.
+Native OS select menus are not exercised. Full regression CI is still pending.
+Physical AD/CA and Mac acceptance remain required.
 
 Source: [Apple Active Directory Certificate schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml).

@@ -8,6 +8,14 @@ restoration and System/User installation. The device's trust chain can also come
 from separately installed certificates or system trust; that does not require
 explicit anchor UUIDs pointing into another profile.
 
+Regular `com.apple.vpn.managed` profiles now receive the same identity-reference
+checks for `PayloadCertificateUUID` inside their `VPN`, `IPSec` and `IKEv2`
+dictionaries. Each present protocol configuration must be a dictionary, and each
+present identity reference must identify a local identity payload. A VPN without
+such a reference does not acquire a new certificate requirement. This extension
+does not validate every VPN setting, require an identity for every authentication
+mode, or cover App-Layer VPN and nested Always On tunnel configurations yet.
+
 `PayloadCertificateUUID` on a Wi-Fi payload must identify exactly one ACME, SCEP,
 PKCS12 or Active Directory Certificate identity payload. Public certificates
 cannot satisfy a client identity reference. Each entry in the EAP
@@ -48,8 +56,17 @@ and [pull request](https://github.com/the-luap/openuem-console/actions/runs/3436
 This includes native protocol/persistence/TLS, scoped console routes, rendering,
 gateway/login/CSRF, existing models, desktop authorization/services, Linux/Windows
 builds and protected Windows protocol checks. Console handlers, templates and
-assets are unchanged from the 36-case ACME browser check at `461c235`.
+assets at that commit are unchanged from the 36-case ACME browser check at
+`461c235`. Subsequent editor checks are recorded with the EAP-TLS composer.
+
+The VPN extension passes isolated tests for all three protocol dictionaries,
+four identity payload types, plist serialization, case normalization, missing or
+ambiguous identities, public-certificate rejection and bounded errors. PostgreSQL
+tests cover System/User upload, revision and legacy reassignment rejection with
+removal preserved; execution in full CI is pending. No VPN client/provider or
+physical tunnel authentication has been exercised by these tests.
 
 References: [Apple Wi-Fi payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.wifi.managed.yaml),
 [Apple Active Directory Certificate payload](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml),
+[Apple VPN payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.vpn.managed.yaml),
 [Apple 802.1X deployment guide](https://support.apple.com/en-gb/guide/deployment/depabc994b84/web).
