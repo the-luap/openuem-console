@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Managed Mac applications](apple-managed-applications.md) are in progress:
+  an approved immutable artifact catalog and native installation/removal backend
+  now distinguish command acceptance from observed managed state and exact app
+  version. Source credentials are encrypted, delivery is scope-bound, and unknown
+  mutations are retained. Local protocol/fuzz and actual-schema SQL checks pass;
+  the full integration CI, console workflows, browser and physical acceptance,
+  unified platform adapters, Apps & Books and Platform SSO integration remain open.
+
 - [ADE enrollment protocol primitives](apple-automated-enrollment.md#enrollment-protocol-primitives)
   add bounded profile definition/retrieval, per-device assignment/removal outcomes
   and current ownership lookups. Uncertain creation is not automatically replayed;

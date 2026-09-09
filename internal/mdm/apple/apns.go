@@ -150,7 +150,7 @@ func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
 		if err := s.RefreshCatalog(work); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Error("Apple software catalog refresh failed", "error", err)
 		}
-		for _, task := range []func(context.Context) error{s.CleanupEnrollmentClaims, s.CleanupSCEPEnrollments, s.CleanupPushRequests, s.expireCommands, s.ReconcileMacAdmins, s.ReconcileADESetups, s.ReconcileRecoveryLocks, s.ReconcileMacBindings, s.ReconcileMacLinks, s.ReconcileFileVaultRotations, s.ReconcileFileVaultValidations, s.ReconcileIdentityRenewals, s.ScheduleIdentityRenewals, s.ScheduleInventory, s.MaintainUserChannels, s.ReconcileUpdateAvailability} {
+		for _, task := range []func(context.Context) error{s.CleanupEnrollmentClaims, s.CleanupSCEPEnrollments, s.CleanupPushRequests, s.expireCommands, s.ReconcileMacApps, s.ReconcileMacAdmins, s.ReconcileADESetups, s.ReconcileRecoveryLocks, s.ReconcileMacBindings, s.ReconcileMacLinks, s.ReconcileFileVaultRotations, s.ReconcileFileVaultValidations, s.ReconcileIdentityRenewals, s.ScheduleIdentityRenewals, s.ScheduleInventory, s.MaintainUserChannels, s.ReconcileUpdateAvailability} {
 			if err := task(work); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Error("Apple management maintenance failed", "error", err)
 			}

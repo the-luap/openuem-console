@@ -86,7 +86,7 @@ func (s *Store) queuePlatformInventory(ctx context.Context, tx *sql.Tx, d *Devic
 	kinds = append(kinds, inventoryKindsFor(*d)...)
 	for _, kind := range kinds {
 		var exists bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_commands WHERE device_id=$1 AND request_type=$2 AND status IN ('queued','sent','not_now') AND expires_at>now())`, d.ID, kind).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_commands WHERE device_id=$1 AND request_type=$2 AND NOT managed_app AND status IN ('queued','sent','not_now') AND expires_at>now())`, d.ID, kind).Scan(&exists); err != nil {
 			return err
 		}
 		if exists {
@@ -121,7 +121,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	if _, err := s.Device(ctx, scope, id); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at,EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.command_id=mdm_apple_commands.id),mac_binding,filevault,recovery_lock,ade_setup,mac_admin FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at,EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.command_id=mdm_apple_commands.id),mac_binding,filevault,recovery_lock,ade_setup,mac_admin,managed_app FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	list := []Command{}
 	for rows.Next() {
 		var c Command
-		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt, &c.IdentityRenewal, &c.MacBinding, &c.FileVault, &c.RecoveryLock, &c.ADESetup, &c.MacAdmin); err != nil {
+		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt, &c.IdentityRenewal, &c.MacBinding, &c.FileVault, &c.RecoveryLock, &c.ADESetup, &c.MacAdmin, &c.ManagedApp); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -382,12 +382,19 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			return nil, errors.New("response requires a valid CommandUUID")
 		}
 		var kind, previous string
-		var binding, filevault, recoveryLock, adeSetup, macAdmin bool
+		var binding, filevault, recoveryLock, adeSetup, macAdmin, managedApp bool
 		var profileID sql.NullString
 		var revision sql.NullInt64
-		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock,ade_setup,mac_admin FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock, &adeSetup, &macAdmin)
+		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock,ade_setup,mac_admin,managed_app FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock, &adeSetup, &macAdmin, &managedApp)
 		if err != nil {
 			return nil, notFound(err)
+		}
+		if managedApp {
+			stop, err = s.macAppCommandResult(ctx, tx, current, id, status, message)
+			if err != nil {
+				return nil, err
+			}
+			break
 		}
 		if macAdmin {
 			stop, err = s.macAdminCommandResult(ctx, tx, current, id, status)
@@ -547,18 +554,30 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 	if err = s.reconcileMacAdmin(ctx, tx, current); err != nil {
 		return nil, err
 	}
+	if err = s.reconcileMacApps(ctx, tx, current); err != nil {
+		return nil, err
+	}
 	if err = s.reconcileADESetup(ctx, tx, current); err != nil {
 		return nil, err
 	}
 	var id string
 	var payload []byte
-	var recoveryLock, macAdmin bool
-	err = tx.QueryRowContext(ctx, `SELECT id,payload,recovery_lock,mac_admin FROM mdm_apple_commands WHERE device_id=$1 AND status IN ('queued','sent','not_now') AND available_at<=now() AND expires_at>now() AND NOT(recovery_lock AND request_type='SetRecoveryLock' AND attempts>0) AND NOT(mac_admin AND status='sent') ORDER BY CASE WHEN status='sent' THEN 0 ELSE 1 END,created_at,id LIMIT 1 FOR UPDATE`, current.ID).Scan(&id, &payload, &recoveryLock, &macAdmin)
+	var recoveryLock, macAdmin, managedApp bool
+	err = tx.QueryRowContext(ctx, `SELECT id,payload,recovery_lock,mac_admin,managed_app FROM mdm_apple_commands WHERE device_id=$1 AND status IN ('queued','sent','not_now') AND available_at<=now() AND expires_at>now() AND NOT(recovery_lock AND request_type='SetRecoveryLock' AND attempts>0) AND NOT(mac_admin AND status='sent') AND NOT(managed_app AND request_type IN ('InstallEnterpriseApplication','RemoveApplication') AND status='sent') ORDER BY CASE WHEN status='sent' THEN 0 ELSE 1 END,created_at,id LIMIT 1 FOR UPDATE`, current.ID).Scan(&id, &payload, &recoveryLock, &macAdmin, &managedApp)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, tx.Commit()
 	}
 	if err != nil {
 		return nil, err
+	}
+	if managedApp {
+		ready, e := s.prepareMacAppDelivery(ctx, tx, current, id)
+		if e != nil {
+			return nil, e
+		}
+		if !ready {
+			return nil, tx.Commit()
+		}
 	}
 	if macAdmin {
 		ready, e := s.prepareMacAdminDelivery(ctx, tx, current, id)
@@ -786,7 +805,7 @@ func (s *Store) RetryCommand(ctx context.Context, scope Scope, deviceID, command
 	if state != "enrolled" {
 		return ErrConflict
 	}
-	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='queued',error='',available_at=now(),expires_at=now()+interval '7 days',completed_at=NULL WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND status IN ('failed','expired','not_now') AND NOT mac_binding AND NOT filevault AND NOT recovery_lock AND NOT ade_setup AND NOT mac_admin AND ((profile_id IS NULL AND request_type NOT IN ('InstallProfile','RemoveProfile')) OR EXISTS(SELECT 1 FROM mdm_apple_profile_assignments a WHERE a.profile_id=mdm_apple_commands.profile_id AND a.device_id=mdm_apple_commands.device_id AND a.revision=mdm_apple_commands.profile_revision AND ((a.desired='installed' AND mdm_apple_commands.request_type='InstallProfile') OR (a.desired='removed' AND mdm_apple_commands.request_type='RemoveProfile'))))`, commandID, deviceID, scope.TenantID)
+	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='queued',error='',available_at=now(),expires_at=now()+interval '7 days',completed_at=NULL WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND status IN ('failed','expired','not_now') AND NOT mac_binding AND NOT filevault AND NOT recovery_lock AND NOT ade_setup AND NOT mac_admin AND NOT managed_app AND ((profile_id IS NULL AND request_type NOT IN ('InstallProfile','RemoveProfile')) OR EXISTS(SELECT 1 FROM mdm_apple_profile_assignments a WHERE a.profile_id=mdm_apple_commands.profile_id AND a.device_id=mdm_apple_commands.device_id AND a.revision=mdm_apple_commands.profile_revision AND ((a.desired='installed' AND mdm_apple_commands.request_type='InstallProfile') OR (a.desired='removed' AND mdm_apple_commands.request_type='RemoveProfile'))))`, commandID, deviceID, scope.TenantID)
 	if err != nil {
 		return err
 	}

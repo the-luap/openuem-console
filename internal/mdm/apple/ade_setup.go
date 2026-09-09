@@ -231,6 +231,9 @@ func (s *Store) ReconcileADESetups(ctx context.Context) error {
 }
 
 func (s *Store) cancelADESetup(ctx context.Context, tx *sql.Tx, id string) error {
+	if err := s.cancelMacApps(ctx, tx, id); err != nil {
+		return err
+	}
 	if err := s.cancelMacAdmin(ctx, tx, id); err != nil {
 		return err
 	}

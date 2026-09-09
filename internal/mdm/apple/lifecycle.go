@@ -68,7 +68,7 @@ func (s *Store) ScopeInUse(ctx context.Context, scope Scope) (bool, error) {
 	}
 	var exists bool
 	if scope.SiteID == 0 {
-		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_settings WHERE tenant_id=$1) OR EXISTS(SELECT 1 FROM mdm_apple_ade_servers WHERE tenant_id=$1)`, scope.TenantID).Scan(&exists)
+		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_settings WHERE tenant_id=$1) OR EXISTS(SELECT 1 FROM mdm_apple_ade_servers WHERE tenant_id=$1) OR EXISTS(SELECT 1 FROM uem_software_packages WHERE tenant_id=$1)`, scope.TenantID).Scan(&exists)
 		return exists, err
 	}
 	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2) OR EXISTS(SELECT 1 FROM mdm_apple_ade_profiles WHERE tenant_id=$1 AND site_id=$2)`, scope.TenantID, scope.SiteID).Scan(&exists)

@@ -20,6 +20,8 @@ func auditOutcome(ctx context.Context, tx *sql.Tx, tenant int, actor, action, re
 	site := 0
 	query, target := "", resource
 	switch {
+	case strings.HasPrefix(action, "apple.software.") && !strings.HasPrefix(action, "apple.software.version."):
+		query = `SELECT d.site_id FROM mdm_apple_app_attempts a JOIN mdm_apple_devices d ON d.id=a.device_id AND d.tenant_id=a.tenant_id WHERE a.tenant_id=$1 AND a.id::text=$2`
 	case action == "apple.mac_admin.pause_rotation" || action == "apple.mac_admin.resume_rotation":
 		query = `SELECT site_id FROM mdm_apple_devices WHERE tenant_id=$1 AND id::text=$2`
 	case action == "apple.mac_admin.password.reveal":

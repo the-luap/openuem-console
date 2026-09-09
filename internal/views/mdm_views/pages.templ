@@ -411,7 +411,7 @@ Manual device enrollment
 									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
 									<td>
 										{ cmd.Error }
-										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && !cmd.ADESetup && !cmd.MacAdmin && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
+										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && !cmd.ADESetup && !cmd.MacAdmin && !cmd.ManagedApp && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
 											if info.Can(access.AssignProfiles) {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
 													@CSRF(info)

@@ -20,6 +20,9 @@ const (
 	EnrollDevices        Capability = "devices.enroll"
 	RevokeDevices        Capability = "devices.revoke"
 	ReadProfiles         Capability = "profiles.read"
+	ReadSoftware         Capability = "software.read"
+	ManageSoftware       Capability = "software.manage"
+	AssignSoftware       Capability = "software.assign"
 	ManageProfiles       Capability = "profiles.manage"
 	AssignProfiles       Capability = "profiles.assign"
 	ManageUpdates        Capability = "updates.manage"
@@ -81,11 +84,11 @@ func (p Principal) IsAdministrator() bool {
 
 func roleAllows(role Role, capability Capability) bool {
 	switch capability {
-	case ReadDevices, ReadProfiles:
+	case ReadDevices, ReadProfiles, ReadSoftware:
 		return role == Viewer || role == Operator || role == TenantAdmin || role == Administrator
-	case RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates:
+	case RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates, AssignSoftware:
 		return role == Operator || role == TenantAdmin || role == Administrator
-	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys:
+	case RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys, ManageSoftware:
 		return role == TenantAdmin || role == Administrator
 	case ManageAccess:
 		return role == Administrator
