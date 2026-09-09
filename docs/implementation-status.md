@@ -65,7 +65,9 @@ the table's package summaries do not remove any detail from the roadmap.
   assessment, Finder exception and malware-submission prompt settings. The editor
   separates Apple's payloads, omits unchanged defaults and checks macOS versions
   for direct assignment and revision updates. Local core checks pass; full native,
-  console and browser acceptance are pending. PPPC/TCC, System Extensions and
+  console validation is still running. Nine cases using the actual CI-rendered
+  page pass at 390/768/1440 pixels, including policy values, confirmation and
+  keyboard submission without overflow. PPPC/TCC, System Extensions and
   certificate templates remain separate work.
 
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
@@ -104,8 +106,9 @@ the table's package summaries do not remove any detail from the roadmap.
   keep prerequisite changes closed even after an explicit release retry.
   Cross-profile routing reservations are implemented in `96b8d0c`; all 33 migrations
   and 287 prepared SQL statements pass locally, including historical System/User
-  reservation backfill and verification-dependent release. The full integration
-  run is pending. Provider-specific registration, token provisioning and hardware
+  reservation backfill and verification-dependent release. Both complete CI
+  workflows pass at `ccbde13`, including the corrected historical migration test.
+  Provider-specific registration, token provisioning and hardware
   acceptance remain open.
 
 - [ADE required applications](apple-ade-required-applications.md) now include

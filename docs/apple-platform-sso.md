@@ -161,9 +161,8 @@ was performed. Physical-device and provider-specific acceptance remain open.
 
 Immutable profile history, ADE prerequisites and the combined revision correction
 workflow are implemented. An app-only correction cannot change an active provider
-binding. Cross-profile routing reservations are implemented with full integration
-validation pending. Provider-specific registration evidence and token provisioning
-remain open.
+binding. Cross-profile routing reservations also pass full integration validation.
+Provider-specific registration evidence and token provisioning remain open.
 
 The ADE binding and unattended editor at `2eaeb5d` passed both complete workflows:
 [push CI](https://github.com/the-luap/openuem-console/actions/runs/34339173364) and
@@ -207,6 +206,9 @@ ignored-field checks in an isolated Go harness. The harness copied the productio
 routing implementation, text validation and dictionary accessor without changes
 and recorded their source hashes. The full-suite upload case separately exercises
 two different provider payloads with duplicate URLs and then distinct URLs.
+At `a0af321`, both complete workflows passed:
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34345522910) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34345526470).
 
 The reservation migration and five new production SQL statements pass an isolated
 PostgreSQL check, bringing the checked totals to 33 migrations and 287 statements.
@@ -216,8 +218,15 @@ foreign-scope reservations, retain the installed revision after verification, an
 free all revisions only for verified removal. Full integration cases cover sent
 commands, wrong and delayed inventories, concurrent conflicting assignments,
 audit and catalog rollback, user isolation, provider merging and migration
-recovery; their CI results are pending. The native race-suite timeout is explicitly
-20 minutes because the existing complete suite already takes nearly 10 minutes.
+recovery. At `ccbde13`, all four jobs passed in both
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34346564029) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34346568702).
+The push native Apple race suite took 603.241 seconds, scoped console routes
+12.251 seconds and desktop regression 30.639 seconds. The earlier `96b8d0c` run
+failed only because its migration fixture omitted the embedded `migrations/`
+prefix; the corrected complete runs exercise that fixture successfully. The
+native race-suite timeout is explicitly 20 minutes because the complete suite
+can exceed the default 10 minutes.
 
 Sources checked 9 September 2026:
 

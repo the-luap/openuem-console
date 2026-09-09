@@ -35,15 +35,27 @@ affect application launches.
 
 The isolated core check uses the unchanged production Gatekeeper validator,
 platform detection, version comparison and relevant data types. It passes boolean,
-System/User, platform and macOS version boundaries. The generated console template
-formats and compiles with the existing profile page.
+System/User, platform and macOS version boundaries. Formatting and code generation pass for the template and its containing profile
+page.
 
 Full-suite cases cover separate assessment/Finder payloads, omitted defaults,
 explicit false values, uploaded User policies, mixed-platform assignment rollback,
 macOS 15 revision rollback, installation and removal observations. Console cases
 cover role restrictions, CSRF, confirmation, repeated or unrelated fields, query
-parameter rejection and persisted choices. Full CI and checks against its rendered
-browser artifact are pending.
+parameter rejection and persisted choices. Linux/Windows builds, native Windows
+bootstrap checks, console rendering and scoped route tests pass in the
+[`4d6fe4d` PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34347551705).
+The native Apple race suite found that the shared inventory fixture reported
+macOS 15 instead of the intended 14.7 in the revision rollback case. The fixture
+now reports 14.7 explicitly and asserts the persisted version before that check.
+A full rerun is required; the remaining downstream checks were skipped.
+
+Nine browser cases use that workflow's actual rendered profile page at 390, 768
+and 1440 pixels. They cover all three source policies, omitted defaults, explicit
+false values, required names and review confirmation, keyboard confirmation and
+submission, scoped routes and CSRF. No horizontal page overflow occurred.
+The harness sets native select values directly; these checks do not independently
+verify native dropdown arrow-key behavior.
 
 No application is launched, Gatekeeper configuration is changed, or profile is
 installed on the development host by these tests. Profile inventory proves that

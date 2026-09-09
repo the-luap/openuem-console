@@ -76,7 +76,7 @@ func TestGatekeeperAssignmentAndRevisionRollback(t *testing.T) {
 	testSettings(t, s, 1)
 	scope := Scope{TenantID: 1, SiteID: 1}
 	mac, _, _ := testEnrollPlatformWithKey(t, s, scope, "Gatekeeper Mac", "Mac16,1", "14.7")
-	drainMacInventory(t, s, mac)
+	drainMacHardwareInventory(t, s, mac, map[string]any{"OSVersion": "14.7"})
 	phone, _, _ := testEnrollPlatformWithKey(t, s, scope, "Gatekeeper iPhone", "iPhone16,1", "18.0")
 	data, err := BuildProfile("Gatekeeper", "com.example.gatekeeper", "macos-gatekeeper", map[string]any{"EnableAssessment": true, "AllowIdentifiedDevelopers": true, "DisableOverride": true})
 	if err != nil {
@@ -97,6 +97,10 @@ func TestGatekeeperAssignmentAndRevisionRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	drainCommands(t, s, mac, []InstalledProfile{{Identifier: p.Identifier, UUID: p.UUID}})
+	var observedVersion string
+	if err = s.db.QueryRow(`SELECT os_version FROM mdm_apple_devices WHERE id=$1`, mac.ID).Scan(&observedVersion); err != nil || observedVersion != "14.7" {
+		t.Fatal("inventory changed the older-Mac fixture", observedVersion, err)
+	}
 	data, err = BuildProfile("Gatekeeper", "com.example.gatekeeper", "macos-gatekeeper", map[string]any{"EnableAssessment": true, "EnableXProtectMalwareUpload": false})
 	if err != nil {
 		t.Fatal(err)

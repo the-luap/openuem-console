@@ -99,8 +99,8 @@ requirements, ownership of pinned assignments and reviewed corrections are now
 implemented; their validation is recorded in
 [Platform SSO profiles](apple-platform-sso.md). Cross-profile routing reservations
 now retain potentially installed revisions until fresh replacement or removal
-verification; their full integration validation is pending. Provider-specific
-registration acceptance remains open. Verification against
+verification; both complete integration workflows pass at `ccbde13`.
+Provider-specific registration acceptance remains open. Verification against
 an assigned historical snapshot is recorded separately below. This revision
 foundation does not complete the full roadmap.
 
