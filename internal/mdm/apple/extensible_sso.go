@@ -19,10 +19,15 @@ func platformSSOURLKey(raw string) (string, error) {
 	return strings.ToLower(u.Scheme+"://"+u.Host) + u.EscapedPath(), nil
 }
 
+type extensibleSSORoute struct {
+	Extension, Team string
+	Platform        bool
+}
+
 // Extensible SSO routing is shared by Redirect and Credential payloads. Only
 // scheme and host names are case-insensitive; distinct URL paths and wildcard
 // host suffixes are not treated as overlapping reservations.
-func extensibleSSORoutes(data []byte) (map[string]bool, error) {
+func extensibleSSORoutes(data []byte) (map[string]extensibleSSORoute, error) {
 	var root map[string]any
 	if _, err := plist.Unmarshal(data, &root); err != nil {
 		return nil, err
@@ -30,8 +35,8 @@ func extensibleSSORoutes(data []byte) (map[string]bool, error) {
 	return extensibleSSORootRoutes(root)
 }
 
-func extensibleSSORootRoutes(root map[string]any) (map[string]bool, error) {
-	routes := map[string]bool{}
+func extensibleSSORootRoutes(root map[string]any) (map[string]extensibleSSORoute, error) {
+	routes := map[string]extensibleSSORoute{}
 	items, _ := root["PayloadContent"].([]any)
 	for _, item := range items {
 		payload, _ := item.(map[string]any)
@@ -68,10 +73,12 @@ func extensibleSSORootRoutes(root map[string]any) (map[string]bool, error) {
 				}
 				key = "host:" + strings.ToLower(raw)
 			}
-			if routes[key] {
+			if _, exists := routes[key]; exists {
 				return nil, errors.New("SSO URL prefixes and host names must be unique across all payloads in a profile")
 			}
-			routes[key] = true
+			_, modern := payload["PlatformSSO"]
+			_, legacy := payload["AuthenticationMethod"]
+			routes[key] = extensibleSSORoute{Extension: stringValue(payload, "ExtensionIdentifier"), Team: stringValue(payload, "TeamIdentifier"), Platform: modern || legacy}
 		}
 	}
 	return routes, nil

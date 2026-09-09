@@ -284,6 +284,11 @@ func (s *Store) ingestUserProfiles(ctx context.Context, tx *sql.Tx, u *UserChann
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_user_assignments SET status=$2,error='' WHERE user_channel_id=$1 AND profile_id=$3`, u.ID, c.status, c.id); err != nil {
 			return err
 		}
+		if c.status == "verified" {
+			if err = releaseSSORoutes(ctx, tx, u.TenantID, u.DeviceID, u.ID, c.id); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

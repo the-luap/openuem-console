@@ -47,6 +47,11 @@ func (s *Store) assignUserProfile(ctx context.Context, tx *sql.Tx, d *Device, u 
 			return err
 		}
 	}
+	if desired == "installed" {
+		if err := s.reserveSSORoutes(ctx, tx, d, u.ID, p); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_user_commands SET status='cancelled',payload=''::bytea,completed_at=clock_timestamp() WHERE user_channel_id=$1 AND profile_id=$2 AND status IN ('queued','sent','not_now')`, u.ID, p.ID); err != nil {
 		return err
 	}

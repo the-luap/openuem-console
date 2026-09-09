@@ -43,8 +43,27 @@ including ordinary Redirect and Credential configurations. Duplicate URL prefixe
 use case-insensitive scheme and host matching; paths remain case-sensitive.
 Credential host names are compared case-insensitively. Distinct URL prefixes and
 wildcard suffixes remain allowed. The URL and host namespaces are separate, and
-fields that Apple ignores for a payload type do not create reservations. This
-within-profile check does not yet prevent conflicts between separate assignments.
+fields that Apple ignores for a payload type do not create reservations.
+
+Assignments reserve their exact retained routing revisions under the device's
+transaction lock. A catalog update, ADE correction or cancelled sent command does
+not free the previous routes. Only a newly accepted profile inventory that
+verifies the replacement UUID or removal releases them. A conflicting assignment
+or failed audit rolls back its reservations, commands and profile revision.
+Reservation rows contain snapshot references; URL values and provider credentials
+stay in encrypted profile history. A missing legacy snapshot remains unresolved
+until replacement or removal is verified.
+
+System profiles are checked against the device and its managed users. Separate
+user channels retain separate effective profile sets. The same Platform SSO
+extension and team can configure both System and User scopes: Apple merges their
+settings, with device values taking precedence. This does not permit duplicate
+routes within the same channel or between unrelated providers.
+[Apple's device/user Platform SSO configuration](https://developer.apple.com/documentation/devicemanagement/configuring-platform-single-sign-on)
+
+These checks cover profiles managed through the native assignment workflow.
+Inventory does not expose another management system's provider URL configuration,
+so installation verification and physical-device acceptance remain necessary.
 
 Batch assignment and profile revision updates must pass platform and approval
 checks before committing. Removing a profile remains possible after those
@@ -142,8 +161,9 @@ was performed. Physical-device and provider-specific acceptance remain open.
 
 Immutable profile history, ADE prerequisites and the combined revision correction
 workflow are implemented. An app-only correction cannot change an active provider
-binding. Cross-profile URL collision checks, provider-specific registration
-evidence and token provisioning remain open.
+binding. Cross-profile routing reservations are implemented with full integration
+validation pending. Provider-specific registration evidence and token provisioning
+remain open.
 
 The ADE binding and unattended editor at `2eaeb5d` passed both complete workflows:
 [push CI](https://github.com/the-luap/openuem-console/actions/runs/34339173364) and
@@ -187,6 +207,17 @@ ignored-field checks in an isolated Go harness. The harness copied the productio
 routing implementation, text validation and dictionary accessor without changes
 and recorded their source hashes. The full-suite upload case separately exercises
 two different provider payloads with duplicate URLs and then distinct URLs.
+
+The reservation migration and five new production SQL statements pass an isolated
+PostgreSQL check, bringing the checked totals to 33 migrations and 287 statements.
+Existing System and User assignments retain both known dispatched revisions and
+missing historical snapshots. The actual release queries preserve unresolved and
+foreign-scope reservations, retain the installed revision after verification, and
+free all revisions only for verified removal. Full integration cases cover sent
+commands, wrong and delayed inventories, concurrent conflicting assignments,
+audit and catalog rollback, user isolation, provider merging and migration
+recovery; their CI results are pending. The native race-suite timeout is explicitly
+20 minutes because the existing complete suite already takes nearly 10 minutes.
 
 Sources checked 9 September 2026:
 

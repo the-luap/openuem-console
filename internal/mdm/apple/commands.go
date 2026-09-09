@@ -786,6 +786,11 @@ func (s *Store) verifyProfiles(ctx context.Context, tx *sql.Tx, d *Device, creat
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_profile_assignments SET status=$1,error='',updated_at=clock_timestamp() WHERE device_id=$2 AND profile_id=$3`, r.status, d.ID, r.id); err != nil {
 			return err
 		}
+		if r.status == "verified" {
+			if err = releaseSSORoutes(ctx, tx, d.TenantID, d.ID, "", r.id); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

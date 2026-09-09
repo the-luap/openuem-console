@@ -210,6 +210,11 @@ func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Dev
 			}
 		}
 	}
+	if desired == "installed" {
+		if err = s.reserveSSORoutes(ctx, tx, current, "", p); err != nil {
+			return err
+		}
+	}
 	// Cancel previous queued/sent work so stale responses cannot reverse the new
 	// desired state. A new assignment always replaces all commands for this pair.
 	if _, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='cancelled',completed_at=now() WHERE device_id=$1 AND profile_id=$2 AND status IN ('queued','sent','not_now')`, d.ID, p.ID); err != nil {
