@@ -171,6 +171,10 @@ func exerciseADERoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Conte
 			t.Fatal(err)
 		}
 		profileForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "name": {"Synthetic automated Mac"}, "platform": {"macos"}, "site_id": {fmt.Sprint(site)}, "removal": {"disallowed"}, "await_configuration": {"yes"}, "ignore_backup_profile": {"yes"}}
+		oversized := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "serials": {strings.Repeat("x", 129<<10)}}
+		if rec := post("organization-admin", path+"/targets", oversized); rec.Code != 403 {
+			t.Fatal("ADE body bound was bypassed by CSRF form parsing", rec.Code)
+		}
 		if rec := post("organization-admin", path+"/profiles", profileForm); rec.Code != 303 {
 			t.Fatal("ADE profile intent failed", rec.Code, rec.Body.String())
 		}

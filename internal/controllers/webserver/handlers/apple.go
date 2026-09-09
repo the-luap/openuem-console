@@ -79,6 +79,12 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
+			switch appleRoute(c.Path()) {
+			case "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
+				// CSRF reads the form before the endpoint. Apply its bound here
+				// as well so a cached PostForm cannot bypass the endpoint limit.
+				limit = 128 << 10
+			}
 			if appleRoute(c.Path()) == "/desktop/invitations" || strings.Contains(appleRoute(c.Path()), "/recovery-lock") {
 				limit = 8192
 			}

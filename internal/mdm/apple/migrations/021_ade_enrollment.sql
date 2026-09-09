@@ -98,6 +98,10 @@ CREATE TABLE mdm_apple_ade_admissions (
  FOREIGN KEY(tenant_id,server_id,profile_id) REFERENCES mdm_apple_ade_profiles(tenant_id,server_id,id)
 );
 ALTER TABLE mdm_apple_commands ADD COLUMN ade_setup BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX mdm_apple_ade_setup_due ON mdm_apple_ade_admissions(next_setup_at,device_id)
+ WHERE awaiting_configuration=true AND setup_state IN ('awaiting','releasing');
+CREATE INDEX mdm_apple_ade_retry_cleanup ON mdm_apple_ade_admissions(expires_at,device_id)
+ WHERE retry_profile IS NOT NULL;
 
 CREATE FUNCTION mdm_apple_enrollment_removal_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected BOOLEAN;
