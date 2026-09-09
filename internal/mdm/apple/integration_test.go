@@ -11,8 +11,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"io/fs"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +25,11 @@ import (
 )
 
 func testStore(t *testing.T) *Store {
+	t.Helper()
+	return testStoreBeforeMigration(t, "")
+}
+
+func testStoreBeforeMigration(t *testing.T, before string) *Store {
 	t.Helper()
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -69,11 +76,56 @@ func testStore(t *testing.T) *Store {
 	if _, err = db.Exec(`CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT NOT NULL REFERENCES tenants(id)); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(1,1),(2,2)`); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.Migrate(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err = s.Migrate(context.Background()); err != nil {
-		t.Fatal("migration is not idempotent", err)
+	if before == "" {
+		if err = s.Migrate(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err = s.Migrate(context.Background()); err != nil {
+			t.Fatal("migration is not idempotent", err)
+		}
+	} else {
+		// Build the historical schema from the actual preceding migrations.
+		// Future foreign keys must not change a legacy migration fixture.
+		names, err := fs.Glob(migrations, "migrations/*.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sort.Strings(names)
+		found := false
+		for _, name := range names {
+			if name == before {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("unknown migration boundary", before)
+		}
+		tx, err := db.BeginTx(t.Context(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		if _, err = tx.Exec(`CREATE TABLE mdm_apple_migrations(name TEXT PRIMARY KEY,applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			if name >= before {
+				break
+			}
+			body, err := migrations.ReadFile(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = tx.Exec(string(body)); err != nil {
+				t.Fatal(name, err)
+			}
+			if _, err = tx.Exec(`INSERT INTO mdm_apple_migrations(name) VALUES($1)`, name); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err = tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	catalog, _ := json.Marshal(SoftwareCatalog{PublicAssetSets: map[string][]OSRelease{"iOS": {{Version: "18.7.1", Build: "22H100", PostingDate: time.Now().AddDate(0, -1, 0).Format("2006-01-02"), ExpirationDate: time.Now().AddDate(1, 0, 0).Format("2006-01-02"), SupportedDevices: []string{"iPhone16,1"}}}}})
 	if _, err = s.db.Exec(`UPDATE mdm_apple_software_catalog SET document=$1,fetched_at=now(),attempted_at=now()`, catalog); err != nil {

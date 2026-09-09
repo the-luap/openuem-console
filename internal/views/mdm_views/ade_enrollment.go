@@ -39,6 +39,9 @@ func adeProfileName(profiles []apple.ADEEnrollmentProfile, id string) string {
 }
 
 func adeSetupMessage(a *apple.ADEDeviceEnrollment) string {
+	if a.SetupError == "platform_sso_pending" {
+		return "Waiting for the reviewed Platform SSO profile revision and its provider application. Check the profile requirement and required application status before setup can continue."
+	}
 	if a.SetupError == "application_pending" {
 		return "Waiting for every required application to be reported as installed and managed at its exact approved version. Check required application status and resolve failed or unresolved attempts before setup can continue."
 	}

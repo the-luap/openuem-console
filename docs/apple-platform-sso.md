@@ -12,7 +12,10 @@ identity-provider URL prefixes, authentication method, account display name,
 shared device keys and optional login-window account creation. Login-window
 account creation requires shared device keys and Password or Smart Card
 authentication. Setup Assistant options retain their operating-system and
-provider defaults. The editor does not verify that the provider extension is
+provider defaults unless the operator selects unattended ADE setup. This mode
+requires macOS 26, shared keys and login-window account creation; it explicitly
+enables registration during setup and disables first-user creation during setup.
+The editor does not verify that the provider extension is
 already installed.
 
 Optional provider data is entered as a JSON dictionary and converted into plist
@@ -47,6 +50,38 @@ new revision. Restoration rechecks current Mac compatibility and queues fresh
 UUID verification for active assignments. Deleting an unused catalog entry keeps
 its protected history, including any historical provider credentials.
 
+## Unattended ADE prerequisites
+
+An ADE enrollment profile can bind an immutable System profile revision to an
+approved provider application revision. The operator must confirm the extension
+and provider's silent registration support and record a review reason. The policy
+also requires macOS 26, automatic advance, the Setup Assistant hold and a managed
+administrator with primary account creation skipped.
+
+The ADE form searches current SSO profiles in pages of 25. It identifies profiles
+that still need unattended setup configuration, retains selected snapshots across
+searches, and includes the provider app in the maximum of 16 required applications.
+Search results contain metadata and eligibility, never registration tokens or
+provider configuration dictionaries. Profile read permission is required in
+addition to organization ADE access; creating the binding additionally checks
+profile assignment, software assignment and account-management permissions.
+
+Admission retains the reviewed profile/app pair. Catalog revisions do not advance
+that enrollment's profile assignment while its setup hold remains active.
+Ordinary assignment, removal and host-app version changes cannot bypass the
+requirement. Setup release requires fresh verification of the retained profile
+and the existing exact-version managed application checks. A device must report
+that its hold ended before ordinary profile ownership resumes. Provider
+registration begins after `DeviceConfigured` and is not a pre-release condition.
+
+The device page shows retained revision metadata, current profile verification,
+the provider review and repair history. Before release dispatch, an authorized
+operator can resend the same snapshot with confirmation and a reason. That action
+queues profile delivery and fresh inventory and commits its immutable repair
+receipt and audit event together. History is scoped to the device and organization
+and paginated at 100 records. An installation observation or a repair request does
+not establish successful identity-provider registration.
+
 ## Validation and remaining acceptance
 
 Tests cover typed payload placement, invalid URL and
@@ -74,12 +109,34 @@ focused parser check.
 No real identity-provider registration, account creation or profile deployment
 was performed. Physical-device and provider-specific acceptance remain open.
 
-The immutable profile storage foundation is implemented. Unattended ADE still
-needs an explicit SSO profile requirement bound to the
-required extension application, managed administrator policy and setup sequence.
-The extension and profile must be installed before `DeviceConfigured`; silent
-provider registration begins afterwards. Cross-profile URL collision checks,
-provider-specific registration evidence and token provisioning remain open.
+The immutable profile and ADE prerequisite foundations are implemented. A combined
+correction workflow for the profile and provider application revisions remains
+open; an app-only correction cannot change an active provider binding. Cross-profile
+URL collision checks, provider-specific registration evidence and token provisioning
+also remain open.
+
+The ADE binding and unattended editor at `2eaeb5d` passed both complete workflows:
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34339173364) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34339178970).
+The native Apple race suite passed in 566.538 seconds, scoped console routes in
+12.160 seconds, and desktop regression in 26.896 seconds in the push run. The
+profile/app picker at `f31e044` also passed its
+[complete push workflow](https://github.com/the-luap/openuem-console/actions/runs/34339525979).
+
+Twenty-seven browser scenarios used actual CI-rendered pages at 390, 768 and 1440
+pixels: three unattended editor cases, three ADE selection cases and 21 device
+status/repair/history cases. They passed keyboard operation, required confirmation
+and reasons, optional-field activation, escaped display text, pagination, failed
+and stale search replies, retained selections, scoped form bodies, CSRF and role
+restrictions without page overflow.
+
+The status/repair integration run at `05be000` detected that its synthetic fixture
+reused a withdrawn application. The fixture now selects the still-approved
+revision; a fresh complete CI run is required. The legacy profile migration fixture
+now constructs its historical schema from preceding migration files so later
+foreign keys cannot invalidate that setup. Local checks applied all 31 migrations
+and prepared 272 production statements plus 11 synthetic route fixture statements
+in an isolated PostgreSQL transaction.
 
 Sources checked 9 September 2026:
 

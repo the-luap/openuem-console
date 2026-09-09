@@ -17,7 +17,7 @@ func exerciseADEPlatformSSORoutes(t *testing.T, h *Handler, ctx context.Context,
 	if err := h.Model.DB.QueryRowContext(ctx, `SELECT id,revision_id FROM mdm_apple_profiles WHERE tenant_id=$1 AND identifier='com.example.console-unattended'`, tenant).Scan(&profile, &revision); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Model.DB.QueryRowContext(ctx, `SELECT v.id FROM uem_software_versions v JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id WHERE v.tenant_id=$1 AND p.identifier='com.example.RouteEditor' AND v.version='42.0'`, tenant).Scan(&version); err != nil {
+	if err := h.Model.DB.QueryRowContext(ctx, `SELECT v.id FROM uem_software_versions v JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id WHERE v.tenant_id=$1 AND p.identifier='com.example.RouteEditor' AND v.version='43.0' AND v.withdrawn_at IS NULL`, tenant).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
 	server, err := h.Apple.CreateADEServer(ctx, tenant, "SSO route fixture", "organization-admin", h.Access)

@@ -6,6 +6,9 @@ func adePlatformSSOMessage(r *apple.ADEPlatformSSOStatus, setup string) string {
 	if setup == "complete" {
 		return "The Mac reported that the MDM setup hold ended. This panel retains the original enrollment requirement."
 	}
+	if r.Error == "provider_application_mismatch" {
+		return "The required provider application differs from the reviewed version. Setup release remains held."
+	}
 	if r.ProfileVerified {
 		return "The retained profile revision is verified by current inventory."
 	}
@@ -16,8 +19,6 @@ func adePlatformSSOMessage(r *apple.ADEPlatformSSOStatus, setup string) string {
 		return "The retained profile is missing or its installation needs attention. Review profile commands and current inventory before resending it."
 	case "profile_prerequisites_required":
 		return "Profile prerequisites are not ready. Check this Mac's platform, enrollment capabilities and current security inventory."
-	case "provider_application_mismatch":
-		return "The required provider application differs from the reviewed version. Setup release remains held."
 	default:
 		return "Waiting for current inventory to verify the retained profile revision."
 	}
