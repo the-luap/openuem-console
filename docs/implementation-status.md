@@ -62,9 +62,9 @@ the table's package summaries do not remove any detail from the roadmap.
 ## Current change evidence
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend
-  local identity binding checks to regular VPN, IPsec and IKEv2 configurations.
-  Isolated tests pass; System/User PostgreSQL regression execution is pending.
-  Complete VPN templates, App-Layer/Always On references and physical tunnel
+  local identity binding checks to regular/App-Layer VPN, IPsec, IKEv2 and
+  transparent proxy configurations. Isolated tests pass; System/User PostgreSQL
+  regression execution is pending. Complete VPN templates, Always On references and physical tunnel
   acceptance remain open.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks
@@ -72,7 +72,7 @@ the table's package summaries do not remove any detail from the roadmap.
   manual-prompt/automatic-renewal restrictions. The dedicated creation form
   preserves omitted options and restricts enabled renewal to computer identities.
   Isolated payload tests, scoped form tests and 15 browser cases pass; full
-  regression CI for the form is pending.
+  backend validation CI passes. Full regression CI for the form is pending.
   Physical AD/CA acceptance remains open.
 
 - [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted

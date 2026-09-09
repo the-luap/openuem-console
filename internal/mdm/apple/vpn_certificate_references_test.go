@@ -20,7 +20,7 @@ func vpnReferenceFixture(protocol string) (map[string]any, map[string]any, map[s
 }
 
 func TestVPNCertificateReferencesResolveOnlyLocalIdentityPayloads(t *testing.T) {
-	for _, protocol := range []string{"VPN", "IPSec", "IKEv2"} {
+	for _, protocol := range []string{"VPN", "IPSec", "IKEv2", "TransparentProxy"} {
 		for _, kind := range []string{"com.apple.security.scep", "com.apple.security.acme", "com.apple.security.pkcs12", "com.apple.ADCertificate.managed"} {
 			root, configuration, identity, _ := vpnReferenceFixture(protocol)
 			identity["PayloadType"] = kind
@@ -47,7 +47,7 @@ func TestVPNCertificateReferencesResolveOnlyLocalIdentityPayloads(t *testing.T) 
 }
 
 func TestVPNCertificateReferencesRejectExternalPublicAmbiguousAndMalformedValues(t *testing.T) {
-	for _, protocol := range []string{"VPN", "IPSec", "IKEv2"} {
+	for _, protocol := range []string{"VPN", "IPSec", "IKEv2", "TransparentProxy"} {
 		for _, change := range []func(map[string]any, map[string]any, map[string]any, map[string]any){
 			func(r, c, i, a map[string]any) { c["PayloadCertificateUUID"] = r["PayloadUUID"] },
 			func(r, c, i, a map[string]any) { c["PayloadCertificateUUID"] = "eeeeeeee-0000-4000-8000-000000000005" },
@@ -64,6 +64,24 @@ func TestVPNCertificateReferencesRejectExternalPublicAmbiguousAndMalformedValues
 			change(root, configuration, identity, anchor)
 			if err := validateProfileCertificateReferences(root); err == nil || strings.Contains(err.Error(), "synthetic-vpn-private-value") {
 				t.Fatal("invalid VPN certificate binding accepted or value echoed", protocol, err)
+			}
+		}
+	}
+}
+
+func TestAppLayerVPNReferencesUseTheSameLocalIdentityRules(t *testing.T) {
+	for _, protocol := range []string{"VPN", "IPSec", "IKEv2"} {
+		root, configuration, _, anchor := vpnReferenceFixture(protocol)
+		network := root["PayloadContent"].([]any)[0].(map[string]any)
+		network["PayloadType"] = "com.apple.vpn.managed.applayer"
+		network["VPNUUID"] = "ffffffff-0000-4000-8000-000000000006"
+		if err := validateProfileCertificateReferences(root); err != nil {
+			t.Fatal(protocol, err)
+		}
+		for _, bad := range []any{network["VPNUUID"], root["PayloadUUID"], anchor["PayloadUUID"], false} {
+			configuration["PayloadCertificateUUID"] = bad
+			if err := validateProfileCertificateReferences(root); err == nil {
+				t.Fatal("app-layer VPN accepted a connection UUID, root UUID or public identity", protocol)
 			}
 		}
 	}

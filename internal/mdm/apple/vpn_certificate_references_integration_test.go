@@ -8,22 +8,28 @@ import (
 	"howett.net/plist"
 )
 
-func vpnCertificateProfileData(t *testing.T, scope, protocol string, broken bool) []byte {
+func vpnCertificateProfileData(t *testing.T, scope, protocol, payloadType string, broken bool) []byte {
 	t.Helper()
 	var root map[string]any
 	if _, err := plist.Unmarshal(wifiCertificateSource(t, scope, "scep"), &root); err != nil {
 		t.Fatal(err)
 	}
-	root["PayloadIdentifier"] = "com.example.vpn-reference." + scope + "." + protocol
+	root["PayloadIdentifier"] = "com.example.vpn-reference." + scope + "." + protocol + "." + payloadType
 	identity := root["PayloadContent"].([]any)[0].(map[string]any)
 	reference := identity["PayloadUUID"]
 	if broken {
 		reference = uuid.NewString()
 	}
 	configuration := map[string]any{"RemoteAddress": "vpn.example.test", "AuthenticationMethod": "Certificate", "PayloadCertificateUUID": reference}
-	vpn := map[string]any{"PayloadType": "com.apple.vpn.managed", "PayloadIdentifier": "com.example.vpn-reference.settings", "PayloadVersion": 1, "PayloadUUID": uuid.NewString(), "VPNType": protocol, "UserDefinedName": "Synthetic certificate VPN", protocol: configuration}
-	if protocol == "VPN" {
+	vpn := map[string]any{"PayloadType": payloadType, "PayloadIdentifier": "com.example.vpn-reference.settings", "PayloadVersion": 1, "PayloadUUID": uuid.NewString(), "VPNType": protocol, "UserDefinedName": "Synthetic certificate VPN", protocol: configuration}
+	if protocol == "VPN" || protocol == "TransparentProxy" {
 		vpn["VPNSubType"] = "com.example.synthetic-provider"
+	}
+	if payloadType == "com.apple.vpn.managed.applayer" {
+		vpn["VPNUUID"] = uuid.NewString()
+	}
+	if protocol == "TransparentProxy" {
+		delete(configuration, "RemoteAddress")
 	}
 	if protocol == "IKEv2" {
 		configuration["LocalIdentifier"], configuration["RemoteIdentifier"] = "device.example.test", "vpn.example.test"
@@ -44,12 +50,16 @@ func TestVPNCertificateReferencesGuardUploadRevisionAndLegacyReassignment(t *tes
 	drainMacInventory(t, s, d)
 	u := testUserEnroll(t, s, d, "alice")
 	for _, channel := range []string{"System", "User"} {
-		for _, protocol := range []string{"VPN", "IPSec", "IKEv2"} {
-			bad := vpnCertificateProfileData(t, channel, protocol, true)
+		for _, tc := range []struct{ protocol, payloadType string }{
+			{"VPN", "com.apple.vpn.managed"}, {"IPSec", "com.apple.vpn.managed"}, {"IKEv2", "com.apple.vpn.managed"}, {"TransparentProxy", "com.apple.vpn.managed"},
+			{"VPN", "com.apple.vpn.managed.applayer"}, {"IPSec", "com.apple.vpn.managed.applayer"}, {"IKEv2", "com.apple.vpn.managed.applayer"},
+		} {
+			protocol := tc.protocol
+			bad := vpnCertificateProfileData(t, channel, protocol, tc.payloadType, true)
 			if _, err := ParseProfile(bad); err == nil {
 				t.Fatal("external VPN identity accepted on upload", channel, protocol)
 			}
-			p, err := s.SaveProfile(t.Context(), 1, "", 0, vpnCertificateProfileData(t, channel, protocol, false), "admin")
+			p, err := s.SaveProfile(t.Context(), 1, "", 0, vpnCertificateProfileData(t, channel, protocol, tc.payloadType, false), "admin")
 			if err != nil {
 				t.Fatal(err)
 			}

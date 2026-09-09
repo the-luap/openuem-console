@@ -52,8 +52,9 @@ func validateProfileCertificateReferences(root map[string]any) error {
 	}
 	for _, item := range items {
 		payload := item.(map[string]any)
-		if stringValue(payload, "PayloadType") == "com.apple.vpn.managed" {
-			for _, key := range []string{"VPN", "IPSec", "IKEv2"} {
+		kind := stringValue(payload, "PayloadType")
+		if kind == "com.apple.vpn.managed" || kind == "com.apple.vpn.managed.applayer" {
+			for _, key := range []string{"VPN", "IPSec", "IKEv2", "TransparentProxy"} {
 				if value, exists := payload[key]; exists {
 					configuration, ok := value.(map[string]any)
 					if !ok {

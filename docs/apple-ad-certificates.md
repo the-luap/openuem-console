@@ -62,4 +62,11 @@ zero/false values, confirmation, keyboard submission, reset and page overflow.
 Native OS select menus are not exercised. Full regression CI is still pending.
 Physical AD/CA and Mac acceptance remain required.
 
+The preceding backend validation at `95c9b80` passes both complete workflows:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34370903854) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34370910988).
+This includes System/User revision rollback, unsupported targets, malformed
+uploads, composition validation, removal, protocol/TLS, authorization, models,
+desktop services, Linux/Windows builds and protected Windows protocol checks.
+
 Source: [Apple Active Directory Certificate schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml).
