@@ -127,9 +127,25 @@ the table's package summaries do not remove any detail from the roadmap.
   tests verify response framing and revocation on resumed connections. Bounded
   text chunks validate their declared size before completion. The final local
   PostgreSQL/race suite passes in 33.144 seconds at 89.4% coverage; vet and 325,599
-  transition fuzz executions pass. Full CI for this session change is pending. Administrative
-  policy/update commands, console/gateway wiring, lifecycle and physical Windows
+  transition fuzz executions pass. Both complete workflows pass for session
+  commit `2c3c2ad`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34407599355),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34407601208)).
+  Typed policy/update commands, console/gateway wiring, lifecycle and physical Windows
   acceptance remain open; exchange completion does not prove policy compliance.
+- [Native Windows CSP commands](native-windows-csp.md) add an administrator-only
+  compiler and scoped encrypted queue for Get/Add/Replace/Delete/Exec and bounded
+  Atomic/Sequence trees. Authenticated sessions deliver eligible intent and persist
+  correlated statuses, chunked Get results and immutable packet-bound evidence.
+  Creator permission revisions, deadlines, user context and negotiated sizes guard
+  delivery and replay. Unknown outcomes stop the queue until an audited resolution;
+  acknowledgment is separate from verified policy compliance. PostgreSQL, restart,
+  real TLS, rollback, integrity and lifecycle tests pass. The final PostgreSQL/race
+  suite passes in 49.024 seconds at 86.4% package coverage; compiler and structured
+  result-transition fuzzing pass after 622,469 and 21,261 executions. Full CI for
+  this CSP change is pending. Typed
+  policies/updates, command/result views, outgoing chunking, production wiring,
+  renewal/unenrollment and physical Windows acceptance remain open.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

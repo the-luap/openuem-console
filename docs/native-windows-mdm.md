@@ -9,13 +9,14 @@ organization CAs, an authenticated XCEP policy handler and the [initial WSTEP
 issuance/provisioning service](native-windows-enrollment.md), plus [direct TLS
 device identity and OMA DM digest verification](native-windows-management.md), and
 the [bounded SyncML XML codec](native-windows-syncml.md) and
-[durable authenticated sessions with a read-only identity probe](native-windows-sessions.md). These components
+[durable authenticated sessions with a read-only identity probe](native-windows-sessions.md),
+plus [scoped CSP command delivery and results](native-windows-csp.md). These components
 are not registered in a production listener, gateway or console flow.
 
 Initial certificate issuance and bootstrap provisioning are implemented and
 tested synthetically. A real Windows management session and applied CSP are
-not yet demonstrated on hardware. Administrative CSP commands/results,
-policy/update workflows, certificate renewal,
+not yet demonstrated on hardware. Administrative command/result views,
+typed policy/update workflows, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
 
@@ -298,8 +299,8 @@ Both complete workflows now pass for CA/policy commit `a1f6353`
 They include native Windows checks, Linux PostgreSQL/race/fuzz tests, the existing
 console/browser regressions and both platform builds. The subsequent
 [WSTEP implementation](native-windows-enrollment.md) records its own local
-issuance/replay/provisioning evidence. Real Windows management sessions,
-SyncML/CSP and physical acceptance remain open.
+issuance/replay/provisioning evidence. The subsequent session and CSP extensions
+record their synthetic evidence separately. Physical Windows acceptance remains open.
 
 ## Sources
 

@@ -38,6 +38,11 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 		return nil, err
 	}
 	defer tx.Rollback()
+	// Use the same permission-before-scope lock order as console enqueue and
+	// cancellation. This does not require the device to have a console account.
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock_shared(684627902)`); err != nil {
+		return nil, err
+	}
 	device, err := s.authorizeManagementDevice(ctx, tx, certificate, options)
 	if err != nil {
 		return nil, err
@@ -69,11 +74,20 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	if session != nil && session.WireID == request.Header.SessionID && messageID <= session.LastMessage {
 		response, replayErr := s.replaySyncML(ctx, tx, identity, options, session, messageID, requestDigest[:])
 		if replayErr == nil {
+			command, err := s.authorizeCSPReplay(ctx, tx, identity, session.ID, messageID)
+			if err != nil {
+				return nil, err
+			}
 			if err := checkSyncMLSessionTime(ctx, tx, session); err != nil {
 				return nil, err
 			}
 			if err := auditSyncML(ctx, tx, identity, session.ID, "message.replayed"); err != nil {
 				return nil, err
+			}
+			if command != nil {
+				if err := checkCSPDeadline(ctx, tx, command); err != nil {
+					return nil, err
+				}
 			}
 			if err := commitSyncML(ctx, tx, device, session); err != nil {
 				return nil, err
@@ -109,6 +123,9 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 			}
 			session.Phase = "expired"
 			session.Revision++
+			if err := s.stopCSPSession(ctx, tx, identity, session); err != nil {
+				return nil, err
+			}
 			if err := s.saveSyncMLSession(ctx, tx, identity, options, session, false); err != nil {
 				return nil, err
 			}
@@ -129,9 +146,29 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	} else {
 		session.Revision++
 	}
+	activeCommand, err := s.lockCurrentCSP(ctx, tx, identity, session)
+	if err != nil {
+		return nil, err
+	}
 	response, transitionEvents, err := advanceSyncMLSession(identity, options, record, session, request, secrets)
 	if err != nil {
 		return nil, err
+	}
+	if err := s.observeCSP(ctx, tx, identity, session, activeCommand, request.Header.MessageID, requestDigest[:]); err != nil {
+		return nil, err
+	}
+	dispatched, err := s.dispatchCSP(ctx, tx, identity, session, response)
+	if err != nil {
+		return nil, err
+	}
+	if dispatched != nil {
+		filtered := transitionEvents[:0]
+		for _, event := range transitionEvents {
+			if event != "session.completed" {
+				filtered = append(filtered, event)
+			}
+		}
+		transitionEvents = filtered
 	}
 	encoded, err := EncodeSyncML(response)
 	if err != nil {
@@ -153,6 +190,11 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	}
 	for _, event := range append(events, transitionEvents...) {
 		if err := auditSyncML(ctx, tx, identity, session.ID, event); err != nil {
+			return nil, err
+		}
+	}
+	if dispatched != nil {
+		if err := checkCSPDeadline(ctx, tx, dispatched); err != nil {
 			return nil, err
 		}
 	}

@@ -110,8 +110,9 @@ configured XML path; it does not advertise WBXML or newer application protocol
 versions. No Windows profile/certificate has been installed on the host, no
 physical SyncML exchange has been accepted, and no production management route
 has been registered. The subsequent [session implementation](native-windows-sessions.md)
-records its own evidence. Administrative CSP execution/results and production
-integration remain open; WIN-02 stays in progress.
+and [CSP command extension](native-windows-csp.md) record their own evidence.
+Typed policy/update workflows and production integration remain open; WIN-02
+stays in progress.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows

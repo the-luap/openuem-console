@@ -111,6 +111,7 @@ go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=30s -parallel=2 ./internal/md
 
 Set the database environment variable according to the
 [reserved fixture instructions](native-windows-mdm.md#scoped-enrollment-credentials).
-Remaining work includes administrative CSP commands/results, update workflows, enrollment
+The [CSP extension](native-windows-csp.md) adds administrative command queues and
+correlated results. Remaining work includes their console views, typed update workflows, enrollment
 console and gateway wiring, certificate renewal/unenrollment, key rotation,
 backup/restore and physical Windows acceptance. WIN-02 remains in progress.

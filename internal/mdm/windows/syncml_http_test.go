@@ -90,7 +90,7 @@ func TestSyncMLHTTPTransportAndContentBoundaries(t *testing.T) {
 	}
 }
 
-func TestSyncMLHTTPRealTLSExchangeReplayAndRevocation(t *testing.T) {
+func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	s := authorityTestStore(t)
 	initializeTestAuthority(t, s, 1)
 	var handler *SyncMLHandler
@@ -105,6 +105,7 @@ func TestSyncMLHTTPRealTLSExchangeReplayAndRevocation(t *testing.T) {
 	options.ManagementURL = "https://" + server.Listener.Addr().String() + "/windows/syncml"
 	_, result, key := managementTestEnrollment(t, s, options)
 	f := syncMLTestEnrolled(t, s, result, options)
+	queued := cspTestQueue(t, f, cspTestPolicy())
 	var err error
 	handler, err = NewSyncMLHandler(s, options)
 	if err != nil {
@@ -156,12 +157,24 @@ func TestSyncMLHTTPRealTLSExchangeReplayAndRevocation(t *testing.T) {
 	if !<-resumed {
 		t.Fatal("retry did not exercise TLS resumption")
 	}
-	final := post(syncMLTestWire(t, syncMLTestReply(syncMLTestParsed(t, first))), http.StatusOK)
+	deliveryRequest := syncMLTestWire(t, syncMLTestReply(syncMLTestParsed(t, first)))
+	delivery := post(deliveryRequest, http.StatusOK)
+	if !<-resumed || len(syncMLTestParsed(t, delivery).Commands) != 2 {
+		t.Fatal("CSP delivery did not use the authenticated resumed TLS session")
+	}
+	final := post(syncMLTestWire(t, cspTestReply(syncMLTestParsed(t, delivery))), http.StatusOK)
 	if !<-resumed {
 		t.Fatal("completion did not use resumed TLS")
 	}
 	if message := syncMLTestParsed(t, final); len(message.Commands) != 1 || message.Header.Credential != nil {
 		t.Fatal("unexpected completed exchange")
+	}
+	if cspTestRead(t, f, queued.ID).Command.Phase != "acknowledged" {
+		t.Fatal("TLS CSP evidence was not committed")
+	}
+	post(deliveryRequest, http.StatusConflict)
+	if !<-resumed {
+		t.Fatal("completed CSP replay did not exercise TLS resumption")
 	}
 	if _, err := s.db.Exec(`UPDATE mdm_windows_device_certificates SET revoked_at=clock_timestamp() WHERE id=$1`, f.identity.CertificateID); err != nil {
 		t.Fatal(err)
@@ -170,5 +183,5 @@ func TestSyncMLHTTPRealTLSExchangeReplayAndRevocation(t *testing.T) {
 	if !<-resumed {
 		t.Fatal("revocation test did not use resumed TLS")
 	}
-	syncMLTestCounts(t, s, 1, 1, 2, 4)
+	syncMLTestCounts(t, s, 1, 1, 3, 4)
 }

@@ -52,22 +52,25 @@ type syncMLIncomingChunk struct {
 }
 
 type syncMLSessionState struct {
-	Version              int
-	SourceURI            string
-	ClientAuthenticated  bool
-	ServerAuthenticated  bool
-	ServerVerified       bool
-	ClientChallenges     int
-	ServerChallenges     int
-	ClientNonce          string
-	ServerNonce          string
-	MaximumResponseBytes uint64
-	DeviceInfo           map[string]string
-	IncompleteInfo       map[string]bool
-	LastServerCredential bool
-	LastResponse         []syncMLSentCommand
-	Probe                *syncMLIdentityProbe
-	IncomingChunk        *syncMLIncomingChunk
+	Version                    int
+	SourceURI                  string
+	ClientAuthenticated        bool
+	ServerAuthenticated        bool
+	ServerVerified             bool
+	ClientChallenges           int
+	ServerChallenges           int
+	ClientNonce                string
+	ServerNonce                string
+	MaximumResponseBytes       uint64
+	MaximumResponseObjectBytes uint64
+	DeviceInfo                 map[string]string
+	IncompleteInfo             map[string]bool
+	LastServerCredential       bool
+	LastResponse               []syncMLSentCommand
+	Probe                      *syncMLIdentityProbe
+	IncomingChunk              *syncMLIncomingChunk
+	LoginStatus                string
+	CSP                        *cspSessionCommand
 }
 
 type syncMLSession struct {
@@ -152,6 +155,12 @@ func (s *syncMLSession) validate() error {
 	if v.Version != 1 || !syncMLStoredIdentifier(v.SourceURI, 2048) || v.ClientChallenges < 0 || v.ClientChallenges > 1 || v.ServerChallenges < 0 || v.ServerChallenges > 1 || v.MaximumResponseBytes == 0 || v.MaximumResponseBytes > MaxSyncMLBytes || v.DeviceInfo == nil || v.IncompleteInfo == nil || len(v.DeviceInfo) > len(syncMLRequiredDeviceInfo) || len(v.IncompleteInfo) != len(v.DeviceInfo) || len(v.LastResponse) == 0 || len(v.LastResponse) > MaxSyncMLCommands {
 		return ErrAuthoritySecret
 	}
+	if v.LoginStatus != "" && v.LoginStatus != "user" && v.LoginStatus != "others" && v.LoginStatus != "none" || v.CSP.validate() != nil {
+		return ErrAuthoritySecret
+	}
+	if v.MaximumResponseObjectBytes > MaxCSPRequestBytes {
+		return ErrAuthoritySecret
+	}
 	if (syncMLDeviceNonces{Version: 1, ClientNonce: v.ClientNonce, ServerNonce: v.ServerNonce}).validate() != nil || v.ServerAuthenticated && !v.ServerVerified || s.Phase == "active" && (!v.ClientAuthenticated || !v.ServerVerified) {
 		return ErrAuthoritySecret
 	}
@@ -181,7 +190,12 @@ func (s *syncMLSession) validate() error {
 		}
 	}
 	for n, sent := range v.LastResponse {
-		if sent.ID != syncMLResponseCommandID(s, strconv.Itoa(s.LastMessage), n) || sent.Kind != "Status" && sent.Kind != "Get" && sent.Kind != "Alert" {
+		if sent.ID != syncMLResponseCommandID(s, strconv.Itoa(s.LastMessage), n) {
+			return ErrAuthoritySecret
+		}
+		switch sent.Kind {
+		case "Status", "Get", "Alert", "Add", "Replace", "Delete", "Exec", "Atomic", "Sequence":
+		default:
 			return ErrAuthoritySecret
 		}
 	}

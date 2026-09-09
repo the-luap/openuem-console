@@ -5,8 +5,9 @@
 created by [WSTEP enrollment](native-windows-enrollment.md). It persists an
 authenticated exchange and an initial read-only `Get ./DevInfo/DevId` probe.
 It is not registered in a production gateway or console enrollment flow yet.
-Administrative CSP policies, updates, certificate renewal and unenrollment remain
-separate implementation work. WIN-02 remains in progress.
+The [CSP command extension](native-windows-csp.md) adds administrative queues and
+correlated results. Typed policies, updates, certificate renewal and unenrollment
+remain separate implementation work. WIN-02 remains in progress.
 
 ## HTTP and authorization
 
@@ -71,8 +72,8 @@ size can complete the object. A size mismatch reports `424`; interrupted objects
 report alert `1225` and terminate this exchange. Requests for further messages use
 alert `1222` without Final. The large-object and package rules come from
 [OMA DM Protocol 1.2.1, sections 6–7](https://www.openmobilealliance.org/release/DM/V1_2_1-20080617-A/OMA-TS-DM_Protocol-V1_2_1-20080617-A.pdf).
-This receiver is limited to the DevInfo initialization and identity probe; it is
-not a generic CSP object delivery service.
+DevInfo initialization and the identity probe retain their 4,096-byte limit.
+The CSP extension provides its own bounded Get result receiver.
 
 An exchange can finish with a successful result, a device-reported probe error,
 an abort or a failure. `completed` describes protocol completion. It does not
@@ -115,7 +116,8 @@ closed while a new session is created in the same transaction.
 | --- | --- |
 | Request or encoded response | 1 MiB, plus the independent XML codec limits |
 | Response size | Client MaxMsgSize, capped at 1 MiB; 5,000 bytes if omitted |
-| Accepted DevInfo object | 4,096 bytes, also advertised as MaxObjSize |
+| Accepted DevInfo object | 4,096 bytes |
+| Advertised MaxObjSize | 256 KiB for the CSP Get result receiver |
 | Session | 64 client messages, at most 15 minutes, no later than certificate expiry |
 | Protected session JSON | 2 MiB |
 | Authentication resynchronization | One challenge in each direction per session |
@@ -140,8 +142,11 @@ The final combined PostgreSQL 17/race suite passes in **33.144 seconds**, at
 **89.4%** package statement coverage. The final 30-second transition fuzz run
 passes after **325,599 executions**. Vet, formatting, whitespace and local
 documentation-link checks also pass. CI includes the transition fuzz target, portable native
-Windows checks and Linux PostgreSQL/TLS/race tests. Full CI evidence for this
-session change is pending.
+Windows checks and Linux PostgreSQL/TLS/race tests. Both complete workflows pass
+for session commit `2c3c2ad`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34407599355),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34407601208)).
+The subsequent CSP extension records its own evidence separately.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows
@@ -151,6 +156,7 @@ go test -run '^$' -fuzz='^FuzzSyncMLSessionTransition$' -fuzztime=30s -parallel=
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 All certificates and device messages are synthetic; no Windows profile or
 certificate has been installed on the host. No physical Windows device has
-completed acceptance. Remaining work includes scoped command queues and result
-views, configuration/update policies, enrollment console and gateway wiring,
+completed acceptance. The CSP extension adds scoped queues and audited result
+reads. Remaining work includes command/result views, configuration/update
+policies, enrollment console and gateway wiring,
 renewal/unenrollment, recovery, Entra/Autopilot and hardware acceptance.

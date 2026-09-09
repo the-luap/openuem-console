@@ -6,6 +6,8 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+
+	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 const syncMLContentType = "application/vnd.syncml.dm+xml"
@@ -85,13 +87,13 @@ func (h *SyncMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
-		case errors.Is(err, ErrManagementIdentity):
+		case errors.Is(err, ErrManagementIdentity), errors.Is(err, access.ErrDenied):
 			status = http.StatusForbidden
-		case errors.Is(err, ErrSyncML), errors.Is(err, ErrSyncMLSession), errors.Is(err, ErrSyncMLMessageSize):
+		case errors.Is(err, ErrSyncML), errors.Is(err, ErrSyncMLSession), errors.Is(err, ErrSyncMLMessageSize), errors.Is(err, ErrCSPCommand):
 			status = http.StatusBadRequest
-		case errors.Is(err, ErrSyncMLReplay):
+		case errors.Is(err, ErrSyncMLReplay), errors.Is(err, ErrCSPAlreadySent):
 			status = http.StatusConflict
-		case errors.Is(err, ErrSyncMLSessionExpired):
+		case errors.Is(err, ErrSyncMLSessionExpired), errors.Is(err, ErrCSPDeadline):
 			status = http.StatusGone
 		}
 		// A fixed empty HTTP error cannot leak SQL details, credentials, device

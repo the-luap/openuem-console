@@ -17,7 +17,7 @@ func syncMLDeviceInfoURI(uri string) bool {
 }
 
 func syncMLResponseHeader(identity ManagementDeviceIdentity, options EnrollmentOptions, session *syncMLSession, messageID string) SyncMLHeader {
-	maximumMessage, maximumObject := uint64(MaxSyncMLBytes), uint64(maxSyncMLDeviceInfoBytes)
+	maximumMessage, maximumObject := uint64(MaxSyncMLBytes), uint64(MaxCSPResultBytes)
 	return SyncMLHeader{SessionID: session.WireID, MessageID: messageID,
 		Target: SyncMLLocation{URI: session.State.SourceURI, Name: identity.DeviceID},
 		Source: SyncMLLocation{URI: options.ManagementURL, Name: options.ProviderID},
@@ -57,6 +57,9 @@ func advanceSyncMLSession(identity ManagementDeviceIdentity, options EnrollmentO
 	state := &session.State
 	if request.Header.Meta != nil && request.Header.Meta.MaxMessageSize != nil {
 		state.MaximumResponseBytes = min(*request.Header.Meta.MaxMessageSize, uint64(MaxSyncMLBytes))
+	}
+	if request.Header.Meta != nil && request.Header.Meta.MaxObjectSize != nil {
+		state.MaximumResponseObjectBytes = min(*request.Header.Meta.MaxObjectSize, uint64(MaxCSPRequestBytes))
 	}
 	response := &SyncMLMessage{Header: syncMLResponseHeader(identity, options, session, request.Header.MessageID), Final: true}
 	events := []string{}
@@ -119,6 +122,17 @@ func advanceSyncMLSession(identity ManagementDeviceIdentity, options EnrollmentO
 		session.Phase = "active"
 		events = append(events, "session.authenticated")
 	}
+	if state.CSP != nil {
+		remaining, err := processCSPResponses(session, request, response)
+		if err != nil {
+			return nil, nil, err
+		}
+		request = remaining
+		if serverRetry {
+			state.CSP.StopReason = "server_authentication_retry"
+			session.Phase = "failed"
+		}
+	}
 	if session.Phase == "failed" {
 		syncMLAbortResponse(response)
 		events = append(events, "session.failed")
@@ -131,7 +145,7 @@ func advanceSyncMLSession(identity ManagementDeviceIdentity, options EnrollmentO
 		} else if session.Phase == "failed" {
 			syncMLAbortResponse(response)
 			events = append(events, "session.failed")
-		} else if request.Final && state.Probe != nil && state.ServerVerified && (state.Probe.Status == "200" && state.Probe.HasResult && !state.Probe.MoreData || syncMLProbeFailed(state.Probe)) {
+		} else if request.Final && state.Probe != nil && state.ServerVerified && (state.CSP == nil || cspOutcome(state.CSP) != "") && (state.Probe.Status == "200" && state.Probe.HasResult && !state.Probe.MoreData || syncMLProbeFailed(state.Probe)) {
 			session.Phase = "completed"
 			events = append(events, "session.completed")
 		} else if messageID == maxSyncMLSessionMessages {
@@ -172,20 +186,28 @@ func finishSyncMLResponse(options EnrollmentOptions, session *syncMLSession, res
 		}
 		response.Header.Credential = &SyncMLCredential{Digest: digest}
 	}
-	state.LastResponse = nil
-	for n := range response.Commands {
-		command := &response.Commands[n]
-		id := syncMLResponseCommandID(session, response.Header.MessageID, n)
-		// Wire SessionIDs can wrap. A server session UUID in each command ID
-		// prevents old Results from acknowledging a new probe after that wrap.
-		if state.Probe != nil && state.Probe.MessageID == response.Header.MessageID && state.Probe.CommandID == command.ID {
-			state.Probe.CommandID = id
-		}
-		command.ID = id
-		state.LastResponse = append(state.LastResponse, syncMLSentCommand{ID: command.ID, Kind: command.Kind})
-	}
+	state.LastResponse = assignSyncMLResponseIDs(session, response)
 	session.LastMessage++
 	return nil
+}
+
+func assignSyncMLResponseIDs(session *syncMLSession, response *SyncMLMessage) []syncMLSentCommand {
+	var sent []syncMLSentCommand
+	var assign func([]SyncMLCommand)
+	assign = func(commands []SyncMLCommand) {
+		for n := range commands {
+			command := &commands[n]
+			id := syncMLResponseCommandID(session, response.Header.MessageID, len(sent))
+			if session.State.Probe != nil && session.State.Probe.MessageID == response.Header.MessageID && session.State.Probe.CommandID == command.ID {
+				session.State.Probe.CommandID = id
+			}
+			command.ID = id
+			sent = append(sent, syncMLSentCommand{ID: id, Kind: command.Kind})
+			assign(command.Commands)
+		}
+	}
+	assign(response.Commands)
+	return sent
 }
 
 func syncMLResponseCommandID(session *syncMLSession, messageID string, index int) string {
@@ -386,6 +408,8 @@ func processSyncMLClientCommands(session *syncMLSession, request, response *Sync
 				value := strings.ToLower(command.Items[0].Data.Text)
 				if value != "user" && value != "others" && value != "none" {
 					code = "406"
+				} else {
+					state.LoginStatus = value
 				}
 			default:
 				code = "406"
