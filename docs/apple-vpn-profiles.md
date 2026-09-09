@@ -13,6 +13,8 @@ commands. Removal remains available when installation prerequisites are no longe
 satisfied. This is partial schema validation; broader protocol authentication,
 provider configuration, app mapping, routes, additional property versions and VPN
 editors remain separate implementation work.
+The [certificate and network acceptance procedure](apple-network-acceptance.md)
+records the outstanding device/provider checks and the evidence needed for each.
 
 ## DNS settings
 
@@ -256,11 +258,15 @@ suites with shared lifecycle, request isolation, time limits and machine-readabl
 results. Its local run passes all 81 cases against the same `e20074e` artifact.
 A disposable fixture with the required VPN algorithm attribute removed fails at
 the expected assertion, returns exit status 1 and saves a failure screenshot.
-Both new CI browser steps at `b41e647` pass:
+Both complete CI workflows, including the new browser steps, at `b41e647` pass:
 [push](https://github.com/the-luap/openuem-console/actions/runs/34380299127) and
 [pull request](https://github.com/the-luap/openuem-console/actions/runs/34380304160).
-The downloaded push artifact records all 81 cases passing on Linux; complete
-protocol/persistence workflows for this test-runner commit remain in progress.
+The downloaded push artifact records all 81 cases passing on Linux with Node
+24.20.0 and Chrome 152.0.7977.82. All three narrow screenshots were visually
+inspected. Local success and intentional-failure runs left no owned browser
+processes or temporary browser profiles behind.
+A further local isolation check inserted a request to a second owned loopback
+server: the browser runner rejected it, and that server observed zero requests.
 
 The subsequent Always On exception validator passes isolated tests using 25
 unchanged production/test files (0.454 seconds), including plist preservation,
@@ -268,7 +274,10 @@ iPhone/iPad version boundaries, empty arrays, ambiguous/oversized lists, unsuppo
 fields and invalid ignored captive lists. PostgreSQL regression cases cover three
 exception-version upgrades across two assigned devices, atomic rejected revisions
 and restoration, and removal after a malformed encrypted historical payload.
-Full CI for this extension remains pending.
+Both complete workflows at `c9e0c93` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34380904751) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34380910735).
+They also rerun the 81 browser cases against their own rendered templates.
 
 The IKEv2 on-demand extension passes an isolated run of 27 unchanged
 production/test files (0.443 seconds). Cases cover plist order/value preservation,
@@ -276,8 +285,12 @@ explicit disabled/empty rules, all actions, field placement, required DNS/probe
 conditions, malformed types, UTF-8 SSID byte limits and error redaction.
 PostgreSQL cases cover five System/User, regular/App-Layer and Always On paths:
 upload, rejected revision without catalog/history/command changes, valid replacement
-and encrypted legacy assignment rejection with removal retained. Their full CI is
-pending; the console templates and browser suites are unchanged.
+and encrypted legacy assignment rejection with removal retained. Both complete
+workflows at `abc5ecd` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34381626280) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34381631621).
+Both also pass the 81 automatic browser cases; the console templates and browser
+suites are unchanged.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

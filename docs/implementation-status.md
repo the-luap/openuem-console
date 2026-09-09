@@ -70,11 +70,13 @@ the table's package summaries do not remove any detail from the roadmap.
   tunnel, including the iOS 14.2 minimum Diffie-Hellman group.
   The subsequent exception validator checks service actions, app/captive bundle
   identifiers, UDP limits, duplicate/unknown fields and property versions;
-  isolated tests pass, while its PostgreSQL regression cases await full CI.
+  isolated tests and both full workflows at `c9e0c93` pass, including PostgreSQL
+  cases with mixed iPhone/iPad targets, revision/restoration rollback and removal.
   IKEv2 on-demand rules add ordered action/evaluation structure, field placement,
   bounded match lists, SSID byte limits and DNS/probe validation. Isolated tests
-  pass; five persistence/assignment paths await full CI. Broader provider rules
-  and an on-demand editor remain open.
+  and both full workflows at `abc5ecd` pass, including five persistence/assignment
+  paths and all 81 browser cases. Broader provider rules and an on-demand editor
+  remain open.
   A typed IKEv2 generator copies certificate configurations into System/User
   profiles with local bindings and machine/EAP-TLS authentication. Protected
   composition uses exact encrypted certificate revisions and atomic audit
@@ -85,8 +87,10 @@ the table's package summaries do not remove any detail from the roadmap.
   in Chrome, including scope changes, exact form values, keyboard review,
   reset, reader restrictions and three window widths.
   The [portable browser suites](../tests/browser/README.md) reproduce all 81
-  cases locally and detect an intentionally broken fixture. Both automatic
-  CI browser steps at `b41e647` pass; their full workflows remain in progress.
+  cases locally and detect an intentionally broken fixture. Both complete
+  workflows at `b41e647` pass, including the new automatic browser steps.
+  The [network acceptance procedure](apple-network-acceptance.md) records the
+  still outstanding physical-device and provider tests separately.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend

@@ -106,6 +106,8 @@ Profile installation or a synthetic protocol test does not establish
 successful certificate issuance or 802.1X authentication. Physical Mac, iPhone and
 iPad acceptance must verify issuance, RADIUS name/trust enforcement, rejected
 server certificates, selected TLS versions, roaming, renewal and removal.
+Record these observations using the
+[certificate and network acceptance procedure](apple-network-acceptance.md).
 
 Sources: [Apple Wi-Fi payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.wifi.managed.yaml),
 [Apple EAP client configuration](https://developer.apple.com/documentation/devicemanagement/wifi/eapclientconfiguration-data.dictionary),

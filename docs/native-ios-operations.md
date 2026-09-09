@@ -11,7 +11,9 @@ fork are still outstanding. Treat this branch as a pilot until those checks pass
 
 [Native Mac management](native-macos-management.md) documents Mac enrollment,
 platform/version gates, device-channel profiles, update compatibility and encrypted
-bootstrap-token escrow. Mac user channels and agent/MDM identity linkage remain open.
+bootstrap-token escrow. [Mac user channels](macos-user-channels.md) and
+[agent/MDM identity linkage](macos-agent-mdm-linkage.md) have their own implemented
+workflows and automated evidence; physical acceptance remains open.
 
 ## Included workflows
 
@@ -21,7 +23,7 @@ bootstrap-token escrow. Mac user channels and agent/MDM identity linkage remain 
 | Identity renewal | Automatic replacement within 30 days of expiry, candidate key confirmation, atomic push/identity activation, bounded retired acknowledgement and scoped history |
 | Inventory | OS version/build, model, serial, supervision, last contact, installed apps and configuration profiles |
 | Refresh | On enrollment, manually, and every six hours; separate observation timestamps |
-| Profiles | Unsigned XML/binary `.mobileconfig` upload; passcode, personal Wi-Fi and restriction builders; revisions; bulk assignment/removal; result verification |
+| Profiles | Unsigned XML/binary `.mobileconfig` upload; passcode, personal/enterprise Wi-Fi, certificate, IKEv2 and Mac security editors; revisions; System/User assignment/removal; result verification |
 | OS updates | Native DDM declarations, Apple release catalog validation, target version/build, device-local deadline, device-reported status and fresh-inventory compliance |
 | Reliability | Durable PostgreSQL command queue, device deferrals, expiry, retry, encrypted command/profile data, transactional state changes |
 | Console | Existing login/2FA, organization/site selection, shared navigation, device details, setup, profile management and Windows deployment access |
@@ -260,6 +262,10 @@ An earlier comparison reproduced SMTP/user expectation failures at unmodified up
 `TestUpdateSMTPSettings`, `TestAddOIDCUser`, and `TestConfirmEmail`.
 The SMTP settings regression is now fixed and `TestSMTPTestSuite` passes; this
 does not claim that the unrelated upstream user expectations have been resolved.
+
+Use the [certificate and network acceptance procedure](apple-network-acceptance.md)
+for issuance, EAP-TLS, IKEv2, ordered on-demand rules and Always On exceptions.
+Keep delivery, installed-profile inventory and actual network outcomes separate.
 
 Before a production rollout, record these checks on actual managed hardware:
 

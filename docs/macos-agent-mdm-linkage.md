@@ -2,8 +2,9 @@
 
 The console can group a verified native Mac enrollment and an individual agent
 under one scoped device identity, list row and detail page. It retains separate
-channel authorization and enrollment history. Roadmap MAC-01 remains open for
-user-channel profiles, Mac templates and physical-device acceptance.
+channel authorization and enrollment history. [Managed user-channel profiles](macos-user-channels.md)
+have a separate implemented workflow. Roadmap MAC-01 remains open for further
+Mac templates and physical-device acceptance.
 
 ## Verify a Mac
 
