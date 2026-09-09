@@ -61,17 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [SCEP certificate profiles](apple-scep-profiles.md) add typed external-CA settings,
+  subject/alternative names, key controls and pinned HTTP or HTTPS configuration.
+  System/User revision updates check Mac option versions. Parser, wire-format and
+  shared public-certificate checks pass locally; full CI and browser checks are
+  pending. Issuance and renewal against the intended CA remain device acceptance.
+
 - [Public certificate profiles](apple-public-certificates.md) add bounded PEM/DER
   import, separate certificate payloads, System/User scope and assignment-time
   validity checks with revision rollback. Core checks and template generation
-  pass; full CI and browser checks are pending. Identity certificates, SCEP/ACME
+  pass. Builds, scoped multipart console checks and six actual browser cases pass;
+  both complete workflows pass. Identity certificate and ACME
   templates and physical trust/renewal acceptance remain separate work.
 
 - [Mac privacy profiles (PPPC/TCC)](macos-privacy.md) add typed application identities,
   all 24 privacy services, Apple Events receivers, grant/deny/user-choice policies
   and their version boundaries. Device/channel/approval checks also guard revision
-  changes. The full push workflow and 21 cases using actual CI-rendered pages pass;
-  the matching PR workflow remains in progress. Application signature matching and privacy behavior remain
+  changes. Both complete workflows and 21 cases using actual CI-rendered pages pass. Application signature matching and privacy behavior remain
   physical acceptance requirements.
 
 - [Mac System Extensions profiles](macos-system-extensions.md) add typed team/bundle

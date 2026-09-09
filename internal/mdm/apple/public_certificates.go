@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -125,19 +124,8 @@ func validatePublicCertificatePayload(payload map[string]any, scope string, d *D
 	if d == nil {
 		return nil
 	}
-	minimum := "4.0"
-	switch d.Family() {
-	case PlatformMacOS:
-		minimum = "10.7"
-	case PlatformIOS, PlatformIPadOS:
-		if scope == "User" {
-			return errors.New("User certificate profiles require a managed Mac user channel")
-		}
-	default:
-		return errors.New("refresh inventory to identify the certificate target platform")
-	}
-	if !versionPattern.MatchString(d.OSVersion) || CompareVersions(d.OSVersion, minimum) < 0 {
-		return fmt.Errorf("this certificate profile requires %s %s or later", d.Family(), minimum)
+	if err := validateCertificateTarget(d, scope, "10.7", "4.0"); err != nil {
+		return err
 	}
 	now := time.Now()
 	for _, certificate := range certificates {

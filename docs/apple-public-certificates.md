@@ -48,9 +48,23 @@ Native cases cover supported Mac/iPhone batches, future/expired assignment and
 revision rollback, retained history, managed Mac user profiles and verified System
 profile removal. Console cases use real scoped multipart requests and check roles,
 CSRF, repeated/unrelated fields, query rejection, additional files, safe errors
-and persisted System/User certificate data. Full CI and browser checks are pending.
+and persisted System/User certificate data. Linux/Windows builds, native Windows
+checks, rendering and scoped multipart console tests pass in the
+[`b264254` push workflow](https://github.com/the-luap/openuem-console/actions/runs/34352935466).
+Both that workflow and the [matching PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34352940670)
+pass every job, including native Apple race tests (462.854 s), handlers (10.854 s)
+and desktop lifecycles (25.045 s).
 
-PKCS12 identity and SCEP/ACME templates remain separate work. In particular,
+Six browser cases use that workflow's actual rendered page at 390/768/1440 pixels
+for System and User scope. Required names, identifiers, certificate file and review
+confirmation, multipart encoding, file metadata, scoped submission and CSRF pass.
+Keyboard confirmation and submission work, with no horizontal overflow; the narrow
+layout was inspected. The harness injects a synthetic file and sets native selects
+directly. It does not independently verify the operating system file picker or
+native dropdown arrow keys.
+
+The [SCEP template](apple-scep-profiles.md) is being validated separately. PKCS12
+identity and ACME templates remain separate work. In particular,
 untrusted PKCS12 decoding needs bounded KDF work and allocation before inspecting
 an archive on the server. Physical certificate installation, trust behavior,
 removal and certificate renewal require device acceptance.

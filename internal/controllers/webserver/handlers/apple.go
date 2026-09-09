@@ -662,6 +662,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 				return err
 			}
 		}
+		if c.FormValue("editor") == "apple-scep" {
+			if err = appleSCEPSettings(c, settings); err != nil {
+				return err
+			}
+		}
 		if c.FormValue("editor") == "macos-privacy" {
 			if err = applePrivacySettings(c, settings); err != nil {
 				return err
