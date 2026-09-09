@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"time"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -81,21 +81,20 @@ func (h *Handler) SoftwareVersion(c echo.Context) error {
 		return softwareFailure(err)
 	}
 	eligible := []apple.Device{}
+	query, next := strings.TrimSpace(c.QueryParam("q")), ""
+	if len(query) > 128 {
+		return echo.NewHTTPError(http.StatusBadRequest, "Use at most 128 bytes for the device search")
+	}
 	if info.Can(access.AssignSoftware) && v.WithdrawnAt == nil {
-		devices, err := h.Apple.Devices(c.Request().Context(), scope)
+		eligible, next, err = h.Apple.MacAppDevices(c.Request().Context(), scope, *v, query, c.QueryParam("after"))
 		if err != nil {
 			return softwareFailure(err)
-		}
-		for _, d := range devices {
-			if apple.MacAppInstallReady(d, *v, time.Now()) {
-				eligible = append(eligible, d)
-			}
 		}
 	}
 	if err = h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "software.catalog.read", id); err != nil {
 		return softwareFailure(err)
 	}
-	return RenderView(c, mdm_views.SoftwareVersion(c, info, *v, eligible, scope.SiteID == 0 && info.Can(access.ManageSoftware)))
+	return RenderView(c, mdm_views.SoftwareVersion(c, info, *v, eligible, scope.SiteID == 0 && info.Can(access.ManageSoftware), mdm_views.SoftwareDeviceSearch{Query: query, Next: next}))
 }
 
 func (h *Handler) PublishMacAppPackage(c echo.Context) error {

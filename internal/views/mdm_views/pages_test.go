@@ -224,9 +224,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 
 		{"software-catalog", SoftwareCatalog(c, info, []apple.SoftwareVersion{appVersion, withdrawnVersion}, appVersion.ID, true), []string{"Approve a Mac application package", "Editor &lt;Suite&gt;", "Older revisions", "Withdrawn", `name="sha256"`, `name="source_url"`}},
 		{"software-catalog-reader", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{appVersion}, "", false), []string{"Published revisions", "Editor &lt;Suite&gt;"}},
-		{"software-version", SoftwareVersion(c, info, appVersion, []apple.Device{appDevice}, true), []string{"Request installation", "Withdraw approval", "Exact bundle version", strings.Repeat("a", 64)}},
-		{"software-version-reader", SoftwareVersion(c, &reader, appVersion, nil, false), []string{"Approved artifact", strings.Repeat("a", 64)}},
-		{"software-version-withdrawn", SoftwareVersion(c, info, withdrawnVersion, nil, true), []string{"Withdrawn at", "cannot be sent for another installation"}},
+		{"software-version", SoftwareVersion(c, info, appVersion, []apple.Device{appDevice}, true, SoftwareDeviceSearch{Next: appDevice.ID}), []string{"Request installation", "Withdraw approval", "Exact bundle version", "Search Macs", "More matching Macs", strings.Repeat("a", 64)}},
+		{"software-version-reader", SoftwareVersion(c, &reader, appVersion, nil, false, SoftwareDeviceSearch{}), []string{"Approved artifact", strings.Repeat("a", 64)}},
+		{"software-version-withdrawn", SoftwareVersion(c, info, withdrawnVersion, nil, true, SoftwareDeviceSearch{}), []string{"Withdrawn at", "cannot be sent for another installation"}},
 		{"software-app-queued", MacApplications(c, info, &appDevice, appState("queued"), ""), []string{"Cancel queued operation", "Queued for delivery", "View operation history"}},
 		{"software-app-verifying", MacApplications(c, info, &appDevice, appState("verifying"), ""), []string{"Waiting for application observations", "41.0", "Request current app status"}},
 		{"software-app-verified", MacApplications(c, info, &appDevice, appState("verified"), ""), []string{"Expected managed app version reported", "Request app removal", "42.0"}},

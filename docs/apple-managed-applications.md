@@ -66,7 +66,9 @@ Checkout stops management and preserves attempt history and uncertain outcomes.
 
 Open **Approved software** from device management to publish or inspect revisions.
 Publishing and permanent withdrawal are organization-level actions; scoped
-operators can select a compatible Mac and request an approved revision. Publishing,
+operators can search by name or serial number, select a compatible Mac and request
+an approved revision. Device selection reads at most 101 small metadata records
+per page and escapes search wildcards; it does not load full device inventories. Publishing,
 installation and removal require explicit confirmation and a valid CSRF token.
 The server rejects duplicate form fields, query-based mutation input and unapproved
 command or download parameters. Download credentials never appear on read pages.
@@ -82,7 +84,7 @@ enrollments retain history. Catalog and history pages use scoped bounded cursors
 
 Local protocol tests cover package validation, pinned manifests, management
 options, credential exclusion and conservative observation parsing. URL fuzzing
-completed 183,084 inputs. All 26 actual Apple migrations and all 58 SQL statements
+completed 183,084 inputs. All 26 actual Apple migrations and all 59 SQL statements
 in the application backend and console reads passed an isolated PostgreSQL migration and
 parameter-inference check. These checks roll back their temporary schema.
 
@@ -92,7 +94,11 @@ late responses, concurrent requests, scope and checkout. The initial backend com
 and Windows builds, native Windows protocol checks and PostgreSQL/race tests.
 The subsequent console/history/timeout changes add route authorization, CSRF,
 stale-inventory cancellation, read isolation and missing-report recovery tests;
-their complete CI and browser acceptance are pending. Actual signed-package
+their complete CI is pending. The initial console commit `7777f5a` passed
+39 synthetic browser checks across 13 states at 390, 768 and 1440 pixels, including
+keyboard confirmation, scoped reader controls and horizontal overflow. The
+subsequent bounded device search and additional negative tests are undergoing CI
+and browser validation. Actual signed-package
 installation on an explicitly authorized Mac remains open.
 No package is downloaded or executed by these synthetic tests.
 

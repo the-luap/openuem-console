@@ -275,3 +275,117 @@ func TestMacAppMissingReportsBecomeUncertainAndLaterResolve(t *testing.T) {
 		t.Fatal("verification timeout not audited exactly once", events, err)
 	}
 }
+
+func TestMacAppAuditRollbackAndBoundedHistory(t *testing.T) {
+	s, d, v := macAppFixture(t)
+	ctx, scope := t.Context(), Scope{TenantID: 1, SiteID: 1}
+	adeExec(t, s, `CREATE FUNCTION reject_app_request_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='apple.software.install' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$;CREATE TRIGGER reject_app_request_audit BEFORE INSERT ON mdm_apple_audit FOR EACH ROW EXECUTE FUNCTION reject_app_request_audit()`)
+	if err := s.installMacApp(ctx, scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); err == nil {
+		t.Fatal("failed audit committed executable delivery")
+	}
+	var assignments, commands int
+	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_app_assignments WHERE device_id=$1`, d.ID).Scan(&assignments); err != nil || assignments != 0 {
+		t.Fatal("failed audit retained assignment", assignments, err)
+	}
+	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_commands WHERE device_id=$1 AND managed_app`, d.ID).Scan(&commands); err != nil || commands != 0 {
+		t.Fatal("failed audit retained native command", commands, err)
+	}
+	adeExec(t, s, `DROP TRIGGER reject_app_request_audit ON mdm_apple_audit`)
+	if err := s.installMacApp(ctx, scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	a := macAppState(t, s, d)
+	// Equal timestamps exercise the UUID tie breaker independently of the
+	// currently queued attempt. The fixture inserts no executable commands.
+	adeExec(t, s, `INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,created_at) SELECT md5($1||n::text)::uuid,1,$2,$3,$4,$5,'install','{}','cancelled','history fixture',now()-interval '1 day' FROM generate_series(1,102) n`, uuid.NewString(), d.ID, v.PackageID, a.ID, v.ID)
+	first, cursor, err := s.MacAppHistory(ctx, scope, d.ID, a.ID, "")
+	if err != nil || len(first) != 100 || cursor == "" || first[0].AttemptID != a.AttemptID || first[0].Status != "queued" {
+		t.Fatal("history first page is incomplete or unbounded", len(first), err)
+	}
+	second, next, err := s.MacAppHistory(ctx, scope, d.ID, a.ID, cursor)
+	if err != nil || len(second) != 3 || next != "" {
+		t.Fatal("history last page skipped attempts", len(second), err)
+	}
+	seen := map[string]bool{}
+	for _, item := range append(first, second...) {
+		if seen[item.AttemptID] {
+			t.Fatal("history cursor repeated an attempt")
+		}
+		seen[item.AttemptID] = true
+		if item.AttemptID != a.AttemptID && item.Status != "cancelled" {
+			t.Fatal("history used the current assignment state")
+		}
+	}
+	prefix := uuid.NewString()
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,model,os_version,enrollment_method,enrollment_platform,invite_expires_at,certificate_expires_at,inventory_at) SELECT md5($1||n::text)::uuid,1,1,'Selector fixture '||n,'enrolled','Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 hour',clock_timestamp()+interval '1 year',clock_timestamp() FROM generate_series(1,102) n`, prefix)
+	adeExec(t, s, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,identity_type,public_url,topic,access_rights) SELECT id,tenant_id,$1,$2,$3,'com.apple.security.scep','https://mdm.example.test','com.apple.mgmt.test',7955 FROM mdm_apple_devices WHERE name LIKE 'Selector fixture %'`, uuid.NewString(), uuid.NewString(), uuid.NewString())
+	targets, targetCursor, err := s.MacAppDevices(ctx, scope, *v, "Selector fixture", "")
+	if err != nil || len(targets) != 100 || targetCursor == "" {
+		t.Fatal("device selector is not bounded", len(targets), err)
+	}
+	rest, final, err := s.MacAppDevices(ctx, scope, *v, "Selector fixture", targetCursor)
+	if err != nil || len(rest) != 2 || final != "" {
+		t.Fatal("device selector skipped matches", len(rest), err)
+	}
+	targetIDs := map[string]bool{}
+	for _, device := range append(targets, rest...) {
+		if targetIDs[device.ID] {
+			t.Fatal("device selector repeated a device")
+		}
+		targetIDs[device.ID] = true
+		if device.Apps != nil || device.Inventory != nil || device.SecurityInventory != nil {
+			t.Fatal("device selector loaded unrelated inventory")
+		}
+	}
+	for _, query := range []string{"%", "_", "\\"} {
+		matches, _, err := s.MacAppDevices(ctx, scope, *v, query, "")
+		if err != nil || len(matches) != 0 {
+			t.Fatal("literal search became a wildcard", query, err)
+		}
+	}
+	if matches, _, err := s.MacAppDevices(ctx, Scope{TenantID: 1, SiteID: 2}, *v, "Selector fixture", ""); err != nil || len(matches) != 0 {
+		t.Fatal("device selector crossed site scope", err)
+	}
+
+}
+
+func TestMacAppMalformedReportsAndDeviceErrorsRemainRedacted(t *testing.T) {
+	s, d, v := macAppFixture(t)
+	ctx, scope := t.Context(), Scope{TenantID: 1, SiteID: 1}
+	if err := s.installMacApp(ctx, scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	wire := adeConnect(t, s, d, "Idle", "", nil)
+	wire = adeConnect(t, s, d, "Acknowledged", wire["CommandUUID"].(string), nil)
+	query := wire["CommandUUID"].(string)
+	wire = adeConnect(t, s, d, "Acknowledged", query, map[string]any{"ManagedApplicationList": "sensitive-response-marker", "InstalledApplicationList": "sensitive-response-marker"})
+	a := macAppState(t, s, d)
+	if a.Status != "verifying" || a.Error != "invalid_application_inventory" {
+		t.Fatal("malformed query changed installation evidence", a.Status, a.Error)
+	}
+	macAppObserve(t, s, d, wire, "Managed", "42.0")
+	if err := s.changeMacApp(ctx, scope, d.ID, a.ID, "refresh", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	macAppObserve(t, s, d, nil, "Managed", "42.0")
+	if macAppState(t, s, d).Status != "verified" {
+		t.Fatal("fresh valid query did not recover observation")
+	}
+	if err := s.changeMacApp(ctx, scope, d.ID, a.ID, "remove", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	wire = adeConnect(t, s, d, "Idle", "", nil)
+	command := wire["CommandUUID"].(string)
+	adeConnect(t, s, d, "Error", command, map[string]any{"ErrorChain": []any{map[string]any{"ErrorDomain": "sensitive-response-marker", "ErrorCode": uint64(1), "LocalizedDescription": "sensitive-response-marker"}}})
+	a = macAppState(t, s, d)
+	if a.Status != "failed" || a.Error != "command_failed" {
+		t.Fatal("device error did not end the mutation conservatively")
+	}
+	if wire = adeConnect(t, s, d, "Idle", "", nil); wire != nil {
+		t.Fatal("failed application mutation automatically retried")
+	}
+	var leaked bool
+	if err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM mdm_apple_commands WHERE device_id=$1 AND (error LIKE '%sensitive-response-marker%' OR position('sensitive-response-marker'::bytea in payload)>0)) OR EXISTS(SELECT 1 FROM mdm_apple_audit WHERE tenant_id=1 AND details::text LIKE '%sensitive-response-marker%')`, d.ID).Scan(&leaked); err != nil || leaked {
+		t.Fatal("native error persisted sensitive response data", err)
+	}
+}

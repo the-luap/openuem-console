@@ -6,6 +6,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
 	"time"
 )
 
@@ -68,7 +69,7 @@ templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []appl
 	}
 }
 
-templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.SoftwareVersion, devices []apple.Device, canManage bool) {
+templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.SoftwareVersion, devices []apple.Device, canManage bool, search SoftwareDeviceSearch) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Approved software", Url: partials.GetNavigationUrl(info, "/software/catalog")}, {Title: v.Name, Url: partials.GetNavigationUrl(info, "/software/catalog/"+v.ID)}}, info)
@@ -101,8 +102,12 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">Install on a Mac</h2><p>The device must report the expected managed app version before the installation is verified.</p></div>
 					<div class="uk-card-body">
+						<form method="get" action={ partials.GetNavigationUrl(info, "/software/catalog/"+v.ID) } class="mb-4">
+							<label>Find a Mac by name or serial number<input class="uk-input" name="q" value={ search.Query } maxlength="128"/></label>
+							<button class="uk-button uk-button-default mt-4" type="submit">Search Macs</button>
+						</form>
 						if len(devices)==0 {
-							<p>No compatible Macs with current inventory and a valid management identity are available in this scope. Refresh device inventory or select another scope.</p>
+							<p>No compatible Macs with current inventory and a valid management identity match this page. Search by name or serial number, refresh device inventory, or select another scope.</p>
 						} else {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/software/catalog/"+v.ID+"/install") }>
 								@CSRF(info)
@@ -123,6 +128,9 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 								<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Install this approved revision on the selected Mac.</label>
 								<button class="uk-button uk-button-primary" type="submit">Request installation</button>
 							</form>
+						}
+						if search.Next!="" {
+							<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+v.ID+"?q="+url.QueryEscape(search.Query)+"&after="+search.Next)) }>More matching Macs</a>
 						}
 					</div>
 				</section>

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +37,52 @@ func MacAppManagementReady(d Device, now time.Time) bool { return macAppDeviceRe
 
 func MacAppInstallReady(d Device, v SoftwareVersion, now time.Time) bool {
 	return v.WithdrawnAt == nil && macAppDeviceReady(d, now) && macAppCompatible(d, v)
+}
+
+// MacAppDevices reads a bounded page of enrollment metadata without loading
+// every device's application, profile and security inventories into a selector.
+func (s *Store) MacAppDevices(ctx context.Context, scope Scope, version SoftwareVersion, query, after string) ([]Device, string, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, "", err
+	}
+	query = strings.TrimSpace(query)
+	if len(query) > 128 {
+		return nil, "", ErrMacApp
+	}
+	var cursor any
+	if after != "" {
+		id, err := uuid.Parse(after)
+		if err != nil || id == uuid.Nil || id.String() != after {
+			return nil, "", ErrMacApp
+		}
+		cursor = after
+	}
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query) + "%"
+	rows, err := s.db.QueryContext(ctx, `SELECT d.id,d.name,d.serial_number,d.model,d.os_version,d.enrollment_method,d.enrollment_platform,d.inventory_at,d.certificate_expires_at,d.apple_silicon FROM mdm_apple_devices d JOIN mdm_apple_enrollment_layouts l ON l.device_id=d.id AND l.tenant_id=d.tenant_id WHERE d.tenant_id=$1 AND ($2=0 OR d.site_id=$2) AND d.status='enrolled' AND d.enrollment_platform='macos' AND d.inventory_at>clock_timestamp()-interval '1 day' AND d.inventory_at<=clock_timestamp() AND d.certificate_expires_at>clock_timestamp()+interval '1 minute' AND (l.access_rights & 4352)=4352 AND ($3::uuid IS NULL OR d.id>$3) AND (d.name ILIKE $4 OR d.serial_number ILIKE $4) ORDER BY d.id LIMIT 101`, scope.TenantID, scope.SiteID, cursor, pattern)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	items := []Device{}
+	last, next := "", ""
+	count := 0
+	for rows.Next() {
+		var d Device
+		if err = rows.Scan(&d.ID, &d.Name, &d.SerialNumber, &d.Model, &d.OSVersion, &d.EnrollmentMethod, &d.EnrollmentPlatform, &d.InventoryAt, &d.CertificateExpiresAt, &d.AppleSilicon); err != nil {
+			return nil, "", err
+		}
+		count++
+		if count > 100 {
+			next = last
+			break
+		}
+		last = d.ID
+		d.Status = "enrolled"
+		if MacAppInstallReady(d, version, time.Now()) {
+			items = append(items, d)
+		}
+	}
+	return items, next, rows.Err()
 }
 
 const macAppColumns = `a.tenant_id,a.id,t.id,a.device_id,a.status,t.operation,t.options,t.managed_state,t.installed_state,t.installed_version,t.error,t.created_at,t.dispatched_at,t.accepted_at,t.managed_at,t.installed_at,t.requested_by,` + softwareVersionColumns

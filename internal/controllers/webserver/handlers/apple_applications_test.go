@@ -64,6 +64,16 @@ func exerciseAppleApplications(t *testing.T, h *Handler, ctx context.Context, te
 			t.Fatal("viewer sees installation form")
 		}
 	}
+
+	for _, search := range []struct {
+		query    string
+		eligible bool
+	}{{"Application route", true}, {"%", false}, {"No matching Mac", false}} {
+		rec = request("scoped-operator", "GET", scoped+"/software/catalog/"+version+"?q="+url.QueryEscape(search.query), nil)
+		if rec.Code != 200 || strings.Contains(rec.Body.String(), "Request installation") != search.eligible {
+			t.Fatal("device search changed scope or interpreted wildcard input", search.query, rec.Code)
+		}
+	}
 	install := scoped + "/software/catalog/" + version + "/install"
 	installForm := func() url.Values { return url.Values{"device": {device}, "confirmed": {"yes"}} }
 	if rec = request("scoped-viewer", "POST", install, installForm()); rec.Code != 403 {

@@ -2,6 +2,8 @@ package mdm_views
 
 import "github.com/open-uem/openuem-console/internal/mdm/apple"
 
+type SoftwareDeviceSearch struct{ Query, Next string }
+
 func YesNo(value bool) string {
 	if value {
 		return "Yes"
