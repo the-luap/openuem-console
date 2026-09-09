@@ -55,6 +55,7 @@ func exerciseAppleApplications(t *testing.T, h *Handler, ctx context.Context, te
 	if _, err := uuid.Parse(version); err != nil {
 		t.Fatal("approval redirect missing revision", err)
 	}
+	exerciseADEApplicationRoutes(t, h, ctx, tenant, site, sibling, version, request)
 	for _, user := range []string{"scoped-viewer", "scoped-operator"} {
 		rec = request(user, "GET", scoped+"/software/catalog/"+version, nil)
 		if rec.Code != 200 {

@@ -33,6 +33,9 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/software/catalog/:version/install", h.InstallMacApp)
 		g.GET("/ios/:id/applications", h.MacApplications)
 		g.GET("/ios/:id/applications/:assignment/history", h.MacApplicationHistory)
+		g.GET("/ios/ade/software", h.ADESoftwareOptions)
+		g.GET("/ios/:id/setup/applications/:requirement/history", h.ADEApplicationHistory)
+		g.POST("/ios/:id/setup/applications/:requirement/replace", h.ReplaceADEApplication)
 		g.POST("/ios/:id/applications/:assignment/action", h.ChangeMacApp)
 		g.GET("/devices", h.UnifiedDevices)
 		g.GET("/ios", h.UnifiedDevices)
@@ -90,7 +93,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
+			case "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
 				// CSRF reads the form before the endpoint. Apply its bound here
 				// as well so a cached PostForm cannot bypass the endpoint limit.
 				limit = 128 << 10
@@ -445,6 +448,12 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 	detail.ADE, err = h.Apple.ADEDeviceEnrollment(c.Request().Context(), scope, id)
 	if err != nil {
 		return appleFailure(err)
+	}
+	if detail.ADE != nil && info.Can(access.ReadSoftware) {
+		detail.ADEApplications, err = h.Apple.ADEApplications(c.Request().Context(), scope, id)
+		if err != nil {
+			return appleFailure(err)
+		}
 	}
 	if mac != nil && info.Principal.IsAdministrator() {
 		var available bool

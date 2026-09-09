@@ -36,6 +36,10 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 						<p>Enrollment is mandatory and requests supervision. Disallowing removal also applies to future identity renewals. Revoking server access does not remove the profile from the device.</p>
 						<label><input class="uk-checkbox" type="checkbox" name="await_configuration" value="yes" checked/> Hold Setup Assistant until current inventory and assigned configuration profiles are verified</label>
 						<label><input class="uk-checkbox" type="checkbox" name="ignore_backup_profile" value="yes" checked/> Use this profile instead of an enrollment profile restored from backup</label>
+						if info.Can(access.AssignSoftware) {
+							<p>Required applications are available for Mac profiles with the Setup Assistant hold enabled. The exact managed versions must be verified before setup release.</p>
+							@ADEApplicationPicker(info,"required_applications",16,"")
+						}
 						if info.Can(access.ManageDeviceSecurity) {
 							@MacAdminProfileFields()
  <label><input class="uk-checkbox" type="checkbox" name="allow_device_lock" value="yes"/> Allow Recovery Lock and device lock management (Mac only)</label>
@@ -74,6 +78,16 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 							Setup hold not requested
 						}
 					</p>
+					if len(p.RequiredApplications)>0 {
+						<p>Required application revisions: {Number(len(p.RequiredApplications))}</p>
+						if info.Can(access.ReadSoftware) {
+							<ul>
+								for i,id:=range p.RequiredApplications {
+									<li><a class="underline" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/"+id))}>View required application {Number(i+1)}</a></li>
+								}
+							</ul>
+						}
+					}
 					if p.MacAdmin!=nil {
  <p>Managed administrator: { p.MacAdmin.ShortName } · Primary account: { p.MacAdmin.PrimaryAccount } · Rotation interval: { Number(p.MacAdmin.RotationDays) } days (0 means manual)</p>
  }

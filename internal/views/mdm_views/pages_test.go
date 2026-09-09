@@ -216,11 +216,25 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	appHistory := append(appState("verified"), appState("cancelled")...)
 	appHistory[1].Version.Version = "41.0"
 	appHistory[1].AttemptID = "90000000-0000-4000-8000-000000000024"
+	adeProfile.RequiredApplications = []string{appVersion.ID}
+	adeEnrollment.Profiles[0] = adeProfile
+	adeAppState := func(status string, changeable bool) Detail {
+		d := Detail{Device: &appDevice, ADE: &apple.ADEDeviceEnrollment{SetupState: "awaiting", SetupError: "application_pending", CanChangeApplications: changeable}}
+		a := appState(status)[0]
+		d.ADEApplications = []apple.ADEApplication{{ID: "90000000-0000-4000-8000-000000000025", OriginalVersionID: appVersion.ID, Version: appVersion, Assignment: &a, Error: "application_pending"}}
+		return d
+	}
+	adeAppChanges := []apple.ADEApplicationChange{{ID: "90000000-0000-4000-8000-000000000026", PreviousVersionID: appHistory[1].Version.ID, PreviousVersion: "41.0", VersionID: appVersion.ID, Version: appVersion.Version, Actor: "Operator <A>", Reason: "Correct <version> for setup", CreatedAt: now}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"ade-app-queued", DeviceDetails(c, info, adeAppState("queued", true)), []string{"Required setup applications", "Replace required revision", "Select approved application revisions", "Editor &lt;Suite&gt;"}},
+		{"ade-app-uncertain", DeviceDetails(c, info, adeAppState("uncertain", true)), []string{"Required setup applications", "Outcome unknown"}},
+		{"ade-app-release-sent", DeviceDetails(c, info, adeAppState("verified", false)), []string{"Required setup applications", "Expected managed app version reported"}},
+		{"ade-app-reader", DeviceDetails(c, &reader, adeAppState("queued", true)), []string{"Required setup applications", "Required revision history"}},
+		{"ade-app-history", ADEApplicationHistory(c, &reader, &appDevice, adeAppState("queued", true).ADEApplications[0], adeAppChanges, adeAppChanges[0].ID), []string{"Required application history", "Original enrollment requirement", "Operator &lt;A&gt;", "Correct &lt;version&gt; for setup", "Older revision changes"}},
 
 		{"software-catalog", SoftwareCatalog(c, info, []apple.SoftwareVersion{appVersion, withdrawnVersion}, appVersion.ID, true), []string{"Approve a Mac application package", "Editor &lt;Suite&gt;", "Older revisions", "Withdrawn", `name="sha256"`, `name="source_url"`}},
 		{"software-catalog-reader", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{appVersion}, "", false), []string{"Published revisions", "Editor &lt;Suite&gt;"}},
@@ -296,6 +310,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "ade-app-uncertain" || tc.name == "ade-app-release-sent" || tc.name == "ade-app-reader" {
+				if strings.Contains(html, "Replace required revision") || strings.Contains(html, "data-app-search") {
+					t.Fatal("blocked required revision exposes correction form")
+				}
+			}
 			if strings.HasSuffix(tc.name, "reader") && strings.HasPrefix(tc.name, "software-") {
 				for _, forbidden := range []string{"Request installation", "Request app removal", "Cancel queued operation", "Request current app status", "Approve package revision", "Withdraw approval"} {
 					if strings.Contains(html, forbidden) {

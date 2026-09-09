@@ -122,6 +122,32 @@ func TestSoftwareCatalogStablePagesAndAuditRollback(t *testing.T) {
 	if err != nil || len(last) != 2 || next != "" || first[0].Version != "101" || last[1].Version != "0" {
 		t.Fatal("catalog cursor skipped or duplicated versions", len(last), err)
 	}
+	selected, after, err := s.SearchApprovedMacApplications(ctx, Scope{TenantID: 1}, "", "Editor", first[0].PackageID)
+	if err != nil || len(selected) != 100 || after != cursor {
+		t.Fatal("approved picker pagination differs from catalog", err)
+	}
+	selected, after, err = s.SearchApprovedMacApplications(ctx, Scope{TenantID: 1}, after, "com.example.Editor", first[0].PackageID)
+	if err != nil || len(selected) != 2 || after != "" {
+		t.Fatal("approved picker omitted older versions", err)
+	}
+	for _, query := range []string{"%", "_", `\`, "no such app"} {
+		if selected, _, err = s.SearchApprovedMacApplications(ctx, Scope{TenantID: 1}, "", query, ""); err != nil || len(selected) != 0 {
+			t.Fatal("application search interpreted wildcards", query, err)
+		}
+	}
+	if selected, _, err = s.SearchApprovedMacApplications(ctx, Scope{TenantID: 1}, "", "", uuid.NewString()); err != nil || len(selected) != 0 {
+		t.Fatal("package filter returned unrelated versions", err)
+	}
+	if _, _, err = s.SearchApprovedMacApplications(ctx, Scope{TenantID: 2}, cursor, "", ""); !errors.Is(err, ErrNotFound) {
+		t.Fatal("picker cursor crossed tenant", err)
+	}
+	if _, err = s.db.Exec(`UPDATE uem_software_versions SET withdrawn_at=clock_timestamp() WHERE id=$1`, first[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	selected, _, err = s.SearchApprovedMacApplications(ctx, Scope{TenantID: 1}, "", "", "")
+	if err != nil || len(selected) != 100 || selected[0].ID == first[0].ID {
+		t.Fatal("withdrawn revision remained selectable", err)
+	}
 	if _, err = s.db.Exec(`CREATE FUNCTION reject_software_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit unavailable'; END; $$;CREATE TRIGGER reject_software_audit BEFORE INSERT ON mdm_apple_audit FOR EACH ROW EXECUTE FUNCTION reject_software_audit()`); err != nil {
 		t.Fatal(err)
 	}

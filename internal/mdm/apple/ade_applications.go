@@ -50,6 +50,10 @@ type ADEApplication struct {
 	Assignment                   *MacAppAssignment
 }
 
+func (r ADEApplication) Ready(now time.Time) bool {
+	return adeApplicationVerified(r.Assignment, r.Version, now)
+}
+
 const adeApplicationColumns = `r.id,r.original_version_id,r.error,` + softwareVersionColumns
 const adeApplicationFrom = ` FROM mdm_apple_ade_device_apps r JOIN uem_software_versions v ON v.tenant_id=r.tenant_id AND v.id=r.version_id JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id `
 

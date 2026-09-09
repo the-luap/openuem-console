@@ -45,11 +45,11 @@ func appleCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
-		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history":
+		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
 		case "/ios/configurations":
 			return access.ReadProfiles, true
-		case "/ios/ade", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
+		case "/ios/ade", "/ios/ade/software", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
 			return access.ManageCertificates, true
 		case "/ios/configurations/:id/download":
 			return access.ManageProfiles, true
@@ -57,6 +57,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/ios/:id/setup/applications/:requirement/replace":
+			return access.ManageCertificates, true
 		case "/software/catalog", "/software/catalog/:version/withdraw":
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action":

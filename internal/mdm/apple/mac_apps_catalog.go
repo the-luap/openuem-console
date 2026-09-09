@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,8 +40,30 @@ func scanSoftwareVersion(row scanner) (*SoftwareVersion, error) {
 // Catalog pagination does not expose the encrypted source or infer cross-tenant
 // cursor timestamps. Site readers see the organization's approved catalog.
 func (s *Store) SoftwareVersions(ctx context.Context, scope Scope, before string) ([]SoftwareVersion, string, error) {
+	return s.softwareVersions(ctx, scope, before, "", false, "")
+}
+
+// SearchApprovedMacApplications supports bounded, credential-free selection of
+// required apps and replacement revisions without loading the complete catalog.
+func (s *Store) SearchApprovedMacApplications(ctx context.Context, scope Scope, before, query, packageID string) ([]SoftwareVersion, string, error) {
+	return s.softwareVersions(ctx, scope, before, query, true, packageID)
+}
+
+func (s *Store) softwareVersions(ctx context.Context, scope Scope, before, query string, approvedOnly bool, packageID string) ([]SoftwareVersion, string, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, "", err
+	}
+	query = strings.TrimSpace(query)
+	if len(query) > 128 {
+		return nil, "", ErrMacApp
+	}
+	var pkg any
+	if packageID != "" {
+		id, err := uuid.Parse(packageID)
+		if err != nil || id == uuid.Nil || id.String() != packageID {
+			return nil, "", ErrMacApp
+		}
+		pkg = packageID
 	}
 	var stamp any
 	var cursor any
@@ -55,7 +78,8 @@ func (s *Store) SoftwareVersions(ctx context.Context, scope Scope, before string
 		}
 		stamp, cursor = at, before
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT `+softwareVersionColumns+softwareVersionFrom+`WHERE v.tenant_id=$1 AND ($2::timestamptz IS NULL OR (v.approved_at,v.id)<($2,$3::uuid)) ORDER BY v.approved_at DESC,v.id DESC LIMIT 101`, scope.TenantID, stamp, cursor)
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query) + "%"
+	rows, err := s.db.QueryContext(ctx, `SELECT `+softwareVersionColumns+softwareVersionFrom+`WHERE v.tenant_id=$1 AND ($2::timestamptz IS NULL OR (v.approved_at,v.id)<($2,$3::uuid)) AND (v.name ILIKE $4 OR p.identifier ILIKE $4) AND (NOT $5::boolean OR (v.withdrawn_at IS NULL AND p.platform='macos' AND v.kind='macos-pkg')) AND ($6::uuid IS NULL OR v.package_id=$6) ORDER BY v.approved_at DESC,v.id DESC LIMIT 101`, scope.TenantID, stamp, cursor, pattern, approvedOnly, pkg)
 	if err != nil {
 		return nil, "", err
 	}

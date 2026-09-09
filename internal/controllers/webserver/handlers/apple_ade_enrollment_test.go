@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -10,6 +11,48 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
+
+func TestADERequiredApplicationForms(t *testing.T) {
+	for _, count := range []int{1, 2, 16, 17} {
+		f := url.Values{"csrf": {"x"}, "confirmed": {"yes"}, "site_id": {"1"}, "platform": {"macos"}, "removal": {"disallowed"}, "await_configuration": {"yes"}}
+		for i := range count {
+			f.Add("required_applications", fmt.Sprintf("90000000-0000-4000-8000-%012d", i+1))
+		}
+		r := httptest.NewRequest("POST", "/ios/ade", strings.NewReader(f.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		form, err := adeEnrollmentForm(echo.New().NewContext(r, httptest.NewRecorder()), "required_applications", "site_id", "platform", "removal", "await_configuration")
+		if count > 16 {
+			if err == nil {
+				t.Fatal("unbounded selection accepted")
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		o, err := adeProfileOptions(form, 1)
+		if err != nil || len(o.RequiredApplications) != count {
+			t.Fatal("selected revisions lost", err)
+		}
+	}
+	for _, raw := range []string{"csrf=x&confirmed=yes&version=a&version=b", "csrf=x&confirmed=yes&required_applications=a&required_applications=b"} {
+		r := httptest.NewRequest("POST", "/ios/ade", strings.NewReader(raw))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if _, err := adeEnrollmentForm(echo.New().NewContext(r, httptest.NewRecorder()), "version", "reason"); err == nil {
+			t.Fatal("replacement accepted ambiguous or unrelated app fields")
+		}
+	}
+	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
+		for _, route := range []struct {
+			method, path string
+			cap          access.Capability
+		}{{"GET", "/ios/ade/software", access.ManageCertificates}, {"GET", "/ios/:id/setup/applications/:requirement/history", access.ReadSoftware}, {"POST", "/ios/:id/setup/applications/:requirement/replace", access.ManageCertificates}} {
+			if cap, ok := appleCapability(route.method, prefix+route.path); !ok || cap != route.cap {
+				t.Fatal("required app route permission missing", route.path)
+			}
+		}
+	}
+}
 
 func TestADEEnrollmentFormsRejectAmbiguityAndScopeChanges(t *testing.T) {
 	for _, raw := range []string{"csrf=x&confirmed=yes&operation=retry&operation=disable", "csrf=x&confirmed=yes&unknown=value", "confirmed=yes", "csrf=x", "csrf=x&confirmed=no", "csrf=x&confirmed=yes&serials=" + strings.Repeat("x", 129<<10)} {

@@ -1,0 +1,93 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"time"
+)
+
+templ ADEApplicationPicker(info *partials.CommonInfo, name string, maximum int, packageID string) {
+	<link rel="stylesheet" href="/assets/css/apple-required-apps.css" type="text/css"/>
+	<script src="/assets/js/apple-required-apps.js" defer></script>
+	<fieldset class="ade-app-picker" data-source={ partials.GetNavigationUrl(info, "/ios/ade/software") } data-input={ name } data-maximum={ Number(maximum) } data-package={ packageID }>
+		<legend class="font-semibold">Select approved application revisions</legend>
+		<p>Search by application name or bundle identifier. Select one revision per application, up to { Number(maximum) } total. Selections remain when you search again.</p>
+		<label>Application search<input class="uk-input" type="search" maxlength="128" data-app-search autocomplete="off"/></label>
+		<button type="button" class="uk-button uk-button-default" data-app-find>Search approved applications</button>
+		<p role="status" aria-live="polite" data-app-status>Search to view approved revisions.</p>
+		<ul class="ade-app-results" data-app-results aria-label="Matching application revisions"></ul>
+		<button type="button" class="uk-button uk-button-default" data-app-next hidden>Older matching revisions</button>
+		<p class="font-semibold">Selected revisions</p>
+		<ul data-app-selected aria-label="Selected application revisions"></ul>
+		<noscript>Enable JavaScript to select required application revisions.</noscript>
+	</fieldset>
+}
+
+templ ADEApplicationPanel(info *partials.CommonInfo, detail Detail) {
+	if detail.ADE!=nil && info.Can(access.ReadSoftware) && len(detail.ADEApplications)>0 {
+		<section class="uk-card uk-card-default" aria-labelledby="ade-app-title">
+			<div class="uk-card-header"><h2 class="uk-card-title" id="ade-app-title">Required setup applications</h2><p>Setup release requires the exact approved version to be reported as installed and managed. A delivery acknowledgement alone is insufficient.</p></div>
+			<div class="uk-card-body space-y-4">
+				for _,r:=range detail.ADEApplications {
+					<article class="software-revision">
+						<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+r.Version.ID)) }>{ r.Version.Name } · { r.Version.Version }</a></h3>
+						<p>{ r.Version.Identifier } · { r.Version.Architecture } · macOS { r.Version.MinimumOS }+</p>
+						<p role="status">{ adeApplicationMessage(r,detail.ADE) }</p>
+						if r.Assignment!=nil {
+							<p>{ MacAppState(*r.Assignment) }</p>
+							<p>Managed observation: { When(r.Assignment.ManagedAt) } · Installed observation: { When(r.Assignment.InstalledAt) }</p>
+						}
+						<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/applications")) }>Application actions and attempts</a> · <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/applications/"+r.ID+"/history")) }>Required revision history</a></p>
+						if detail.ADE.CanChangeApplications && apple.MacAppManagementReady(*detail.Device,time.Now()) && info.Can(access.ManageCertificates) && info.Can(access.EnrollDevices) && info.Can(access.AssignSoftware) && adeCanReplaceApplication(r) {
+							<details class="mt-4">
+								<summary>Replace the required revision for this enrollment</summary>
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/applications/"+r.ID+"/replace") } class="mt-4">
+									@CSRF(info)
+									<p>Select another approved revision of this application. This records a correction and queues its installation. The original enrollment requirement remains in history. Any unsent or deferred previous attempt is cancelled.</p>
+									@ADEApplicationPicker(info, "version", 1, r.Version.PackageID)
+									<label class="block mt-4">Reason for the revision change<input class="uk-input" name="reason" maxlength="1000" required/></label>
+									<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/>Replace this requirement and install the selected revision while Setup Assistant remains held.</label>
+									<button class="uk-button uk-button-primary mt-4" type="submit">Replace required revision</button>
+								</form>
+							</details>
+						}
+					</article>
+				}
+			</div>
+		</section>
+	}
+}
+
+templ ADEApplicationHistory(c echo.Context, info *partials.CommonInfo, d *apple.Device, r apple.ADEApplication, changes []apple.ADEApplicationChange, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Required application history", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Required application history</h1><p>{ r.Version.Name } · { d.Name }</p><a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID)) }>Back to device</a></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Current required revision: <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+r.Version.ID)) }>{ r.Version.Version }</a></p>
+					<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+r.OriginalVersionID)) }>Original enrollment requirement</a></p>
+					<p>Corrections apply to this enrollment. The published enrollment profile remains unchanged.</p>
+					if len(changes)==0 {
+						<p>No recorded revision changes on this page.</p>
+					}
+					for _,change:=range changes {
+						<article class="software-revision">
+							<h2 class="font-semibold">{ When(&change.CreatedAt) } · { change.Actor }</h2>
+							<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+change.PreviousVersionID)) }>{ change.PreviousVersion }</a> → <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+change.VersionID)) }>{ change.Version }</a></p>
+							<p>{ change.Reason }</p>
+						</article>
+					}
+					if next!="" {
+						<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/setup/applications/"+r.ID+"/history?before="+url.QueryEscape(next))) }>Older revision changes</a>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

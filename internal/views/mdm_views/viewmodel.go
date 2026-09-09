@@ -17,6 +17,7 @@ type Detail struct {
 	MacAdmin         *apple.MacAdminAccount
 	MacAdminKeys     []apple.MacAdminKey
 	ADE              *apple.ADEDeviceEnrollment
+	ADEApplications  []apple.ADEApplication
 	RecoveryLock     *apple.RecoveryLock
 	RecoveryLockKeys []apple.RecoveryLockKey
 	FileVault        *apple.FileVault

@@ -3,6 +3,7 @@ package mdm_views
 import (
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 )
@@ -38,6 +39,9 @@ func adeProfileName(profiles []apple.ADEEnrollmentProfile, id string) string {
 }
 
 func adeSetupMessage(a *apple.ADEDeviceEnrollment) string {
+	if a.SetupError == "application_pending" {
+		return "Waiting for every required application to be reported as installed and managed at its exact approved version. Check required application status and resolve failed or unresolved attempts before setup can continue."
+	}
 	if a.SetupState == "complete" {
 		return "The device reports that the MDM configuration hold has ended. This does not confirm completion of every Setup Assistant screen or local account setup."
 	}
@@ -51,6 +55,44 @@ func adeSetupMessage(a *apple.ADEDeviceEnrollment) string {
 		return "This enrollment ended. A new activation requires a separate admission from the Automated Device Enrollment page."
 	}
 	return "OpenUEM records the device's reported MDM hold state. A delivery acknowledgement alone does not confirm that the hold has ended."
+}
+
+func adeCanReplaceApplication(r apple.ADEApplication) bool {
+	if r.Assignment == nil {
+		return true
+	}
+	if r.Assignment.CanCancel() {
+		return true
+	}
+	switch r.Assignment.Status {
+	case "verified", "failed", "cancelled", "expired", "drifted":
+		return true
+	default:
+		return false
+	}
+}
+
+func adeApplicationMessage(r apple.ADEApplication, a *apple.ADEDeviceEnrollment) string {
+	if a.SetupState == "complete" || a.SetupState == "cancelled" {
+		return "Setup requirement retained for enrollment history. See application observations for the current state."
+	}
+	if r.Error == "" && !r.Ready(time.Now()) {
+		return "Required application verification is pending."
+	}
+	labels := map[string]string{
+		"":                              "Required revision verified for setup release.",
+		"application_pending":           "Waiting for the exact managed application version.",
+		"inventory_required":            "A current compatible Mac inventory report is required before installation.",
+		"revision_mismatch":             "The active application revision differs from this setup requirement.",
+		"operator_action_required":      "The previous attempt needs an explicit operator action. Setup polling does not rerun the installer.",
+		"approval_withdrawn":            "The required approval was withdrawn. Select another approved revision before setup can continue.",
+		"device_incompatible":           "The required revision is incompatible with this Mac. Select a compatible approved revision.",
+		"approved_artifact_unavailable": "The approved artifact could not be queued. Check approval and device prerequisites.",
+	}
+	if label, ok := labels[r.Error]; ok {
+		return label
+	}
+	return "Required application verification is pending."
 }
 
 func stringsForADEError(code string) string {

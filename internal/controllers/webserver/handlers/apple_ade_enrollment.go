@@ -37,7 +37,8 @@ func adeEnrollmentForm(c echo.Context, fields ...string) (url.Values, error) {
 		allowed[k] = true
 	}
 	for k, v := range f {
-		if !allowed[k] || len(v) != 1 {
+		boundedSelection := k == "required_applications" && len(v) > 0 && len(v) <= 16
+		if !allowed[k] || len(v) != 1 && !boundedSelection {
 			return nil, echo.NewHTTPError(400, "Ambiguous automated enrollment form")
 		}
 	}
@@ -76,7 +77,7 @@ func adeProfileOptions(f url.Values, site int) (apple.ADEProfileOptions, error) 
 			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Managed administrator setup requires a valid Mac account policy and the Setup Assistant hold")
 		}
 	}
-	return apple.ADEProfileOptions{MacAdmin: admin, SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}, nil
+	return apple.ADEProfileOptions{RequiredApplications: f["required_applications"], MacAdmin: admin, SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}, nil
 }
 
 func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
@@ -92,7 +93,7 @@ func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := adeEnrollmentForm(c, "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items", "manage_admin", "admin_short_name", "admin_full_name", "admin_hidden", "admin_primary_account", "admin_rotation_days")
+	f, err := adeEnrollmentForm(c, "required_applications", "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items", "manage_admin", "admin_short_name", "admin_full_name", "admin_hidden", "admin_primary_account", "admin_rotation_days")
 	if err != nil {
 		return err
 	}

@@ -162,6 +162,22 @@ func TestADERequiredAppWithdrawalReplacementAndHistory(t *testing.T) {
 	if r.OriginalVersionID != v.ID || r.Version.ID != v2.ID || r.Assignment == nil || r.Assignment.Version.ID != v2.ID {
 		t.Fatal("replacement lost original intent or failed to queue the new revision")
 	}
+	stored, changes, cursor, err := s.ADEApplicationChanges(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, r.ID, "")
+	if err != nil || stored.OriginalVersionID != v.ID || len(changes) != 1 || cursor != "" || changes[0].PreviousVersionID != v.ID || changes[0].VersionID != v2.ID || changes[0].Reason != "Correct approved source" {
+		t.Fatal("scoped replacement history missing", err)
+	}
+	_, older, _, err := s.ADEApplicationChanges(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, r.ID, changes[0].ID)
+	if err != nil || len(older) != 0 {
+		t.Fatal("history cursor repeated its boundary", err)
+	}
+	for _, scope := range []Scope{{TenantID: 1, SiteID: 2}, {TenantID: 2}} {
+		if _, _, _, err = s.ADEApplicationChanges(t.Context(), scope, d.ID, r.ID, changes[0].ID); !errors.Is(err, ErrNotFound) {
+			t.Fatal("history escaped device scope", err)
+		}
+	}
+	if _, _, _, err = s.ADEApplicationChanges(t.Context(), Scope{TenantID: 1}, d.ID, r.ID, uuid.NewString()); !errors.Is(err, ErrNotFound) {
+		t.Fatal("foreign history cursor accepted", err)
+	}
 	var previous, replacement, reason string
 	var site int
 	if err = s.db.QueryRow(`SELECT c.previous_version_id,c.version_id,c.reason,(a.details->>'site_id')::int FROM mdm_apple_ade_app_changes c JOIN mdm_apple_audit a ON a.resource_id=c.id::text AND a.action='apple.ade.application.replace' WHERE c.requirement_id=$1`, r.ID).Scan(&previous, &replacement, &reason, &site); err != nil || previous != v.ID || replacement != v2.ID || reason != "Correct approved source" || site != 1 {

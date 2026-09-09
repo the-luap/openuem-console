@@ -34,6 +34,9 @@ func MacAppObservationLabel(value string) string {
 }
 
 func MacAppError(value string) string {
+	if value == "ade_revision_replaced" {
+		return "The previous attempt was cancelled by an explicit correction of the required setup revision."
+	}
 	if value == "verification_timeout" {
 		return "The Mac has not established the requested app state within one day. Further mutations remain blocked while status checks continue."
 	}

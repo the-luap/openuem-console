@@ -286,6 +286,7 @@ Manual device enrollment
 			</section>
 			@DeviceIdentity(detail)
 			@ADEDevicePanel(info,detail)
+			@ADEApplicationPanel(info,detail)
 			@MacCapabilities(detail.Device)
 			if detail.Device.Family()==apple.PlatformMacOS {
 				@MacUsers(info,detail.Device,detail.Users)
