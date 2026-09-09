@@ -61,11 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Public certificate profiles](apple-public-certificates.md) add bounded PEM/DER
+  import, separate certificate payloads, System/User scope and assignment-time
+  validity checks with revision rollback. Core checks and template generation
+  pass; full CI and browser checks are pending. Identity certificates, SCEP/ACME
+  templates and physical trust/renewal acceptance remain separate work.
+
 - [Mac privacy profiles (PPPC/TCC)](macos-privacy.md) add typed application identities,
   all 24 privacy services, Apple Events receivers, grant/deny/user-choice policies
   and their version boundaries. Device/channel/approval checks also guard revision
-  changes. Core checks and template/JavaScript validation pass; full CI and browser
-  checks are pending. Application signature matching and privacy behavior remain
+  changes. The full push workflow and 21 cases using actual CI-rendered pages pass;
+  the matching PR workflow remains in progress. Application signature matching and privacy behavior remain
   physical acceptance requirements.
 
 - [Mac System Extensions profiles](macos-system-extensions.md) add typed team/bundle
@@ -74,7 +80,8 @@ the table's package summaries do not remove any detail from the roadmap.
   reservations until fresh replacement/removal evidence. Parser checks, all 34
   migrations and 291 prepared production statements pass locally. Builds and scoped
   console checks pass, as do 12 cases on the actual CI-rendered page across three
-  widths. Full native CI and the strict-builder follow-up are pending.
+  widths. Both complete workflows pass for the original implementation and the
+  strict-builder follow-up.
 
 - [Mac Gatekeeper profiles](macos-gatekeeper.md) now provide typed application
   assessment, Finder exception and malware-submission prompt settings. The editor
@@ -83,7 +90,8 @@ the table's package summaries do not remove any detail from the roadmap.
   The corrected push workflow passes all jobs, including the older-Mac revision
   rollback case; the matching PR workflow also passes every job. Nine cases using the actual CI-rendered
   page pass at 390/768/1440 pixels, including policy values, confirmation and
-  keyboard submission without overflow. Certificate templates remain separate work.
+  keyboard submission without overflow. Identity certificate and SCEP/ACME
+  templates remain separate work.
 
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
   encrypted immutable System/User snapshots, protected history/downloads and

@@ -642,6 +642,8 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 	var data []byte
 	if c.FormValue("editor") == "upload" {
 		data, err = readAppleUpload(c, "profile", apple.MaxProfileBytes)
+	} else if c.FormValue("editor") == "apple-certificates" {
+		data, err = applePublicCertificateData(c)
 	} else {
 		settings := map[string]any{"SSID_STR": c.FormValue("ssid"), "EncryptionType": c.FormValue("wifi_security"), "Password": c.FormValue("wifi_password")}
 		if scope := c.FormValue("payload_scope"); scope != "" {

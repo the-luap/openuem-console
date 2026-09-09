@@ -93,6 +93,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if err := validatePublicCertificatePayload(p, scope, nil); err != nil {
+			return nil, err
+		}
 		if err := validatePrivacyPayload(p, scope, nil); err != nil {
 			return nil, err
 		}
@@ -177,6 +180,12 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	var additional []any
 	switch kind {
+	case "apple-certificates":
+		var err error
+		additional, err = buildPublicCertificatePayload(payload, settings, scope)
+		if err != nil {
+			return nil, err
+		}
 	case "macos-privacy":
 		if err := buildPrivacyPayload(payload, settings, scope); err != nil {
 			return nil, err

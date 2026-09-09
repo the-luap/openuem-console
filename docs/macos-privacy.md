@@ -65,8 +65,18 @@ Full native tests add mixed-platform and revision rollback, stale approval,
 compatible conflicting-policy assignment, macOS 27 denial versus grant and
 verified profile removal. Console tests cover roles, CSRF, repeated/unrelated and
 query fields, forbidden grants, receiver fields, static code options, binary paths,
-user-choice authorization and escaped display labels. Full CI and browser checks
-for this change are pending.
+user-choice authorization and escaped display labels. The [`3742608` push workflow](https://github.com/the-luap/openuem-console/actions/runs/34351542646)
+passes every job, including native Apple race tests (389.855 s), handlers
+(11.104 s) and desktop lifecycles (22.898 s). The PR workflow is still running.
+
+Twenty-one browser cases use that workflow's actual rendered page at 390/768/1440
+pixels. They cover camera/microphone denials, input monitoring and screen capture
+user choice, Accessibility grant warnings, Apple Events receivers and binary-path
+identities. Mandatory fields, policy resets with explanations, inactive receiver
+omission, retained inputs, keyboard checkbox selection and submission, form reset,
+CSRF and scoped routes pass without horizontal overflow. The narrow receiver
+layout was inspected. The harness sets native selects directly and does not
+independently verify dropdown arrow-key behavior.
 
 Physical acceptance must verify signatures, user prompts and access behavior for
 the intended applications and OS releases. Profile delivery alone does not prove

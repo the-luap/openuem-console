@@ -72,7 +72,11 @@ Console cases cover permissions, CSRF, strict forms, all approval modes, no allo
 types, removal distinctions and escaped labels. Template generation and JavaScript
 syntax checks pass. Linux/Windows builds, native Windows checks, scoped console handlers and rendering
 pass in the [`c4fb18d` push workflow](https://github.com/the-luap/openuem-console/actions/runs/34350292179);
-the full native suite is still running. Twelve browser cases use its actual
+all jobs pass in both the push and [PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34350297353).
+The strict-builder follow-up also passes both the [`87bab64` push](https://github.com/the-luap/openuem-console/actions/runs/34350908464)
+and [PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34350914099),
+including native Apple race tests (431.647 s), handlers (9.395 s) and desktop
+lifecycles (26.845 s). Twelve browser cases use its actual
 rendered page at 390/768/1440 pixels. They cover all three approval modes and
 empty type selection, mandatory fields, inactive-field omission, retained input
 after mode changes, keyboard checkbox selection and submission, reset, CSRF and
