@@ -146,7 +146,7 @@ func TestMacAppReenrollmentDeliveryGuardAndAtomicEvidence(t *testing.T) {
 	}
 	// A legacy case-variant identity appears after this operation was queued.
 	other := uuid.NewString()
-	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,3,'Legacy duplicate','enrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 hour')`, other, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,certificate_expires_at,invite_expires_at) VALUES($1,1,3,'Legacy duplicate','enrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 year',clock_timestamp()+interval '1 hour')`, other, d.UDID)
 	if wire := adeConnect(t, s, d, "Idle", "", nil); wire != nil {
 		t.Fatal("duplicate identity escaped delivery guard")
 	}
@@ -186,7 +186,7 @@ func TestADERequiredApplicationWaitsForPriorEnrollmentStoppingEvidence(t *testin
 	s, d, v, _ := adeAppFixture(t)
 	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
 	old, assignment, attempt := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,3,'Prior ADE Mac','unenrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp())`, old, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,certificate_expires_at,invite_expires_at) VALUES($1,1,3,'Prior ADE Mac','unenrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 year',clock_timestamp())`, old, d.UDID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status) VALUES($1,1,$2,$3,$4,'present','not_managed')`, assignment, old, v.PackageID, v.ID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,dispatched_at) VALUES($1,1,$2,$3,$4,$5,'install','{}','uncertain','admin',clock_timestamp())`, attempt, old, v.PackageID, assignment, v.ID)
 	adeSetupReady(t, s, d)
@@ -219,8 +219,8 @@ func TestADERequiredApplicationWaitsForPriorEnrollmentStoppingEvidence(t *testin
 func TestMacAppPriorEnrollmentHistoryIsBoundedAndScoped(t *testing.T) {
 	s, d, v := macAppFixture(t)
 	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
-	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at)
- SELECT md5('prior-device-'||n)::uuid,1,3,'Earlier Mac','unenrolled',$1,'Mac16,1','15.0','manual_device','macos',clock_timestamp() FROM generate_series(1,102) n`, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,certificate_expires_at,invite_expires_at)
+ SELECT md5('prior-device-'||n)::uuid,1,3,'Earlier Mac','unenrolled',$1,'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 year',clock_timestamp() FROM generate_series(1,102) n`, d.UDID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status)
  SELECT md5('prior-assignment-'||n)::uuid,1,md5('prior-device-'||n)::uuid,$1,$2,'present','not_managed' FROM generate_series(1,102) n`, v.PackageID, v.ID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,dispatched_at,created_at)

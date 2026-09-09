@@ -20,7 +20,7 @@ func exerciseAppleAppRecovery(t *testing.T, h *Handler, ctx context.Context, ten
 	}
 	old, assignment, attempt, udid := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
 	exec(`UPDATE mdm_apple_devices SET udid=$2,inventory_at=clock_timestamp() WHERE id=$1`, device, udid)
-	exec(`INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,$2,$3,'Private earlier <Site>','unenrolled',upper($4),'Mac16,1','15.0','manual_device','macos',clock_timestamp())`, old, tenant, sibling, udid)
+	exec(`INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,certificate_expires_at,invite_expires_at) VALUES($1,$2,$3,'Private earlier <Site>','unenrolled',upper($4),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 year',clock_timestamp())`, old, tenant, sibling, udid)
 	exec(`INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status) SELECT $1,tenant_id,$2,package_id,id,'present','not_managed' FROM uem_software_versions WHERE id=$3`, assignment, old, version)
 	exec(`INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,dispatched_at) SELECT $1,tenant_id,device_id,package_id,id,version_id,'install','{}','uncertain','private-actor',clock_timestamp() FROM mdm_apple_app_assignments WHERE id=$2`, attempt, assignment)
 	base := fmt.Sprintf("/tenant/%d/site/%d/ios/%s/applications", tenant, site, device)
