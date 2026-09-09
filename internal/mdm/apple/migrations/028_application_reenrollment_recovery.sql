@@ -22,10 +22,10 @@ CREATE FUNCTION mdm_apple_app_recovery_guard() RETURNS trigger LANGUAGE plpgsql 
 BEGIN
  IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Application stopping evidence is immutable'; END IF;
  IF NOT EXISTS(SELECT 1 FROM mdm_apple_devices d
-   JOIN mdm_apple_devices old ON old.tenant_id=d.tenant_id AND old.udid<>'' AND upper(old.udid)=upper(d.udid)
-   JOIN mdm_apple_app_attempts a ON a.tenant_id=old.tenant_id AND a.device_id=old.id
+   JOIN mdm_apple_devices prior_device ON prior_device.tenant_id=d.tenant_id AND prior_device.udid<>'' AND upper(prior_device.udid)=upper(d.udid)
+   JOIN mdm_apple_app_attempts a ON a.tenant_id=prior_device.tenant_id AND a.device_id=prior_device.id
    WHERE d.tenant_id=NEW.tenant_id AND d.id=NEW.device_id AND d.status='enrolled'
-   AND old.id=NEW.previous_device_id AND old.status IN ('unenrolled','revoked')
+   AND prior_device.id=NEW.previous_device_id AND prior_device.status IN ('unenrolled','revoked')
    AND a.id=NEW.attempt_id AND a.status='uncertain' AND a.dispatched_at IS NOT NULL) THEN
   RAISE EXCEPTION 'Stopping evidence must refer to an unresolved retired enrollment on this device';
  END IF;
