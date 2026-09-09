@@ -11,6 +11,9 @@ import (
 
 templ Navigation(info *partials.CommonInfo) {
 	<div class="flex flex-wrap gap-4 my-4">
+		if info.Can(access.ReadSoftware) {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog")) }>Approved software</a>
+		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/devices")) }>All devices</a>
 		if info.Principal.IsAdministrator() {
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/deploy")) }>Windows software deployment</a>
@@ -215,6 +218,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				@MacBindingPanel(info, detail)
 				@FileVaultPanel(info, detail)
 				@MacAdminPanel(info,detail)
+				if info.Can(access.ReadSoftware) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/applications")) }>Managed applications</a>
+				}
  @RecoveryLockPanel(info,detail)
 			}
 			<section class="uk-card uk-card-default">

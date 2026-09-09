@@ -36,7 +36,7 @@ func (s *Store) finishMacApp(ctx context.Context, tx *sql.Tx, attempt, state, de
 }
 
 func (s *Store) reconcileMacAppExpiry(ctx context.Context, tx *sql.Tx, d *Device) error {
-	rows, err := tx.QueryContext(ctx, `SELECT t.id,t.status FROM mdm_apple_app_attempts t JOIN mdm_apple_app_commands m ON m.attempt_id=t.id AND m.kind IN ('install','remove') JOIN mdm_apple_commands c ON c.id=m.command_id WHERE t.device_id=$1 AND t.tenant_id=$2 AND t.status IN ('queued','sent','not_now') AND (c.expires_at<=clock_timestamp() OR c.status IN ('expired','cancelled'))`, d.ID, d.TenantID)
+	rows, err := tx.QueryContext(ctx, `SELECT t.id,t.status FROM mdm_apple_app_attempts t JOIN mdm_apple_app_commands m ON m.attempt_id=t.id AND m.kind IN ('install','remove') JOIN mdm_apple_commands c ON c.id=m.command_id WHERE t.device_id=$1 AND t.tenant_id=$2 AND ((t.status IN ('queued','sent','not_now') AND (c.expires_at<=clock_timestamp() OR c.status IN ('expired','cancelled'))) OR (t.status='verifying' AND t.accepted_at<clock_timestamp()-interval '1 day'))`, d.ID, d.TenantID)
 	if err != nil {
 		return err
 	}
@@ -57,10 +57,14 @@ func (s *Store) reconcileMacAppExpiry(ctx context.Context, tx *sql.Tx, d *Device
 	}
 	for _, item := range items {
 		state := "expired"
-		if item.status == "sent" {
+		detail := "command_expired"
+		if item.status == "sent" || item.status == "verifying" {
 			state = "uncertain"
 		}
-		if err = s.finishMacApp(ctx, tx, item.id, state, "command_expired"); err != nil {
+		if item.status == "verifying" {
+			detail = "verification_timeout"
+		}
+		if err = s.finishMacApp(ctx, tx, item.id, state, detail); err != nil {
 			return err
 		}
 		if err = auditOutcome(ctx, tx, d.TenantID, "system", "apple.software."+state, item.id, "failure"); err != nil {

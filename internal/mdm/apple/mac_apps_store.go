@@ -17,6 +17,7 @@ type MacAppAssignment struct {
 	Version                                               SoftwareVersion
 	Options                                               MacAppInstallOptions
 	ManagedState, InstalledState, InstalledVersion, Error string
+	RequestedBy                                           string
 	CreatedAt                                             time.Time
 	DispatchedAt, AcceptedAt, ManagedAt, InstalledAt      *time.Time
 }
@@ -25,14 +26,28 @@ func activeMacApp(status string) bool {
 	return status == "queued" || status == "sent" || status == "not_now" || status == "verifying" || status == "uncertain"
 }
 
-const macAppColumns = `a.tenant_id,a.id,t.id,a.device_id,a.status,t.operation,t.options,t.managed_state,t.installed_state,t.installed_version,t.error,t.created_at,t.dispatched_at,t.accepted_at,t.managed_at,t.installed_at,` + softwareVersionColumns
+func (a MacAppAssignment) CanCancel() bool { return a.Status == "queued" || a.Status == "not_now" }
+
+func (a MacAppAssignment) CanRemove(now time.Time) bool {
+	return !activeMacApp(a.Status) && a.ManagedState == "managed" && a.ManagedAt != nil && !a.ManagedAt.After(now) && a.ManagedAt.After(now.Add(-24*time.Hour))
+}
+
+func MacAppManagementReady(d Device, now time.Time) bool { return macAppDeviceReady(d, now) }
+
+func MacAppInstallReady(d Device, v SoftwareVersion, now time.Time) bool {
+	return v.WithdrawnAt == nil && macAppDeviceReady(d, now) && macAppCompatible(d, v)
+}
+
+const macAppColumns = `a.tenant_id,a.id,t.id,a.device_id,a.status,t.operation,t.options,t.managed_state,t.installed_state,t.installed_version,t.error,t.created_at,t.dispatched_at,t.accepted_at,t.managed_at,t.installed_at,t.requested_by,` + softwareVersionColumns
 const macAppFrom = ` FROM mdm_apple_app_assignments a JOIN mdm_apple_app_attempts t ON t.id=a.current_attempt_id AND t.assignment_id=a.id JOIN uem_software_versions v ON v.id=t.version_id AND v.tenant_id=t.tenant_id JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id JOIN mdm_apple_devices d ON d.id=a.device_id AND d.tenant_id=a.tenant_id `
+const macAppHistoryColumns = `a.tenant_id,a.id,t.id,a.device_id,t.status,t.operation,t.options,t.managed_state,t.installed_state,t.installed_version,t.error,t.created_at,t.dispatched_at,t.accepted_at,t.managed_at,t.installed_at,t.requested_by,` + softwareVersionColumns
+const macAppHistoryFrom = ` FROM mdm_apple_app_assignments a JOIN mdm_apple_app_attempts t ON t.assignment_id=a.id AND t.tenant_id=a.tenant_id JOIN uem_software_versions v ON v.id=t.version_id AND v.tenant_id=t.tenant_id JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id JOIN mdm_apple_devices d ON d.id=a.device_id AND d.tenant_id=a.tenant_id `
 
 func scanMacApp(row scanner) (*MacAppAssignment, error) {
 	var a MacAppAssignment
 	var options []byte
 	v := &a.Version
-	err := row.Scan(&a.TenantID, &a.ID, &a.AttemptID, &a.DeviceID, &a.Status, &a.Operation, &options, &a.ManagedState, &a.InstalledState, &a.InstalledVersion, &a.Error, &a.CreatedAt, &a.DispatchedAt, &a.AcceptedAt, &a.ManagedAt, &a.InstalledAt, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
+	err := row.Scan(&a.TenantID, &a.ID, &a.AttemptID, &a.DeviceID, &a.Status, &a.Operation, &options, &a.ManagedState, &a.InstalledState, &a.InstalledVersion, &a.Error, &a.CreatedAt, &a.DispatchedAt, &a.AcceptedAt, &a.ManagedAt, &a.InstalledAt, &a.RequestedBy, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -74,6 +89,54 @@ func (s *Store) MacApps(ctx context.Context, scope Scope, device, after string) 
 	if len(items) > 100 {
 		items = items[:100]
 		next = items[len(items)-1].ID
+	}
+	return items, next, nil
+}
+
+// MacAppHistory returns the recorded state and approved revision of each attempt,
+// including operations from a retired enrollment. It never substitutes the
+// latest assignment state for an older attempt's outcome.
+func (s *Store) MacAppHistory(ctx context.Context, scope Scope, device, assignment, before string) ([]MacAppAssignment, string, error) {
+	if _, err := s.Device(ctx, scope, device); err != nil {
+		return nil, "", err
+	}
+	var found string
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM mdm_apple_app_assignments WHERE tenant_id=$1 AND device_id=$2 AND id=$3`, scope.TenantID, device, assignment).Scan(&found); err != nil {
+		return nil, "", notFound(err)
+	}
+	var cursorAt any
+	var cursorID any
+	if before != "" {
+		id, err := uuid.Parse(before)
+		if err != nil || id == uuid.Nil || id.String() != before {
+			return nil, "", ErrMacApp
+		}
+		var at time.Time
+		if err = s.db.QueryRowContext(ctx, `SELECT created_at FROM mdm_apple_app_attempts WHERE tenant_id=$1 AND assignment_id=$2 AND id=$3`, scope.TenantID, assignment, before).Scan(&at); err != nil {
+			return nil, "", notFound(err)
+		}
+		cursorAt, cursorID = at, before
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+macAppHistoryColumns+macAppHistoryFrom+`WHERE a.tenant_id=$1 AND a.device_id=$2 AND a.id=$3 AND ($4::timestamptz IS NULL OR (t.created_at,t.id)<($4,$5::uuid)) AND ($6=0 OR d.site_id=$6) ORDER BY t.created_at DESC,t.id DESC LIMIT 101`, scope.TenantID, device, assignment, cursorAt, cursorID, scope.SiteID)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	items := []MacAppAssignment{}
+	for rows.Next() {
+		a, err := scanMacApp(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		items = append(items, *a)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, "", err
+	}
+	next := ""
+	if len(items) > 100 {
+		items = items[:100]
+		next = items[len(items)-1].AttemptID
 	}
 	return items, next, nil
 }
@@ -219,7 +282,15 @@ func (s *Store) changeMacApp(ctx context.Context, scope Scope, device, assignmen
 			return err
 		}
 	}
-	d, err := s.lockMacAppDevice(ctx, tx, scope, device)
+	var d *Device
+	if operation == "cancel" {
+		d, err = scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE tenant_id=$1 AND id=$2 AND ($3=0 OR site_id=$3) FOR UPDATE`, scope.TenantID, device, scope.SiteID))
+		if err == nil && d.Status != "enrolled" {
+			err = ErrConflict
+		}
+	} else {
+		d, err = s.lockMacAppDevice(ctx, tx, scope, device)
+	}
 	if err != nil {
 		return err
 	}

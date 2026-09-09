@@ -25,6 +25,25 @@
   overflow-wrap: anywhere;
 }
 
+#device-management dd,
+#device-management code,
+#device-management h2,
+#device-management h3 {
+  overflow-wrap: anywhere;
+}
+
+#device-management .software-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+#device-management .software-revision + .software-revision {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+}
+
 #apple-device .uk-button,
 #device-management .uk-button {
   height: auto;

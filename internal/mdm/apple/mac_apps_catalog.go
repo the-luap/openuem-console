@@ -23,6 +23,13 @@ type SoftwareVersion struct {
 const softwareVersionColumns = `v.id,v.package_id,p.platform,v.name,p.identifier,v.version,v.architecture,v.minimum_os,v.artifact_sha256,v.single_app,v.approved_by,v.approved_at,v.withdrawn_at`
 const softwareVersionFrom = ` FROM uem_software_versions v JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id `
 
+func (s *Store) SoftwareVersion(ctx context.Context, scope Scope, id string) (*SoftwareVersion, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	return scanSoftwareVersion(s.db.QueryRowContext(ctx, `SELECT `+softwareVersionColumns+softwareVersionFrom+`WHERE v.tenant_id=$1 AND v.id=$2`, scope.TenantID, id))
+}
+
 func scanSoftwareVersion(row scanner) (*SoftwareVersion, error) {
 	var v SoftwareVersion
 	err := row.Scan(&v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)

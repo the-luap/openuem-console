@@ -45,6 +45,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
+		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history":
+			return access.ReadSoftware, true
 		case "/ios/configurations":
 			return access.ReadProfiles, true
 		case "/ios/ade", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
@@ -55,6 +57,10 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/software/catalog", "/software/catalog/:version/withdraw":
+			return access.ManageSoftware, true
+		case "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action":
+			return access.AssignSoftware, true
 		case "/ios/ade/servers", "/ios/ade/servers/:id/token", "/ios/ade/servers/:id/action", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
 			return access.ManageCertificates, true
 		case "/ios/enroll":
@@ -151,7 +157,7 @@ func (h *Handler) requireApplePermission(c echo.Context, scope access.Scope) err
 	}
 	// Profile contents and APNs configuration affect an entire organization.
 	// A site URL cannot reduce their authorization scope.
-	if capability == access.ManageProfiles || capability == access.ManageCertificates {
+	if capability == access.ManageProfiles || capability == access.ManageCertificates || capability == access.ManageSoftware {
 		scope.SiteID = 0
 	}
 	if !p.Can(capability, scope) {

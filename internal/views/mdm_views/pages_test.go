@@ -192,12 +192,47 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	failedDetail.MacAdmin = &failedAdmin
 	adminAwaiting := true
 	failedDetail.ADE = &apple.ADEDeviceEnrollment{SetupState: "awaiting", AwaitingConfiguration: &adminAwaiting}
+
+	appDevice := adminDevice
+	appVersion := apple.SoftwareVersion{ID: "90000000-0000-4000-8000-000000000020", PackageID: "90000000-0000-4000-8000-000000000021", Platform: "macos", Name: "Editor <Suite>", Identifier: "com.example.Editor", Version: "42.0", Architecture: "universal", MinimumOS: "14.0", SHA256: strings.Repeat("a", 64), ApprovedAt: now, ApprovedBy: "Package administrator"}
+	withdrawnVersion := appVersion
+	withdrawnVersion.WithdrawnAt = &now
+	appState := func(status string) []apple.MacAppAssignment {
+		a := apple.MacAppAssignment{ID: "90000000-0000-4000-8000-000000000022", AttemptID: "90000000-0000-4000-8000-000000000023", DeviceID: appDevice.ID, Version: appVersion, Operation: "install", Status: status, CreatedAt: now, RequestedBy: "Site operator", ManagedState: "managed", ManagedAt: &now, InstalledState: "installed", InstalledVersion: "41.0", InstalledAt: &now, DispatchedAt: &now, AcceptedAt: &now}
+		if status == "verified" {
+			a.InstalledVersion = "42.0"
+		}
+		if status == "queued" {
+			a.DispatchedAt = nil
+			a.AcceptedAt = nil
+			a.ManagedAt = nil
+			a.InstalledAt = nil
+			a.InstalledVersion = ""
+			a.ManagedState = "unknown"
+			a.InstalledState = "unknown"
+		}
+		return []apple.MacAppAssignment{a}
+	}
+	appHistory := append(appState("verified"), appState("cancelled")...)
+	appHistory[1].Version.Version = "41.0"
+	appHistory[1].AttemptID = "90000000-0000-4000-8000-000000000024"
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
 
+		{"software-catalog", SoftwareCatalog(c, info, []apple.SoftwareVersion{appVersion, withdrawnVersion}, appVersion.ID, true), []string{"Approve a Mac application package", "Editor &lt;Suite&gt;", "Older revisions", "Withdrawn", `name="sha256"`, `name="source_url"`}},
+		{"software-catalog-reader", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{appVersion}, "", false), []string{"Published revisions", "Editor &lt;Suite&gt;"}},
+		{"software-version", SoftwareVersion(c, info, appVersion, []apple.Device{appDevice}, true), []string{"Request installation", "Withdraw approval", "Exact bundle version", strings.Repeat("a", 64)}},
+		{"software-version-reader", SoftwareVersion(c, &reader, appVersion, nil, false), []string{"Approved artifact", strings.Repeat("a", 64)}},
+		{"software-version-withdrawn", SoftwareVersion(c, info, withdrawnVersion, nil, true), []string{"Withdrawn at", "cannot be sent for another installation"}},
+		{"software-app-queued", MacApplications(c, info, &appDevice, appState("queued"), ""), []string{"Cancel queued operation", "Queued for delivery", "View operation history"}},
+		{"software-app-verifying", MacApplications(c, info, &appDevice, appState("verifying"), ""), []string{"Waiting for application observations", "41.0", "Request current app status"}},
+		{"software-app-verified", MacApplications(c, info, &appDevice, appState("verified"), ""), []string{"Expected managed app version reported", "Request app removal", "42.0"}},
+		{"software-app-uncertain", MacApplications(c, info, &appDevice, appState("uncertain"), ""), []string{"Outcome unknown", "Another mutation remains blocked", "Request current app status"}},
+		{"software-app-reader", MacApplications(c, &reader, &appDevice, appState("verified"), ""), []string{"Expected managed app version reported", "View operation history"}},
+		{"software-app-history", MacApplicationHistory(c, &reader, &appDevice, appHistory[0].ID, appHistory, appHistory[1].AttemptID), []string{"Application operation history", "does not establish the current installed state", "Cancelled before confirmed execution", "Older operations", "Site operator"}},
 		{"mac-admin-paused", DeviceDetails(c, info, pausedAdminDetail), []string{"Automatic rotation is paused", "Resume automatic rotation", "Not scheduled"}},
 		{"mac-admin-ready", DeviceDetails(c, info, adminDetail), []string{"Rotate administrator password", "Reveal password", "Managed &lt;Admin&gt;", "Last acknowledged password"}},
 		{"mac-admin-uncertain", DeviceDetails(c, info, uncertainDetail), []string{"outcome is unknown", "Reveal password"}},
@@ -261,6 +296,22 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if strings.HasSuffix(tc.name, "reader") && strings.HasPrefix(tc.name, "software-") {
+				for _, forbidden := range []string{"Request installation", "Request app removal", "Cancel queued operation", "Request current app status", "Approve package revision", "Withdraw approval"} {
+					if strings.Contains(html, forbidden) {
+						t.Fatalf("reader sees software mutation: %s", forbidden)
+					}
+				}
+			}
+			if tc.name == "software-version-withdrawn" && (strings.Contains(html, "Request installation") || strings.Contains(html, "Withdraw approval")) {
+				t.Fatal("withdrawn revision offers mutation")
+			}
+			if tc.name == "software-app-uncertain" || tc.name == "software-app-verifying" {
+				if strings.Contains(html, "Request app removal") || strings.Contains(html, "Cancel queued operation") {
+					t.Fatal("unresolved mutation offers unsafe action")
+				}
+			}
+
 			if strings.HasPrefix(tc.name, "mac-admin-") && strings.Contains(html, "f0000000-0000-4000-8000-000000000012/retry") {
 				t.Fatal("administrator mutation has generic retry")
 			}

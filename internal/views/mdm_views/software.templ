@@ -1,0 +1,229 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"time"
+)
+
+templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []apple.SoftwareVersion, next string, canManage bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Approved software", Url: partials.GetNavigationUrl(info, "/software/catalog")}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Approved software</h1>
+				<p class="uk-text-muted mt-2">Versioned packages approved for your organization. Open a revision to install it on a compatible Mac.</p>
+				@Navigation(info)
+			</div>
+			if canManage {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">Approve a Mac application package</h2><p>Approve the exact package source, SHA-256 and application bundle version. Verify the signed package and its contents before publishing.</p></div>
+					<div class="uk-card-body">
+						<form method="post" action={ partials.GetNavigationUrl(info, "/software/catalog") }>
+							@CSRF(info)
+							<div class="software-fields">
+								<label>Name<input class="uk-input" name="name" maxlength="255" required/></label>
+								<label>Application bundle identifier<input class="uk-input" name="identifier" placeholder="com.example.Editor" maxlength="255" required/></label>
+								<label>Exact bundle version<input class="uk-input" name="version" maxlength="128" required/></label>
+								<label>Architecture<select class="uk-select" name="architecture"><option value="universal">Universal</option><option value="arm64">Apple silicon</option><option value="x86_64">Intel</option></select></label>
+								<label>Minimum macOS version<input class="uk-input" name="minimum_os" value="14.0" maxlength="11" required/></label>
+								<label>SHA-256<input class="uk-input" name="sha256" pattern="[a-f0-9]{64}" maxlength="64" autocomplete="off" required/></label>
+							</div>
+							<label class="block mt-4">HTTPS package URL<input class="uk-input" type="url" name="source_url" maxlength="8192" autocomplete="off" required/></label>
+							<p class="uk-text-muted mt-2">Use an encoded URL that remains available for device downloads. Download credentials are not displayed after approval.</p>
+							<label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="single_app" value="yes"/>I verified that the package contains one signed app installed in /Applications (required for macOS 11–13).</label>
+							<label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>I approve this exact package for installation by authorized operators.</label>
+							<button class="uk-button uk-button-primary mt-4" type="submit">Approve package revision</button>
+						</form>
+					</div>
+				</section>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">Published revisions</h2><p>Existing approvals remain unchanged when a new revision is published.</p></div>
+				<div class="uk-card-body">
+					if len(versions)==0 {
+						<p>No approved package revisions in this organization.</p>
+					}
+					for _,v:=range versions {
+						<article class="software-revision">
+							<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+v.ID)) }>{ v.Name } · { v.Version }</a></h3>
+							<p>{ v.Identifier } · { v.Platform } · { v.Architecture } · macOS { v.MinimumOS }+</p>
+							if v.WithdrawnAt!=nil {
+								<p>Withdrawn · { When(v.WithdrawnAt) }</p>
+							} else {
+								<p>Approved · { When(&v.ApprovedAt) }</p>
+							}
+						</article>
+					}
+					if next!="" {
+						<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog?before="+next)) }>Older revisions</a>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.SoftwareVersion, devices []apple.Device, canManage bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Approved software", Url: partials.GetNavigationUrl(info, "/software/catalog")}, {Title: v.Name, Url: partials.GetNavigationUrl(info, "/software/catalog/"+v.ID)}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">{ v.Name } · { v.Version }</h1>
+				@Navigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">Approved artifact</h2></div>
+				<div class="uk-card-body">
+					<dl class="uk-description-list"><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>Exact bundle version</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>macOS { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ v.SHA256 }</code></dd><dt>Approved</dt><dd>{ When(&v.ApprovedAt) } · { v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
+					if v.WithdrawnAt!=nil {
+						<p role="status" class="uk-alert uk-alert-warning mt-4">Withdrawn at { When(v.WithdrawnAt) }. This revision cannot be sent for another installation.</p>
+					}
+					if canManage && v.WithdrawnAt==nil {
+						<details class="mt-4">
+							<summary>Withdraw this approval</summary>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/software/catalog/"+v.ID+"/withdraw") } class="mt-4">
+								@CSRF(info)
+								<p>Withdrawal prevents future installation delivery. It does not stop a sent installer or uninstall an existing app.</p>
+								<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Permanently withdraw this revision.</label>
+								<button class="uk-button uk-button-danger" type="submit">Withdraw approval</button>
+							</form>
+						</details>
+					}
+				</div>
+			</section>
+			if info.Can(access.AssignSoftware) && v.WithdrawnAt==nil {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">Install on a Mac</h2><p>The device must report the expected managed app version before the installation is verified.</p></div>
+					<div class="uk-card-body">
+						if len(devices)==0 {
+							<p>No compatible Macs with current inventory and a valid management identity are available in this scope. Refresh device inventory or select another scope.</p>
+						} else {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/software/catalog/"+v.ID+"/install") }>
+								@CSRF(info)
+								<label>
+									Compatible Mac
+									<select class="uk-select" name="device" required>
+										<option value="">Select a Mac</option>
+										for _,d:=range devices {
+											<option value={ d.ID }>{ d.Name } · { Show(d.SerialNumber) }</option>
+										}
+									</select>
+								</label>
+								<details class="mt-4">
+									<summary>Additional installation options</summary>
+									<label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="remove_on_unenroll" value="yes"/>Remove this app and its app data when MDM is removed.</label>
+									<label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="take_over" value="yes"/>Allow taking management of an app already installed by the user.</label>
+								</details>
+								<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Install this approved revision on the selected Mac.</label>
+								<button class="uk-button uk-button-primary" type="submit">Request installation</button>
+							</form>
+						}
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device, items []apple.MacAppAssignment, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: d.Name, Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}, {Title: "Managed applications", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications")}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Managed applications · { d.Name }</h1>
+				<p class="uk-text-muted mt-2">Requested package versions and the latest application observations for this enrollment.</p>
+				@Navigation(info)
+			</div>
+			if !apple.MacAppManagementReady(*d,time.Now()) && d.Status=="enrolled" {
+				<p role="status" class="uk-alert uk-alert-warning">Refresh inventory on this Mac before requesting installation, removal or application observations. Queued operations can still be cancelled.</p>
+			}
+			if len(items)==0 {
+				<p>No managed application operations have been requested for this enrollment.</p>
+			}
+			for _,a:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ MacAppState(a) }</p></div>
+					<div class="uk-card-body">
+						<dl class="uk-description-list"><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested operation</dt><dd>{ a.Operation } · { When(&a.CreatedAt) }</dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } · { When(a.ManagedAt) }</dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } · { When(a.InstalledAt) }</dd><dt>Command accepted</dt><dd>{ When(a.AcceptedAt) }</dd></dl>
+						if message:=MacAppError(a.Error);message!="" {
+							<p class="uk-alert uk-alert-warning mt-4">{ message }</p>
+						}
+						if a.Status=="uncertain" {
+							<p class="mt-4">Another mutation remains blocked while this outcome is unknown. Requesting status does not rerun the installer.</p>
+						}
+						<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+a.Version.ID)) }>View approved revision</a>
+						<a class="underline block mt-2" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications/"+a.ID+"/history")) }>View operation history</a>
+						if info.Can(access.AssignSoftware) && d.Status=="enrolled" {
+							<div class="flex flex-wrap gap-4 mt-4">
+								if a.DispatchedAt!=nil && apple.MacAppManagementReady(*d,time.Now()) {
+									@MacAppAction(info, d.ID, a.ID, "refresh", "Request current app status", false)
+								}
+								if a.CanCancel() {
+									@MacAppAction(info, d.ID, a.ID, "cancel", "Cancel queued operation", false)
+								}
+							</div>
+							if a.CanRemove(time.Now()) && apple.MacAppManagementReady(*d,time.Now()) {
+								<details class="mt-4">
+									<summary>Remove this managed app</summary>
+									<p class="mt-4">Removal deletes the managed app and its app data. Additional files or services installed by a package may remain.</p>
+									@MacAppAction(info, d.ID, a.ID, "remove", "Request app removal", true)
+								</details>
+							}
+						}
+					</div>
+				</section>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications?after="+next)) }>More applications</a>
+			}
+		</main>
+	}
+}
+
+templ MacAppAction(info *partials.CommonInfo, device, assignment, operation, label string, confirm bool) {
+	<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+device+"/applications/"+assignment+"/action") } class="mt-4">
+		@CSRF(info)
+		<input type="hidden" name="operation" value={ operation }/>
+		if confirm {
+			<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Remove this managed app and its app data.</label>
+		} else {
+			<input type="hidden" name="confirmed" value="yes"/>
+		}
+		<button class="uk-button uk-button-default" type="submit">{ label }</button>
+	</form>
+}
+
+templ MacApplicationHistory(c echo.Context, info *partials.CommonInfo, d *apple.Device, assignment string, items []apple.MacAppAssignment, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: d.Name, Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}, {Title: "Managed applications", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications")}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Application operation history</h1><p class="uk-text-muted mt-2">Recorded operations for { d.Name }, newest first. An earlier observation describes that attempt; it does not establish the current installed state.</p></div>
+			for _,a:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ a.Operation } · { MacAppState(a) }</p></div>
+					<div class="uk-card-body">
+						<dl class="uk-description-list"><dt>Requested</dt><dd>{ When(&a.CreatedAt) } · { Show(a.RequestedBy) }</dd><dt>Sent</dt><dd>{ When(a.DispatchedAt) }</dd><dt>Command accepted</dt><dd>{ When(a.AcceptedAt) }</dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } · { When(a.ManagedAt) }</dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } · { When(a.InstalledAt) }</dd><dt>Operation identifier</dt><dd>{ a.AttemptID }</dd></dl>
+						if message:=MacAppError(a.Error);message!="" {
+							<p class="uk-alert uk-alert-warning mt-4">{ message }</p>
+						}
+						if a.Operation=="install" {
+							<p class="mt-4">Remove on unenrollment: { YesNo(a.Options.RemoveOnUnenroll) } · Take over an existing app: { YesNo(a.Options.TakeOver) }</p>
+						}
+						<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+a.Version.ID)) }>View approved revision</a>
+					</div>
+				</section>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications/"+assignment+"/history?before="+next)) }>Older operations</a>
+			}
+		</main>
+	}
+}

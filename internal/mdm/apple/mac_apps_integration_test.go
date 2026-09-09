@@ -3,6 +3,7 @@ package apple
 import (
 	"bytes"
 	"errors"
+	"github.com/google/uuid"
 	"sync"
 	"testing"
 )
@@ -118,6 +119,20 @@ func TestMacAppInstallVersionVerificationAndRemoval(t *testing.T) {
 	if a.Status != "verified" || a.Operation != "remove" || a.InstalledState != "absent" {
 		t.Fatal("removal was not verified from absence")
 	}
+	attempts, next, err := s.MacAppHistory(t.Context(), scope, d.ID, a.ID, "")
+	if err != nil || next != "" || len(attempts) != 2 || attempts[0].Operation != "remove" || attempts[1].Operation != "install" || attempts[1].Status != "verified" || attempts[1].InstalledVersion != "42.0" || attempts[1].RequestedBy != "admin" {
+		t.Fatal("attempt history lost original intent or observation", err)
+	}
+	older, _, err := s.MacAppHistory(t.Context(), scope, d.ID, a.ID, attempts[0].AttemptID)
+	if err != nil || len(older) != 1 || older[0].AttemptID != attempts[1].AttemptID {
+		t.Fatal("history cursor repeated or skipped an operation", err)
+	}
+	if _, _, err = s.MacAppHistory(t.Context(), Scope{TenantID: 1, SiteID: 2}, d.ID, a.ID, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatal("history leaked across sites", err)
+	}
+	if _, _, err = s.MacAppHistory(t.Context(), scope, d.ID, a.ID, uuid.NewString()); !errors.Is(err, ErrNotFound) {
+		t.Fatal("foreign history cursor accepted", err)
+	}
 	var history, site int
 	if err = s.db.QueryRow(`SELECT count(*) FROM mdm_apple_app_attempts WHERE device_id=$1`, d.ID).Scan(&history); err != nil || history != 2 {
 		t.Fatal("installation history was lost", err)
@@ -221,5 +236,42 @@ func TestMacAppConcurrentRequestsWithdrawalAndCheckout(t *testing.T) {
 	var uncertain int
 	if err = s.db.QueryRow(`SELECT count(*) FROM mdm_apple_app_attempts WHERE device_id=$1 AND status='uncertain'`, d.ID).Scan(&uncertain); err != nil || uncertain != 1 {
 		t.Fatal("checkout invented a stopped installer", err)
+	}
+}
+
+func TestMacAppMissingReportsBecomeUncertainAndLaterResolve(t *testing.T) {
+	s, d, v := macAppFixture(t)
+	scope := Scope{TenantID: 1, SiteID: 1}
+	if err := s.installMacApp(t.Context(), scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	wire := adeConnect(t, s, d, "Idle", "", nil)
+	adeConnect(t, s, d, "Acknowledged", wire["CommandUUID"].(string), nil)
+	a := macAppState(t, s, d)
+	adeExec(t, s, `UPDATE mdm_apple_app_attempts SET accepted_at=clock_timestamp()-interval '25 hours' WHERE id=$1`, a.AttemptID)
+	adeExec(t, s, `UPDATE mdm_apple_app_assignments SET next_check_at=clock_timestamp()-interval '1 second' WHERE id=$1`, a.ID)
+	if err := s.ReconcileMacApps(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	a = macAppState(t, s, d)
+	if a.Status != "uncertain" || a.Error != "verification_timeout" {
+		t.Fatal("missing reports left a permanent verifying state", a.Status, a.Error)
+	}
+	if err := s.installMacApp(t.Context(), scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); !errors.Is(err, ErrConflict) {
+		t.Fatal("unobserved installer allowed another mutation", err)
+	}
+	if err := s.changeMacApp(t.Context(), scope, d.ID, a.ID, "refresh", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	macAppObserve(t, s, d, nil, "Managed", "42.0")
+	if macAppState(t, s, d).Status != "verified" {
+		t.Fatal("fresh observations could not resolve timed-out verification")
+	}
+	var mutations, events int
+	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_app_commands WHERE device_id=$1 AND kind='install'`, d.ID).Scan(&mutations); err != nil || mutations != 1 {
+		t.Fatal("verification replayed the installer", mutations, err)
+	}
+	if err := s.db.QueryRow(`SELECT count(*) FROM mdm_apple_audit WHERE resource_id=$1 AND action='apple.software.uncertain'`, a.AttemptID).Scan(&events); err != nil || events != 1 {
+		t.Fatal("verification timeout not audited exactly once", events, err)
 	}
 }

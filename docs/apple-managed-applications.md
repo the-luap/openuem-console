@@ -1,9 +1,10 @@
 # Managed Mac applications
 
 Implementation is in progress. The native backend now has an approved artifact
-catalog and a device-channel installation/removal lifecycle. Console workflows,
-the complete acceptance matrix, ADE application prerequisites and Platform SSO
-integration are still being implemented. This is not yet a completed software
+catalog and a device-channel installation/removal lifecycle. Console approval,
+assignment and paginated history workflows are implemented, with their full CI
+and browser checks in progress. The complete acceptance matrix, ADE application
+prerequisites and Platform SSO integration are still being implemented. This is not yet a completed software
 distribution or self-service feature.
 
 ## Approved artifacts
@@ -54,23 +55,45 @@ An unanswered sent mutation is not automatically replayed. An explicit `NotNow`
 permits deferred delivery of the same command. Expired sent commands retain an
 unknown outcome and block another mutation. An exact late response can resolve
 that state. Acknowledged operations continue to require installation observations.
+After one day without verification, an accepted operation becomes uncertain even
+when the Mac sends no observations. Status queries continue; new mutations remain
+blocked. Fresh reports can subsequently establish the requested state.
 Old terminal replies cannot reverse a newer operation. Queued/deferred operations
-can be cancelled; cancellation does not claim that an accepted installer stopped.
+can be cancelled even when device inventory is stale; cancellation does not claim that an accepted installer stopped.
 Checkout stops management and preserves attempt history and uncertain outcomes.
+
+## Console workflows
+
+Open **Approved software** from device management to publish or inspect revisions.
+Publishing and permanent withdrawal are organization-level actions; scoped
+operators can select a compatible Mac and request an approved revision. Publishing,
+installation and removal require explicit confirmation and a valid CSRF token.
+The server rejects duplicate form fields, query-based mutation input and unapproved
+command or download parameters. Download credentials never appear on read pages.
+
+A Mac's **Managed applications** page exposes observed state, explicit status
+queries, cancellation before confirmed execution and managed-app removal when
+eligible. Its **Operation history** retains each attempt's original revision,
+actor, options, timestamps and observations, independently of the latest state.
+Read-only users can inspect these records without mutation controls. Retired
+enrollments retain history. Catalog and history pages use scoped bounded cursors.
 
 ## Validation status
 
 Local protocol tests cover package validation, pinned manifests, management
 options, credential exclusion and conservative observation parsing. URL fuzzing
-completed 183,084 inputs. All 25 actual Apple migrations and all 53 SQL statements
-in the initial application backend passed an isolated PostgreSQL migration and
+completed 183,084 inputs. All 26 actual Apple migrations and all 58 SQL statements
+in the application backend and console reads passed an isolated PostgreSQL migration and
 parameter-inference check. These checks roll back their temporary schema.
 
 PostgreSQL integration tests exercise catalog authorization, immutable approvals,
 withdrawal, pagination, failed-audit rollback, installation/observation/removal,
-late responses, concurrent requests, scope and checkout. Their complete CI result
-is pending for the implementation commit. Console/browser acceptance and actual
-signed-package installation on an explicitly authorized Mac remain open.
+late responses, concurrent requests, scope and checkout. The initial backend commit `b0c90af` passed both complete CI runs, including Linux
+and Windows builds, native Windows protocol checks and PostgreSQL/race tests.
+The subsequent console/history/timeout changes add route authorization, CSRF,
+stale-inventory cancellation, read isolation and missing-report recovery tests;
+their complete CI and browser acceptance are pending. Actual signed-package
+installation on an explicitly authorized Mac remains open.
 No package is downloaded or executed by these synthetic tests.
 
 ## Platform references
