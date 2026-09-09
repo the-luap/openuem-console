@@ -200,7 +200,7 @@ func TestSSORouteReservationsRespectUserIsolationAndPlatformSSOMerging(t *testin
 }
 
 func TestSSORouteReservationMigrationRetainsDispatchedAndMissingHistory(t *testing.T) {
-	s := testStoreBeforeMigration(t, "033_sso_route_reservations.sql")
+	s := testStoreBeforeMigration(t, "migrations/033_sso_route_reservations.sql")
 	testSettings(t, s, 1)
 	scope := Scope{TenantID: 1, SiteID: 1}
 	d, _, _ := testEnrollPlatformWithKey(t, s, scope, "Legacy SSO reservations", "Mac16,1", "15.0")

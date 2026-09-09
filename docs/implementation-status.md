@@ -47,11 +47,11 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
-| APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, Platform SSO setup, certificate rotation and Apple/hardware acceptance |
+| APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
-| SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, ADE prerequisites, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
+| SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
 
 Cross-cutting scope includes native User Enrollment/privacy limits, SCIM and IdP
 associations, macOS recovery/local-admin/Platform SSO extensions, certificate
@@ -73,7 +73,8 @@ the table's package summaries do not remove any detail from the roadmap.
   protects newer device/user snapshots from late queries; all 30 migrations, 250
   prepared SQL statements and actual query execution pass, as do all four jobs in
   both complete CI workflows.
-  ADE pin ownership, profile prerequisites and physical acceptance remain open.
+  ADE pin ownership and profile prerequisites now have the implemented Platform
+  SSO workflow below. Physical acceptance remains open.
 
 - [Mac application reenrollment recovery](apple-application-reenrollment.md) now
   guards creation and delivery across earlier enrollment identities, retains
@@ -88,9 +89,17 @@ the table's package summaries do not remove any detail from the roadmap.
   encrypted registration-token storage, bounded provider data, shared editor and
   upload validation, and platform/MDM approval checks for assignment. Console and
   native protocol tests, three responsive browser scenarios and 28,837 isolated
-  parser fuzz inputs pass. Immutable ADE profile prerequisites, provider-specific
-  registration, cross-profile URL collision checks and hardware acceptance remain
-  open.
+  parser fuzz inputs pass. Immutable ADE profile/app pairs, setup ownership,
+  reviewed corrections, retained history and repair receipts pass both complete
+  workflows at `67b968c`, together with 36 further browser scenarios. The binding
+  and every correction have separate revision identifiers, so stale forms cannot
+  become valid after returning to an earlier pair. Historical release dispatches
+  keep prerequisite changes closed even after an explicit release retry.
+  Cross-profile routing reservations are implemented in `96b8d0c`; all 33 migrations
+  and 287 prepared SQL statements pass locally, including historical System/User
+  reservation backfill and verification-dependent release. The full integration
+  run is pending. Provider-specific registration, token provisioning and hardware
+  acceptance remain open.
 
 - [ADE required applications](apple-ade-required-applications.md) now include
   immutable approved revisions inherited at admission, native app observations
@@ -98,7 +107,8 @@ the table's package summaries do not remove any detail from the roadmap.
   per-device revision correction retaining original intent and change history.
   Migration/preparation, console, native protocol and 18 browser scenarios pass.
   Cross-enrollment installer recovery is covered by the separate milestone above.
-  Physical acceptance and the additional Platform SSO sequence remain open.
+  The Platform SSO workflow above binds and corrects provider app/profile
+  revisions together. Physical installation and provider acceptance remain open.
 
 - [Managed Mac applications](apple-managed-applications.md) now have an approved
   immutable artifact catalog, native installation/removal and scoped console
@@ -108,7 +118,8 @@ the table's package summaries do not remove any detail from the roadmap.
   read pages. Both complete CI runs at `3bfc0c9` passed, as did 39 browser checks,
   URL fuzzing and actual-schema SQL checks. ADE application prerequisites have
   their own subsequent milestone above. Physical acceptance, unified platform
-  adapters, Apps & Books, DDM applications and Platform SSO integration remain open.
+  adapters, Apps & Books and DDM applications remain open. Platform SSO provider
+  prerequisites are implemented above; provider registration remains separate.
 
 - [ADE enrollment protocol primitives](apple-automated-enrollment.md#enrollment-protocol-primitives)
   add bounded profile definition/retrieval, per-device assignment/removal outcomes
