@@ -2,9 +2,11 @@
 
 Uploaded `com.apple.ADCertificate.managed` profiles and AD identities selected
 by the [EAP-TLS composer](apple-enterprise-wifi.md) receive field, scope and target
-validation. The typed profile builder accepts `apple-ad-certificate`. A dedicated
-console creation form is not yet provided; administrators can upload a prepared
-profile and select its retained revision in the Wi-Fi composer.
+validation. The typed profile builder and console creation form accept
+`apple-ad-certificate`. Organization profile administrators can enter server and
+template details, optional authority/acquisition settings, key access and renewal
+options, or upload a prepared profile. Its retained revision can then be selected
+in the Wi-Fi composer.
 
 The payload requires an ASCII fully qualified DNS name for `CertServer` and a
 nonempty `CertTemplate` of up to 255 UTF-8 bytes. Punycode DNS labels and a trailing
@@ -35,6 +37,14 @@ rejects an enabled prompt for MDM delivery, and requires that computer profiles
 omit the prompt key entirely. A disabled User prompt is accepted. Every target
 must be a Mac with a known compatible OS version.
 
+The form omits optional settings by default, preserving platform behavior. The
+explicit key-size choices are 2048, 3072, 4096 and 8192 bits. Switching to User
+scope clears enabled automatic renewal and the review checkbox; the enabled
+renewal option is unavailable for User scope. Interactive credential prompting is
+not exposed. Saving requires confirmation and the normal organization profile
+permission, CSRF and strict single-value form checks. Payload details are omitted
+from the catalog listing.
+
 Upload, composition, System/User assignment, revision deployment and restoration
 apply the checks. Failed revisions roll back catalog changes, historical snapshots
 and replacement commands. Removal keeps working when an old profile no longer
@@ -44,7 +54,8 @@ private-key export protection, certificate issuance or renewal on physical Macs.
 
 The isolated production payload tests pass for serialized types, absent options,
 zero/false values, hostname and value limits, prompt/renewal scope restrictions
-and exact version boundaries. Database regression and full CI for this validation
-change are pending. Physical AD/CA and Mac acceptance remain required.
+and exact version boundaries. The combined certificate/composition payload tests
+also pass. Database regression, scoped form tests, full CI and browser checks for
+the new form are pending. Physical AD/CA and Mac acceptance remain required.
 
 Source: [Apple Active Directory Certificate schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml).

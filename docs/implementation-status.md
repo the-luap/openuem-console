@@ -63,9 +63,10 @@ the table's package summaries do not remove any detail from the roadmap.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks
   uploaded and composed AD identities, typed values, Mac property versions and
-  manual-prompt/automatic-renewal restrictions. Isolated payload tests pass;
-  full CI is pending. A dedicated creation form and physical AD/CA acceptance
-  remain open.
+  manual-prompt/automatic-renewal restrictions. The dedicated creation form
+  preserves omitted options and restricts enabled renewal to computer identities.
+  Isolated payload tests pass; full CI and browser checks for the form are pending.
+  Physical AD/CA acceptance remains open.
 
 - [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted
   identity/trust certificate revisions with new local payload bindings, explicit

@@ -676,6 +676,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 				return err
 			}
 		}
+		if c.FormValue("editor") == "apple-ad-certificate" {
+			if err = appleADCertificateSettings(c, settings); err != nil {
+				return err
+			}
+		}
 		if c.FormValue("editor") == "apple-acme" {
 			if err = appleACMESettings(c, settings); err != nil {
 				return err

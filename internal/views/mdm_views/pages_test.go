@@ -378,6 +378,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "profiles" && (!strings.Contains(html, "Create an Active Directory certificate profile") || !strings.Contains(html, `name="certificate_server"`) || !strings.Contains(html, "Interactive credential prompting") || !strings.Contains(html, "/assets/js/apple-ad-certificates.js")) {
+				t.Fatal("AD certificate editor or delivery guidance missing")
+			}
+			if tc.name == "wifi-eap-reader" && strings.Contains(html, "ad-certificate-editor") {
+				t.Fatal("reader sees AD certificate creation controls")
+			}
 			if tc.name == "wifi-eap-reader" && strings.Contains(html, "wifi-eap-profile-editor") {
 				t.Fatal("reader sees enterprise Wi-Fi composition controls")
 			}

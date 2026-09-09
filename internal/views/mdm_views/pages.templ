@@ -490,7 +490,8 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						@PublicCertificatesEditor(info)
 						@SCEPEditor(info)
 						@ACMEEditor(info)
-						@WiFiEAPTLSEditor(info, profiles)
+				@WiFiEAPTLSEditor(info, profiles)
+				@ADCertificateEditor(info)
 						if info.Can(access.ManageProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4">
 								@CSRF(info)
