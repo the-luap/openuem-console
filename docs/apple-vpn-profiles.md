@@ -104,7 +104,7 @@ server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
 No cryptographic exchange is performed by saving a profile. Complete on-demand
 rules, provider schemas, Always On exceptions, further protocol options
-and a dedicated console editor remain open.
+and additional console editors remain open.
 
 ## Certificate profile generator
 
@@ -130,10 +130,19 @@ transaction. Source updates and catalog deletion do not substitute a newer
 revision. A shared transaction implementation with EAP-TLS Wi-Fi saves the
 encrypted profile, retained snapshot and `apple.profile.compose` audit together.
 The audit records source profile/revision identifiers without credentials, and
-the profile description records copy provenance. The dedicated console form is
-still pending for VPN. Existing save/assignment paths preserve ACME client
+the profile description records copy provenance. The dedicated console form
+exposes this workflow to organization profile administrators. Existing save/assignment paths preserve ACME client
 ownership and AD Mac-only target checks. Generation alone does not assign the
 profile, contact an issuer or establish a VPN connection.
+
+The form requires explicit certificate algorithm selection and review confirmation.
+Changing scope clears incompatible identity/trust selections and confirmation;
+it does not silently switch a selected trust profile to existing device trust.
+Selecting SCEP or AD disables EC algorithms and clears a previously selected EC
+algorithm. ACME and PKCS12 retain explicit algorithm choices, with backend checks
+for known ACME key parameters. Switching authentication updates the OS/TLS
+guidance. Strict single-value forms, CSRF and organization authorization apply;
+catalog rows omit credentials, and protected downloads require profile rights.
 
 ## Validation evidence
 
@@ -155,7 +164,9 @@ authentication, serialized values, malformed input, TLS and property boundaries,
 post-quantum parameters, strict selection, child inheritance and removed
 algorithms. PostgreSQL regression cases add eight System/User property upgrades,
 failed revision rollback, modern replacements and rejected legacy restoration.
-Full CI for this extension is pending.
+Both complete workflows for this IKEv2 validation at `d5f7ec5` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34375938850) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34375944694).
 
 The Always On extension also passes isolated tests for multiple flat tunnels,
 identity types and ambiguity, malformed structures, integer switches, nested TLS
@@ -176,6 +187,11 @@ rejection, typed option mapping, encrypted storage and audit-failure rollback.
 The existing Wi-Fi composition regression tests cover the shared transaction.
 Production SQL text is unchanged; extraction still identifies 306 statements.
 Full CI for the store composition change is pending.
+
+Scoped console tests add permission and CSRF denial, strict form parsing, exact
+retained revision selection, scope/algorithm checks, System/User and machine/EAP
+modes, trust selection and credential/download privacy. Template generation
+passes; full CI and actual browser checks for the form are pending.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

@@ -647,6 +647,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 			return err
 		}
 		return appleRedirect(c, info, "/ios/configurations")
+	} else if c.FormValue("editor") == "vpn-ikev2-certificate" {
+		if err = h.appleCreateIKEv2Certificate(c, scope.TenantID); err != nil {
+			return err
+		}
+		return appleRedirect(c, info, "/ios/configurations")
 	} else if c.FormValue("editor") == "upload" {
 		data, err = readAppleUpload(c, "profile", apple.MaxProfileBytes)
 	} else if c.FormValue("editor") == "apple-pkcs12" {

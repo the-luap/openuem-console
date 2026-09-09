@@ -71,9 +71,10 @@ the table's package summaries do not remove any detail from the roadmap.
   A typed IKEv2 generator copies certificate configurations into System/User
   profiles with local bindings and machine/EAP-TLS authentication. Protected
   composition uses exact encrypted certificate revisions and atomic audit
-  provenance; its console editor remains pending.
-  Isolated production tests and both full target/DNS workflows pass; full CI
-  execution for the later IKEv2, Always On, generator and composition changes is pending.
+  provenance; its console editor enforces scope/algorithm choices and review.
+  Isolated production tests and both full target/DNS and IKEv2 validation workflows
+  pass. Full CI for later Always On, generator, composition and form changes,
+  plus actual browser checks for the form, is pending.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend

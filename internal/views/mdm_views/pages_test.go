@@ -276,6 +276,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}{
 		{"wifi-eap-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an enterprise Wi-Fi profile (EAP-TLS)", "Device &lt;identity&gt;", `value="70000000-0000-4000-8000-000000000001/7"`, `value="70000000-0000-4000-8000-000000000004/2"`, `data-scope="User"`, `name="trust_revision" required`, `value="existing" selected`, "Source updates and deletion do not change the saved copy.", "32 UTF-8 bytes", "iOS/iPadOS 17 or macOS 14", "/assets/js/apple-wifi-eap.js"}},
 		{"wifi-eap-reader", Profiles(c, &reader, wifiCertificates, []apple.Device{*d}), []string{"Device &lt;identity&gt;"}},
+		{"ikev2-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an IKEv2 certificate VPN profile", `value="70000000-0000-4000-8000-000000000001/7"`, `data-identity-kind="com.apple.security.scep"`, `name="certificate_type" required`, `name="server_issuer"`, "Source updates and deletion do not change the saved copy.", "/assets/js/apple-vpn-ikev2.js"}},
+		{"ikev2-reader", Profiles(c, &reader, wifiCertificates, []apple.Device{*d}), []string{"Device &lt;identity&gt;"}},
 		{"ade-sso-revisions", ADEPlatformSSORevisions(c, info, &appDevice, &ssoRequirement, ssoRevisions, ssoRevisions[1].ID), []string{"Original enrollment requirement", "Current required pair", "Reviewed &lt;correction&gt;", "Older provider revisions"}},
 		{"ade-sso-attention", DeviceDetails(c, info, ssoState("attention")), []string{"Platform SSO setup requirement", "installation needs attention", "Send retained profile revision", "Reviewed &lt;provider&gt; extension", "Profile repair history"}},
 		{"ade-sso-verified", DeviceDetails(c, info, ssoState("verified")), []string{"retained profile revision is verified by current inventory", "Send retained profile revision"}},
@@ -386,6 +388,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			}
 			if tc.name == "wifi-eap-reader" && strings.Contains(html, "wifi-eap-profile-editor") {
 				t.Fatal("reader sees enterprise Wi-Fi composition controls")
+			}
+			if (tc.name == "wifi-eap-reader" || tc.name == "ikev2-reader") && strings.Contains(html, "ikev2-certificate-editor") {
+				t.Fatal("reader sees IKEv2 certificate composition controls")
 			}
 			if strings.HasPrefix(tc.name, "acme-history-") && tc.name != "acme-history-unresolved" && strings.Contains(html, `name="profile"`) {
 				t.Fatal("unavailable ACME historical review form exposed")
