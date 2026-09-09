@@ -49,7 +49,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadSoftware, true
 		case "/ios/configurations", "/ios/configurations/history", "/ios/configurations/:id/history":
 			return access.ReadProfiles, true
-		case "/ios/:id/applications/previous", "/ios/ade", "/ios/ade/software", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
+		case "/ios/:id/applications/previous", "/ios/ade", "/ios/ade/software", "/ios/ade/platform-sso/profiles", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
 			return access.ManageCertificates, true
 		case "/ios/configurations/:id/download", "/ios/configurations/:id/revisions/:revision/download":
 			return access.ManageProfiles, true

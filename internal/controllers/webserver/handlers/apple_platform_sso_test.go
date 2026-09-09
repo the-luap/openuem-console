@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"howett.net/plist"
 	"net/http/httptest"
@@ -96,6 +97,36 @@ func exerciseApplePlatformSSO(t *testing.T, h *Handler, ctx context.Context, ten
 	}
 	if !unattended {
 		t.Fatal("unattended editor lost setup flags")
+	}
+	search := fmt.Sprintf("/tenant/%d/ios/ade/platform-sso/profiles", tenant)
+	for _, user := range []string{"scoped-viewer", "scoped-operator"} {
+		if rec := request(user, "GET", search, nil); rec.Code != 403 {
+			t.Fatal("scoped role accessed ADE profile search", user, rec.Code)
+		}
+	}
+	for _, query := range []string{"?q=a&q=b", "?unknown=value"} {
+		if rec := request("organization-admin", "GET", search+query, nil); rec.Code != 400 {
+			t.Fatal("ambiguous profile search accepted", rec.Code)
+		}
+	}
+	for _, tc := range []struct {
+		identifier string
+		eligible   bool
+	}{{"com.example.console-identity", false}, {"com.example.console-unattended", true}} {
+		rec := request("organization-admin", "GET", search+"?q="+tc.identifier, nil)
+		var choices struct {
+			Items []struct {
+				ID, Profile, Label string
+				Eligible           bool
+			}
+			Next string
+		}
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &choices) != nil || len(choices.Items) != 1 || choices.Items[0].Eligible != tc.eligible || choices.Items[0].ID == choices.Items[0].Profile || choices.Next != "" {
+			t.Fatal("profile picker lost current snapshot eligibility", tc.identifier, rec.Code)
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" || strings.Contains(rec.Body.String(), "synthetic-route-sso-token") || strings.Contains(rec.Body.String(), "ProviderFlag") {
+			t.Fatal("profile picker exposed provider secrets")
+		}
 	}
 	for _, user := range []string{"organization-admin", "scoped-viewer"} {
 		rec := request(user, "GET", path, nil)

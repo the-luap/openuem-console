@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,8 @@ import (
 
 func adeWorkflowFailure(err error) error {
 	switch {
+	case errors.Is(err, apple.ErrADEPlatformSSO):
+		return echo.NewHTTPError(409, "The Platform SSO requirement is unavailable. Select a profile prepared for unattended macOS 26 setup, its approved provider app, automatic advance and a managed administrator with primary account creation skipped. Active setup requirements retain their reviewed versions.")
 	case errors.Is(err, apple.ErrMacAppPriorEnrollment):
 		return softwareFailure(err)
 	case errors.Is(err, access.ErrDenied):
@@ -60,7 +63,7 @@ func adeProfileOptions(f url.Values, site int) (apple.ADEProfileOptions, error) 
 	} else if value := f.Get("site_id"); value != "" && value != strconv.Itoa(site) {
 		return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "The selected site must match this page")
 	}
-	for _, k := range []string{"await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "manage_admin", "admin_hidden"} {
+	for _, k := range []string{"await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "manage_admin", "admin_hidden", "enable_platform_sso", "sso_provider_confirmed"} {
 		if f.Get(k) != "" && f.Get(k) != "yes" {
 			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Invalid automated enrollment option")
 		}
@@ -79,7 +82,16 @@ func adeProfileOptions(f url.Values, site int) (apple.ADEProfileOptions, error) 
 			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Managed administrator setup requires a valid Mac account policy and the Setup Assistant hold")
 		}
 	}
-	return apple.ADEProfileOptions{RequiredApplications: f["required_applications"], MacAdmin: admin, SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}, nil
+	options := apple.ADEProfileOptions{RequiredApplications: f["required_applications"], MacAdmin: admin, SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}
+	if f.Get("enable_platform_sso") == "yes" {
+		options.PlatformSSO = &apple.ADEPlatformSSOOptions{ProfileRevisionID: f.Get("sso_profile_revision"), ApplicationVersionID: f.Get("sso_application_version"), ProviderConfirmed: f.Get("sso_provider_confirmed") == "yes", ApprovalReason: strings.TrimSpace(f.Get("sso_approval_reason"))}
+		if !slices.Contains(options.RequiredApplications, options.PlatformSSO.ApplicationVersionID) {
+			options.RequiredApplications = append(options.RequiredApplications, options.PlatformSSO.ApplicationVersionID)
+		}
+	} else if f.Get("sso_profile_revision") != "" || f.Get("sso_application_version") != "" || f.Get("sso_provider_confirmed") != "" || f.Get("sso_approval_reason") != "" {
+		return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Enable Platform SSO to submit a provider requirement")
+	}
+	return options, nil
 }
 
 func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
@@ -95,7 +107,7 @@ func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := adeEnrollmentForm(c, "required_applications", "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items", "manage_admin", "admin_short_name", "admin_full_name", "admin_hidden", "admin_primary_account", "admin_rotation_days")
+	f, err := adeEnrollmentForm(c, "required_applications", "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items", "manage_admin", "admin_short_name", "admin_full_name", "admin_hidden", "admin_primary_account", "admin_rotation_days", "enable_platform_sso", "sso_profile_revision", "sso_application_version", "sso_provider_confirmed", "sso_approval_reason")
 	if err != nil {
 		return err
 	}

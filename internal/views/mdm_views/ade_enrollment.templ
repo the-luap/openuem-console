@@ -38,13 +38,16 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 						<label><input class="uk-checkbox" type="checkbox" name="ignore_backup_profile" value="yes" checked/> Use this profile instead of an enrollment profile restored from backup</label>
 						if info.Can(access.AssignSoftware) {
 							<p>Required applications are available for Mac profiles with the Setup Assistant hold enabled. The exact managed versions must be verified before setup release.</p>
-							@ADEApplicationPicker(info,"required_applications",16,"")
+							@ADEApplicationPicker(info, "required_applications", 16, "")
 						}
 						if info.Can(access.ManageDeviceSecurity) {
 							@MacAdminProfileFields()
- <label><input class="uk-checkbox" type="checkbox" name="allow_device_lock" value="yes"/> Allow Recovery Lock and device lock management (Mac only)</label>
+							<label><input class="uk-checkbox" type="checkbox" name="allow_device_lock" value="yes"/> Allow Recovery Lock and device lock management (Mac only)</label>
 						}
 						<label><input class="uk-checkbox" type="checkbox" name="auto_advance" value="yes"/> Automatically advance supported Setup Assistant screens (Mac only)</label>
+						if info.Can(access.ReadProfiles) && info.Can(access.AssignProfiles) && info.Can(access.AssignSoftware) && info.Can(access.ManageDeviceSecurity) {
+							@ADEPlatformSSOFields(info)
+						}
 						<details>
 							<summary class="cursor-pointer">Support details and Setup Assistant screens</summary>
 							<label>Department<input class="uk-input" name="department" maxlength="125"/></label>
@@ -79,19 +82,26 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 						}
 					</p>
 					if len(p.RequiredApplications)>0 {
-						<p>Required application revisions: {Number(len(p.RequiredApplications))}</p>
+						<p>Required application revisions: { Number(len(p.RequiredApplications)) }</p>
 						if info.Can(access.ReadSoftware) {
 							<ul>
 								for i,id:=range p.RequiredApplications {
-									<li><a class="underline" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/"+id))}>View required application {Number(i+1)}</a></li>
+									<li><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+id)) }>View required application { Number(i+1) }</a></li>
 								}
 							</ul>
 						}
 					}
 					if p.MacAdmin!=nil {
- <p>Managed administrator: { p.MacAdmin.ShortName } · Primary account: { p.MacAdmin.PrimaryAccount } · Rotation interval: { Number(p.MacAdmin.RotationDays) } days (0 means manual)</p>
- }
- if p.DeviceLockAllowed {
+						<p>Managed administrator: { p.MacAdmin.ShortName } · Primary account: { p.MacAdmin.PrimaryAccount } · Rotation interval: { Number(p.MacAdmin.RotationDays) } days (0 means manual)</p>
+					}
+					if p.PlatformSSO!=nil {
+						<p>Unattended Platform SSO required · macOS 26 or later</p>
+						if info.Can(access.ReadProfiles) {
+							<p>Retained profile revision: { p.PlatformSSO.ProfileRevisionID }</p>
+							<p>Provider review: { p.PlatformSSO.ApprovalReason }</p>
+						}
+					}
+					if p.DeviceLockAllowed {
 						<p>Recovery Lock and device lock management allowed</p>
 					}
 					<p class="uk-text-muted">

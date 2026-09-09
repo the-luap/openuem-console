@@ -36,6 +36,7 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/applications/previous/:attempt/resolve", h.RecordMacAppStoppingEvidence)
 		g.GET("/ios/:id/applications/:assignment/history", h.MacApplicationHistory)
 		g.GET("/ios/ade/software", h.ADESoftwareOptions)
+		g.GET("/ios/ade/platform-sso/profiles", h.ADEPlatformSSOChoices)
 		g.GET("/ios/:id/setup/applications/:requirement/history", h.ADEApplicationHistory)
 		g.POST("/ios/:id/setup/applications/:requirement/replace", h.ReplaceADEApplication)
 		g.POST("/ios/:id/applications/:assignment/action", h.ChangeMacApp)

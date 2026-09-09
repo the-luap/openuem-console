@@ -220,6 +220,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	resolvedApp := priorApp
 	resolvedApp.Recovery = &apple.MacAppRecovery{ID: "90000000-0000-4000-8000-000000000032", DeviceID: appDevice.ID, Evidence: "device_erased", Reason: "Synthetic erase <evidence>", Actor: "Operator <A>", CreatedAt: now}
 	adeProfile.RequiredApplications = []string{appVersion.ID}
+	adeProfile.PlatformSSO = &apple.ADEPlatformSSOOptions{ProfileRevisionID: "a0000000-0000-4000-8000-000000000030", ApplicationVersionID: appVersion.ID, ProviderConfirmed: true, ApprovalReason: "Reviewed <provider> extension"}
 	adeEnrollment.Profiles[0] = adeProfile
 	adeAppState := func(status string, changeable bool) Detail {
 		d := Detail{Device: &appDevice, ADE: &apple.ADEDeviceEnrollment{SetupState: "awaiting", SetupError: "application_pending", CanChangeApplications: changeable}}
@@ -274,7 +275,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-admin-uncertain", DeviceDetails(c, info, uncertainDetail), []string{"outcome is unknown", "Reveal password"}},
 		{"mac-admin-failed", DeviceDetails(c, info, failedDetail), []string{"Retry account configuration"}},
 		{"mac-admin-reader", DeviceDetails(c, &reader, adminDetail), []string{"Managed Mac administrator", "Account reported"}},
-		{"ade-enrollment", ADE(c, info, []apple.ADEServer{adeServer}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Queue profile publication", "Publication outcome unknown", "Assignment accepted; verification pending", "Allow next activation", "Corporate Mac &lt;profile&gt;", "Next enrollments"}},
+		{"ade-enrollment", ADE(c, info, []apple.ADEServer{adeServer}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Queue profile publication", "Publication outcome unknown", "Assignment accepted; verification pending", "Allow next activation", "Corporate Mac &lt;profile&gt;", "Next enrollments", "Select the Platform SSO profile revision", "Provider registration starts after release", "Reviewed &lt;provider&gt; extension", `name="enable_platform_sso"`, "data-sso-fields hidden disabled"}},
 		{"ade-enrollment-disabled", ADE(c, info, []apple.ADEServer{adeDisabled}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Apple assignment verified", "Corporate Mac &lt;profile&gt;"}},
 		{"ade-setup-failed", DeviceDetails(c, info, adeDetail), []string{"Automated Device Enrollment", "Retry setup release", "Removal disallowed"}},
 		{"ade-setup-reader", DeviceDetails(c, &reader, adeDetail), []string{"Automated Device Enrollment", "Removal disallowed"}},

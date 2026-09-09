@@ -115,3 +115,24 @@ func TestADEManagedAdministratorOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestADEPlatformSSOFormPreservesReviewedPair(t *testing.T) {
+	profile, app := "90000000-0000-4000-8000-000000000010", "90000000-0000-4000-8000-000000000011"
+	f := url.Values{"site_id": {"1"}, "platform": {"macos"}, "removal": {"disallowed"}, "enable_platform_sso": {"yes"}, "sso_profile_revision": {profile}, "sso_application_version": {app}, "sso_provider_confirmed": {"yes"}, "sso_approval_reason": {" Reviewed provider "}}
+	for _, selected := range [][]string{nil, {app}} {
+		f["required_applications"] = selected
+		o, err := adeProfileOptions(f, 1)
+		if err != nil || o.PlatformSSO == nil || o.PlatformSSO.ProfileRevisionID != profile || o.PlatformSSO.ApplicationVersionID != app || !o.PlatformSSO.ProviderConfirmed || o.PlatformSSO.ApprovalReason != "Reviewed provider" || len(o.RequiredApplications) != 1 || o.RequiredApplications[0] != app {
+			t.Fatal("reviewed pair changed or host app duplicated", err)
+		}
+	}
+	f.Del("enable_platform_sso")
+	if _, err := adeProfileOptions(f, 1); err == nil {
+		t.Fatal("disabled requirement accepted submitted provider fields")
+	}
+	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
+		if cap, ok := appleCapability("GET", prefix+"/ios/ade/platform-sso/profiles"); !ok || cap != access.ManageCertificates {
+			t.Fatal("profile search lacks exact organization capability")
+		}
+	}
+}

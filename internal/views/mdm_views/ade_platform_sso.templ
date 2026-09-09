@@ -1,0 +1,31 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ ADEPlatformSSOFields(info *partials.CommonInfo) {
+	<script src="/assets/js/apple-ade-platform-sso.js" defer></script>
+	<div class="ade-sso-options">
+		<label><input class="uk-checkbox" type="checkbox" name="enable_platform_sso" value="yes" data-sso-enable/> Require unattended Platform SSO setup (macOS 26 or later)</label>
+		<fieldset data-sso-fields hidden disabled>
+			<legend class="font-semibold">Platform SSO prerequisites</legend>
+			<p>Enable automatic advance and the Setup Assistant hold above. Configure a managed administrator and skip primary account creation. The selected profile must enable unattended setup, shared device keys and account creation at login.</p>
+			<fieldset class="ade-sso-picker" data-source={ partials.GetNavigationUrl(info, "/ios/ade/platform-sso/profiles") }>
+				<legend class="font-semibold">Select the Platform SSO profile revision</legend>
+				<p>Search current System profiles by name or identifier. The selected revision is retained when the catalog changes.</p>
+				<label>Profile search<input class="uk-input" type="search" maxlength="128" data-sso-search autocomplete="off"/></label>
+				<button type="button" class="uk-button uk-button-default" data-sso-find>Search Platform SSO profiles</button>
+				<p role="status" aria-live="polite" data-sso-status>Search to view profile revisions.</p>
+				<ul class="ade-app-results" data-sso-results aria-label="Matching Platform SSO profiles"></ul>
+				<button type="button" class="uk-button uk-button-default" data-sso-next hidden>More matching profiles</button>
+				<p class="font-semibold">Selected profile revision</p>
+				<ul data-sso-selected aria-label="Selected Platform SSO profile"></ul>
+			</fieldset>
+			<p>Select the approved application containing this profile's SSO extension. It is included in the limit of 16 required applications, so you do not need to select it again above.</p>
+			@ADEApplicationPicker(info, "sso_application_version", 1, "")
+			<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="sso_provider_confirmed" value="yes" required/> I verified that this application contains the configured extension and that the provider supports silent registration with this configuration.</label>
+			<label class="block mt-4">Reason for approving this provider configuration<input class="uk-input" name="sso_approval_reason" maxlength="1000" required/></label>
+			<p>Setup release waits for the exact profile and managed application revisions. Provider registration starts after release; these installation observations do not prove successful registration.</p>
+		</fieldset>
+		<noscript>Enable JavaScript to configure this optional Platform SSO requirement.</noscript>
+	</div>
+}
