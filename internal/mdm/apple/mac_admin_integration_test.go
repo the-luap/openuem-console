@@ -280,3 +280,76 @@ func TestMacAdminCreationExpiryAndFreshInventory(t *testing.T) {
 		t.Fatal("future account evidence")
 	}
 }
+
+func TestMacAdminInventoryIgnoresOldAndFutureRequests(t *testing.T) {
+	s, d := macAdminFixture(t)
+	guid := macAdminEstablished(t, s, d)
+	scope := Scope{TenantID: 1, SiteID: 1}
+	before := macAdminStateForTest(t, s, d)
+	for _, age := range []string{"old", "future"} {
+		if err := s.RefreshInventory(t.Context(), scope, d.ID, "admin"); err != nil {
+			t.Fatal(err)
+		}
+		wire := adeConnect(t, s, d, "Idle", "", nil)
+		if wire["Command"].(map[string]any)["RequestType"] != "DeviceInformation" {
+			t.Fatal("missing fresh inventory request")
+		}
+		id := wire["CommandUUID"].(string)
+		if age == "old" {
+			adeExec(t, s, `UPDATE mdm_apple_commands SET created_at=clock_timestamp()-interval '2 days' WHERE id=$1`, id)
+		} else {
+			adeExec(t, s, `UPDATE mdm_apple_commands SET created_at=clock_timestamp()+interval '2 days' WHERE id=$1`, id)
+		}
+		wire = adeConnect(t, s, d, "Acknowledged", id, map[string]any{"QueryResponses": map[string]any{"AutoSetupAdminAccounts": []any{map[string]any{"shortName": "localadmin", "GUID": uuid.NewString()}}}})
+		after := macAdminStateForTest(t, s, d)
+		if after.GUID != guid || after.InventoryState != "present" || !after.ObservedAt.Equal(*before.ObservedAt) {
+			t.Fatal("out-of-order report changed account evidence", age)
+		}
+		macAdminDrive(t, s, d, wire, "", false, []any{map[string]any{"shortName": "localadmin", "GUID": guid}})
+	}
+}
+
+func TestMacAdminPolicyIsImmutableAndRequiresMacSetupHold(t *testing.T) {
+	s, server, _ := adeEnrollmentStore(t)
+	base := adeEnrollmentOptions()
+	base.AllowDeviceLock = false
+	base.MacAdmin = &MacAdminOptions{ShortName: "localadmin", PrimaryAccount: "standard"}
+	for _, change := range []func(*ADEProfileOptions){func(o *ADEProfileOptions) { o.Platform = PlatformIOS }, func(o *ADEProfileOptions) { o.AwaitConfiguration = false }} {
+		o := base
+		change(&o)
+		if _, err := s.createADEProfile(t.Context(), 1, server, o, "admin", nil); !errors.Is(err, ErrADEProfile) {
+			t.Fatal("invalid administrator enrollment allowed", err)
+		}
+	}
+	id, err := s.createADEProfile(t.Context(), 1, server, base, "admin", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`UPDATE mdm_apple_ade_profiles SET admin_options=NULL WHERE id=$1`, id); err == nil {
+		t.Fatal("administrator policy mutable")
+	}
+	if err = s.publishADEProfile(t.Context(), 1, server, id); err != nil {
+		t.Fatal(err)
+	}
+	p := adeProfileState(t, s, server, id)
+	if p.MacAdmin == nil || p.MacAdmin.ShortName != "localadmin" || p.DeviceLockAllowed {
+		t.Fatal("account policy depends on device lock rights")
+	}
+}
+
+func TestRecoveryLockAcceptsAuthenticatedADEMac(t *testing.T) {
+	s, _, _, _, selector, info := adeArmedFixture(t)
+	profile, err := s.admitADE(t.Context(), selector, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, cert := adeAuthenticate(t, s, info, profile, false)
+	drainMacHardwareInventory(t, s, d, map[string]any{"SerialNumber": info.Serial, "AwaitingConfiguration": false})
+	d, err = s.AuthenticateCertificate(t.Context(), d.ID, cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.requestRecoveryLock(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, "set", "", nil, "admin", nil); err != nil {
+		t.Fatal("eligible ADE Mac rejected Recovery Lock", err)
+	}
+}

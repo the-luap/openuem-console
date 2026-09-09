@@ -89,7 +89,11 @@ func macAdminCommandArguments(kind string, options MacAdminOptions, guid string,
 		if options.Validate() != nil || guid != "" {
 			return nil, ErrMacAdmin
 		}
-		return map[string]any{"AutoSetupAdminAccounts": []any{map[string]any{"shortName": options.ShortName, "fullName": options.FullName, "hidden": options.Hidden, "passwordHash": passwordHash}}, "SkipPrimarySetupAccountCreation": options.PrimaryAccount == "skip", "SetPrimarySetupAccountAsRegularUser": options.PrimaryAccount == "standard"}, nil
+		account := map[string]any{"shortName": options.ShortName, "hidden": options.Hidden, "passwordHash": passwordHash}
+		if options.FullName != "" {
+			account["fullName"] = options.FullName
+		}
+		return map[string]any{"AutoSetupAdminAccounts": []any{account}, "SkipPrimarySetupAccountCreation": options.PrimaryAccount == "skip", "SetPrimarySetupAccountAsRegularUser": options.PrimaryAccount == "standard"}, nil
 	case "SetAutoAdminPassword":
 		id, err := uuid.Parse(guid)
 		if err != nil || id == uuid.Nil || !strings.EqualFold(id.String(), guid) {

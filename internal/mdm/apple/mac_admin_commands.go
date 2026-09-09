@@ -159,7 +159,7 @@ func (s *Store) recordMacAdminInventory(ctx context.Context, tx *sql.Tx, d *Devi
 	if err = tx.QueryRowContext(ctx, `SELECT created_at FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND request_type='DeviceInformation' AND status='acknowledged'`, command, d.ID, d.TenantID).Scan(&requested); err != nil {
 		return err
 	}
-	if a.AcceptedAt == nil || requested.Before(*a.AcceptedAt) || (a.ObservedAt != nil && !requested.After(*a.ObservedAt)) {
+	if requested.After(time.Now()) || a.AcceptedAt == nil || requested.Before(*a.AcceptedAt) || (a.ObservedAt != nil && !requested.After(*a.ObservedAt)) {
 		return nil
 	}
 	state, guid := "unknown", ""
