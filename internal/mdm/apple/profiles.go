@@ -104,6 +104,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 			}
 		}
 	}
+	if _, err := extensibleSSORootRoutes(root); err != nil {
+		return nil, err
+	}
 	name := strings.TrimSpace(stringValue(root, "PayloadDisplayName"))
 	if name == "" {
 		name = id

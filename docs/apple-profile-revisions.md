@@ -95,11 +95,12 @@ existing model tests and desktop agent regression. The native Apple suites
 completed in 488.507 and 534.643 seconds, respectively.
 
 No profile is deployed to a real device by these tests. Immutable ADE SSO profile
-requirements, ownership of pinned assignments, cross-profile URL reservations
-and the complete unattended provider sequence remain open. Verification against
-an assigned historical snapshot is a subsequent change, with validation recorded
-separately below. This revision foundation does not complete those requirements
-or the full roadmap.
+requirements, ownership of pinned assignments and reviewed corrections are now
+implemented; their validation is recorded in
+[Platform SSO profiles](apple-platform-sso.md). Cross-profile URL reservations
+and provider-specific registration acceptance remain open. Verification against
+an assigned historical snapshot is recorded separately below. This revision
+foundation does not complete the full roadmap.
 
 ## Assigned revision observations
 

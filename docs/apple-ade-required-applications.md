@@ -3,8 +3,10 @@
 ADE profiles can pin approved Mac application revisions, inherit those
 requirements at admission, and hold Setup Assistant until the exact managed app
 versions are observed. The console provides application search, explicit
-per-device revision correction and retained history. Platform SSO configuration,
-provider registration and physical-device acceptance remain separate work.
+per-device revision correction and retained history. Platform SSO profiles can
+bind the provider application to a reviewed configuration revision. Provider
+registration and physical-device acceptance remain separate from installation
+verification.
 
 ## Console workflow
 
@@ -53,6 +55,12 @@ reason. The change, native command and audit records commit together. Queued or
 explicitly deferred app operations can be cancelled as part of the correction.
 An unresolved sent installer cannot be replaced. Once a setup-release command
 has been dispatched, the prerequisite cannot be changed for that admission.
+
+For an active Platform SSO requirement, use the device's
+[reviewed provider revision correction](apple-platform-sso.md) to select the profile
+and application revisions together. The application-only action cannot change
+that provider binding. The original profile and application identities remain
+fixed, and both revision changes share a transaction and retained review history.
 
 No action silently drops a required app or rewrites the published profile.
 Changes for future enrollments require a new ADE profile version.

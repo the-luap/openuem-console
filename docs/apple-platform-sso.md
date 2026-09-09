@@ -38,6 +38,14 @@ authentication requires macOS 14. Shared device keys are System-only. Uploaded
 require macOS 26. Ordinary Credential/Kerberos SSO payloads do not inherit
 Platform SSO-specific restrictions.
 
+Uploaded profiles also validate routing across their Extensible SSO payloads,
+including ordinary Redirect and Credential configurations. Duplicate URL prefixes
+use case-insensitive scheme and host matching; paths remain case-sensitive.
+Credential host names are compared case-insensitively. Distinct URL prefixes and
+wildcard suffixes remain allowed. The URL and host namespaces are separate, and
+fields that Apple ignores for a payload type do not create reservations. This
+within-profile check does not yet prevent conflicts between separate assignments.
+
 Batch assignment and profile revision updates must pass platform and approval
 checks before committing. Removing a profile remains possible after those
 prerequisites change. A verified profile assignment means the configuration was
@@ -74,13 +82,31 @@ and the existing exact-version managed application checks. A device must report
 that its hold ended before ordinary profile ownership resumes. Provider
 registration begins after `DeviceConfigured` and is not a pre-release condition.
 
-The device page shows retained revision metadata, current profile verification,
-the provider review and repair history. Before release dispatch, an authorized
+The device page shows the current reviewed pair, profile verification and its
+retained review and repair histories. Before release dispatch, an authorized
 operator can resend the same snapshot with confirmation and a reason. That action
 queues profile delivery and fresh inventory and commits its immutable repair
 receipt and audit event together. History is scoped to the device and organization
 and paginated at 100 records. An installation observation or a repair request does
 not establish successful identity-provider registration.
+
+Before the first setup-release dispatch, the operator can correct the two
+required revisions together. Both selections must belong to the original profile
+and provider application; the application revision must remain approved and
+compatible. The form requires a renewed provider confirmation and a reason.
+Profile assignment, application delivery, the reviewed pair and audit records
+commit in one transaction. A failure rolls back all of them. A sent installer
+with an unresolved outcome prevents an application revision change. A profile-only
+correction can retain that application revision, while setup still waits for its
+installation evidence.
+
+The original requirement stays immutable. Each correction has its own retained
+revision identifier and links to its predecessor. Forms name that exact reviewed
+revision, so an old form remains stale even if later corrections return to the
+same profile/app combination. Corrections require profile observations from a
+query created after the new review. Repair receipts reference the exact reviewed
+pair and profile snapshot that they resend. The migration preserves every
+original receipt field while attaching the historical pair reference.
 
 An earlier setup-release dispatch keeps prerequisite changes and profile repairs
 closed even when a failed release is explicitly retried. The checks consult all
@@ -114,11 +140,10 @@ focused parser check.
 No real identity-provider registration, account creation or profile deployment
 was performed. Physical-device and provider-specific acceptance remain open.
 
-The immutable profile and ADE prerequisite foundations are implemented. A combined
-correction workflow for the profile and provider application revisions remains
-open; an app-only correction cannot change an active provider binding. Cross-profile
-URL collision checks, provider-specific registration evidence and token provisioning
-also remain open.
+Immutable profile history, ADE prerequisites and the combined revision correction
+workflow are implemented. An app-only correction cannot change an active provider
+binding. Cross-profile URL collision checks, provider-specific registration
+evidence and token provisioning remain open.
 
 The ADE binding and unattended editor at `2eaeb5d` passed both complete workflows:
 [push CI](https://github.com/the-luap/openuem-console/actions/runs/34339173364) and
@@ -128,20 +153,40 @@ The native Apple race suite passed in 566.538 seconds, scoped console routes in
 profile/app picker at `f31e044` also passed its
 [complete push workflow](https://github.com/the-luap/openuem-console/actions/runs/34339525979).
 
-Twenty-seven browser scenarios used actual CI-rendered pages at 390, 768 and 1440
-pixels: three unattended editor cases, three ADE selection cases and 21 device
-status/repair/history cases. They passed keyboard operation, required confirmation
+Thirty-six browser scenarios used the actual CI-rendered pages from `67b968c` at
+390, 768 and 1440 pixels: three unattended editor cases, three ADE selection cases,
+21 device status/repair/history cases, six paired correction cases and three
+reviewed revision history cases. They passed keyboard operation, required confirmation
 and reasons, optional-field activation, escaped display text, pagination, failed
 and stale search replies, retained selections, scoped form bodies, CSRF and role
 restrictions without page overflow.
 
-The status/repair integration run at `05be000` detected that its synthetic fixture
-reused a withdrawn application. The fixture now selects the still-approved
-revision; a fresh complete CI run is required. The legacy profile migration fixture
-now constructs its historical schema from preceding migration files so later
-foreign keys cannot invalidate that setup. Local checks applied all 31 migrations
-and prepared 272 production statements plus 11 synthetic route fixture statements
-in an isolated PostgreSQL transaction.
+The status/repair fixture fix at `c32763d` passed both complete workflows:
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34340874284) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34340878052).
+The historical dispatch guard at `bf1bf25` also passed both complete workflows:
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34341231423) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34341236033).
+
+The paired correction at `67b968c` passed all four jobs in both complete workflows:
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34344021741) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34344025025).
+The push run passed the native Apple race suite in 588.807 seconds, scoped console
+routes in 12.011 seconds and desktop regression in 28.495 seconds. Local checks
+applied all 32 migrations and
+prepared 282 production statements plus 13 synthetic route fixture statements.
+An isolated PostgreSQL check preserved existing reviews and repair receipts,
+rejected history changes and stale predecessor pointers, and enforced exact
+repair-to-pair references, approved applications and the historical release guard.
+The integration cases additionally exercise concurrent corrections, audit failure
+rollback, unresolved installers, 101-record pagination, a return to the original
+pair with a new review identifier and fresh profile verification.
+
+The subsequent within-profile routing parser passed 32 table-driven cases and two
+ignored-field checks in an isolated Go harness. The harness copied the production
+routing implementation, text validation and dictionary accessor without changes
+and recorded their source hashes. The full-suite upload case separately exercises
+two different provider payloads with duplicate URLs and then distinct URLs.
 
 Sources checked 9 September 2026:
 

@@ -2,9 +2,7 @@ package apple
 
 import (
 	"errors"
-	"net/url"
 	"regexp"
-	"strings"
 	"time"
 
 	"howett.net/plist"
@@ -50,17 +48,6 @@ func buildPlatformSSOPayload(payload, settings map[string]any, scope string) err
 	}
 	payload["PlatformSSO"] = configuration
 	return validatePlatformSSOPayload(payload, scope, nil)
-}
-
-func platformSSOURLKey(raw string) (string, error) {
-	if !validMacAppText(raw, 2048) {
-		return "", errors.New("SSO URL prefixes must contain 1 to 2048 characters")
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Opaque != "" || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.ForceQuery || u.RawQuery != "" || u.Fragment != "" || strings.Contains(raw, "#") {
-		return "", errors.New("SSO URL prefixes require HTTP or HTTPS without credentials, query parameters or fragments")
-	}
-	return strings.ToLower(u.Scheme+"://"+u.Host) + u.EscapedPath(), nil
 }
 
 // Generic SSO extensions remain supported. Additional checks apply only when
