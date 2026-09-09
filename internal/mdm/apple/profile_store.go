@@ -192,6 +192,9 @@ func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Dev
 		return fmt.Errorf("%w: refresh inventory to identify the platform and OS version before assigning profiles", ErrProfilePrerequisite)
 	}
 	if desired == "installed" {
+		if err := validateGatekeeperProfile(p, current); err != nil {
+			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
+		}
 		if err := validateFirewallProfile(p, current); err != nil {
 			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
 		}

@@ -660,6 +660,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 				return err
 			}
 		}
+		if c.FormValue("editor") == "macos-gatekeeper" {
+			if err = appleGatekeeperSettings(c, settings); err != nil {
+				return err
+			}
+		}
 		if c.FormValue("editor") == "macos-platform-sso" {
 			if err = applePlatformSSOSettings(c, settings); err != nil {
 				return err

@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Mac Gatekeeper profiles](macos-gatekeeper.md) now provide typed application
+  assessment, Finder exception and malware-submission prompt settings. The editor
+  separates Apple's payloads, omits unchanged defaults and checks macOS versions
+  for direct assignment and revision updates. Local core checks pass; full native,
+  console and browser acceptance are pending. PPPC/TCC, System Extensions and
+  certificate templates remain separate work.
+
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
   encrypted immutable System/User snapshots, protected history/downloads and
   confirmed restoration with stale-write protection and fresh UUID deployment.

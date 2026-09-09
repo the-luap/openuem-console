@@ -93,6 +93,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if err := validateGatekeeperPayload(p, scope, nil); err != nil {
+			return nil, err
+		}
 		if kind == "com.apple.extensiblesso" {
 			if err := validatePlatformSSOPayload(p, scope, nil); err != nil {
 				return nil, err
@@ -166,7 +169,14 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 		return nil, errors.New("name and identifier are required")
 	}
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
+	var additional []any
 	switch kind {
+	case "macos-gatekeeper":
+		var err error
+		additional, err = buildGatekeeperPayload(payload, settings, scope)
+		if err != nil {
+			return nil, err
+		}
 	case "macos-platform-sso":
 		if err := buildPlatformSSOPayload(payload, settings, scope); err != nil {
 			return nil, err
@@ -220,5 +230,6 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	default:
 		return nil, errors.New("unknown profile editor")
 	}
-	return plist.Marshal(map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": identifier, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": name, "PayloadScope": scope, "PayloadContent": []any{payload}}, plist.XMLFormat)
+	content := append([]any{payload}, additional...)
+	return plist.Marshal(map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": identifier, "PayloadUUID": uuid.NewString(), "PayloadDisplayName": name, "PayloadScope": scope, "PayloadContent": content}, plist.XMLFormat)
 }

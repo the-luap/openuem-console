@@ -53,6 +53,9 @@ func userPayloadCapability(kind string) error {
 }
 
 func validateUserPayload(payload map[string]any, d *Device) error {
+	if err := validateGatekeeperPayload(payload, "User", d); err != nil {
+		return err
+	}
 	kind := stringValue(payload, "PayloadType")
 	if kind == "com.apple.extensiblesso" {
 		if err := validatePlatformSSOPayload(payload, "User", d); err != nil {
