@@ -47,7 +47,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/ios/configurations":
 			return access.ReadProfiles, true
-		case "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
+		case "/ios/ade", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
 			return access.ManageCertificates, true
 		case "/ios/configurations/:id/download":
 			return access.ManageProfiles, true
@@ -55,7 +55,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
+		case "/ios/ade/servers", "/ios/ade/servers/:id/token", "/ios/ade/servers/:id/action", "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
 			return access.ManageCertificates, true
 		case "/ios/enroll":
 			return access.EnrollDevices, true

@@ -20,6 +20,9 @@ templ Navigation(info *partials.CommonInfo) {
 		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Apple profiles</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup")) }>Apple setup & enrollment</a>
+        if info.Can(access.ManageCertificates) {
+            <a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>Automated Device Enrollment</a>
+        }
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/desktop/enrollment")) }>Desktop enrollment</a>
 	</div>
 }

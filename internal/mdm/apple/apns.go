@@ -137,6 +137,9 @@ func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	adeDone := make(chan struct{})
+	go func() { defer close(adeDone); s.runADEServers(ctx, logger) }()
+	defer func() { <-adeDone }()
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {

@@ -96,6 +96,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})
 	exercisePushRequestRoutes(t, h, e, ctx, tenantID, siteID, otherTenant.ID, otherSite.ID)
+	exerciseADERoutes(t, h, e, ctx, tenantID, siteID, otherTenant.ID, otherSite.ID)
 	t.Run("readers see only permitted scope and no mutation controls", func(t *testing.T) {
 		for _, path := range []string{"/devices", fmt.Sprintf("/tenant/%d/devices", tenantID), base + "/devices"} {
 			rec := request("scoped-viewer", "GET", path, nil)

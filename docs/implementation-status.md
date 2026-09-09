@@ -47,7 +47,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
-| APP-02 | No ADE integration | Apple Business/ADE tokens, device assignments, setup/re-enrollment, groups/rings and directory associations |
+| APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and synthetic protocol/browser tests; PostgreSQL CI verification pending | ADE profile definition/assignment, signed activation and setup/re-enrollment, groups/rings, directory associations, certificate rotation and Apple/hardware acceptance |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
@@ -60,6 +60,17 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Automated Device Enrollment connections](apple-automated-enrollment.md) add
+  organization-scoped server certificate creation, verified encrypted token import
+  and renewal, immutable Apple account binding, full/delta assignment sync and
+  retained history. Page and cursor publication share a transaction with audit;
+  failed or partial full fetches cannot remove published assignments. Apple retry
+  deadlines apply to scheduled/manual sync and token verification. Five browser
+  states passed at 390/768/1440 px with keyboard submission and confirmation
+  checks. Local protocol/race and console rendering tests pass; PostgreSQL CI is
+  pending because the local database is unavailable. ADE profile assignment,
+  authenticated setup/re-enrollment and physical Apple acceptance remain open.
 
 - [FileVault rotation recovery](macos-filevault.md) now requires a signed process
   stopping claim before an uncertain attempt can admit an old-key resolution check.

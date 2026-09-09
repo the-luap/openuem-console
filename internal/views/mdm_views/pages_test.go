@@ -149,6 +149,16 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		d.Commands = []apple.Command{{ID: "f0000000-0000-4000-8000-000000000004", RecoveryLock: true, RequestType: "SetRecoveryLock", Status: "failed"}}
 		return d
 	}
+	adeServer := apple.ADEServer{ID: "a0000000-0000-4000-8000-000000000001", Name: "Corporate Apple devices", Status: "connected", AppleServerID: "b0000000-0000-4000-8000-000000000001", AppleServerName: "Apple server", AppleOrganizationID: "100001", AppleOrganizationName: "Example organization", CertificateExpiresAt: now.AddDate(10, 0, 0), TokenExpiresAt: &vendorExpires, VerifiedAt: &now, SyncedAt: &now, NextSyncAt: &vendorExpires, SyncMode: "delta", Assigned: 1}
+	adePending := adeServer
+	adePending.Status = "pending"
+	adePending.TokenExpiresAt = nil
+	adeDisabled := adeServer
+	adeDisabled.Status = "disabled"
+	adeThrottled := adeServer
+	adeThrottled.SyncError = "throttled"
+	adeThrottled.RetryAfter = &vendorExpires
+	adeDevices := []apple.ADEDevice{{Serial: "SYNTHETIC1", Model: "MacBook Pro", Family: "Mac", OS: "OSX", ProfileStatus: "empty", Assigned: true, ObservedAt: now}, {Serial: "SYNTHETIC2", Model: "iPhone", Family: "iPhone", OS: "iOS", ProfileStatus: "removed", ObservedAt: now}}
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -157,6 +167,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-recovery-new", DeviceDetails(c, info, recoveryDetail("new")), []string{"Set a Recovery Lock password", "Import an existing Recovery Lock password", "confirm_recovery_lock"}},
 		{"mac-recovery-verified", DeviceDetails(c, info, recoveryDetail("verified")), []string{"Rotate the Recovery Lock password", "Remove the Recovery Lock password", "Retrieve Recovery Lock password"}},
 		{"mac-recovery-checking", DeviceDetails(c, info, recoveryDetail("checking")), []string{"verify the current password before changing it"}},
+		{"ade-empty", ADE(c, info, nil, "", nil, ""), []string{"Create a connection", "An Apple server assignment does not confirm MDM enrollment"}},
+		{"ade-pending", ADE(c, info, []apple.ADEServer{adePending}, adeServer.ID, nil, ""), []string{"Download public certificate", "Verify and import token", "Waiting for a verified Apple server token"}},
+		{"ade-connected", ADE(c, info, []apple.ADEServer{adeServer}, adeServer.ID, adeDevices, "SYNTHETIC2"), []string{"Schedule synchronization", "SYNTHETIC1", "Removed", "Next page"}},
+		{"ade-disabled", ADE(c, info, []apple.ADEServer{adeDisabled}, adeServer.ID, adeDevices, ""), []string{"Synchronization is disabled", "SYNTHETIC2"}},
+		{"ade-throttled", ADE(c, info, []apple.ADEServer{adeThrottled}, adeServer.ID, adeDevices, ""), []string{"Apple requested a later retry", "Apple retry deadline"}},
 		{"mac-recovery-uncertain", DeviceDetails(c, info, recoveryDetail("uncertain")), []string{"Another password change remains blocked", "Check proposed password"}},
 		{"mac-recovery-stopped", DeviceDetails(c, info, recoveryDetail("stopped")), []string{"Check retained previous password"}},
 		{"mac-recovery-removal-uncertain", DeviceDetails(c, info, recoveryDetail("removal-uncertain")), []string{"has not confirmed whether the password was removed"}},

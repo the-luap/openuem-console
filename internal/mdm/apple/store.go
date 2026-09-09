@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+
+	"github.com/open-uem/openuem-console/internal/mdm/ade"
 )
 
 //go:embed migrations/*.sql
@@ -20,6 +22,7 @@ type Store struct {
 	vendor              *VendorTrust
 	pushTrust           *pushCertificateTrust
 	checkPushConnection func(context.Context, *Settings) error
+	adeService          func(*ade.Token) ade.Service
 }
 
 func NewStore(db *sql.DB, masterKey string) (*Store, error) {
@@ -43,7 +46,7 @@ func NewStoreWithVendor(db *sql.DB, masterKey string, vendor *VendorTrust) (*Sto
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db, secrets: box, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection}, nil
+	return &Store{db: db, secrets: box, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection, adeService: func(t *ade.Token) ade.Service { return ade.NewClient(t) }}, nil
 }
 
 // Migrate is additive and serialized across console replicas. It never runs

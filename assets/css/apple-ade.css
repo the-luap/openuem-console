@@ -1,0 +1,15 @@
+#apple-ade { min-width:0; grid-template-columns:minmax(0,1fr); color:hsl(var(--foreground)); }
+#apple-ade section, #apple-ade form, #apple-ade .uk-card-body { min-width:0; }
+#apple-ade p, #apple-ade dd, #apple-ade h2, #apple-ade a, #apple-ade label { overflow-wrap:anywhere; }
+#apple-ade .uk-button { height:auto; min-height:2.25rem; padding-block:.4rem; white-space:normal; }
+#apple-ade input:not([type="checkbox"]) { min-width:0; max-width:100%; }
+#apple-ade input[type="file"] { height:auto; padding-block:.5rem; }
+#apple-ade input[type="checkbox"] { flex-shrink:0; margin-top:.2rem; }
+#apple-ade .ade-metadata { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); gap:1rem; }
+#apple-ade dt { font-weight:600; }
+#apple-ade dd { margin:0; }
+#apple-ade .ade-table { overflow-x:auto; max-width:100%; }
+#apple-ade table { min-width:42rem; }
+#apple-ade :focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+#apple-ade .uk-card-body > * + *, #apple-ade form > label + label, #apple-ade form > label + button { margin-block-start:1rem; }
+#apple-ade form label input:not([type="checkbox"]) { display:block; margin-top:.35rem; }

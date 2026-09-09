@@ -165,7 +165,9 @@ icons, reports and policy targets.
 5. Renew device certificates automatically before their current one-year expiry,
    preserving enrollment rather than requiring routine re-enrollment.
 6. Implement ADE/Apple Business integration, token renewal, assignment, Setup
-   Assistant and re-enrollment.
+   Assistant and re-enrollment. Subsequent connection/token and assignment-sync
+   work is tracked in [ADE implementation evidence](apple-automated-enrollment.md);
+   it does not complete automated setup or re-enrollment.
 7. Add real account-driven User Enrollment for later BYOD, with restricted
    inventory and transparent separation of personal data.
 8. Subsequently add Apps & Books, license assignment, app updates and self-service.

@@ -1,0 +1,144 @@
+package mdm_views
+
+import (
+ "fmt"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/mdm/apple"
+ "github.com/open-uem/openuem-console/internal/views/layout"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, selected string, devices []apple.ADEDevice, next string) {
+ @layout.Base("devices",info) {
+  <link rel="stylesheet" href="/assets/css/apple-ade.css" type="text/css"/>
+  @partials.Header(c, []partials.Breadcrumb{{Title:"Automated Device Enrollment",Url:partials.GetNavigationUrl(info,"/ios/ade")}},info)
+  <main id="apple-ade" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div>
+    <h1 class="text-2xl font-semibold">Automated Device Enrollment</h1>
+    <p class="uk-text-muted mt-2">Connect this organization to Apple Business Manager or Apple School Manager and synchronize its assigned devices.</p>
+    @Navigation(info)
+   </div>
+   <div class="uk-alert uk-alert-primary" role="note">An Apple server assignment does not confirm MDM enrollment or supervision. This connection synchronizes assignments; automated enrollment profile assignment and Setup Assistant enrollment are not available yet.</div>
+   <section class="uk-card uk-card-default" aria-labelledby="ade-create-title">
+    <div class="uk-card-header"><h2 id="ade-create-title" class="uk-card-title">1. Create a connection</h2></div>
+    <div class="uk-card-body">
+     <p class="mb-4">Use one connection for each Apple device management server. Keep the existing connection when renewing its token. Up to 16 connections, including disabled connections, are retained per organization.</p>
+     <form method="post" action={ partials.GetNavigationUrl(info,"/ios/ade/servers") } class="flex flex-wrap gap-4 items-end">
+      @CSRF(info)
+      <label>Connection name<input class="uk-input" name="name" required maxlength="255" placeholder="Corporate Apple devices"/></label>
+      <button class="uk-button uk-button-primary" type="submit" disabled?={len(servers)>=16}>Create connection</button>
+     </form>
+    </div>
+   </section>
+   if len(servers)>0 {
+    <nav aria-label="Apple server connections" class="flex flex-wrap gap-4">
+     for _,s:=range servers {
+      if s.ID==selected {
+       <a class="uk-button uk-button-primary" aria-current="page" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(s.Status)}</a>
+      } else {
+       <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(s.Status)}</a>
+      }
+     }
+    </nav>
+   }
+   for _,s:=range servers {
+    if s.ID==selected {
+     <section class="uk-card uk-card-default" aria-labelledby="ade-selected-title">
+      <div class="uk-card-header"><h2 id="ade-selected-title" class="uk-card-title">{s.Name}</h2><p class="uk-text-muted">{s.ID}</p></div>
+      <div class="uk-card-body space-y-6">
+       <div>
+        <h3 class="font-semibold text-lg">2. Add the certificate to your Apple server</h3>
+        <p class="my-3">Download this public certificate and upload it to the matching device management server in Apple Business Manager or Apple School Manager. The private key stays on this OpenUEM server.</p>
+        <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/certificate"))}>Download public certificate</a>
+        <p class="uk-text-muted mt-2">Certificate expires: {When(&s.CertificateExpiresAt)}</p>
+       </div>
+       <div>
+        <h3 class="font-semibold text-lg">3. Verify and import the Apple server token</h3>
+        <p class="my-3">Download the server token from Apple after uploading this certificate. For renewal, use the same Apple server and connection. Verification must succeed before existing credentials are replaced.</p>
+        <form method="post" enctype="multipart/form-data" action={partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/token")} class="space-y-4" autocomplete="off">
+         @CSRF(info)
+         <label class="block">Apple server token (.p7m, up to 1 MiB)<input type="file" class="uk-input" name="token" accept=".p7m,application/pkcs7-mime,application/x-pkcs7-mime" required/></label>
+         <label class="flex gap-3 items-start"><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/><span>This token belongs to this organization's Apple server and was encrypted for this connection.</span></label>
+         <button class="uk-button uk-button-primary" type="submit">Verify and import token</button>
+        </form>
+       </div>
+       <dl class="ade-metadata">
+        <div><dt>Connection status</dt><dd>{StateLabel(s.Status)}</dd></div>
+        <div><dt>Apple organization</dt><dd>{Show(s.AppleOrganizationName)} · {Show(s.AppleOrganizationID)}</dd></div>
+        <div><dt>Apple server</dt><dd>{Show(s.AppleServerName)} · {Show(s.AppleServerID)}</dd></div>
+        <div><dt>Apple administrator</dt><dd>{Show(s.AppleAdministrator)}</dd></div>
+        <div><dt>Token expires</dt><dd>{When(s.TokenExpiresAt)}</dd></div>
+        <div><dt>Token verified</dt><dd>{When(s.VerifiedAt)}</dd></div>
+        <div><dt>Last completed synchronization</dt><dd>{When(s.SyncedAt)}</dd></div>
+        <div><dt>Last attempt</dt><dd>{When(s.AttemptedAt)}</dd></div>
+        <div><dt>Next scheduled attempt</dt><dd>{When(s.NextSyncAt)}</dd></div>
+        if s.RetryAfter!=nil {
+<div><dt>Apple retry deadline</dt><dd>{When(s.RetryAfter)}</dd></div>
+}
+       </dl>
+       <p role="status" class="uk-alert uk-alert-primary">{adeSyncMessage(s)}</p>
+       if s.Status=="connected" {
+        <p>{fmt.Sprintf("%d currently assigned devices · %d pages in the current fetch",s.Assigned,s.Pages)}</p>
+        <form method="post" action={partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/action")}>
+         @CSRF(info)<input type="hidden" name="operation" value="sync"/><button class="uk-button uk-button-default" type="submit">Schedule synchronization</button>
+        </form>
+        <details>
+         <summary class="cursor-pointer font-semibold">Restart a full fetch</summary>
+         <form method="post" action={partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/action")} class="space-y-3 mt-3">
+          @CSRF(info)<input type="hidden" name="operation" value="reload"/>
+          <p>The last published assignments remain available while every page is fetched again. Apple's retry deadline still applies.</p>
+          <label class="flex gap-3 items-start"><input type="checkbox" class="uk-checkbox" name="confirmed" value="yes" required/><span>Discard the unfinished fetch and schedule a new full fetch.</span></label>
+          <button class="uk-button uk-button-default" type="submit">Restart full fetch</button>
+         </form>
+        </details>
+       }
+       if s.Status!="disabled" {
+        <details>
+         <summary class="cursor-pointer font-semibold">Disable this connection</summary>
+         <form method="post" action={partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/action")} class="space-y-3 mt-3">
+          @CSRF(info)<input type="hidden" name="operation" value="disable"/>
+          <p>This stops synchronization and removes the stored token. Assignment history and the certificate remain available. Devices keep their Apple server assignment and any existing MDM enrollment.</p>
+          <label class="flex gap-3 items-start"><input type="checkbox" class="uk-checkbox" name="confirmed" value="yes" required/><span>Disable this connection and remove its stored token.</span></label>
+          <button class="uk-button uk-button-danger" type="submit">Disable connection</button>
+         </form>
+        </details>
+       }
+      </div>
+     </section>
+     <section class="uk-card uk-card-default" aria-labelledby="ade-devices-title">
+      <div class="uk-card-header"><h2 id="ade-devices-title" class="uk-card-title">Apple assignment history</h2></div>
+      <div class="uk-card-body">
+       <p class="mb-4">Up to 100 records per page. Removed assignments retain their last reported details. Enrollment profile status is reported by Apple and does not confirm device enrollment.</p>
+       if len(devices)==0 {
+<p class="uk-text-muted">No assignment records on this page. A completed first synchronization is required before assigned devices appear.</p>
+} else {
+        <div class="ade-table" tabindex="0" role="region" aria-label="Scrollable Apple assignment history">
+         <table class="uk-table uk-table-divider">
+          <thead><tr><th>Serial number</th><th>Device</th><th>Assignment</th><th>Apple profile</th><th>Observed</th></tr></thead>
+          <tbody>
+for _,d:=range devices {
+           <tr><td>{d.Serial}</td><td>{Show(d.Model)}<br/>{Show(d.Family)} · {Show(d.OS)}</td><td>
+if d.Assigned {
+Assigned
+} else {
+Removed
+}
+</td><td>{Show(d.ProfileStatus)}<br/>{Show(d.ProfileID)}</td><td>{When(&d.ObservedAt)}</td></tr>
+          }
+</tbody>
+         </table>
+        </div>
+       }
+       <nav class="flex flex-wrap gap-4 mt-4" aria-label="Assignment pages">
+        <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>First page / refresh</a>
+        if next!="" {
+<a class="uk-button uk-button-primary" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,next)))}>Next page</a>
+}
+       </nav>
+      </div>
+     </section>
+    }
+   }
+  </main>
+ }
+}
