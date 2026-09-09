@@ -46,13 +46,14 @@ jobs:
     env:
       APPLE_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
       AGENT_ENROLLMENT_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+      WINDOWS_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.8'
           cache: true
-      - name: Native Windows enrollment discovery and TLS boundaries
+      - name: Native Windows enrollment protocol, TLS and credential persistence
         run: go test -race -count=1 ./internal/mdm/windows
       - name: Bounded Windows discovery parser fuzzing
         run: go test -run '^$' -fuzz=FuzzDiscovery -fuzztime=15s -parallel=2 ./internal/mdm/windows

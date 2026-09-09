@@ -48,7 +48,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
-| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, strict endpoint/parser/HTTP boundaries and synthetic local race tests; production route not registered | Authenticated XCEP/WSTEP enrollment, durable scoped credentials/identities/provisioning, gateway/UI integration, SyncML/CSP policies/results, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
+| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; synthetic protocol/TLS/credential race tests; production route not registered | XCEP policy responses and service integration, WSTEP certificate issuance, durable device identities/provisioning, credential and gateway/UI integration, SyncML/CSP policies/results, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
@@ -65,13 +65,19 @@ the table's package summaries do not remove any detail from the roadmap.
   decoder and fixed-configuration HTTPS handler with read-only GET/HEAD probes,
   request/response correlation, fixed-length responses, endpoint binding and
   non-reflecting faults. Synthetic parser, TLS, HTTP and concurrent correlation
-  race tests pass locally; Linux/native Windows CI steps and a bounded fuzz run
-  are added. Discovery is not registered publicly and does not yet authenticate
+  race tests pass locally; both complete workflows for `79eeac3` and `2dd103a`
+  pass Linux/native Windows protocol and fuzz checks, database/browser regression
+  and both builds. Discovery is not registered publicly and does not authenticate
   or enroll a device. WIN-02 and its remaining protocol/hardware gates stay open.
   The subsequent OnPremise XCEP request decoder checks nil policy fields and
   unique bounded `UsernameToken` credentials, preserves exact password text and
-  redacts default credential serialization. Its synthetic race tests pass;
-  credential validation, policy responses and certificate issuance remain open.
+  redacts default credential serialization. The subsequent PostgreSQL credential
+  store adds exact tenant/site and creator-permission-revision binding, random
+  enrollment secrets with stored verifiers, scoped audit/revocation and atomic
+  one-use consumption. Local race tests cover restart, 12 concurrent claims,
+  observed lock waits, expiry, permission/site changes and complete issuer/audit/
+  cancellation rollback. Credential service/UI integration, policy responses,
+  verified CSR issuance and real Windows enrollment remain open.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

@@ -3,11 +3,13 @@
 WIN-02 is in progress. The first native protocol component is discovery in
 [`internal/mdm/windows`](../internal/mdm/windows). It is separate from the existing
 OpenUEM agent. The package currently contains a bounded SOAP/XML decoder, a
-discovery response builder, an immutable HTTPS discovery handler and an OnPremise
-XCEP request decoder. It is not registered in a production listener or gateway.
+discovery response builder, an immutable HTTPS discovery handler, an OnPremise
+XCEP request decoder and a PostgreSQL enrollment credential store. These components
+are not registered in a production listener, gateway or console flow.
 
 This does not yet enroll Windows, issue a device certificate or apply a CSP.
-Authenticated XCEP/WSTEP enrollment, durable scoped identities, provisioning,
+XCEP policy responses and service integration, WSTEP issuance, durable device
+identities, provisioning,
 SyncML commands and results, policy/update workflows, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
@@ -67,7 +69,8 @@ matrix remains to be implemented and verified.
 
 ## Automated evidence
 
-Run the self-contained package without a database or device:
+Run the parser, TLS and password grammar tests without a database or device.
+The PostgreSQL tests explicitly skip when their dedicated variable is unset:
 
 ```sh
 go test -race -count=1 ./internal/mdm/windows
@@ -88,8 +91,16 @@ fuzz run completed 1,380,623 executions without a failure; the subsequent final
 race run also covers literal whitespace outside the root and bracketed-host
 rejections added during review. The existing CI workflow now includes this package on
 Linux with race detection and on native Windows, plus a bounded Linux fuzz run.
-Those added workflow steps are not remote execution evidence until their runs
-complete. Physical Windows enrollment has not been tested.
+Both complete workflows now pass for discovery at `79eeac3`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34386162922),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34386167551))
+and policy request parsing at `2dd103a`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34387097933),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34387105197)).
+These runs include native Windows protocol checks, Linux race/fuzz tests,
+the existing PostgreSQL/console/browser regressions and both platform builds.
+Physical Windows enrollment has not been tested. The subsequent credential-store
+change has its own local evidence below; earlier CI runs do not cover that change.
 
 ## OnPremise certificate policy request
 
@@ -116,9 +127,10 @@ limits. Returned credential objects redact their default Go formatting and omit
 their username/password fields from JSON/XML/YAML serialization. Callers must
 still never log individual fields or the original SOAP request.
 
-This decoder does not validate a password or return an enrollment policy.
-A durable organization/site-scoped credential store must authorize policy
-retrieval. Certificate issuance must recheck the credential, current permissions,
+The decoder does not validate a password or return an enrollment policy.
+`Store.CheckPolicyCredential` provides the separate durable credential check
+described below. Service integration must call it before returning a policy.
+Certificate issuance must recheck the credential, current permissions,
 expiry/revocation and CSR binding in its own transaction; a previously parsed
 request or successful policy lookup must not authorize later issuance.
 
@@ -129,6 +141,77 @@ run passes with 97.6% statement coverage; a 30-second policy parser fuzz run
 completed 155,226 executions without a failure. The CI
 package test includes these cases and has an additional bounded policy fuzz step;
 execution evidence is recorded separately from merely editing the workflow.
+
+## Scoped enrollment credentials
+
+`Store.CreateEnrollmentInvitation` creates an invitation for one existing
+organization/site pair. It rechecks the authenticated console actor's
+`devices.enroll` permission while holding the shared permission lock, locks the
+live site/organization relationship and inserts the invitation and audit event
+in one transaction. Metadata reads and revocation use the same scoped permission
+boundary. Console routes and views for these operations are still to be connected.
+
+Each invitation returns one generated credential with a 256-bit random secret.
+Its password has an `owin1` version prefix and a public UUID locator. PostgreSQL
+stores an HMAC verifier bound to the invitation ID, organization, site, username,
+creator and creator permission revision. The random secret is the HMAC key; the
+plaintext password is never stored or included in audit events. These credentials
+are independent of console and directory account passwords.
+
+Invitation usernames match exactly and are limited to 320 UTF-8 bytes, consistent
+with the discovery account-hint limit. They cannot contain controls or leading/
+trailing whitespace. The wider 512-byte XCEP parser bound does not expand this
+backend admission limit. Validity is an integral number of seconds from one
+minute to 24 hours. Timestamps come from the database clock.
+
+`CheckPolicyCredential` verifies the secret, exact username, current creator
+permissions, original permission revision, live site ownership, creation time,
+expiry, revocation and consumption. It returns scope only for an active credential
+and never consumes it. Any permission revision change invalidates pending
+credentials from that creator; removing and later restoring access does not
+reactivate them. A new invitation must be issued. Unknown, malformed, mismatched,
+expired, revoked and already consumed credentials share one credential error.
+
+The private `withEnrollmentCredential` transaction helper locks an active
+invitation for update, holds its permission and site locks through the supplied
+issuance work, rechecks database time, records one consumption and audits it.
+Its tests use a synthetic issuance row. WSTEP still must connect verified CSR
+processing and the complete certificate/provisioning response to this transaction,
+including durable retries of the same CSR. The helper alone does not issue a
+certificate or establish a managed device identity.
+
+Concurrent consumption admits one callback. Issuer errors, audit errors,
+cancellation and expiry during the callback roll back all work and consumption.
+Expiry is also checked after waiting for the invitation row lock. PostgreSQL
+constraints and a trigger prevent invitation reassignment, lifetime extension,
+secret/issuer replacement and rearming after consumption or revocation. Revoking
+an invitation closes enrollment access; device-certificate revocation and
+unenrollment remain separate unfinished lifecycle operations.
+
+The additive migration uses its own ledger and advisory lock. Upstream
+organization/site/user tables and console access migrations must already exist.
+There is no production startup migration registration in this step.
+
+The local PostgreSQL 17 race suite passes in 6.601 seconds, with 93.1% combined
+package statement coverage. It verifies restart persistence, scoped denial,
+secret/audit privacy, current permission revisions, permanent revocation,
+12-way single consumption, live database lock waits, expiry before/after waiting
+and during issuance, issuer/audit/cancellation rollback and valid lifetime/name
+boundaries. The issuance fixture never signs or installs a certificate.
+
+To run the database suite, set `WINDOWS_MDM_TEST_DATABASE_URL` for the reserved
+`openuem_test` PostgreSQL 17 database and role on `127.0.0.1:55440`, then run:
+
+```sh
+go test -race -count=1 -timeout=3m ./internal/mdm/windows
+```
+
+Each test creates and removes its own random schema. It rejects other endpoints;
+GitHub Actions uses its declared disposable PostgreSQL service on port 5432.
+The Linux CI step now supplies this variable. The native Windows job runs the
+portable protocol tests without PostgreSQL, so it does not prove database
+execution on Windows. Physical enrollment, credential UI/service integration,
+CA issuance and public-route admission limits remain open.
 
 ## Sources
 
