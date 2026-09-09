@@ -14,6 +14,7 @@ type DeviceRow struct {
 }
 
 type Detail struct {
+	ADE              *apple.ADEDeviceEnrollment
 	RecoveryLock     *apple.RecoveryLock
 	RecoveryLockKeys []apple.RecoveryLockKey
 	FileVault        *apple.FileVault

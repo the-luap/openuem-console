@@ -189,6 +189,10 @@ func inventoryQueriesFor(d Device) []string {
 			queries = append(queries, "SoftwareUpdateDeviceID")
 		}
 	}
+	if d.EnrollmentMethod == "automated_device" && ((d.Family() == PlatformMacOS && CompareVersions(d.OSVersion, "10.11") >= 0) || ((d.Family() == PlatformIOS || d.Family() == PlatformIPadOS) && CompareVersions(d.OSVersion, "9.0") >= 0)) {
+		queries = append(queries, "AwaitingConfiguration")
+	}
+
 	return queries
 }
 

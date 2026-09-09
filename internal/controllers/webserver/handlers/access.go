@@ -55,7 +55,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/ios/ade/servers", "/ios/ade/servers/:id/token", "/ios/ade/servers/:id/action", "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
+		case "/ios/ade/servers", "/ios/ade/servers/:id/token", "/ios/ade/servers/:id/action", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
 			return access.ManageCertificates, true
 		case "/ios/enroll":
 			return access.EnrollDevices, true
@@ -65,7 +65,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.AssignProfiles, true
 		case "/ios/:id/refresh", "/ios/:id/users/:user/refresh":
 			return access.RefreshDevices, true
-		case "/ios/:id/mac-binding", "/ios/:id/mac-binding/cancel", "/ios/:id/users/:user/resume":
+		case "/ios/:id/mac-binding", "/ios/:id/mac-binding/cancel", "/ios/:id/users/:user/resume", "/ios/:id/setup/retry":
 			return access.EnrollDevices, true
 		case "/ios/:id/revoke", "/ios/:id/users/:user/pause":
 			return access.RevokeDevices, true

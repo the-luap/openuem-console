@@ -33,6 +33,9 @@ func (s *Store) RevokeEnrollment(ctx context.Context, scope Scope, id, actor str
 	if err = s.cancelDeviceRenewal(ctx, tx, &Device{ID: id, TenantID: scope.TenantID}); err != nil {
 		return err
 	}
+	if err = s.cancelADESetup(ctx, tx, id); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_bootstrap_tokens WHERE device_id=$1`, id); err != nil {
 		return err
 	}
@@ -65,9 +68,9 @@ func (s *Store) ScopeInUse(ctx context.Context, scope Scope) (bool, error) {
 	}
 	var exists bool
 	if scope.SiteID == 0 {
-		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_settings WHERE tenant_id=$1)`, scope.TenantID).Scan(&exists)
+		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_settings WHERE tenant_id=$1) OR EXISTS(SELECT 1 FROM mdm_apple_ade_servers WHERE tenant_id=$1)`, scope.TenantID).Scan(&exists)
 		return exists, err
 	}
-	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2)`, scope.TenantID, scope.SiteID).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2) OR EXISTS(SELECT 1 FROM mdm_apple_ade_profiles WHERE tenant_id=$1 AND site_id=$2)`, scope.TenantID, scope.SiteID).Scan(&exists)
 	return exists, err
 }

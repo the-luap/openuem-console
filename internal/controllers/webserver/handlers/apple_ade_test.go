@@ -18,7 +18,7 @@ import (
 )
 
 func TestADEExactRoutesAndSafeFailures(t *testing.T) {
-	for route, method := range map[string]string{"/ios/ade": "GET", "/ios/ade/servers": "POST", "/ios/ade/servers/:id/certificate": "GET", "/ios/ade/servers/:id/token": "POST", "/ios/ade/servers/:id/action": "POST"} {
+	for route, method := range map[string]string{"/ios/ade": "GET", "/ios/ade/servers": "POST", "/ios/ade/servers/:id/certificate": "GET", "/ios/ade/servers/:id/token": "POST", "/ios/ade/servers/:id/action": "POST", "/ios/ade/servers/:id/profiles": "POST", "/ios/ade/servers/:id/profiles/:profile/action": "POST", "/ios/ade/servers/:id/targets": "POST", "/ios/ade/servers/:id/targets/:serial/rearm": "POST"} {
 		for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 			for _, m := range []string{"GET", "POST", "HEAD", "DELETE", "PUT"} {
 				cap, ok := appleCapability(m, prefix+route)
@@ -92,7 +92,7 @@ func exerciseADERoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Conte
 				if rec := request(user, "GET", p+"/certificate", "", nil); rec.Code != 403 {
 					t.Fatal("public certificate downloaded without organization authority", rec.Code)
 				}
-				for _, suffix := range []string{"/token", "/action"} {
+				for _, suffix := range []string{"/token", "/action", "/profiles", "/profiles/00000000-0000-4000-8000-000000000001/action", "/targets", "/targets/SYNTHETIC1/rearm"} {
 					if rec := post(user, p+suffix, form); rec.Code != 403 {
 						t.Fatal("ADE mutation permission bypass", suffix, rec.Code)
 					}
@@ -164,6 +164,53 @@ func exerciseADERoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Conte
 			if rec.Code != want || strings.Contains(rec.Body.String(), "synthetic-private-invalid-token") {
 				t.Fatal("unsafe token import", mode, rec.Code)
 			}
+		}
+		// This fixture only stages durable operator intent. No ADE worker or
+		// external Apple service is started by the console route test.
+		if _, err = h.Model.DB.Exec(`UPDATE mdm_apple_ade_servers SET status='connected',token='synthetic-test-only',token_expires_at=clock_timestamp()+interval '1 year',apple_server_id='eeeeeeee-0000-4000-8000-000000000001',apple_organization_id='synthetic-console-org' WHERE id=$1`, id); err != nil {
+			t.Fatal(err)
+		}
+		profileForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "name": {"Synthetic automated Mac"}, "platform": {"macos"}, "site_id": {fmt.Sprint(site)}, "removal": {"disallowed"}, "await_configuration": {"yes"}, "ignore_backup_profile": {"yes"}}
+		if rec := post("organization-admin", path+"/profiles", profileForm); rec.Code != 303 {
+			t.Fatal("ADE profile intent failed", rec.Code, rec.Body.String())
+		}
+		profiles, err := h.Apple.ADEProfiles(ctx, tenant, id)
+		if err != nil || len(profiles) != 1 || profiles[0].Status != "queued" || profiles[0].SiteID != site || profiles[0].Removable {
+			t.Fatal("ADE profile intent not persisted", err)
+		}
+		profileID := profiles[0].ID
+		profileForm.Set("site_id", fmt.Sprint(otherSite))
+		if rec := post("organization-admin", path+"/profiles", profileForm); rec.Code != 400 {
+			t.Fatal("ADE profile site switched", rec.Code)
+		}
+		profileForm.Set("site_id", fmt.Sprint(site))
+		if _, err = h.Model.DB.Exec(`UPDATE mdm_apple_ade_profiles SET status='published',remote_id='SYNTHETICCONSOLE1' WHERE id=$1`, profileID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = h.Model.DB.Exec(`INSERT INTO mdm_apple_ade_devices(tenant_id,server_id,serial,assigned,payload) VALUES($1,$2,'SYNTHETICCONSOLE1',true,'{}')`, tenant, id); err != nil {
+			t.Fatal(err)
+		}
+		targetForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "profile_id": {profileID}, "serials": {"SYNTHETICCONSOLE1"}}
+		if rec := post("organization-admin", path+"/targets", targetForm); rec.Code != 303 {
+			t.Fatal("ADE target intent failed", rec.Code, rec.Body.String())
+		}
+		targets, _, err := h.Apple.ADETargets(ctx, tenant, id, "")
+		if err != nil || len(targets) != 1 || targets[0].Status != "pending" || targets[0].DeviceID != "" {
+			t.Fatal("assignment was confused with enrollment", err)
+		}
+		actionForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "operation": {"disable"}}
+		if rec := post("organization-admin", path+"/profiles/"+profileID+"/action", actionForm); rec.Code != 409 {
+			t.Fatal("assigned ADE version disabled", rec.Code)
+		}
+		if rec := post("organization-admin", path+"/targets/SYNTHETICCONSOLE1/rearm", url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}}); rec.Code != 404 {
+			t.Fatal("unused activation rearmed", rec.Code)
+		}
+		targetForm.Set("profile_id", "clear")
+		if rec := post("organization-admin", path+"/targets", targetForm); rec.Code != 303 {
+			t.Fatal("ADE clear intent failed", rec.Code)
+		}
+		if rec := post("organization-admin", path+"/profiles/"+profileID+"/action", actionForm); rec.Code != 303 {
+			t.Fatal("unassigned ADE version not disabled", rec.Code)
 		}
 		f := url.Values{"csrf": {"console-test-token"}, "operation": {"disable"}}
 		if rec := post("organization-admin", path+"/action", f); rec.Code != 400 {

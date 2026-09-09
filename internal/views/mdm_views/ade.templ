@@ -8,7 +8,7 @@ import (
  "github.com/open-uem/openuem-console/internal/views/partials"
 )
 
-templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, selected string, devices []apple.ADEDevice, next string) {
+templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, selected string, devices []apple.ADEDevice, next string, enrollments ...ADEEnrollment) {
  @layout.Base("devices",info) {
   <link rel="stylesheet" href="/assets/css/apple-ade.css" type="text/css"/>
   @partials.Header(c, []partials.Breadcrumb{{Title:"Automated Device Enrollment",Url:partials.GetNavigationUrl(info,"/ios/ade")}},info)
@@ -18,7 +18,7 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
     <p class="uk-text-muted mt-2">Connect this organization to Apple Business Manager or Apple School Manager and synchronize its assigned devices.</p>
     @Navigation(info)
    </div>
-   <div class="uk-alert uk-alert-primary" role="note">An Apple server assignment does not confirm MDM enrollment or supervision. This connection synchronizes assignments; automated enrollment profile assignment and Setup Assistant enrollment are not available yet.</div>
+   <div class="uk-alert uk-alert-primary" role="note">An Apple server assignment does not confirm MDM enrollment or supervision. Publish a profile, assign it to devices, then track their authenticated enrollment and MDM configuration phase below.</div>
    <section class="uk-card uk-card-default" aria-labelledby="ade-create-title">
     <div class="uk-card-header"><h2 id="ade-create-title" class="uk-card-title">1. Create a connection</h2></div>
     <div class="uk-card-body">
@@ -97,7 +97,7 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
          <summary class="cursor-pointer font-semibold">Disable this connection</summary>
          <form method="post" action={partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/action")} class="space-y-3 mt-3">
           @CSRF(info)<input type="hidden" name="operation" value="disable"/>
-          <p>This stops synchronization and removes the stored token. Assignment history and the certificate remain available. Devices keep their Apple server assignment and any existing MDM enrollment.</p>
+          <p>This stops synchronization, profile publication and new automated enrollments, and removes the stored token. Assignment history and the certificate remain available. Devices keep their Apple server assignment and any existing MDM enrollment.</p>
           <label class="flex gap-3 items-start"><input type="checkbox" class="uk-checkbox" name="confirmed" value="yes" required/><span>Disable this connection and remove its stored token.</span></label>
           <button class="uk-button uk-button-danger" type="submit">Disable connection</button>
          </form>
@@ -105,6 +105,9 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
        }
       </div>
      </section>
+     if len(enrollments)>0 {
+      @ADEEnrollmentPanel(info,s,enrollments[0])
+     }
      <section class="uk-card uk-card-default" aria-labelledby="ade-devices-title">
       <div class="uk-card-header"><h2 id="ade-devices-title" class="uk-card-title">Apple assignment history</h2></div>
       <div class="uk-card-body">

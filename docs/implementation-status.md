@@ -47,7 +47,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | WIN-01 | Upstream deployment and model tests | Simple approved standard/custom catalog, detection/reboot/retry results, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
-| APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; tested internal profile/assignment/detail service operations and pinned-issuer CMS MachineInfo verification | Administrative ADE profile workflow, persisted signed activation and setup/re-enrollment, groups/rings, directory associations, certificate rotation and Apple/hardware acceptance |
+| APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; synthetic persistence/protocol tests | Groups/rings, directory associations, managed administrator and Platform SSO setup, certificate rotation and Apple/hardware acceptance |
 | WIN-02 | Agent transport only | Native discovery/WSTEP/enrollment, SyncML/CSP policies/results, renewal/unenrollment; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
@@ -69,10 +69,13 @@ the table's package summaries do not remove any detail from the roadmap.
   signed attributes, and bounds both XML and binary device dictionaries. Synthetic
   protocol/race tests and vet pass. Parser fuzzing completed 869,945 and 302,482
   inputs; an optional public Apple CMS capture also verified locally. Native
-  Windows CI now includes the ADE protocol suite. These internal operations do
-  not expose a public enrollment route or administrator assignment action yet;
-  durable intent/admission, SCEP/check-in binding, Setup Assistant and physical
-  acceptance remain required.
+  Windows CI includes the ADE protocol suite. The subsequent durable integration
+  exposes profile/assignment actions and signed admission, binds SCEP/check-in to
+  one activation generation, preserves removal rights on renewal and reconciles
+  Setup Assistant from reported state. New focused PostgreSQL tests passed locally;
+  the broad local regression run exhausted disk space, so complete regression
+  evidence must come from the corresponding branch CI. Physical acceptance remains
+  required.
 
 - [Automated Device Enrollment connections](apple-automated-enrollment.md) add
   organization-scoped server certificate creation, verified encrypted token import
@@ -85,8 +88,8 @@ the table's package summaries do not remove any detail from the roadmap.
   [PostgreSQL/console/build CI](https://github.com/the-luap/openuem-console/actions/runs/34299243491).
   Parser regression tests also reject Unicode case-folded duplicate field names
   and restart unchanged continuation cursors; additional fuzzing passed 380,344
-  inputs. ADE profile assignment,
-  authenticated setup/re-enrollment and physical Apple acceptance remain open.
+  inputs. Subsequent profile assignment and authenticated setup/re-enrollment
+  are described above; physical Apple acceptance remains open.
 
 - [FileVault rotation recovery](macos-filevault.md) now requires a signed process
   stopping claim before an uncertain attempt can admit an old-key resolution check.

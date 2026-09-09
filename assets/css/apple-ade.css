@@ -13,3 +13,7 @@
 #apple-ade :focus-visible { outline:2px solid currentColor; outline-offset:3px; }
 #apple-ade .uk-card-body > * + *, #apple-ade form > label + label, #apple-ade form > label + button { margin-block-start:1rem; }
 #apple-ade form label input:not([type="checkbox"]) { display:block; margin-top:.35rem; }
+#apple-ade select, #apple-ade textarea { min-width:0; max-width:100%; display:block; margin-top:.35rem; }
+#apple-ade .ade-profile-form > label, #apple-ade form > label { display:block; }
+#apple-ade .ade-profile-version { border-top:1px solid hsl(var(--border)); padding-top:1.25rem; }
+#apple-ade .ade-profile-version p { margin-block:.6rem; }

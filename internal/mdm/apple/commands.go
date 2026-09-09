@@ -120,7 +120,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	if _, err := s.Device(ctx, scope, id); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at,EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.command_id=mdm_apple_commands.id),mac_binding,filevault,recovery_lock FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,device_id,request_type,status,attempts,error,created_at,completed_at,EXISTS(SELECT 1 FROM mdm_apple_identity_renewals r WHERE r.command_id=mdm_apple_commands.id),mac_binding,filevault,recovery_lock,ade_setup FROM mdm_apple_commands WHERE tenant_id=$1 AND device_id=$2 ORDER BY created_at DESC LIMIT 100`, scope.TenantID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (s *Store) Commands(ctx context.Context, scope Scope, id string) ([]Command
 	list := []Command{}
 	for rows.Next() {
 		var c Command
-		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt, &c.IdentityRenewal, &c.MacBinding, &c.FileVault, &c.RecoveryLock); err != nil {
+		if err = rows.Scan(&c.ID, &c.DeviceID, &c.RequestType, &c.Status, &c.Attempts, &c.Error, &c.CreatedAt, &c.CompletedAt, &c.IdentityRenewal, &c.MacBinding, &c.FileVault, &c.RecoveryLock, &c.ADESetup); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -181,6 +181,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	}
 	switch kind {
 	case "Authenticate":
+		if err = s.validateADEIdentity(ctx, tx, current, udid, stringValue(message, "SerialNumber")); err != nil {
+			return err
+		}
 		model, modelErr := reportedModel(message, current.Model)
 		if modelErr != nil {
 			return modelErr
@@ -195,6 +198,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	case "TokenUpdate":
 		if current.UDID == "" {
 			return ErrUnauthorized
+		}
+		if err = s.validateADEIdentity(ctx, tx, current, udid, ""); err != nil {
+			return err
 		}
 		token, ok := message["Token"].([]byte)
 		magic := stringValue(message, "PushMagic")
@@ -227,6 +233,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 				return err
 			}
 		}
+		if err = s.recordADEAwaiting(ctx, tx, current, message); err != nil {
+			return err
+		}
 	case "CheckOut":
 		if current.UDID == "" {
 			return ErrUnauthorized
@@ -251,6 +260,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 			err = s.cancelDeviceRenewal(ctx, tx, current)
 		}
 		if err == nil {
+			err = s.cancelADESetup(ctx, tx, current.ID)
+		}
+		if err == nil {
 			current.Status = "unenrolled"
 			err = s.reconcileMacBindingsForDevice(ctx, tx, current)
 		}
@@ -271,6 +283,9 @@ func (s *Store) CheckIn(ctx context.Context, d *Device, message map[string]any) 
 	}
 	// The device has demonstrated possession. Browser retries must now stop.
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_enrollment_claims SET profile=NULL WHERE device_id=$1`, current.ID); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_ade_admissions SET retry_profile=NULL WHERE device_id=$1`, current.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -366,10 +381,10 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			return nil, errors.New("response requires a valid CommandUUID")
 		}
 		var kind, previous string
-		var binding, filevault, recoveryLock bool
+		var binding, filevault, recoveryLock, adeSetup bool
 		var profileID sql.NullString
 		var revision sql.NullInt64
-		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock)
+		err = tx.QueryRowContext(ctx, `SELECT request_type,status,profile_id,profile_revision,mac_binding,filevault,recovery_lock,ade_setup FROM mdm_apple_commands WHERE id=$1 AND device_id=$2 FOR UPDATE`, id, current.ID).Scan(&kind, &previous, &profileID, &revision, &binding, &filevault, &recoveryLock, &adeSetup)
 		if err != nil {
 			return nil, notFound(err)
 		}
@@ -427,6 +442,9 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 				if filevault || kind == "SecurityInfo" {
 					detail = "Mac security command failed"
 				}
+				if adeSetup {
+					detail = "MDM setup configuration command failed"
+				}
 			}
 			_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status=$1,error=$2,available_at=CASE WHEN $1='not_now' THEN now()+interval '1 minute' ELSE available_at END,completed_at=CASE WHEN $1='not_now' THEN NULL ELSE now() END WHERE id=$3`, next, detail, id)
 			if err != nil {
@@ -465,6 +483,11 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 			}
 			if filevault {
 				if err = s.fileVaultCommandResult(ctx, tx, current, id, next, message); err != nil {
+					return nil, err
+				}
+			}
+			if adeSetup {
+				if err = s.adeSetupCommandResult(ctx, tx, current, id, next); err != nil {
 					return nil, err
 				}
 			}
@@ -511,6 +534,9 @@ func (s *Store) Connect(ctx context.Context, d *Device, message map[string]any) 
 		return nil, err
 	}
 	if err = s.reconcileRecoveryLock(ctx, tx, current, true); err != nil {
+		return nil, err
+	}
+	if err = s.reconcileADESetup(ctx, tx, current); err != nil {
 		return nil, err
 	}
 	var id string
@@ -575,6 +601,9 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 		version := stringValue(info, "OSVersion")
 		build := stringValue(info, "BuildVersion")
 		name := stringValue(info, "DeviceName")
+		if err = s.validateADEIdentity(ctx, tx, d, d.UDID, stringValue(info, "SerialNumber")); err != nil {
+			return err
+		}
 		model, err := reportedModel(info, d.Model)
 		if err != nil {
 			return err
@@ -588,6 +617,9 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 			return err
 		}
 		if err = s.savePlatformInventory(ctx, tx, d, info, model); err != nil {
+			return err
+		}
+		if err = s.recordADEAwaiting(ctx, tx, d, info); err != nil {
 			return err
 		}
 		next, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1`, d.ID))
@@ -731,7 +763,7 @@ func (s *Store) RetryCommand(ctx context.Context, scope Scope, deviceID, command
 	if state != "enrolled" {
 		return ErrConflict
 	}
-	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='queued',error='',available_at=now(),expires_at=now()+interval '7 days',completed_at=NULL WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND status IN ('failed','expired','not_now') AND NOT mac_binding AND NOT filevault AND NOT recovery_lock AND ((profile_id IS NULL AND request_type NOT IN ('InstallProfile','RemoveProfile')) OR EXISTS(SELECT 1 FROM mdm_apple_profile_assignments a WHERE a.profile_id=mdm_apple_commands.profile_id AND a.device_id=mdm_apple_commands.device_id AND a.revision=mdm_apple_commands.profile_revision AND ((a.desired='installed' AND mdm_apple_commands.request_type='InstallProfile') OR (a.desired='removed' AND mdm_apple_commands.request_type='RemoveProfile'))))`, commandID, deviceID, scope.TenantID)
+	r, err := tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET status='queued',error='',available_at=now(),expires_at=now()+interval '7 days',completed_at=NULL WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND status IN ('failed','expired','not_now') AND NOT mac_binding AND NOT filevault AND NOT recovery_lock AND NOT ade_setup AND ((profile_id IS NULL AND request_type NOT IN ('InstallProfile','RemoveProfile')) OR EXISTS(SELECT 1 FROM mdm_apple_profile_assignments a WHERE a.profile_id=mdm_apple_commands.profile_id AND a.device_id=mdm_apple_commands.device_id AND a.revision=mdm_apple_commands.profile_revision AND ((a.desired='installed' AND mdm_apple_commands.request_type='InstallProfile') OR (a.desired='removed' AND mdm_apple_commands.request_type='RemoveProfile'))))`, commandID, deviceID, scope.TenantID)
 	if err != nil {
 		return err
 	}

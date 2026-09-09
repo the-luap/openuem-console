@@ -80,8 +80,8 @@ func (h *Handler) AppleADE(c echo.Context) error {
 	if err = h.appleReady(); err != nil {
 		return err
 	}
-	selected, after := c.QueryParam("server"), c.QueryParam("after")
-	if len(c.QueryParams()["server"]) > 1 || len(c.QueryParams()["after"]) > 1 {
+	selected, after, targetAfter := c.QueryParam("server"), c.QueryParam("after"), c.QueryParam("target_after")
+	if len(c.QueryParams()["server"]) > 1 || len(c.QueryParams()["after"]) > 1 || len(c.QueryParams()["target_after"]) > 1 {
 		return echo.NewHTTPError(400, "Invalid assignment page")
 	}
 	if selected != "" {
@@ -106,19 +106,28 @@ func (h *Handler) AppleADE(c echo.Context) error {
 		return echo.NewHTTPError(404, "Connection not found")
 	}
 	devices := []apple.ADEDevice{}
+	enrollment := mdm_views.ADEEnrollment{}
 	next := ""
 	if selected != "" {
 		devices, next, err = h.Apple.ADEDevices(c.Request().Context(), scope.TenantID, selected, after)
 		if err != nil {
 			return adeFailure(err)
 		}
-	} else if after != "" {
+		enrollment.Profiles, err = h.Apple.ADEProfiles(c.Request().Context(), scope.TenantID, selected)
+		if err != nil {
+			return adeWorkflowFailure(err)
+		}
+		enrollment.Targets, enrollment.Next, err = h.Apple.ADETargets(c.Request().Context(), scope.TenantID, selected, targetAfter)
+		if err != nil {
+			return adeWorkflowFailure(err)
+		}
+	} else if after != "" || targetAfter != "" {
 		return echo.NewHTTPError(400, "Select a connection first")
 	}
 	if err = h.Apple.RecordRead(c.Request().Context(), apple.Scope{TenantID: scope.TenantID}, h.appleActor(c), "ade.inventory.read", "connections"); err != nil {
 		return adeFailure(err)
 	}
-	return renderApple(c, mdm_views.ADE(c, info, servers, selected, devices, next))
+	return renderApple(c, mdm_views.ADE(c, info, servers, selected, devices, next, enrollment))
 }
 func (h *Handler) AppleCreateADEServer(c echo.Context) error {
 	adeHeaders(c)

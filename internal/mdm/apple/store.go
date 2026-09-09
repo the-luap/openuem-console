@@ -17,12 +17,13 @@ import (
 var migrations embed.FS
 
 type Store struct {
-	db                  *sql.DB
-	secrets             *secretBox
-	vendor              *VendorTrust
-	pushTrust           *pushCertificateTrust
-	checkPushConnection func(context.Context, *Settings) error
-	adeService          func(*ade.Token) ade.Service
+	db                   *sql.DB
+	secrets              *secretBox
+	vendor               *VendorTrust
+	pushTrust            *pushCertificateTrust
+	checkPushConnection  func(context.Context, *Settings) error
+	adeService           func(*ade.Token) ade.Service
+	verifyADEMachineInfo func([]byte) (*ade.MachineInfo, error)
 }
 
 func NewStore(db *sql.DB, masterKey string) (*Store, error) {
@@ -46,7 +47,7 @@ func NewStoreWithVendor(db *sql.DB, masterKey string, vendor *VendorTrust) (*Sto
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db, secrets: box, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection, adeService: func(t *ade.Token) ade.Service { return ade.NewClient(t) }}, nil
+	return &Store{db: db, secrets: box, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection, adeService: func(t *ade.Token) ade.Service { return ade.NewClient(t) }, verifyADEMachineInfo: ade.VerifyMachineInfo}, nil
 }
 
 // Migrate is additive and serialized across console replicas. It never runs

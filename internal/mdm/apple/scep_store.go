@@ -124,7 +124,7 @@ func (s *Store) prepareSCEPEnrollment(ctx context.Context, tx *sql.Tx, c *Settin
 	}
 	layout := newEnrollmentLayout(c)
 	var deviceLockAllowed bool
-	if err = tx.QueryRowContext(ctx, `SELECT enrollment_platform='macos',device_lock_allowed FROM mdm_apple_devices WHERE id=$1`, deviceID).Scan(&layout.bootstrapToken, &deviceLockAllowed); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT enrollment_platform='macos',device_lock_allowed,removal_disallowed FROM mdm_apple_devices WHERE id=$1`, deviceID).Scan(&layout.bootstrapToken, &deviceLockAllowed, &layout.removalDisallowed); err != nil {
 		return nil, err
 	}
 	if deviceLockAllowed && !layout.bootstrapToken {
@@ -185,6 +185,9 @@ func scepEnrollmentProfile(c *Settings, deviceID, challenge, endpoint string, la
 		mdm["ServerCapabilities"] = capabilities
 	}
 	profile := map[string]any{"PayloadType": "Configuration", "PayloadVersion": 1, "PayloadIdentifier": prefix, "PayloadUUID": layout.profileUUID, "PayloadDisplayName": c.Organization + " – OpenUEM", "PayloadOrganization": c.Organization, "PayloadDescription": "Manage this device's configuration, software updates, and inventory with OpenUEM.", "PayloadScope": "System", "PayloadContent": []any{trust, identity, mdm}}
+	if layout.removalDisallowed {
+		profile["PayloadRemovalDisallowed"] = true
+	}
 	return plist.Marshal(profile, plist.XMLFormat)
 }
 

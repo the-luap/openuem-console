@@ -24,6 +24,7 @@ type enrollmentLayout struct {
 	accessRights                               int64
 	bootstrapToken                             bool
 	perUserConnections                         bool
+	removalDisallowed                          bool
 }
 
 func newEnrollmentLayout(c *Settings) enrollmentLayout {
@@ -52,19 +53,19 @@ func saveEnrollmentLayout(ctx context.Context, tx *sql.Tx, tenant int, deviceID 
 	if err := l.validate(); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights,bootstrap_token,per_user_connections) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10,$11,$12) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights, l.bootstrapToken, l.perUserConnections)
+	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_apple_enrollment_layouts(device_id,tenant_id,profile_uuid,mdm_uuid,identity_uuid,ca_uuid,identity_type,public_url,topic,access_rights,bootstrap_token,per_user_connections,removal_disallowed) VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(device_id) DO NOTHING`, deviceID, tenant, l.profileUUID, l.mdmUUID, l.identityUUID, l.caUUID, l.identityType, l.publicURL, l.topic, l.accessRights, l.bootstrapToken, l.perUserConnections, l.removalDisallowed)
 	return err
 }
 
 func loadEnrollmentLayout(ctx context.Context, tx *sql.Tx, deviceID string) (*enrollmentLayout, error) {
 	var l enrollmentLayout
-	var allowed bool
+	var allowed, removalDisallowed bool
 	var platform Platform
-	err := tx.QueryRowContext(ctx, `SELECT l.profile_uuid,l.mdm_uuid,l.identity_uuid,COALESCE(l.ca_uuid,''),l.identity_type,l.public_url,l.topic,l.access_rights,l.bootstrap_token,l.per_user_connections,d.device_lock_allowed,d.enrollment_platform FROM mdm_apple_enrollment_layouts l JOIN mdm_apple_devices d ON d.id=l.device_id AND d.tenant_id=l.tenant_id WHERE l.device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken, &l.perUserConnections, &allowed, &platform)
+	err := tx.QueryRowContext(ctx, `SELECT l.profile_uuid,l.mdm_uuid,l.identity_uuid,COALESCE(l.ca_uuid,''),l.identity_type,l.public_url,l.topic,l.access_rights,l.bootstrap_token,l.per_user_connections,d.device_lock_allowed,d.enrollment_platform,l.removal_disallowed,d.removal_disallowed FROM mdm_apple_enrollment_layouts l JOIN mdm_apple_devices d ON d.id=l.device_id AND d.tenant_id=l.tenant_id WHERE l.device_id=$1`, deviceID).Scan(&l.profileUUID, &l.mdmUUID, &l.identityUUID, &l.caUUID, &l.identityType, &l.publicURL, &l.topic, &l.accessRights, &l.bootstrapToken, &l.perUserConnections, &allowed, &platform, &l.removalDisallowed, &removalDisallowed)
 	if err != nil {
 		return nil, notFound(err)
 	}
-	if l.accessRights != enrollmentRights(allowed) || (allowed && platform != PlatformMacOS) {
+	if l.accessRights != enrollmentRights(allowed) || (allowed && platform != PlatformMacOS) || l.removalDisallowed != removalDisallowed {
 		return nil, ErrConflict
 	}
 	return &l, l.validate()
@@ -102,6 +103,9 @@ func (s *Store) recoverEnrollmentLayout(ctx context.Context, tx *sql.Tx, d *Devi
 		return ErrConflict
 	}
 	l := enrollmentLayout{profileUUID: found.UUID, accessRights: enrollmentRights(allowed), perUserConnections: d.PerUserConnections, bootstrapToken: d.Family() == PlatformMacOS}
+	if err := tx.QueryRowContext(ctx, `SELECT removal_disallowed FROM mdm_apple_devices WHERE tenant_id=$1 AND id=$2`, d.TenantID, d.ID).Scan(&l.removalDisallowed); err != nil {
+		return err
+	}
 	seen := make(map[string]bool)
 	for _, p := range found.Payloads {
 		if seen[p.Identifier] || p.UUID == "" {

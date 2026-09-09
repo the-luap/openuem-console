@@ -159,11 +159,28 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	adeThrottled.SyncError = "throttled"
 	adeThrottled.RetryAfter = &vendorExpires
 	adeDevices := []apple.ADEDevice{{Serial: "SYNTHETIC1", Model: "MacBook Pro", Family: "Mac", OS: "OSX", ProfileStatus: "empty", Assigned: true, ObservedAt: now}, {Serial: "SYNTHETIC2", Model: "iPhone", Family: "iPhone", OS: "iOS", ProfileStatus: "removed", ObservedAt: now}}
+	adeProfile := apple.ADEEnrollmentProfile{ID: "c0000000-0000-4000-8000-000000000001", ServerID: adeServer.ID, Name: "Corporate Mac <profile>", SiteID: 1, Platform: apple.PlatformMacOS, Status: "published", RemoteID: "SYNTHETICREMOTE1", AwaitConfiguration: true, DeviceLockAllowed: true}
+	adeUnknown := adeProfile
+	adeUnknown.ID = "c0000000-0000-4000-8000-000000000002"
+	adeUnknown.Status = "unknown"
+	adeUnknown.RemoteID = ""
+	adeUnknown.Error = "publication_uncertain"
+	adeEnrollment := ADEEnrollment{Profiles: []apple.ADEEnrollmentProfile{adeProfile, adeUnknown}, Targets: []apple.ADETarget{{Serial: "SYNTHETIC1", ProfileID: adeProfile.ID, Status: "accepted"}, {Serial: "SYNTHETIC2", ProfileID: adeProfile.ID, Status: "observed", DeviceID: mac.ID, DeviceStatus: "revoked", SetupState: "cancelled", ObservedAt: &now}}, Next: "SYNTHETIC2"}
+	adeMac := mac
+	adeMac.EnrollmentMethod = "automated_device"
+	adeDetail := macDetail
+	adeDetail.Device = &adeMac
+	adeDetail.ADE = &apple.ADEDeviceEnrollment{ServerID: adeServer.ID, ProfileID: adeProfile.ID, ProfileName: adeProfile.Name, SetupState: "failed", SetupError: "command_failed", SetupUpdatedAt: &now}
+	adeDetail.Commands = []apple.Command{{ID: "c0000000-0000-4000-8000-000000000003", RequestType: "DeviceConfigured", Status: "failed", ADESetup: true}}
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"ade-enrollment", ADE(c, info, []apple.ADEServer{adeServer}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Queue profile publication", "Publication outcome unknown", "Assignment accepted; verification pending", "Allow next activation", "Corporate Mac &lt;profile&gt;", "Next enrollments"}},
+		{"ade-enrollment-disabled", ADE(c, info, []apple.ADEServer{adeDisabled}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Apple assignment verified", "Corporate Mac &lt;profile&gt;"}},
+		{"ade-setup-failed", DeviceDetails(c, info, adeDetail), []string{"Automated Device Enrollment", "Retry setup release", "Removal disallowed"}},
+		{"ade-setup-reader", DeviceDetails(c, &reader, adeDetail), []string{"Automated Device Enrollment", "Removal disallowed"}},
 		{"mac-recovery-new", DeviceDetails(c, info, recoveryDetail("new")), []string{"Set a Recovery Lock password", "Import an existing Recovery Lock password", "confirm_recovery_lock"}},
 		{"mac-recovery-verified", DeviceDetails(c, info, recoveryDetail("verified")), []string{"Rotate the Recovery Lock password", "Remove the Recovery Lock password", "Retrieve Recovery Lock password"}},
 		{"mac-recovery-checking", DeviceDetails(c, info, recoveryDetail("checking")), []string{"verify the current password before changing it"}},
@@ -218,6 +235,15 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if strings.HasPrefix(tc.name, "ade-setup-") && strings.Contains(html, "commands/c0000000-0000-4000-8000-000000000003/retry") {
+				t.Fatal("setup command exposes generic retry")
+			}
+			if tc.name == "ade-setup-reader" && strings.Contains(html, "setup/retry") {
+				t.Fatal("viewer has setup retry controls")
+			}
+			if tc.name == "ade-enrollment-disabled" && (strings.Contains(html, "Queue profile publication") || strings.Contains(html, "Save desired assignments") || strings.Contains(html, "Allow next activation")) {
+				t.Fatal("disabled connection permits enrollment mutation")
+			}
 			if tc.name == "mac-filevault-rotation-awaiting-stop" && (strings.Contains(html, "Validate current recovery key") || strings.Contains(html, "Rotate current recovery key")) {
 				t.Fatal("FileVault recovery actions offered without stopping evidence")
 			}

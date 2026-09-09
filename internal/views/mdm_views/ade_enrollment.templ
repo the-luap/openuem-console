@@ -1,0 +1,222 @@
+package mdm_views
+
+import (
+	"fmt"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data ADEEnrollment) {
+	<section class="uk-card uk-card-default" aria-labelledby="ade-profile-title">
+		<div class="uk-card-header"><h2 id="ade-profile-title" class="uk-card-title">4. Publish an enrollment profile</h2></div>
+		<div class="uk-card-body space-y-4">
+			<p>A profile fixes the enrollment site, platform and management rights. Create a new version to change them. Publication creates the profile at Apple; device assignment is a separate step. Up to 256 versions are retained per connection.</p>
+			if server.Status=="connected" && info.Can(access.EnrollDevices) {
+				<details>
+					<summary class="font-semibold cursor-pointer">Create profile version</summary>
+					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/ade/servers/"+server.ID+"/profiles") } class="ade-profile-form mt-4">
+						@CSRF(info)
+						<label>Profile name<input class="uk-input" name="name" required maxlength="125" placeholder="Corporate Mac setup"/></label>
+						if info.SiteID=="-1" {
+							<label>
+								Enrollment site
+								<select class="uk-select" name="site_id" required>
+									<option value="">Select a site</option>
+									for _,site:=range info.Sites {
+										<option value={ Number(site.ID) }>{ site.Description }</option>
+									}
+								</select>
+							</label>
+						} else {
+							<input type="hidden" name="site_id" value={ info.SiteID }/>
+						}
+						<label>Platform<select class="uk-select" name="platform" required><option value="macos">Mac</option><option value="ios">iPhone</option><option value="ipados">iPad</option></select></label>
+						<label>User removal of management<select class="uk-select" name="removal" required><option value="">Choose removal policy</option><option value="disallowed">Disallow removal</option><option value="allowed">Allow removal</option></select></label>
+						<p>Enrollment is mandatory and requests supervision. Disallowing removal also applies to future identity renewals. Revoking server access does not remove the profile from the device.</p>
+						<label><input class="uk-checkbox" type="checkbox" name="await_configuration" value="yes" checked/> Hold Setup Assistant until current inventory and assigned configuration profiles are verified</label>
+						<label><input class="uk-checkbox" type="checkbox" name="ignore_backup_profile" value="yes" checked/> Use this profile instead of an enrollment profile restored from backup</label>
+						if info.Can(access.ManageDeviceSecurity) {
+							<label><input class="uk-checkbox" type="checkbox" name="allow_device_lock" value="yes"/> Allow Recovery Lock and device lock management (Mac only)</label>
+						}
+						<label><input class="uk-checkbox" type="checkbox" name="auto_advance" value="yes"/> Automatically advance supported Setup Assistant screens (Mac only)</label>
+						<details>
+							<summary class="cursor-pointer">Support details and Setup Assistant screens</summary>
+							<label>Department<input class="uk-input" name="department" maxlength="125"/></label>
+							<label>Support email<input class="uk-input" type="email" name="support_email" maxlength="250"/></label>
+							<label>Support phone<input class="uk-input" name="support_phone" maxlength="50"/></label>
+							<label>Screens to skip<textarea class="uk-textarea" name="skip_setup_items" rows="2" maxlength="2048" placeholder="Siri, Appearance, ScreenTime"></textarea></label>
+							<p class="uk-text-muted">Enter Apple's case-sensitive Setup Assistant keys, separated by commas. Only supported keys are accepted; availability depends on the platform and OS version.</p>
+						</details>
+						<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Publish this immutable profile with the selected site and management rights.</label>
+						<button class="uk-button uk-button-primary" type="submit" disabled?={ len(data.Profiles)>=256 }>Queue profile publication</button>
+					</form>
+				</details>
+			}
+			if len(data.Profiles)==0 {
+				<p class="uk-text-muted">No enrollment profiles have been created for this connection.</p>
+			}
+			for _,p:=range data.Profiles {
+				<article class="ade-profile-version">
+					<h3 class="font-semibold">{ p.Name } · { adeEnrollmentState(p.Status) }</h3>
+					<p>
+						{ fmt.Sprintf("%s · Site %d",p.Platform,p.SiteID) } ·
+						if p.Removable {
+							Removal allowed
+						} else {
+							Removal disallowed
+						}
+						·
+						if p.AwaitConfiguration {
+							Setup hold requested
+						} else {
+							Setup hold not requested
+						}
+					</p>
+					if p.DeviceLockAllowed {
+						<p>Recovery Lock and device lock management allowed</p>
+					}
+					<p class="uk-text-muted">
+						Profile: { p.ID }
+						<br/>
+						Apple profile: { Show(p.RemoteID) }
+						<br/>
+						Last attempt: { When(p.AttemptedAt) }
+						<br/>
+						Next scheduled attempt: { When(&p.NextAttemptAt) }
+					</p>
+					if p.Error!="" {
+						<p role="status">
+							Publication status: { stringsForADEError(p.Error) }
+						</p>
+					}
+					if p.Status=="unknown" && server.Status=="connected" {
+						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/ade/servers/"+server.ID+"/profiles/"+p.ID+"/action") }>
+							@CSRF(info)
+							<input type="hidden" name="operation" value="retry"/>
+							<p>Apple may have created an unassigned profile before the response was lost. Retrying can create another profile. Check Apple before explicitly retrying this publication.</p>
+							<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Retry publication despite the unknown previous outcome.</label>
+							<button class="uk-button uk-button-default" type="submit">Retry publication</button>
+						</form>
+					}
+					if p.Status!="disabled" && p.Status!="publishing" {
+						<details>
+							<summary class="cursor-pointer">Disable this version</summary>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/ade/servers/"+server.ID+"/profiles/"+p.ID+"/action") }>
+								@CSRF(info)
+								<input type="hidden" name="operation" value="disable"/>
+								<p>First move or clear every desired assignment using this version. Disabling stops new admission; it does not delete Apple's copy or revoke existing MDM identities.</p>
+								<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Disable this enrollment profile version.</label>
+								<button class="uk-button uk-button-danger" type="submit">Disable version</button>
+							</form>
+						</details>
+					}
+				</article>
+			}
+		</div>
+	</section>
+	<section class="uk-card uk-card-default" aria-labelledby="ade-target-title">
+		<div class="uk-card-header"><h2 id="ade-target-title" class="uk-card-title">5. Assign profiles and track enrollment</h2></div>
+		<div class="uk-card-body space-y-4">
+			<p>Assignments apply at the next device activation. OpenUEM verifies the current Apple assignment before admitting a device. Existing MDM enrollment is retained when a future assignment changes or is cleared.</p>
+			if server.Status=="connected" {
+				<form method="post" action={ partials.GetNavigationUrl(info, "/ios/ade/servers/"+server.ID+"/targets") }>
+					@CSRF(info)
+					<label>
+						Desired Apple profile
+						<select class="uk-select" name="profile_id" required>
+							<option value="">Select an action</option>
+							for _,p:=range data.Profiles {
+								if p.Status=="published" {
+									<option value={ p.ID }>{ p.Name } · { p.Platform } · Site { Number(p.SiteID) } · { p.ID }</option>
+								}
+							}
+							<option value="clear">Clear Apple profile assignment</option>
+						</select>
+					</label>
+					<label>Device serial numbers<textarea class="uk-textarea" name="serials" rows="3" required maxlength="65000" placeholder="One serial number per line"></textarea></label>
+					<p class="uk-text-muted">Up to 1,000 unique serial numbers from this connection's current synchronized inventory. Apple's retry deadlines still apply when you submit again.</p>
+					<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Apply this desired assignment to the listed devices.</label>
+					<button class="uk-button uk-button-primary" type="submit">Save desired assignments</button>
+				</form>
+			}
+			if len(data.Targets)==0 {
+				<p class="uk-text-muted">No desired assignments on this page.</p>
+			} else {
+				<div class="ade-table" tabindex="0" role="region" aria-label="Scrollable enrollment assignments">
+					<table class="uk-table uk-table-divider">
+						<thead><tr><th>Device</th><th>Desired assignment</th><th>Apple observation</th><th>Enrollment</th></tr></thead>
+						<tbody>
+							for _,t:=range data.Targets {
+								<tr>
+									<td>{ t.Serial }</td>
+									<td>{ adeProfileName(data.Profiles,t.ProfileID) }<br/>{ adeEnrollmentState(t.Status) }<br/>{ Show(t.ResponseStatus) }<br/>Next check: { When(&t.NextAttemptAt) }</td>
+									<td>{ Show(t.RemoteProfileID) }<br/>{ Show(t.RemoteStatus) }<br/>{ When(t.ObservedAt) }</td>
+									<td>
+										if t.DeviceID!="" {
+											<a class="uk-link" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+t.DeviceID)) }>{ StateLabel(t.DeviceStatus) }</a>
+											<br/>
+											{ adeEnrollmentState(t.SetupState) }
+										} else {
+											Waiting for device activation
+										}
+										if server.Status=="connected" && t.ProfileID!="" && (t.DeviceStatus=="revoked" || t.DeviceStatus=="unenrolled") {
+											<details>
+												<summary class="cursor-pointer">Allow another activation</summary>
+												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/ade/servers/"+server.ID+"/targets/"+t.Serial+"/rearm") }>
+													@CSRF(info)
+													<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Authorize a new enrollment identity for the next activation.</label>
+													<button class="uk-button uk-button-default" type="submit">Allow next activation</button>
+												</form>
+											</details>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+			<nav aria-label="Enrollment assignment pages" class="flex flex-wrap gap-4">
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, adeTargetPage(server.ID, ""))) }>First page / refresh enrollments</a>
+				if data.Next!="" {
+					<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, adeTargetPage(server.ID, data.Next))) }>Next enrollments</a>
+				}
+			</nav>
+		</div>
+	</section>
+}
+
+templ ADEDevicePanel(info *partials.CommonInfo, detail Detail) {
+	if detail.ADE!=nil {
+		<section class="uk-card uk-card-default" aria-labelledby="ade-device-title">
+			<div class="uk-card-header"><h2 id="ade-device-title" class="uk-card-title">Automated Device Enrollment</h2></div>
+			<div class="uk-card-body space-y-4">
+				<p>
+					Profile: { detail.ADE.ProfileName } ·
+					if detail.ADE.Removable {
+						Removal allowed
+					} else {
+						Removal disallowed
+					}
+				</p>
+				<p class="font-semibold" role="status">
+					{ adeEnrollmentState(detail.ADE.SetupState) }
+				</p>
+				<p>
+					{ adeSetupMessage(detail.ADE) }
+				</p>
+				<p class="uk-text-muted">
+					Last setup update: { When(detail.ADE.SetupUpdatedAt) }
+				</p>
+				if detail.Device.Status=="enrolled" && detail.ADE.SetupState=="failed" && info.Can(access.EnrollDevices) {
+					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/retry") }>
+						@CSRF(info)
+						<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Verify current configuration and retry release of the MDM setup hold.</label>
+						<button class="uk-button uk-button-default" type="submit">Retry setup release</button>
+					</form>
+				}
+			</div>
+		</section>
+	}
+}

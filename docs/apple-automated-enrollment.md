@@ -1,13 +1,13 @@
-# Apple Automated Device Enrollment connections
+# Apple Automated Device Enrollment
 
-OpenUEM can connect an organization to an Apple Business Manager or Apple School
-Manager device management server, verify and renew its server token, and
-synchronize its assigned device inventory. This is the connection and inventory
-foundation of APP-02. The public workflow does not yet provide ADE enrollment
-profile creation or assignment, signed activation requests, Setup Assistant
-enrollment, or re-enrollment. Tested internal protocol primitives described below
-prepare that integration. An Apple assignment never creates an enrolled OpenUEM device or
-sets supervision evidence.
+OpenUEM connects an organization to an Apple Business Manager or Apple School
+Manager device management server, verifies and renews its token, synchronizes
+assigned devices, and publishes immutable enrollment profiles. Operators can
+assign or clear profiles, admit signed device activation requests, and track the
+MDM configuration hold in Setup Assistant. An Apple assignment does not create
+an enrolled device or establish supervision: SCEP and authenticated device
+check-in are still required. APP-02 remains open for groups/rings, directory
+associations and production Apple/device acceptance.
 
 ## Connect an Apple server
 
@@ -109,13 +109,98 @@ through 100 records at a time, scoped to the selected organization and connectio
 It shows both assigned and removed records, Apple profile status and observation
 time. Reading the ADE page is audited without storing inventory contents.
 
+## Publish and assign enrollment profiles
+
+After configuring APNs and completing the first Apple inventory synchronization,
+open **Create profile version** on the connection page. Select a site, platform,
+removal policy and Setup Assistant options, then confirm publication. Profiles
+request mandatory supervised enrollment. Optional Mac lock rights require
+`devices.security.manage`; creating a profile and assigning it for activation
+also require `devices.enroll` in its immutable site. Whole-organization
+`certificates.manage` is required for every connection/profile/assignment action.
+Setup release retry uses `devices.enroll` in the device scope.
+
+The profile definition and private activation selector are encrypted at rest.
+Only its selector hash is indexed. The UI and audit expose scope, identifiers,
+rights and state, never the callback selector or SCEP retry credential. The site,
+platform, removal policy and lock rights cannot change after creation. Existing
+profiles also prevent changing the public enrollment origin. Create another
+version for changed options; up to 256 retained versions are supported per
+connection. Publishing does not assign any device automatically.
+
+Publication commits an attempt identifier before contacting Apple. A lost response
+or interrupted attempt becomes **Publication outcome unknown**; the worker does
+not automatically repeat that creation. Check Apple before using the explicit
+confirmed retry: a previous unassigned Apple profile may already exist. A failed
+local audit/commit after Apple responds also retains the durable attempt for
+this recovery path. Preflight failures that occur before creation can retry
+according to the stored deadline.
+
+Under **Assign profiles and track enrollment**, select a published profile or
+**Clear Apple profile assignment** and enter up to 1,000 unique serial numbers
+from the connection's synchronized inventory. Saving commits desired state and
+audit before a separate worker contacts Apple. The worker first verifies the
+account and device details, then applies the desired assignment. Apple's accepted
+response is displayed separately from its subsequent verified observation and
+from authenticated MDM enrollment. Per-device and connection retry deadlines
+survive repeated operator submissions. Inaccessible or omitted devices never
+provide permission to mutate their assignment.
+
+Clearing an assignment stops future admission and schedules removal of the Apple
+profile assignment; it does not revoke the existing MDM identity. To allow a new
+activation after reinstallation, first revoke the prior enrollment or receive its
+authenticated CheckOut, then confirm **Allow next activation**. This creates a
+new admission generation; prior certificates and activation retries cannot
+revive the old identity. A profile version can be disabled after all desired
+assignments have moved or been cleared. Disabling does not delete Apple's copy.
+
+## Signed activation and MDM setup
+
+The public gateway admits only canonical `POST /mdm/apple/ade/<selector>` requests
+without a query string. The protocol endpoint requires completed TLS, bounds and
+rate-limits input, and verifies the signed Apple MachineInfo statement before
+looking up admission. It rechecks the live Apple account, explicit successful
+device details, exact assigned profile identifier, and all supported remote
+profile options against the immutable definition. Platform must match the
+selected profile. A synchronized inventory row alone cannot authorize enrollment.
+
+One admission generation binds the serial number, UDID, signing certificate
+fingerprint, site and profile. When present, signingTime must be within the past
+hour and no more than five minutes in the future for a new admission; omitted
+timestamps remain supported. This is not a nonce or hardware attestation.
+Concurrent valid retries return the same encrypted-at-rest enrollment profile,
+without extending its one-hour SCEP deadline. Device-generated SCEP key proof and
+initial Authenticate must match the admitted identity while it is still armed.
+Successful check-in clears the retry profile; expiration and revocation also
+remove it. The database stores the UDID on the managed device only after
+Authenticate. TokenUpdate establishes enrollment and records actual push and
+setup state. Later inventory cannot substitute a different serial or UDID.
+
+A nonremovable ADE profile retains that policy during identity renewal and layout
+recovery. Device lock rights are likewise fixed at enrollment. Revoking server
+access does not remove a nonremovable profile from the device.
+
+When requested, Setup Assistant's MDM hold waits for current DeviceInformation
+and ProfileList inventory and every currently assigned configuration profile to
+be verified in its desired state. An empty assignment set can proceed after the
+inventory checks. This workflow does not yet provide group-based setup policy or
+managed administrator account provisioning. The hold is not a promise to wait for
+future assignments that an operator has not saved.
+
+OpenUEM queues DeviceConfigured only after these checks. NotNow preserves device
+backoff; a failed or expired command requires an explicit retry that first asks
+for fresh state. Its delivery acknowledgement queues another DeviceInformation
+request and does not complete setup. Only an authenticated
+`AwaitingConfiguration=false` report marks the MDM hold released; late true
+reports cannot reopen it. This does not confirm completion of every Setup
+Assistant screen, local account setup or the user's desktop session. CheckOut
+and revocation cancel unfinished setup. Apple's report is documented in
+[TokenUpdateRequest](https://developer.apple.com/documentation/devicemanagement/tokenupdaterequest).
+
 ## Enrollment protocol primitives
 
-The internal ADE client now supports defining an enrollment profile, reading its
-supported options, assigning or clearing a profile for a bounded batch, and
-refreshing individual device assignments. These operations are not yet connected
-to an administrator action, background enrollment workflow or public activation
-route. No existing connection starts assigning profiles because of this change.
+The ADE client implements bounded definition/retrieval, per-device assignment and
+removal, and current device-detail lookup for the persisted workflows above.
 
 Profile definition does not include device assignments. A service error can leave
 an unknown creation outcome and is not automatically retried. Assignment and
@@ -157,11 +242,9 @@ and publishes the device CA and date exception in its
 [OTA profile server documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/iPhoneOTAConfiguration/profile-service/profile-service.html).
 
 A verified statement is not hardware attestation, current ADE ownership or an
-enrolled MDM identity. The pending integration must still check the live Apple
-account/profile assignment, persist bounded admission and replay state, verify
-the device-generated SCEP key and subsequent check-in identity, and reconcile
-Setup Assistant from authenticated device evidence. The parser alone cannot
-authorize enrollment or release Setup Assistant.
+enrolled MDM identity. Admission combines it with live assignment checks,
+persisted generation/retry state, SCEP key proof and authenticated check-in.
+The parser alone cannot authorize enrollment or release Setup Assistant.
 
 ## Verification and remaining acceptance
 
@@ -189,7 +272,7 @@ ordering, backoff, cursor resets, concurrent owners, disabling, paged inventory
 and revoked transaction permissions. Real console router tests exercise scoped
 roles, aliases, CSRF, multipart ambiguity, public certificate downloads and fixed
 error messages. The native Apple CI includes the ADE package and PostgreSQL tests.
-Local PostgreSQL was unavailable during this change. The full
+Local PostgreSQL was unavailable during the earlier connection slice. Its full
 [PostgreSQL race, console and build CI](https://github.com/the-luap/openuem-console/actions/runs/34299243491)
 passed for the connection and synchronization implementation. Local parser
 regressions also reject case-folded duplicate keys and classify unchanged
@@ -201,10 +284,18 @@ Rendered empty, pending, connected, disabled and throttled states were checked a
 intercepted locally; disabling required its confirmation checkbox. No credentials
 were sent to Apple and no real device or Apple assignment was changed.
 
-APP-02 remains open for the administrator profile definition/assignment/removal
-workflow, persisted signed enrollment admission, Setup Assistant handling, re-enrollment,
-groups/rings and directory associations. Native managed administrator accounts
-require the corresponding ADE setup-time workflow; this inventory foundation
-does not provide account creation or password rotation. Apps & Books, production
-Apple account acceptance, physical Mac/iPhone/iPad setup, recipient-certificate
-rotation and operational-scale acceptance remain outstanding.
+The durable enrollment integration adds PostgreSQL tests for publication and
+unknown-outcome recovery, audit rollback, desired assignment persistence,
+per-device throttling, concurrent admissions, live ownership/profile mismatch,
+SCEP/check-in identity binding, re-arming, actual setup state, NotNow, failure,
+explicit retry freshness and nonremovable identity renewal. The focused admission
+and setup suite passed locally before the broad local regression run exhausted
+available disk space and stopped the isolated PostgreSQL instance. Full regression,
+router/rendering and race evidence is recorded with the branch CI result.
+
+APP-02 remains open for groups/rings, directory associations, recipient-certificate
+rotation and production Apple/device acceptance. Native managed administrator
+accounts, Platform SSO enrollment, Apps & Books, physical Mac/iPhone/iPad setup
+and operational-scale acceptance remain outstanding. No real Apple account,
+device assignment, device lock, password or local account was mutated by the
+synthetic implementation tests.

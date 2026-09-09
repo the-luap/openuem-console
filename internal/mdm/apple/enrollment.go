@@ -151,11 +151,11 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 		}
 		if oldURL != c.PublicURL {
 			var active bool
-			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_devices WHERE tenant_id=$1 AND status IN ('authenticating','enrolled'))`, c.TenantID).Scan(&active); err != nil {
+			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_devices WHERE tenant_id=$1 AND status IN ('authenticating','enrolled')) OR EXISTS(SELECT 1 FROM mdm_apple_ade_profiles WHERE tenant_id=$1 AND status<>'disabled')`, c.TenantID).Scan(&active); err != nil {
 				return err
 			}
 			if active {
-				return errors.New("the public MDM URL cannot change while enrolled devices use it")
+				return errors.New("the public MDM URL cannot change while enrollments or active ADE profiles use it")
 			}
 		}
 		c.CACertificate = oldCA

@@ -234,7 +234,13 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								{ "No" }
 							}
 						</dd>
-						<dt>Enrollment method</dt><dd>Manual device enrollment</dd>
+						<dt>Enrollment method</dt><dd>
+if detail.Device.EnrollmentMethod=="automated_device" {
+Automated Device Enrollment
+} else {
+Manual device enrollment
+}
+</dd>
 						<dt>Management channel</dt><dd>Device channel · System profiles</dd>
 						<dt>Last contact</dt>
 						<dd>{ When(detail.Device.LastSeen) }</dd>
@@ -272,6 +278,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				</div>
 			</section>
 			@DeviceIdentity(detail)
+			@ADEDevicePanel(info,detail)
 			@MacCapabilities(detail.Device)
 			if detail.Device.Family()==apple.PlatformMacOS {
 				@MacUsers(info,detail.Device,detail.Users)
@@ -403,7 +410,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
 									<td>
 										{ cmd.Error }
-										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
+										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && !cmd.ADESetup && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {
 											if info.Can(access.AssignProfiles) {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/commands/"+cmd.ID+"/retry") }>
 													@CSRF(info)

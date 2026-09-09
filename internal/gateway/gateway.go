@@ -217,7 +217,7 @@ func appleDeviceRoute(r *http.Request) bool {
 		renewal, err := uuid.Parse(parts[5])
 		return err == nil && renewal.String() == parts[5]
 	}
-	if parts[3] == "enroll" && (r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodPost) {
+	if (parts[3] == "enroll" && (r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodPost)) || (parts[3] == "ade" && r.Method == http.MethodPost && r.URL.RawQuery == "" && !r.URL.ForceQuery) {
 		if len(parts[4]) != 43 {
 			return false
 		}

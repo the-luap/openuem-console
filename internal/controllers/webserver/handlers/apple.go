@@ -34,6 +34,11 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/ios/ade/servers/:id/certificate", h.AppleADECertificate)
 		g.POST("/ios/ade/servers/:id/token", h.AppleImportADEToken)
 		g.POST("/ios/ade/servers/:id/action", h.AppleChangeADEServer)
+		g.POST("/ios/ade/servers/:id/profiles", h.AppleCreateADEProfile)
+		g.POST("/ios/ade/servers/:id/profiles/:profile/action", h.AppleChangeADEProfile)
+		g.POST("/ios/ade/servers/:id/targets", h.AppleSetADETargets)
+		g.POST("/ios/ade/servers/:id/targets/:serial/rearm", h.AppleRearmADETarget)
+		g.POST("/ios/:id/setup/retry", h.AppleRetryADESetup)
 		g.POST("/ios/:id/recovery-lock", h.AppleRecoveryLock)
 		g.POST("/ios/:id/recovery-lock/passwords/:key/reveal", h.AppleRecoveryLockPassword)
 		g.POST("/ios/setup", h.AppleSettings)
@@ -421,6 +426,10 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 		return appleFailure(err)
 	}
 	detail := mdm_views.Detail{Device: d, Mac: mac}
+	detail.ADE, err = h.Apple.ADEDeviceEnrollment(c.Request().Context(), scope, id)
+	if err != nil {
+		return appleFailure(err)
+	}
 	if mac != nil && info.Principal.IsAdministrator() {
 		var available bool
 		if err = h.Model.DB.QueryRowContext(c.Request().Context(), `SELECT EXISTS(SELECT 1 FROM agents a JOIN site_agents sa ON sa.agent_id=a.oid WHERE a.oid=$1 AND sa.site_id=$2 AND (SELECT count(*) FROM site_agents WHERE agent_id=a.oid)=1)`, mac.AgentID, d.SiteID).Scan(&available); err != nil {
