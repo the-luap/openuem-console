@@ -10,8 +10,9 @@ and cancellation of undelivered remaining steps.
 This is update-policy management. A verified run confirms the values returned by
 the device's policy CSP. It does not prove update download, installation, restart,
 patch compliance, licensing or physical device acceptance. Production routes,
-console forms, reusable versioned ring definitions and scheduled group rollout
-remain separate implementation work.
+console forms and scheduled group rollout remain separate implementation work.
+[Versioned update rings and explicit cohorts](native-windows-update-rings.md) now
+reuse these device runs with protected source provenance.
 
 ## Typed intent and authority
 
@@ -195,7 +196,7 @@ with active/blocked reads, collection-window boundaries, reassigned read trees,
 and queued/sent legacy runs across migration. A real loopback TLS exchange
 advances all seven steps on resumed connections and verifies the full policy.
 
-The full local PostgreSQL 17/race suite passes in **69.105 seconds**, at **85.5%**
+The batching extension's local PostgreSQL 17/race suite passes in **69.105 seconds**, at **85.5%**
 package statement coverage. The extended typed policy fuzz target, including both
 compiler versions and exact batch reassembly, passes **23,726 executions** in its
 30-second local run. Vet and formatting checks pass.
@@ -209,7 +210,7 @@ go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=30s -parallel=2 ./interna
 
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 No fixture installs a policy/certificate, changes Windows settings or executes a
-host command. Remaining work includes reusable/versioned rings, scheduled group
-assignments, outgoing chunking for large trees, console and production wiring,
+host command. Remaining work includes dynamic groups, scheduled assignments and
+pilot promotion gates, outgoing chunking for large trees, console and production wiring,
 continuous compliance and async reconciliation, actual update/restart evidence,
 renewal/unenrollment, provider integrations and physical Windows acceptance.

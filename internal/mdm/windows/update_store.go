@@ -25,6 +25,9 @@ type UpdateRun struct {
 	Mode              string
 	CreatedAt         time.Time
 	ExpiresAt         time.Time
+	RingID            string
+	RingRevision      int64
+	RolloutID         string
 }
 
 type updateStoredRun struct {
@@ -43,11 +46,11 @@ func (v UpdateRun) GoString() string    { return v.String() }
 func (updateIntent) String() string     { return "[protected Windows update intent]" }
 func (v updateIntent) GoString() string { return v.String() }
 
-const updateRunColumns = `id,device_id,tenant_id,site_id,request_key,created_by,created_by_revision,mode,created_at,expires_at,encrypted_intent`
+const updateRunColumns = `id,device_id,tenant_id,site_id,request_key,created_by,created_by_revision,mode,created_at,expires_at,encrypted_intent,COALESCE(ring_id::text,''),COALESCE(ring_revision,0),COALESCE(rollout_id::text,'')`
 
 func scanUpdateRun(row cspScanner) (*updateStoredRun, error) {
 	run := &updateStoredRun{}
-	err := row.Scan(&run.ID, &run.DeviceID, &run.TenantID, &run.SiteID, &run.RequestKey, &run.CreatedBy, &run.CreatedByRevision, &run.Mode, &run.CreatedAt, &run.ExpiresAt, &run.encrypted)
+	err := row.Scan(&run.ID, &run.DeviceID, &run.TenantID, &run.SiteID, &run.RequestKey, &run.CreatedBy, &run.CreatedByRevision, &run.Mode, &run.CreatedAt, &run.ExpiresAt, &run.encrypted, &run.RingID, &run.RingRevision, &run.RolloutID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -58,10 +61,17 @@ func scanUpdateRun(row cspScanner) (*updateStoredRun, error) {
 }
 
 func updateRunPurpose(run *updateStoredRun) string {
-	return fmt.Sprintf("openuem/windows/update-intent/v1/%s/%s/%d/%d/%s/%x/%d/%s/%s/%s", run.ID, run.DeviceID, run.TenantID, run.SiteID, run.RequestKey, sha256.Sum256([]byte(run.CreatedBy)), run.CreatedByRevision, run.Mode, run.CreatedAt.UTC().Format(time.RFC3339Nano), run.ExpiresAt.UTC().Format(time.RFC3339Nano))
+	purpose := fmt.Sprintf("openuem/windows/update-intent/v1/%s/%s/%d/%d/%s/%x/%d/%s/%s/%s", run.ID, run.DeviceID, run.TenantID, run.SiteID, run.RequestKey, sha256.Sum256([]byte(run.CreatedBy)), run.CreatedByRevision, run.Mode, run.CreatedAt.UTC().Format(time.RFC3339Nano), run.ExpiresAt.UTC().Format(time.RFC3339Nano))
+	if run.RingID != "" {
+		purpose += fmt.Sprintf("/ring/%s/%d/rollout/%s", run.RingID, run.RingRevision, run.RolloutID)
+	}
+	return purpose
 }
 
 func (s *Store) openUpdateRun(run *updateStoredRun) (*updateIntent, error) {
+	if (run.RingID == "" && (run.RingRevision != 0 || run.RolloutID != "")) || (run.RingID != "" && (!canonicalInvitationID(run.RingID) || run.RingRevision < 1 || !canonicalInvitationID(run.RolloutID))) {
+		return nil, ErrAuthoritySecret
+	}
 	plain, err := s.secrets.openBounded(run.encrypted, updateRunPurpose(run), 8192)
 	if err != nil {
 		return nil, err
@@ -150,6 +160,24 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 	if s.secrets == nil {
 		return nil, ErrMasterKey
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	run, err := s.enqueueUpdatePolicyTx(ctx, tx, actor, scope, deviceID, requestKey, name, policy, remove, validFor, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return run, nil
+}
+
+// The caller owns the transaction so a reviewed ring cohort can be admitted all
+// together. All normal device, authority, queue, audit and deadline checks remain.
+func (s *Store) enqueueUpdatePolicyTx(ctx context.Context, tx *sql.Tx, actor string, scope access.Scope, deviceID, requestKey, name string, policy UpdatePolicy, remove bool, validFor time.Duration, source *updateStoredRollout) (*UpdateRun, error) {
 	if !canonicalInvitationID(requestKey) || len(name) > 128 || !validEnrollmentUsername(name) || validFor < time.Minute || validFor > 7*24*time.Hour || validFor%time.Second != 0 {
 		return nil, ErrUpdatePolicy
 	}
@@ -167,11 +195,6 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 	if remove {
 		mode = "remove"
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 	if err := s.authorizeWindowsConsole(ctx, tx, actor, access.ManageUpdates, scope, deviceID, true); err != nil {
 		return nil, err
 	}
@@ -193,13 +216,10 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 			return nil, ErrAuthoritySecret
 		}
 		defer clear(previousBytes)
-		if old.CreatedBy != actor || old.CreatedByRevision != revision || old.Mode != mode || old.ExpiresAt.Sub(old.CreatedAt) != validFor || !bytes.Equal(encoded, previousBytes) {
+		if !updateRunSourceMatches(old, source) || old.CreatedBy != actor || old.CreatedByRevision != revision || old.Mode != mode || old.ExpiresAt.Sub(old.CreatedAt) != validFor || !bytes.Equal(encoded, previousBytes) {
 			return nil, ErrCSPConflict
 		}
 		if err := auditUpdateRun(ctx, tx, old, actor, "run.replayed"); err != nil {
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
 		return &old.UpdateRun, nil
@@ -222,6 +242,9 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 		return nil, ErrCSPQueueFull
 	}
 	run := &updateStoredRun{UpdateRun: UpdateRun{ID: uuid.NewString(), DeviceID: deviceID, Scope: scope, RequestKey: requestKey, CreatedBy: actor, CreatedByRevision: revision, Mode: mode}}
+	if source != nil {
+		run.RingID, run.RingRevision, run.RolloutID = source.RingID, source.RingRevision, source.ID
+	}
 	if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&run.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -230,7 +253,7 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO mdm_windows_update_runs(id,device_id,tenant_id,site_id,request_key,created_by,created_by_revision,mode,created_at,expires_at,encrypted_intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, run.ID, deviceID, scope.TenantID, scope.SiteID, requestKey, actor, revision, mode, run.CreatedAt, run.ExpiresAt, run.encrypted); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO mdm_windows_update_runs(id,device_id,tenant_id,site_id,request_key,created_by,created_by_revision,mode,created_at,expires_at,encrypted_intent,ring_id,ring_revision,rollout_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,'')::uuid,NULLIF($13,0),NULLIF($14,'')::uuid)`, run.ID, deviceID, scope.TenantID, scope.SiteID, requestKey, actor, revision, mode, run.CreatedAt, run.ExpiresAt, run.encrypted, run.RingID, run.RingRevision, run.RolloutID); err != nil {
 		return nil, err
 	}
 	for step, spec := range commands {
@@ -251,9 +274,6 @@ func (s *Store) EnqueueUpdatePolicy(ctx context.Context, actor string, scope acc
 	if err := checkUpdateRunDeadline(ctx, tx, run); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	return &run.UpdateRun, nil
 }
 
@@ -270,6 +290,9 @@ func (s *Store) updateRunForCommand(ctx context.Context, tx *sql.Tx, c *cspStore
 	}
 	intent, err := s.openUpdateRun(run)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := s.validateUpdateRunSource(ctx, tx, run, intent); err != nil {
 		return nil, nil, err
 	}
 	commands, err := updateRunCommands(intent, run.Mode == "remove")

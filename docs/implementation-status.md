@@ -158,8 +158,10 @@ the table's package summaries do not remove any detail from the roadmap.
   PostgreSQL/race tests pass in 51.294 seconds at 85.4% package coverage, including
   restart, cancellation/audit rollback, permission changes, substituted payloads,
   migration and real TLS delivery of all three stages. The policy fuzz target
-  passes 502,874 executions; full CI for this extension is pending. Versioned
-  rings, scheduled group rollout, console/production wiring, continuous and
+  passes 502,874 executions. Both complete workflows pass for `52cc010`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34414811751),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34414816527)).
+  Scheduled group rollout, console/production wiring, continuous and
   asynchronous reconciliation, actual update/restart results and hardware
   acceptance remain open; verified policy values do not prove patch installation.
 - Windows update compiler version 2 partitions verification into ordered batches
@@ -173,6 +175,17 @@ the table's package summaries do not remove any detail from the roadmap.
   at 85.5% coverage; extended compiler fuzzing passes 23,726 executions. The real
   loopback TLS test verifies all seven steps. Vet and formatting pass; full CI
   for this batching extension remains pending.
+- [Windows update ring revisions and explicit cohorts](native-windows-update-rings.md)
+  add reusable scoped policies, optimistic revision checks, enabled/disabled
+  revisions and immutable history. Atomic cohort assignments retain exact
+  normalized targets and source revisions, with encrypted provenance checked at
+  device delivery/read/replay. Historical removal remains available after ring
+  changes. Concurrent retry, edit, multi-device rollback, audit/source integrity,
+  migration and full ring-bound TLS exchanges are tested. Target fuzzing passes
+  213,552 executions. The full PostgreSQL 17/race suite passes in 73.283 seconds
+  at 84.4% package coverage; Vet and formatting pass. Full CI is pending. Dynamic
+  group selection, scheduling/promotion gates, console wiring and actual patch/restart
+  acceptance remain open.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

@@ -107,8 +107,12 @@ func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	f := syncMLTestEnrolled(t, s, result, options)
 	queued := cspTestQueue(t, f, cspTestPolicy())
 	updatePolicy := updateTestFullPolicy()
-	updateRun := updateTestQueue(t, f, updatePolicy, false)
-	var err error
+	ring := updateTestRing(t, f, updatePolicy)
+	rollout, err := s.AssignUpdateRing(t.Context(), "operator", f.identity.Scope, ring.RingID, ring.Revision, ring.RequestKey, []string{f.identity.DeviceID}, false, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updateRun := rollout.Runs[0]
 	handler, err = NewSyncMLHandler(s, options)
 	if err != nil {
 		t.Fatal(err)
