@@ -131,8 +131,13 @@ spaces/Unicode, zero/false/default values, multipart file/revision binding, scop
 CSRF, keyboard confirmation/submission, and horizontal overflow. File inputs use
 synthetic DataTransfer files and selects are set directly; the OS file picker and
 native select-menu keyboard navigation were not tested. Screenshots were inspected.
-The historical read audit integration is corrected and covered by a persisted
-audit assertion. Full protocol/database CI remains pending.
+The historical read audit integration is covered by a persisted audit assertion.
+Both complete workflows for `461c235` pass: [push](https://github.com/the-luap/openuem-console/actions/runs/34363097659)
+and [pull request](https://github.com/the-luap/openuem-console/actions/runs/34363104564).
+This includes native protocol, persistence, migration/backfill and TLS tests,
+scoped console routes, view rendering, gateway/login/CSRF, existing model tests,
+desktop authorization/services, Linux/Windows builds and protected Windows
+protocol checks.
 
 Physical iPhone, iPad, Apple silicon Mac and T2 Mac acceptance remains necessary
 against the intended issuer. Profile delivery alone does not prove issuance,

@@ -93,6 +93,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if err := validateWiFiEAPPayload(p, scope, nil); err != nil {
+			return nil, err
+		}
 		if err := validateACMECertificatePayload(p, scope, nil); err != nil {
 			return nil, err
 		}
@@ -192,6 +195,12 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	var additional []any
 	switch kind {
+	case "wifi-eap-tls":
+		var err error
+		additional, err = buildWiFiEAPTLSPayload(payload, settings, scope)
+		if err != nil {
+			return nil, err
+		}
 	case "apple-acme":
 		if err := buildACMECertificatePayload(payload, settings, scope); err != nil {
 			return nil, err

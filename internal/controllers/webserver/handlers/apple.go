@@ -642,7 +642,12 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 		return err
 	}
 	var data []byte
-	if c.FormValue("editor") == "upload" {
+	if c.FormValue("editor") == "wifi-eap-tls" {
+		if err = h.appleCreateWiFiEAPTLS(c, scope.TenantID); err != nil {
+			return err
+		}
+		return appleRedirect(c, info, "/ios/configurations")
+	} else if c.FormValue("editor") == "upload" {
 		data, err = readAppleUpload(c, "profile", apple.MaxProfileBytes)
 	} else if c.FormValue("editor") == "apple-pkcs12" {
 		data, err = applePKCS12Data(c)

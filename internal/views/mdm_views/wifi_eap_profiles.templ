@@ -1,0 +1,68 @@
+package mdm_views
+
+import (
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ WiFiEAPTLSEditor(info *partials.CommonInfo, profiles []apple.Profile) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create an enterprise Wi-Fi profile (EAP-TLS)</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="wifi-eap-profile-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="wifi-eap-tls"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company enterprise Wi-Fi"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.wifi.enterprise"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole device</option><option value="User">Managed Mac user channel</option></select></label>
+			<label>Network name (SSID)<input class="uk-input" name="ssid" maxlength="32" required/></label>
+			<p>The network name must fit within 32 UTF-8 bytes. Spaces and letter case are preserved.</p>
+			<label>Network security<select class="uk-select" name="wifi_security" required><option value="WPA2">WPA2 / WPA3 compatibility</option><option value="WPA3">WPA3 only</option></select></label>
+			<p>WPA3-only profiles require iOS/iPadOS 16 or macOS 13 or later. On older iPhone/iPad versions, Apple's WPA2 setting may also allow older WPA networks; select WPA3 only when a strict modern network policy is required.</p>
+			<label>
+				Identity certificate revision
+				<select class="uk-select" name="identity_revision" required>
+					<option value="">Select a certificate profile revision</option>
+					for _,p:=range profiles {
+						if apple.IsIdentityCertificateProfile(p) {
+							<option value={ p.ID + "/" + Number(p.Revision) } data-scope={ p.Scope }>{ p.Name } · Revision { Number(p.Revision) } · { p.Scope }</option>
+						}
+					}
+				</select>
+			</label>
+			<p>Select a profile with exactly one ACME, SCEP, PKCS12 or Active Directory Certificate identity. Active Directory identities require a Mac. The certificate profile must use the same scope as this Wi-Fi profile.</p>
+			<label>
+				RADIUS trust certificate revision
+				<select class="uk-select" name="trust_revision" required>
+					<option value="" disabled>Select certificate trust</option>
+					<option value="existing" selected>Use the device's existing certificate trust</option>
+					for _,p:=range profiles {
+						if apple.IsPublicCertificateProfile(p) {
+							<option value={ p.ID + "/" + Number(p.Revision) } data-scope={ p.Scope }>{ p.Name } · Revision { Number(p.Revision) } · { p.Scope }</option>
+						}
+					}
+				</select>
+			</label>
+			<p data-certificate-selection-status role="status" aria-live="polite"></p>
+			<p>Optionally copy all public certificates from a matching-scope profile into this configuration as explicit trust anchors. Otherwise the RADIUS certificate must chain to trust already present on the device. Select the intended CA certificates or RADIUS leaf certificates.</p>
+			<label>Trusted RADIUS server certificate names<textarea class="uk-textarea" name="server_names" rows="3" maxlength="16384" required placeholder="radius.example.com&#10;radius-backup.example.com"></textarea></label>
+			<p>Enter one accepted certificate name per line, up to 64. A wildcard may occupy one whole component, such as *.example.com. Names are checked in addition to certificate trust; users are not offered an exception to these names by this profile.</p>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<label>Minimum EAP TLS version<select class="uk-select" name="tls_minimum" required><option value="1.2">TLS 1.2</option><option value="1.3">TLS 1.3</option></select></label>
+				<label>Maximum EAP TLS version<select class="uk-select" name="tls_maximum" required><option value="1.2">TLS 1.2</option><option value="1.3">TLS 1.3</option></select></label>
+			</div>
+			<p>TLS 1.2 requires iOS/iPadOS 11 or macOS 10.13 or later. Selecting TLS 1.3 requires iOS/iPadOS 17 or macOS 14 or later. The minimum must not exceed the maximum; the RADIUS server must support the selected range. Certificate options can require newer versions.</p>
+			<label>EAP response identity (optional)<input class="uk-input" name="user_name" maxlength="255"/></label>
+			<p>Leave empty to use the certificate identity's common name, or enter the identity expected by your RADIUS server.</p>
+			<label>Outer identity (required when minimum TLS is 1.3)<input class="uk-input" name="outer_identity" maxlength="255" placeholder="anonymous@example.com"/></label>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<label>Join automatically<select class="uk-select" name="auto_join" required><option value="true">Yes</option><option value="false">No</option></select></label>
+				<label>Hidden network<select class="uk-select" name="hidden_network" required><option value="false">No</option><option value="true">Yes</option></select></label>
+			</div>
+			<p>The selected certificate revisions are copied with new payload identifiers. Source updates and deletion do not change the saved copy. SCEP and ACME request a certificate for each target; the issuer controls approval and reuse. An ACME client identifier remains limited to one enrollment. PKCS12 copies retain the imported private key.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the network, RADIUS trust, exact certificate revisions, target scope and credential reuse.</label>
+			<p>Saving does not contact the issuer or connect to Wi-Fi. Assign the saved profile to its intended devices or managed Mac users. Profile installation alone does not prove certificate issuance or successful network authentication.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create enterprise Wi-Fi profile</button>
+		</form>
+	</details>
+	<script src="/assets/js/apple-wifi-eap.js" defer></script>
+}

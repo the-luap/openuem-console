@@ -61,17 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted
+  identity/trust certificate revisions with new local payload bindings, explicit
+  TLS and trust settings, and System/User target checks. Isolated payload tests
+  and 306 production SQL preparations against 35 migrations pass. Full CI and
+  actual browser checks are pending; physical RADIUS authentication remains open.
+
 - [Certificate references in Apple profiles](apple-profile-certificate-references.md)
   check that Wi-Fi identities and EAP anchors resolve to unique, correctly typed
-  certificate payloads in the same profile. Isolated parsing and reference tests
-  pass; System/User persistence and removal tests await CI. A composition editor,
-  broader network templates and physical authentication acceptance remain open.
+  certificate payloads in the same profile. Isolated parsing/reference tests and
+  both full CI workflows pass, including System/User persistence and removal.
+  Composition is tracked above; broader network templates and physical
+  authentication acceptance remain open.
 
 - [ACME certificate profiles](apple-acme-profiles.md) add typed issuer, identity,
   hardware and key settings, durable encrypted client ownership across profile
   removal/deletion, and protected review of historical archive gaps. Parser and
-  schema checks, builds and 36 actual browser cases pass. Native transaction and
-  scoped console CI remain pending. Issuance, renewal and attestation still require
+  schema checks, both full CI workflows and 36 actual browser cases pass.
+  Issuance, renewal and attestation still require
   the intended issuer and physical-device acceptance.
 
 - [PKCS12 identity profiles](apple-pkcs12-profiles.md) add bounded archive uploads,

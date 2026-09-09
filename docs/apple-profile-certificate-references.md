@@ -1,10 +1,12 @@
 # Certificate references in Apple profiles
 
-Wi-Fi client identities and EAP trust anchors must reference certificate payloads
-inside the same configuration profile. An identifier in the catalog, a profile's
+Wi-Fi client identity UUIDs and explicit EAP trust anchor UUIDs resolve certificate
+payloads inside the same configuration profile. An identifier in the catalog, a profile's
 root UUID, or a certificate in another installed profile does not satisfy those
 references. OpenUEM now checks these bindings during upload, revision changes,
-restoration and System/User installation.
+restoration and System/User installation. The device's trust chain can also come
+from separately installed certificates or system trust; that does not require
+explicit anchor UUIDs pointing into another profile.
 
 `PayloadCertificateUUID` on a Wi-Fi payload must identify exactly one ACME, SCEP,
 PKCS12 or Active Directory Certificate identity payload. Public certificates
@@ -29,17 +31,24 @@ revision and encrypted history without queuing a replacement.
 This checks binding and payload type. Existing certificate and channel validators
 retain their own responsibilities. It does not prove private-key possession,
 issuer acceptance, successful EAP authentication, or full Active Directory
-certificate schema/targeting coverage. A catalog-based editor for composing
-certificate and enterprise network payloads, broader Wi-Fi/VPN settings, and
-physical network acceptance remain separate roadmap work.
+certificate schema coverage. The [EAP-TLS composer](apple-enterprise-wifi.md) now
+copies selected certificate revisions into one configuration, with local bindings
+and target checks. Broader Wi-Fi/VPN settings and physical network acceptance
+remain separate roadmap work.
 
 The isolated tests use unchanged production reference-validation code and the
 existing map-string helper. They pass identity/anchor types, case normalization,
 plist round-tripping, plain Wi-Fi compatibility, missing and ambiguous identities,
 wrong credential types, duplicate anchors and secret-safe errors. PostgreSQL
 integration tests cover System/User upload and revision rejection, valid local
-references, legacy reassignment rejection and removal. Full CI is pending for
-this change; there is no new console form or browser behavior.
+references, legacy reassignment rejection and removal. Both complete workflows for
+`1632e7d` pass: [push](https://github.com/the-luap/openuem-console/actions/runs/34364258266)
+and [pull request](https://github.com/the-luap/openuem-console/actions/runs/34364265441).
+This includes native protocol/persistence/TLS, scoped console routes, rendering,
+gateway/login/CSRF, existing models, desktop authorization/services, Linux/Windows
+builds and protected Windows protocol checks. Console handlers, templates and
+assets are unchanged from the 36-case ACME browser check at `461c235`.
 
 References: [Apple Wi-Fi payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.wifi.managed.yaml),
-[Apple Active Directory Certificate payload](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml).
+[Apple Active Directory Certificate payload](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.ADCertificate.managed.yaml),
+[Apple 802.1X deployment guide](https://support.apple.com/en-gb/guide/deployment/depabc994b84/web).

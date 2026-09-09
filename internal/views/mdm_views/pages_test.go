@@ -241,6 +241,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	profileDeleted.CurrentRevision = 0
 	profileMigrated := profileRevision
 	profileMigrated.Origin, profileMigrated.Actor = "migration", ""
+	wifiCertificates := []apple.Profile{
+		{ID: "70000000-0000-4000-8000-000000000001", Name: "Device <identity>", Identifier: "com.example.identity.system", Scope: "System", Revision: 7, PayloadTypes: []string{"com.apple.security.scep"}},
+		{ID: "70000000-0000-4000-8000-000000000002", Name: "User identity", Identifier: "com.example.identity.user", Scope: "User", Revision: 3, PayloadTypes: []string{"com.apple.security.pkcs12"}},
+		{ID: "70000000-0000-4000-8000-000000000003", Name: "Device trust", Identifier: "com.example.trust.system", Scope: "System", Revision: 4, PayloadTypes: []string{"com.apple.security.root", "com.apple.security.pem"}},
+		{ID: "70000000-0000-4000-8000-000000000004", Name: "User trust", Identifier: "com.example.trust.user", Scope: "User", Revision: 2, PayloadTypes: []string{"com.apple.security.pkcs1"}},
+	}
 	ssoRequirement := apple.ADEPlatformSSOStatus{BindingRevisionID: "a0000000-0000-4000-8000-000000000032", PackageID: appVersion.PackageID, ID: "a0000000-0000-4000-8000-000000000032", ProfileID: p.ID, ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileIdentifier: p.Identifier, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: appVersion.Version, ApprovedBy: "Operator <A>", ApprovalReason: "Reviewed <provider> extension", Error: "profile_attention_required", CanRepair: true}
 	ssoState := func(state string) Detail {
 		r := ssoRequirement
@@ -268,6 +274,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		component templ.Component
 		required  []string
 	}{
+		{"wifi-eap-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an enterprise Wi-Fi profile (EAP-TLS)", "Device &lt;identity&gt;", `value="70000000-0000-4000-8000-000000000001/7"`, `value="70000000-0000-4000-8000-000000000004/2"`, `data-scope="User"`, `name="trust_revision" required`, `value="existing" selected`, "Source updates and deletion do not change the saved copy.", "32 UTF-8 bytes", "iOS/iPadOS 17 or macOS 14", "/assets/js/apple-wifi-eap.js"}},
+		{"wifi-eap-reader", Profiles(c, &reader, wifiCertificates, []apple.Device{*d}), []string{"Device &lt;identity&gt;"}},
 		{"ade-sso-revisions", ADEPlatformSSORevisions(c, info, &appDevice, &ssoRequirement, ssoRevisions, ssoRevisions[1].ID), []string{"Original enrollment requirement", "Current required pair", "Reviewed &lt;correction&gt;", "Older provider revisions"}},
 		{"ade-sso-attention", DeviceDetails(c, info, ssoState("attention")), []string{"Platform SSO setup requirement", "installation needs attention", "Send retained profile revision", "Reviewed &lt;provider&gt; extension", "Profile repair history"}},
 		{"ade-sso-verified", DeviceDetails(c, info, ssoState("verified")), []string{"retained profile revision is verified by current inventory", "Send retained profile revision"}},
@@ -370,6 +378,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if tc.name == "wifi-eap-reader" && strings.Contains(html, "wifi-eap-profile-editor") {
+				t.Fatal("reader sees enterprise Wi-Fi composition controls")
+			}
 			if strings.HasPrefix(tc.name, "acme-history-") && tc.name != "acme-history-unresolved" && strings.Contains(html, `name="profile"`) {
 				t.Fatal("unavailable ACME historical review form exposed")
 			}
