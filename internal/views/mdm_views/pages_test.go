@@ -177,6 +177,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	adminDevice.EnrollmentMethod = "automated_device"
 	adminAccount := &apple.MacAdminAccount{Options: apple.MacAdminOptions{ShortName: "localadmin", FullName: "Managed <Admin>", PrimaryAccount: "standard", RotationDays: 30}, CreationState: "accepted", GUID: "f0000000-0000-4000-8000-000000000010", InventoryState: "present", ObservedAt: &now, AcceptedAt: &now, LatestStatus: "acknowledged", LatestOperation: "create", CurrentKeyID: "f0000000-0000-4000-8000-000000000011"}
 	adminDetail := Detail{Device: &adminDevice, MacAdmin: adminAccount, ADE: &apple.ADEDeviceEnrollment{SetupState: "complete"}, MacAdminKeys: []apple.MacAdminKey{{ID: adminAccount.CurrentKeyID, Current: true, Operation: "create", Status: "acknowledged", CreatedAt: now}}, Commands: []apple.Command{{ID: "f0000000-0000-4000-8000-000000000012", MacAdmin: true, RequestType: "SetAutoAdminPassword", Status: "failed"}}}
+	pausedAdmin := *adminAccount
+	pausedAdmin.RotationPaused = true
+	pausedDetail := adminDetail
+	pausedDetail.MacAdmin = &pausedAdmin
 	uncertainAdmin := *adminAccount
 	uncertainAdmin.LatestStatus = "uncertain"
 	uncertainDetail := adminDetail
@@ -194,6 +198,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		required  []string
 	}{
 
+		{"mac-admin-paused", DeviceDetails(c, info, pausedDetail), []string{"Automatic rotation is paused", "Resume automatic rotation", "Not scheduled"}},
 		{"mac-admin-ready", DeviceDetails(c, info, adminDetail), []string{"Rotate administrator password", "Reveal password", "Managed &lt;Admin&gt;", "Last acknowledged password"}},
 		{"mac-admin-uncertain", DeviceDetails(c, info, uncertainDetail), []string{"outcome is unknown", "Reveal password"}},
 		{"mac-admin-failed", DeviceDetails(c, info, failedDetail), []string{"Retry account configuration"}},

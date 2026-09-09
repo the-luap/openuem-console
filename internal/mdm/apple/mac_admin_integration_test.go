@@ -106,6 +106,9 @@ func TestMacAdminProvisionRotationUnknownAndLateResponse(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT password FROM mdm_apple_mac_admin_keys WHERE id=$1`, old).Scan(&sealed); err != nil || bytes.Contains(sealed, password) {
 		t.Fatal("password stored in plaintext", err)
 	}
+	if err = s.requestMacAdmin(t.Context(), scope, d.ID, "pause_rotation", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
 	if err = s.requestMacAdmin(t.Context(), scope, d.ID, "rotate", "admin", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +135,7 @@ func TestMacAdminProvisionRotationUnknownAndLateResponse(t *testing.T) {
 	}
 	wire = adeConnect(t, s, d, "Acknowledged", id, nil)
 	a = macAdminStateForTest(t, s, d)
-	if a.LatestStatus != "acknowledged" || a.CurrentKeyID == old {
+	if a.LatestStatus != "acknowledged" || a.CurrentKeyID == old || !a.RotationPaused || a.NextRotationAt != nil {
 		t.Fatal("late exact acknowledgement lost")
 	}
 	macAdminDrive(t, s, d, wire, "", false, []any{map[string]any{"shortName": "localadmin", "GUID": guid}})
@@ -155,6 +158,26 @@ func TestMacAdminNotNowFailureSchedulingAndIdentityConflict(t *testing.T) {
 	s, d := macAdminFixture(t)
 	guid := macAdminEstablished(t, s, d)
 	scope := Scope{TenantID: 1, SiteID: 1}
+
+	if err := s.requestMacAdmin(t.Context(), scope, d.ID, "pause_rotation", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	if a := macAdminStateForTest(t, s, d); !a.RotationPaused || a.NextRotationAt != nil {
+		t.Fatal("rotation schedule did not pause")
+	}
+	adeExec(t, s, `UPDATE mdm_apple_mac_admin_accounts SET next_rotation_at=clock_timestamp()-interval '1 second',next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID)
+	if err := s.ReconcileMacAdmins(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if a := macAdminStateForTest(t, s, d); a.LatestStatus != "acknowledged" {
+		t.Fatal("paused schedule created a candidate")
+	}
+	if err := s.requestMacAdmin(t.Context(), scope, d.ID, "resume_rotation", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	if a := macAdminStateForTest(t, s, d); a.RotationPaused || a.NextRotationAt == nil || !a.NextRotationAt.After(time.Now().Add(29*24*time.Hour)) {
+		t.Fatal("resume failed to start a new interval")
+	}
 	adeExec(t, s, `UPDATE mdm_apple_mac_admin_accounts SET next_rotation_at=clock_timestamp()-interval '1 second',next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID)
 	if err := s.ReconcileMacAdmins(t.Context()); err != nil {
 		t.Fatal(err)

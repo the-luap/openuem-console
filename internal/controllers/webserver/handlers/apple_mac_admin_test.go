@@ -56,6 +56,11 @@ func exerciseAppleMacAdmin(t *testing.T, h *Handler, ctx context.Context, tenant
 	if rec := request("organization-admin", "POST", base+"/mac-admin", form()); rec.Code != 303 {
 		t.Fatal("authorized account retry failed", rec.Code, rec.Body.String())
 	}
+	for _, operation := range []string{"pause_rotation", "resume_rotation"} {
+		if rec := request("organization-admin", "POST", base+"/mac-admin", url.Values{"operation": {operation}, "confirmed": {"yes"}}); rec.Code != 303 {
+			t.Fatal("schedule action failed", operation, rec.Code)
+		}
+	}
 	var key, command string
 	if err = h.Model.DB.QueryRowContext(ctx, `SELECT id,command_id FROM mdm_apple_mac_admin_keys WHERE device_id=$1`, device).Scan(&key, &command); err != nil {
 		t.Fatal(err)

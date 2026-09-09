@@ -26,7 +26,13 @@ templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
    <div class="uk-card-header"><h2 id="mac-admin-title" class="uk-card-title">Managed Mac administrator</h2></div>
    <div class="uk-card-body space-y-4">
     <p><strong>{ a.Options.ShortName }</strong> · { Show(a.Options.FullName) }</p>
-    <dl><dt>Account configuration</dt><dd>{ macAdminState(a.CreationState) }</dd><dt>Account inventory</dt><dd>{ macAdminState(a.InventoryState) } · { When(a.ObservedAt) }</dd><dt>Bound account ID</dt><dd class="break-all">{ Show(a.GUID) }</dd><dt>Latest password operation</dt><dd>{ Show(a.LatestOperation) } · { macAdminState(a.LatestStatus) }</dd><dt>Next scheduled rotation</dt><dd>{ When(a.NextRotationAt) }</dd></dl>
+    <dl><dt>Account configuration</dt><dd>{ macAdminState(a.CreationState) }</dd><dt>Account inventory</dt><dd>{ macAdminState(a.InventoryState) } · { When(a.ObservedAt) }</dd><dt>Bound account ID</dt><dd class="break-all">{ Show(a.GUID) }</dd><dt>Latest password operation</dt><dd>{ Show(a.LatestOperation) } · { macAdminState(a.LatestStatus) }</dd><dt>Next scheduled rotation</dt><dd>
+ if a.NextRotationAt==nil {
+ Not scheduled
+ } else {
+ { When(a.NextRotationAt) }
+ }
+ </dd></dl>
     <p>Command acknowledgement confirms processing by macOS. It does not verify a login or the Secure Token password used for FileVault. Account inventory confirms the account identity, not its password.</p>
     if a.LatestStatus=="uncertain" {
      <p role="status">The command was sent, but its outcome is unknown. No further password mutation will be sent until that command returns a terminal response. Previous and proposed passwords remain available to authorized administrators.</p>
@@ -34,7 +40,19 @@ templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
     if a.Error!="" {
      <p role="status">{ macAdminError(a.Error) }</p>
     }
+    if a.RotationPaused {
+     <p>Automatic rotation is paused. Manual password changes remain available when their prerequisites are met.</p>
+    }
     if info.Can(access.ManageDeviceSecurity) && detail.Device.Status=="enrolled" {
+     if a.Options.RotationDays>0 {
+      <details><summary class="cursor-pointer">Change automatic rotation</summary>
+      if a.RotationPaused {
+       @MacAdminScheduleAction(info,detail,"resume_rotation","Resume automatic rotation")
+      } else {
+       @MacAdminScheduleAction(info,detail,"pause_rotation","Pause automatic rotation")
+      }
+      </details>
+     }
      if (a.CreationState=="failed" || a.CreationState=="expired") && detail.ADE!=nil && detail.ADE.SetupState!="complete" && detail.ADE.AwaitingConfiguration!=nil && *detail.ADE.AwaitingConfiguration {
       @MacAdminAction(info,detail,"retry_creation","Retry account configuration")
      }
@@ -74,5 +92,16 @@ templ MacAdminAction(info *partials.CommonInfo,detail Detail,operation,label str
   <input type="hidden" name="operation" value={ operation }/>
   <label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Apply this action using a new generated password.</label>
   <button class="uk-button uk-button-primary" type="submit">{ label }</button>
+ </form>
+}
+
+
+templ MacAdminScheduleAction(info *partials.CommonInfo,detail Detail,operation,label string) {
+ <form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/mac-admin") }>
+  @CSRF(info)
+  <input type="hidden" name="operation" value={ operation }/>
+  <p>Pausing stops future scheduling. Already queued or sent commands retain their state. Resuming starts a new interval after an acknowledged operation; failed or unresolved password changes still require resolution.</p>
+  <label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Change the automatic rotation schedule.</label>
+  <button class="uk-button uk-button-default" type="submit">{ label }</button>
  </form>
 }

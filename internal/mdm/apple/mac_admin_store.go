@@ -14,6 +14,7 @@ import (
 // Metadata never contains a password or hash. Acknowledgement means that macOS
 // processed the command, not that login or Secure Token authentication was tested.
 type MacAdminAccount struct {
+	RotationPaused                                           bool
 	Options                                                  MacAdminOptions
 	CreationState, GUID, InventoryState, CurrentKeyID, Error string
 	LatestStatus, LatestOperation                            string
@@ -26,12 +27,12 @@ type MacAdminKey struct {
 	CompletedAt           *time.Time
 }
 
-const macAdminColumns = `options,creation_state,COALESCE(guid::text,''),inventory_state,COALESCE(current_key_id::text,''),error,observed_at,accepted_at,next_rotation_at,COALESCE((SELECT status FROM mdm_apple_mac_admin_keys k WHERE k.device_id=a.device_id ORDER BY created_at DESC,id DESC LIMIT 1),''),COALESCE((SELECT operation FROM mdm_apple_mac_admin_keys k WHERE k.device_id=a.device_id ORDER BY created_at DESC,id DESC LIMIT 1),'')`
+const macAdminColumns = `options,creation_state,COALESCE(guid::text,''),inventory_state,COALESCE(current_key_id::text,''),error,observed_at,accepted_at,next_rotation_at,COALESCE((SELECT status FROM mdm_apple_mac_admin_keys k WHERE k.device_id=a.device_id ORDER BY created_at DESC,id DESC LIMIT 1),''),COALESCE((SELECT operation FROM mdm_apple_mac_admin_keys k WHERE k.device_id=a.device_id ORDER BY created_at DESC,id DESC LIMIT 1),''),rotation_paused`
 
 func scanMacAdmin(row scanner) (*MacAdminAccount, error) {
 	var a MacAdminAccount
 	var options []byte
-	err := row.Scan(&options, &a.CreationState, &a.GUID, &a.InventoryState, &a.CurrentKeyID, &a.Error, &a.ObservedAt, &a.AcceptedAt, &a.NextRotationAt, &a.LatestStatus, &a.LatestOperation)
+	err := row.Scan(&options, &a.CreationState, &a.GUID, &a.InventoryState, &a.CurrentKeyID, &a.Error, &a.ObservedAt, &a.AcceptedAt, &a.NextRotationAt, &a.LatestStatus, &a.LatestOperation, &a.RotationPaused)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -93,7 +94,7 @@ func (s *Store) RequestMacAdmin(ctx context.Context, scope Scope, id, operation,
 	return s.requestMacAdmin(ctx, scope, id, operation, actor, recoveryLockAuthorize(scope, actor, permissions, access.ManageDeviceSecurity))
 }
 func (s *Store) requestMacAdmin(ctx context.Context, scope Scope, id, operation, actor string, authorize func(context.Context, *sql.Tx) error) error {
-	if actor == "" || len(actor) > 255 || (operation != "rotate" && operation != "retry_creation") {
+	if actor == "" || len(actor) > 255 || (operation != "rotate" && operation != "retry_creation" && operation != "pause_rotation" && operation != "resume_rotation") {
 		return ErrMacAdmin
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -121,6 +122,19 @@ func (s *Store) requestMacAdmin(ctx context.Context, scope Scope, id, operation,
 	}
 	if a == nil {
 		return ErrMacAdmin
+	}
+	if operation == "pause_rotation" || operation == "resume_rotation" {
+		paused := operation == "pause_rotation"
+		if d.Status != "enrolled" || a.Options.RotationDays == 0 || a.RotationPaused == paused {
+			return ErrConflict
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET rotation_paused=$2,next_rotation_at=CASE WHEN NOT $2 AND $3 THEN clock_timestamp()+((options->>'rotation_days')::int*interval '1 day') ELSE NULL END WHERE device_id=$1`, d.ID, paused, a.LatestStatus == "acknowledged" && a.CreationState == "accepted"); err != nil {
+			return err
+		}
+		if err = audit(ctx, tx, d.TenantID, actor, "apple.mac_admin."+operation, d.ID); err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	if operation == "rotate" {
 		if a.RotationReason(*d, time.Now()) != "" {

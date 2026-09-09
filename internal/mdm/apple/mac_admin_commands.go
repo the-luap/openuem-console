@@ -47,7 +47,7 @@ func (s *Store) macAdminCommandResult(ctx context.Context, tx *sql.Tx, d *Device
 	if next == "acknowledged" {
 		creation = "accepted"
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET creation_state=CASE WHEN $2='create' THEN $3 ELSE creation_state END,error=$4,current_key_id=CASE WHEN $3='accepted' THEN $5::uuid ELSE current_key_id END,accepted_at=CASE WHEN $2='create' AND $3='accepted' THEN clock_timestamp() ELSE accepted_at END,next_rotation_at=CASE WHEN $3='accepted' AND (options->>'rotation_days')::int>0 THEN clock_timestamp()+((options->>'rotation_days')::int * interval '1 day') ELSE NULL END,next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID, operation, creation, detail, key); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET creation_state=CASE WHEN $2='create' THEN $3 ELSE creation_state END,error=$4,current_key_id=CASE WHEN $3='accepted' THEN $5::uuid ELSE current_key_id END,accepted_at=CASE WHEN $2='create' AND $3='accepted' THEN clock_timestamp() ELSE accepted_at END,next_rotation_at=CASE WHEN $3='accepted' AND NOT rotation_paused AND (options->>'rotation_days')::int>0 THEN clock_timestamp()+((options->>'rotation_days')::int * interval '1 day') ELSE NULL END,next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID, operation, creation, detail, key); err != nil {
 		return false, err
 	}
 	outcome := "success"
@@ -248,7 +248,7 @@ func (s *Store) reconcileMacAdmin(ctx context.Context, tx *sql.Tx, d *Device) er
 	}
 	// Inventory runs on the existing six-hour schedule. A missing account never
 	// becomes a new rotation target and failed/uncertain mutations stop scheduling.
-	if a.NextRotationAt != nil && !a.NextRotationAt.After(time.Now()) && a.RotationReason(*d, time.Now()) == "" && a.LatestStatus == "acknowledged" {
+	if !a.RotationPaused && a.NextRotationAt != nil && !a.NextRotationAt.After(time.Now()) && a.RotationReason(*d, time.Now()) == "" && a.LatestStatus == "acknowledged" {
 		err = s.queueMacAdmin(ctx, tx, d, a, true, "system")
 		if errors.Is(err, ErrConflict) {
 			_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET next_rotation_at=NULL,error='history_limit' WHERE device_id=$1`, d.ID)

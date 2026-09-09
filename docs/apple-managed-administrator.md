@@ -37,7 +37,11 @@ A password change requires a current report of the bound account and an ended
 MDM configuration hold. Manual and scheduled changes retain a new encrypted
 candidate and command atomically with their audit event. Scheduled changes run
 only after a previous acknowledged operation; failures and unknown outcomes stop
-the schedule. Normal six-hour inventory refreshes supply account observations.
+the schedule. An authorized operator can pause or resume future scheduling per
+device. A pause persists across acknowledgements, permits explicit manual changes,
+and does not recall already queued or sent commands. Resume starts a new interval
+when the last operation is acknowledged; unresolved/failed mutations remain
+blocked from automatic retries. Normal six-hour inventory refreshes supply account observations.
 At most 128 passwords are retained per enrollment; reaching this limit stops
 further password generation rather than discarding recovery history.
 
@@ -70,9 +74,17 @@ Synthetic tests cover the independent PBKDF2 vector, generated salt, policy
 validation, wire structures, durable provisioning and setup order, account
 identity binding, password history, manual/scheduled changes, NotNow, expiry,
 late responses, scope/permission boundaries, failed-audit rollback, and checkout.
-Protocol tests and template generation pass locally. Full PostgreSQL/race,
-Windows, build, route and browser checks are pending for this change; previous
-ADE results do not establish this administrator implementation's acceptance.
+Protocol tests and template generation pass locally. The initial implementation
+at `2a04e66` passed all four jobs in both
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34310149557) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34310152746), including
+PostgreSQL/race tests, Linux/Windows builds, console routes, gateway authorization,
+and existing agent lifecycles. Its five synthetic UI states passed keyboard,
+confirmation, permission-control, and overflow checks at 390, 768, and 1440 pixels.
+Follow-up commits add route-specific, audit attribution, concurrency, observation
+ordering, and pause/resume checks. Their results are retained in the
+[branch workflow history](https://github.com/the-luap/openuem-console/actions).
+The generated console fixtures are preserved as CI artifacts for browser checks.
 
 No account or password was changed on the development host or on a real device.
 Real Apple/ADE admission, Setup Assistant account creation, login with the
