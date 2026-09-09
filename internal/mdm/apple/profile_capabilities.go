@@ -53,6 +53,9 @@ func userPayloadCapability(kind string) error {
 }
 
 func validateUserPayload(payload map[string]any, d *Device) error {
+	if err := validatePKCS12Payload(payload, "User", d); err != nil {
+		return err
+	}
 	if err := validateSCEPCertificatePayload(payload, "User", d); err != nil {
 		return err
 	}

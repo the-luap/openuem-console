@@ -642,6 +642,8 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 	var data []byte
 	if c.FormValue("editor") == "upload" {
 		data, err = readAppleUpload(c, "profile", apple.MaxProfileBytes)
+	} else if c.FormValue("editor") == "apple-pkcs12" {
+		data, err = applePKCS12Data(c)
 	} else if c.FormValue("editor") == "apple-certificates" {
 		data, err = applePublicCertificateData(c)
 	} else {

@@ -76,12 +76,23 @@ Native tests cover System/User revision rollback, supported mixed-platform
 assignment, encrypted challenge storage, audit privacy and verified removal. A
 synthetic TLS issuer records zero requests during server-side profile operations.
 Console tests cover roles, strict forms, unpinned HTTP, secret-safe errors, stored
-minimal/User/HTTP variants and escaped display names. Full CI and browser checks
-for this change are pending.
+minimal/User/HTTP variants and escaped display names. Every job in the
+[`e3a559c` PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34355132962)
+passes, including native Apple race tests (490.663 s), handlers (13.122 s) and
+desktop lifecycles (27.584 s). The [matching push workflow](https://github.com/the-luap/openuem-console/actions/runs/34355127393)
+also passes every job.
+
+Eighteen browser cases use the actual CI-rendered page: System/User scope,
+minimal/advanced HTTPS and pinned HTTP at 390/768/1440 pixels. Defaults, required
+URL and review controls, zero/false settings, multiline values, password control,
+scoped submission and CSRF pass. Keyboard confirmation and submission work without
+horizontal overflow; the narrow layout was inspected. Native selects are set
+directly, so operating-system dropdown arrow-key behavior is not independently
+verified.
 
 Physical acceptance must use the intended CA and target OS versions to verify
 issuance, key access/export behavior, trust, renewal and dependent application
-configuration. Identity archive and ACME templates remain separate work.
+configuration. [PKCS12 imports](apple-pkcs12-profiles.md) and ACME templates are tracked separately.
 
 Sources checked 9 September 2026:
 

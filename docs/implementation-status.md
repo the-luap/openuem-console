@@ -61,17 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [PKCS12 identity profiles](apple-pkcs12-profiles.md) add bounded archive uploads,
+  protected passwords, System/User scope and Mac-only key options with revision
+  checks. The server validates the outer envelope without executing archive KDFs
+  or claiming password/identity verification. Core tests pass; full CI and browser
+  checks remain pending, followed by physical certificate acceptance.
+
 - [SCEP certificate profiles](apple-scep-profiles.md) add typed external-CA settings,
   subject/alternative names, key controls and pinned HTTP or HTTPS configuration.
   System/User revision updates check Mac option versions. Parser, wire-format and
-  shared public-certificate checks pass locally; full CI and browser checks are
-  pending. Issuance and renewal against the intended CA remain device acceptance.
+  shared public-certificate checks, both full workflows and 18 actual browser
+  cases pass. Issuance and renewal against the intended CA remain device acceptance.
 
 - [Public certificate profiles](apple-public-certificates.md) add bounded PEM/DER
   import, separate certificate payloads, System/User scope and assignment-time
   validity checks with revision rollback. Core checks and template generation
   pass. Builds, scoped multipart console checks and six actual browser cases pass;
-  both complete workflows pass. Identity certificate and ACME
+  both complete workflows pass. PKCS12 imports are tracked separately; ACME
   templates and physical trust/renewal acceptance remain separate work.
 
 - [Mac privacy profiles (PPPC/TCC)](macos-privacy.md) add typed application identities,
@@ -96,8 +102,7 @@ the table's package summaries do not remove any detail from the roadmap.
   The corrected push workflow passes all jobs, including the older-Mac revision
   rollback case; the matching PR workflow also passes every job. Nine cases using the actual CI-rendered
   page pass at 390/768/1440 pixels, including policy values, confirmation and
-  keyboard submission without overflow. Identity certificate and SCEP/ACME
-  templates remain separate work.
+  keyboard submission without overflow. ACME templates and broader certificate lifecycle/composition remain separate work.
 
 - [Retained Apple profile revisions](apple-profile-revisions.md) now preserve
   encrypted immutable System/User snapshots, protected history/downloads and

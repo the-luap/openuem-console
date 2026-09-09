@@ -23,9 +23,9 @@ templ Navigation(info *partials.CommonInfo) {
 		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Apple profiles</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup")) }>Apple setup & enrollment</a>
-        if info.Can(access.ManageCertificates) {
-            <a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>Automated Device Enrollment</a>
-        }
+		if info.Can(access.ManageCertificates) {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>Automated Device Enrollment</a>
+		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/desktop/enrollment")) }>Desktop enrollment</a>
 	</div>
 }
@@ -116,18 +116,19 @@ templ Setup(c echo.Context, info *partials.CommonInfo, settings *apple.Settings,
 						if settings!=nil {
 							@PushReminderHistory(settings.PushReminders)
 						}
-						<details class="mt-6"><summary>Import an existing certificate and private key</summary>
+						<details class="mt-6">
+							<summary>Import an existing certificate and private key</summary>
 							<p>Import verifies the Apple certificate chain, production push usage, matching private key, validity dates and MDM topic, then checks a fresh APNs connection before replacing active credentials. The connection check can take up to 10 seconds and sends no device command.</p>
-						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
-							@CSRF(info)
-							<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
-							<label>Public HTTPS management URL<input class="uk-input" type="url" name="public_url" required placeholder="https://mdm.example.com" value={ settingURL(settings) }/></label>
-							<label>APNs certificate (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
-							<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
-							<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
-							<p class="uk-text-muted">Saving credentials supersedes all pending requests for this organization.</p>
-							<button class="uk-button uk-button-primary" type="submit">Verify connection and save</button>
-						</form>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/setup") } enctype="multipart/form-data" class="grid gap-4 mt-6">
+								@CSRF(info)
+								<label>Organization name<input class="uk-input" name="organization" required maxlength="255" value={ settingOrganization(settings) }/></label>
+								<label>Public HTTPS management URL<input class="uk-input" type="url" name="public_url" required placeholder="https://mdm.example.com" value={ settingURL(settings) }/></label>
+								<label>APNs certificate (PEM)<input class="uk-input" type="file" name="push_certificate" accept=".pem,.crt,.cer" required/></label>
+								<label>Matching private key (PEM)<input class="uk-input" type="file" name="push_key" accept=".pem,.key" required/></label>
+								<p class="uk-text-muted">Private keys are encrypted in the database and never displayed after saving.</p>
+								<p class="uk-text-muted">Saving credentials supersedes all pending requests for this organization.</p>
+								<button class="uk-button uk-button-primary" type="submit">Verify connection and save</button>
+							</form>
 						</details>
 					}
 				</div>
@@ -217,11 +218,11 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 			if detail.Device.Family()==apple.PlatformMacOS {
 				@MacBindingPanel(info, detail)
 				@FileVaultPanel(info, detail)
-				@MacAdminPanel(info,detail)
+				@MacAdminPanel(info, detail)
 				if info.Can(access.ReadSoftware) {
 					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/applications")) }>Managed applications</a>
 				}
- @RecoveryLockPanel(info,detail)
+				@RecoveryLockPanel(info, detail)
 			}
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Inventory</h2></div>
@@ -241,14 +242,16 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								{ "No" }
 							}
 						</dd>
-						<dt>Enrollment method</dt><dd>
-if detail.Device.EnrollmentMethod=="automated_device" {
-Automated Device Enrollment
-} else {
-Manual device enrollment
-}
-</dd>
-						<dt>Management channel</dt><dd>Device channel · System profiles</dd>
+						<dt>Enrollment method</dt>
+						<dd>
+							if detail.Device.EnrollmentMethod=="automated_device" {
+								Automated Device Enrollment
+							} else {
+								Manual device enrollment
+							}
+						</dd>
+						<dt>Management channel</dt>
+						<dd>Device channel · System profiles</dd>
 						<dt>Last contact</dt>
 						<dd>{ When(detail.Device.LastSeen) }</dd>
 						<dt>OS inventory collected</dt>
@@ -285,12 +288,12 @@ Manual device enrollment
 				</div>
 			</section>
 			@DeviceIdentity(detail)
-			@ADEDevicePanel(info,detail)
-			@ADEPlatformSSOPanel(info,detail)
-			@ADEApplicationPanel(info,detail)
+			@ADEDevicePanel(info, detail)
+			@ADEPlatformSSOPanel(info, detail)
+			@ADEApplicationPanel(info, detail)
 			@MacCapabilities(detail.Device)
 			if detail.Device.Family()==apple.PlatformMacOS {
-				@MacUsers(info,detail.Device,detail.Users)
+				@MacUsers(info, detail.Device, detail.Users)
 			}
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. Requires iOS/iPadOS 17 or later, or a supervised Mac running macOS 14 or later with update authorization. Apple also checks installation conditions on the device.</p></div>
@@ -471,7 +474,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 			<div>
 				<h1 class="text-2xl font-semibold">Apple configuration profiles</h1>
 				<p>Manage system profiles for iPhone, iPad and Mac, and user profiles for managed Mac users. Assign user profiles from the user's page on a Mac.</p>
-				<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info,"/ios/configurations/history")) }>All profile revision history</a>
+				<a class="underline block mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/history")) }>All profile revision history</a>
 				@Navigation(info)
 			</div>
 			if info.Can(access.ManageProfiles) {
@@ -483,6 +486,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						@GatekeeperEditor(info)
 						@SystemExtensionsEditor(info)
 						@PrivacyEditor(info)
+						@PKCS12Editor(info)
 						@PublicCertificatesEditor(info)
 						@SCEPEditor(info)
 						if info.Can(access.ManageProfiles) {
@@ -535,7 +539,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ p.Name }</h2><p>{ p.Identifier+" · "+p.Scope+" scope · Revision "+Number(p.Revision) }</p></div>
 					<div class="uk-card-body grid gap-4">
-						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,ProfileRevisionHistoryPath(p.ID))) }>View revision history</a>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, ProfileRevisionHistoryPath(p.ID))) }>View revision history</a>
 						<p>
 							{ "Payloads: " }
 							for _,kind:=range p.PayloadTypes {

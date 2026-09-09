@@ -63,11 +63,11 @@ layout was inspected. The harness injects a synthetic file and sets native selec
 directly. It does not independently verify the operating system file picker or
 native dropdown arrow keys.
 
-The [SCEP template](apple-scep-profiles.md) is being validated separately. PKCS12
-identity and ACME templates remain separate work. In particular,
-untrusted PKCS12 decoding needs bounded KDF work and allocation before inspecting
-an archive on the server. Physical certificate installation, trust behavior,
-removal and certificate renewal require device acceptance.
+[SCEP templates](apple-scep-profiles.md) and [PKCS12 identity imports](apple-pkcs12-profiles.md)
+are tracked separately. PKCS12 imports perform bounded envelope inspection without
+executing archive KDFs or claiming cryptographic validation. ACME templates,
+certificate lifecycle/composition and physical certificate installation, trust,
+removal and renewal remain separate work.
 
 Sources checked 9 September 2026:
 

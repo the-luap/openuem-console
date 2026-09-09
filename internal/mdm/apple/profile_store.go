@@ -192,6 +192,9 @@ func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Dev
 		return fmt.Errorf("%w: refresh inventory to identify the platform and OS version before assigning profiles", ErrProfilePrerequisite)
 	}
 	if desired == "installed" {
+		if err := validatePKCS12Profile(p, current); err != nil {
+			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
+		}
 		if err := validateSCEPCertificateProfile(p, current); err != nil {
 			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
 		}

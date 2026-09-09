@@ -285,6 +285,7 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	exerciseAppleSystemExtensions(t, h, ctx, tenantID, siteID, request)
 	exerciseApplePrivacy(t, h, ctx, tenantID, siteID, request)
 	exerciseApplePublicCertificates(t, h, ctx, tenantID, siteID, requestBody)
+	exerciseApplePKCS12(t, h, ctx, tenantID, siteID, requestBody)
 	exerciseAppleSCEPProfiles(t, h, ctx, tenantID, siteID, request)
 	exerciseADEPlatformSSORoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleProfileRevisions(t, h, ctx, tenantID, siteID, request)
