@@ -1,7 +1,8 @@
 # Native Windows management authentication
 
-The Windows backend now has a direct TLS device identity verifier and bounded
-OMA DM digest primitives. They build on [initial certificate enrollment and
+The Windows backend now has a direct TLS device identity verifier, bounded
+OMA DM digest primitives and a [SyncML XML codec](native-windows-syncml.md).
+They build on [initial certificate enrollment and
 encrypted provisioning](native-windows-enrollment.md). Durable SyncML sessions,
 nonce transitions, command/result processing and production gateway registration
 remain open. These authentication components do not report a managed device,
@@ -96,8 +97,10 @@ schema in the reserved loopback test database on port 55440.
 
 The 30-second digest fuzz run passes after **824,941 executions**. CI runs portable
 checks on native Windows and database/TLS/race checks on Linux, with a separate
-bounded digest fuzz step. Current management-authentication CI
-execution evidence is pending. No profile or certificate is installed on the host;
+bounded digest fuzz step. Both complete workflows pass for management-authentication
+commit `3fa2827`: [push run](https://github.com/the-luap/openuem-console/actions/runs/34400008541)
+and [pull-request run](https://github.com/the-luap/openuem-console/actions/runs/34400012109).
+These runs precede the separate codec change. No profile or certificate is installed on the host;
 no actual Windows enrollment, authenticated SyncML exchange, applied CSP or
 physical acceptance has been performed.
 
@@ -108,7 +111,7 @@ go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=30s -parallel=2 ./internal/md
 
 Set the database environment variable according to the
 [reserved fixture instructions](native-windows-mdm.md#scoped-enrollment-credentials).
-Remaining work includes the bounded SyncML codec and durable session state,
+Remaining work includes integration of the bounded SyncML codec with durable session state,
 encrypted secret/nonce access, CSP commands/results, update workflows, enrollment
 console and gateway wiring, certificate renewal/unenrollment, key rotation,
 backup/restore and physical Windows acceptance. WIN-02 remains in progress.

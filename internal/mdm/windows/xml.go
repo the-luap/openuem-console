@@ -34,13 +34,15 @@ type xmlElement struct {
 	Attrs    []xml.Attr
 	Children []*xmlElement
 	Text     string
+	content  []byte
 }
 
 type xmlFrame struct {
-	element *xmlElement
-	rawName xml.Name
-	ns      map[string]string
-	text    strings.Builder
+	element      *xmlElement
+	rawName      xml.Name
+	ns           map[string]string
+	text         strings.Builder
+	contentStart int64
 }
 
 // Resolve namespaces explicitly because encoding/xml.Token accepts undeclared
@@ -122,13 +124,14 @@ func parseXML(data []byte, maximum int) (*xmlElement, error) {
 				parent := stack[len(stack)-1].element
 				parent.Children = append(parent.Children, element)
 			}
-			stack = append(stack, &xmlFrame{element: element, rawName: token.Name, ns: ns})
+			stack = append(stack, &xmlFrame{element: element, rawName: token.Name, ns: ns, contentStart: decoder.InputOffset()})
 		case xml.EndElement:
 			if len(stack) == 0 || stack[len(stack)-1].rawName != token.Name {
 				return nil, ErrXML
 			}
 			frame := stack[len(stack)-1]
 			frame.element.Text = frame.text.String()
+			frame.element.content = data[frame.contentStart:offset]
 			stack = stack[:len(stack)-1]
 		case xml.CharData:
 			if len(stack) == 0 {

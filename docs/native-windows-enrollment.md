@@ -132,9 +132,11 @@ Thirty-second fuzz runs completed **953,311** WSTEP parser executions and
 **1,164,556** CSR verifier executions without failure. The CSR corpus contains
 only a [public synthetic request](../internal/mdm/windows/testdata/README.md), with
 no retained private key. CI includes the portable tests on native Windows, the
-PostgreSQL race suite on Linux and separate bounded fuzz steps. Current WSTEP CI
-execution evidence is pending; the preceding CA/policy commit's complete runs do
-not cover this change.
+PostgreSQL race suite on Linux and separate bounded fuzz steps. Both complete
+workflows pass for WSTEP commit `be418e8`: [push run](https://github.com/the-luap/openuem-console/actions/runs/34398356243)
+and [pull-request run](https://github.com/the-luap/openuem-console/actions/runs/34398359882).
+These runs also include the existing browser, database, gateway and platform-build
+regressions. Their success does not establish physical Windows acceptance.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows

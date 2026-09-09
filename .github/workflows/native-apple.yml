@@ -65,6 +65,10 @@ jobs:
         run: go test -run '^$' -fuzz=FuzzEnrollmentCSR -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Bounded Windows SyncML digest fuzzing
         run: go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows SyncML XML codec fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSyncML$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows SyncML data preservation fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSyncMLDataCodec$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - run: go tool templ generate
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
