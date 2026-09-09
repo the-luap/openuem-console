@@ -61,11 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
-- [ADE required applications](apple-ade-required-applications.md) are in progress:
-  immutable approved revisions are inherited at admission, native app observations
-  gate setup release, and explicit per-device revision correction retains original
-  intent and change history. SQL migration/preparation checks pass; console
-  workflows, full integration CI and physical acceptance remain open.
+- [ADE required applications](apple-ade-required-applications.md) now include
+  immutable approved revisions inherited at admission, native app observations
+  that gate setup release, a bounded searchable console picker, and explicit
+  per-device revision correction retaining original intent and change history.
+  Migration/preparation, console, native protocol and 18 browser scenarios pass.
+  Physical acceptance, cross-enrollment installer recovery and the additional
+  Platform SSO sequence remain open.
 
 - [Managed Mac applications](apple-managed-applications.md) now have an approved
   immutable artifact catalog, native installation/removal and scoped console
