@@ -18,10 +18,24 @@ import (
 	"howett.net/plist"
 )
 
-func adeArmedFixture(t *testing.T) (*Store, string, *adeEnrollmentFixture, ADEEnrollmentProfile, string, *ade.MachineInfo) {
+func adeArmedFixture(t *testing.T, admin ...MacAdminOptions) (*Store, string, *adeEnrollmentFixture, ADEEnrollmentProfile, string, *ade.MachineInfo) {
 	t.Helper()
 	s, server, f := adeEnrollmentStore(t)
-	p := adeProfilePublished(t, s, server)
+	var p ADEEnrollmentProfile
+	if len(admin) > 0 {
+		o := adeEnrollmentOptions()
+		o.MacAdmin = &admin[0]
+		id, e := s.createADEProfile(t.Context(), 1, server, o, "admin", nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = s.publishADEProfile(t.Context(), 1, server, id); e != nil {
+			t.Fatal(e)
+		}
+		p = adeProfileState(t, s, server, id)
+	} else {
+		p = adeProfilePublished(t, s, server)
+	}
 	info := &ade.MachineInfo{Serial: "SYNTHETICMAC1", UDID: uuid.NewString(), Product: "Mac14,7", OSVersion: "15.6", Build: "24G100", SignerFingerprint: strings.Repeat("a", 64), SignedAt: time.Now()}
 	adeAddSerial(t, s, f, server, info.Serial)
 	if err := s.setADETargets(t.Context(), 1, server, p.ID, []string{info.Serial}, "admin", nil); err != nil {

@@ -172,11 +172,30 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	adeDetail.Device = &adeMac
 	adeDetail.ADE = &apple.ADEDeviceEnrollment{ServerID: adeServer.ID, ProfileID: adeProfile.ID, ProfileName: adeProfile.Name, SetupState: "failed", SetupError: "command_failed", SetupUpdatedAt: &now}
 	adeDetail.Commands = []apple.Command{{ID: "c0000000-0000-4000-8000-000000000003", RequestType: "DeviceConfigured", Status: "failed", ADESetup: true}}
+
+	adminDevice := mac
+	adminDevice.EnrollmentMethod = "automated_device"
+	adminAccount := &apple.MacAdminAccount{Options: apple.MacAdminOptions{ShortName: "localadmin", FullName: "Managed <Admin>", PrimaryAccount: "standard", RotationDays: 30}, CreationState: "accepted", GUID: "f0000000-0000-4000-8000-000000000010", InventoryState: "present", ObservedAt: &now, AcceptedAt: &now, LatestStatus: "acknowledged", LatestOperation: "create", CurrentKeyID: "f0000000-0000-4000-8000-000000000011"}
+	adminDetail := Detail{Device: &adminDevice, MacAdmin: adminAccount, ADE: &apple.ADEDeviceEnrollment{SetupState: "complete"}, MacAdminKeys: []apple.MacAdminKey{{ID: adminAccount.CurrentKeyID, Current: true, Operation: "create", Status: "acknowledged", CreatedAt: now}}, Commands: []apple.Command{{ID: "f0000000-0000-4000-8000-000000000012", MacAdmin: true, RequestType: "SetAutoAdminPassword", Status: "failed"}}}
+	uncertainAdmin := *adminAccount
+	uncertainAdmin.LatestStatus = "uncertain"
+	uncertainDetail := adminDetail
+	uncertainDetail.MacAdmin = &uncertainAdmin
+	failedAdmin := *adminAccount
+	failedAdmin.CreationState = "failed"
+	failedAdmin.LatestStatus = "failed"
+	failedDetail := adminDetail
+	failedDetail.MacAdmin = &failedAdmin
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+
+		{"mac-admin-ready", DeviceDetails(c, info, adminDetail), []string{"Rotate administrator password", "Reveal password", "Managed &lt;Admin&gt;", "Last acknowledged password"}},
+		{"mac-admin-uncertain", DeviceDetails(c, info, uncertainDetail), []string{"outcome is unknown", "Reveal password"}},
+		{"mac-admin-failed", DeviceDetails(c, info, failedDetail), []string{"Retry account configuration"}},
+		{"mac-admin-reader", DeviceDetails(c, &reader, adminDetail), []string{"Managed Mac administrator", "Account reported"}},
 		{"ade-enrollment", ADE(c, info, []apple.ADEServer{adeServer}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Queue profile publication", "Publication outcome unknown", "Assignment accepted; verification pending", "Allow next activation", "Corporate Mac &lt;profile&gt;", "Next enrollments"}},
 		{"ade-enrollment-disabled", ADE(c, info, []apple.ADEServer{adeDisabled}, adeServer.ID, adeDevices, "", adeEnrollment), []string{"Apple assignment verified", "Corporate Mac &lt;profile&gt;"}},
 		{"ade-setup-failed", DeviceDetails(c, info, adeDetail), []string{"Automated Device Enrollment", "Retry setup release", "Removal disallowed"}},
@@ -235,6 +254,16 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if strings.HasPrefix(tc.name, "mac-admin-") && strings.Contains(html, "f0000000-0000-4000-8000-000000000012/retry") {
+				t.Fatal("administrator mutation has generic retry")
+			}
+			if tc.name == "mac-admin-uncertain" && strings.Contains(html, "Rotate administrator password") {
+				t.Fatal("uncertain operation exposes rotation")
+			}
+			if tc.name == "mac-admin-reader" && (strings.Contains(html, "Reveal password") || strings.Contains(html, "Rotate administrator password") || strings.Contains(html, "Retry account configuration")) {
+				t.Fatal("reader sees password actions")
+			}
+
 			if strings.HasPrefix(tc.name, "ade-setup-") && strings.Contains(html, "commands/c0000000-0000-4000-8000-000000000003/retry") {
 				t.Fatal("setup command exposes generic retry")
 			}

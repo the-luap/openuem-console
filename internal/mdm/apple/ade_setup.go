@@ -102,7 +102,7 @@ func (s *Store) reconcileADESetup(ctx context.Context, tx *sql.Tx, d *Device) er
 		return nil
 	}
 	var ready bool
-	err = tx.QueryRowContext(ctx, `SELECT COALESCE(d.inventory_at>=a.created_at AND d.profiles_at>=a.created_at AND NOT EXISTS(SELECT 1 FROM mdm_apple_profile_assignments p WHERE p.device_id=d.id AND p.status<>'verified'),false) FROM mdm_apple_devices d JOIN mdm_apple_ade_admissions a ON a.device_id=d.id AND a.tenant_id=d.tenant_id WHERE d.tenant_id=$1 AND d.id=$2`, d.TenantID, d.ID).Scan(&ready)
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE(d.inventory_at>=a.created_at AND d.profiles_at>=a.created_at AND NOT EXISTS(SELECT 1 FROM mdm_apple_profile_assignments p WHERE p.device_id=d.id AND p.status<>'verified') AND NOT EXISTS(SELECT 1 FROM mdm_apple_mac_admin_accounts ma WHERE ma.device_id=d.id AND ma.creation_state<>'accepted'),false) FROM mdm_apple_devices d JOIN mdm_apple_ade_admissions a ON a.device_id=d.id AND a.tenant_id=d.tenant_id WHERE d.tenant_id=$1 AND d.id=$2`, d.TenantID, d.ID).Scan(&ready)
 	if err != nil {
 		return err
 	}
@@ -231,6 +231,9 @@ func (s *Store) ReconcileADESetups(ctx context.Context) error {
 }
 
 func (s *Store) cancelADESetup(ctx context.Context, tx *sql.Tx, id string) error {
+	if err := s.cancelMacAdmin(ctx, tx, id); err != nil {
+		return err
+	}
 	_, err := tx.ExecContext(ctx, `UPDATE mdm_apple_ade_admissions SET retry_profile=NULL,setup_state=CASE WHEN setup_state IN ('complete','not_requested') THEN setup_state ELSE 'cancelled' END,setup_error='',setup_updated_at=clock_timestamp() WHERE device_id=$1`, id)
 	return err
 }

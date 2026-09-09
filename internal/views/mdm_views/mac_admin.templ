@@ -1,0 +1,78 @@
+package mdm_views
+
+import (
+ "time"
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ MacAdminProfileFields() {
+ <details>
+  <summary class="cursor-pointer">Managed Mac administrator</summary>
+  <p>Requires the Setup Assistant hold and reported supervision. Each Mac receives its own generated password. This policy applies to new enrollment only.</p>
+  <label><input class="uk-checkbox" type="checkbox" name="manage_admin" value="yes"/> Create a managed administrator during Mac setup</label>
+  <label>Account short name<input class="uk-input" name="admin_short_name" maxlength="31" pattern="[a-z][a-z0-9_-]{0,30}" placeholder="localadmin"/></label>
+  <label>Full name<input class="uk-input" name="admin_full_name" maxlength="255" placeholder="Managed Administrator"/></label>
+  <label><input class="uk-checkbox" type="checkbox" name="admin_hidden" value="yes"/> Hide the managed account from the login window</label>
+  <label>Primary account in Setup Assistant<select class="uk-select" name="admin_primary_account"><option value="standard">Create a standard user</option><option value="administrator">Create an administrator</option><option value="skip">Skip primary account creation</option></select></label>
+  <label>Password rotation interval in days<input class="uk-input" type="number" name="admin_rotation_days" value="0" min="0" max="365"/></label>
+  <p>0 means manual rotation; 1–365 schedules rotation after acknowledgement and current account inventory. A remote password change does not change the Secure Token password used for FileVault.</p>
+ </details>
+}
+
+templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
+ if a:=detail.MacAdmin;a!=nil {
+  <section class="uk-card uk-card-default" aria-labelledby="mac-admin-title">
+   <div class="uk-card-header"><h2 id="mac-admin-title" class="uk-card-title">Managed Mac administrator</h2></div>
+   <div class="uk-card-body space-y-4">
+    <p><strong>{ a.Options.ShortName }</strong> · { Show(a.Options.FullName) }</p>
+    <dl><dt>Account configuration</dt><dd>{ macAdminState(a.CreationState) }</dd><dt>Account inventory</dt><dd>{ macAdminState(a.InventoryState) } · { When(a.ObservedAt) }</dd><dt>Bound account ID</dt><dd class="break-all">{ Show(a.GUID) }</dd><dt>Latest password operation</dt><dd>{ Show(a.LatestOperation) } · { macAdminState(a.LatestStatus) }</dd><dt>Next scheduled rotation</dt><dd>{ When(a.NextRotationAt) }</dd></dl>
+    <p>Command acknowledgement confirms processing by macOS. It does not verify a login or the Secure Token password used for FileVault. Account inventory confirms the account identity, not its password.</p>
+    if a.LatestStatus=="uncertain" {
+     <p role="status">The command was sent, but its outcome is unknown. No further password mutation will be sent until that command returns a terminal response. Previous and proposed passwords remain available to authorized administrators.</p>
+    }
+    if a.Error!="" {
+     <p role="status">{ macAdminError(a.Error) }</p>
+    }
+    if info.Can(access.ManageDeviceSecurity) && detail.Device.Status=="enrolled" {
+     if a.CreationState=="failed" || a.CreationState=="expired" {
+      @MacAdminAction(info,detail,"retry_creation","Retry account configuration")
+     }
+     if reason:=a.RotationReason(*detail.Device,time.Now());reason=="" && detail.ADE!=nil && detail.ADE.SetupState=="complete" {
+      @MacAdminAction(info,detail,"rotate","Rotate administrator password")
+     } else {
+      <p class="uk-text-muted">{ reason } Password rotation also requires the MDM configuration hold to have ended.</p>
+     }
+    }
+    if info.Can(access.RetrieveRecoveryKeys) && len(detail.MacAdminKeys)>0 {
+     <details><summary class="cursor-pointer">Retained passwords</summary>
+      <p>Each reveal is audited. A retained password may be previous, proposed, or unconfirmed. The last acknowledged password can still be uncertain after a later failed or unanswered command.</p>
+      for _,key:=range detail.MacAdminKeys {
+       <article class="mt-4">
+        <p>{ Show(key.Operation) } · { macAdminState(key.Status) } · { When(&key.CreatedAt) }
+         if key.Current {
+ <strong> · Last acknowledged password</strong>
+ }
+        </p>
+        <form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/mac-admin/passwords/"+key.ID+"/reveal") }>
+         @CSRF(info)
+         <label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Reveal this retained password in an audited, uncached response.</label>
+         <button class="uk-button uk-button-default" type="submit">Reveal password</button>
+        </form>
+       </article>
+      }
+     </details>
+    }
+   </div>
+  </section>
+ }
+}
+
+templ MacAdminAction(info *partials.CommonInfo,detail Detail,operation,label string) {
+ <form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/mac-admin") }>
+  @CSRF(info)
+  <input type="hidden" name="operation" value={ operation }/>
+  <label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Apply this action using a new generated password.</label>
+  <button class="uk-button uk-button-primary" type="submit">{ label }</button>
+ </form>
+}

@@ -19,7 +19,7 @@ const maxRecoveryLockPassword = 1024
 // RecoveryLockReason requires current reported evidence. Apple currently gives
 // conflicting supervision requirements; require supervision conservatively.
 func (d Device) RecoveryLockReason(now time.Time) string {
-	if d.Status != "enrolled" || d.Family() != PlatformMacOS || d.EnrollmentMethod != "manual_device" {
+	if d.Status != "enrolled" || d.Family() != PlatformMacOS || (d.EnrollmentMethod != "manual_device" && d.EnrollmentMethod != "automated_device") {
 		return "Recovery Lock requires an enrolled Mac using device enrollment."
 	}
 	if !d.DeviceLockAllowed {

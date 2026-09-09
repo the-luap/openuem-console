@@ -39,6 +39,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/ade/servers/:id/targets", h.AppleSetADETargets)
 		g.POST("/ios/ade/servers/:id/targets/:serial/rearm", h.AppleRearmADETarget)
 		g.POST("/ios/:id/setup/retry", h.AppleRetryADESetup)
+		g.POST("/ios/:id/mac-admin", h.AppleMacAdmin)
+		g.POST("/ios/:id/mac-admin/passwords/:key/reveal", h.AppleMacAdminPassword)
 		g.POST("/ios/:id/recovery-lock", h.AppleRecoveryLock)
 		g.POST("/ios/:id/recovery-lock/passwords/:key/reveal", h.AppleRecoveryLockPassword)
 		g.POST("/ios/setup", h.AppleSettings)
@@ -80,7 +82,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
+			case "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
 				// CSRF reads the form before the endpoint. Apply its bound here
 				// as well so a cached PostForm cannot bypass the endpoint limit.
 				limit = 128 << 10
@@ -452,6 +454,16 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 		}
 	}
 	if d.Family() == apple.PlatformMacOS {
+		detail.MacAdmin, err = h.Apple.MacAdmin(c.Request().Context(), scope, id)
+		if err != nil {
+			return err
+		}
+		if info.Can(access.RetrieveRecoveryKeys) {
+			detail.MacAdminKeys, err = h.Apple.MacAdminKeys(c.Request().Context(), scope, id)
+			if err != nil {
+				return err
+			}
+		}
 		detail.RecoveryLock, err = h.Apple.RecoveryLock(c.Request().Context(), scope, id)
 		if err != nil {
 			return err

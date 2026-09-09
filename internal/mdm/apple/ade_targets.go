@@ -80,7 +80,7 @@ func adeAssignedProfilePermission(ctx context.Context, tx *sql.Tx, permissions *
 	var deviceLock bool
 	// Scope and rights are immutable; the mutation separately locks and checks
 	// the selected version's current publication state.
-	if err := tx.QueryRowContext(ctx, `SELECT site_id,device_lock_allowed FROM mdm_apple_ade_profiles WHERE tenant_id=$1 AND server_id=$2 AND id=$3`, tenant, server, profile).Scan(&site, &deviceLock); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT site_id,(device_lock_allowed OR admin_options IS NOT NULL) FROM mdm_apple_ade_profiles WHERE tenant_id=$1 AND server_id=$2 AND id=$3`, tenant, server, profile).Scan(&site, &deviceLock); err != nil {
 		return notFound(err)
 	}
 	return adeEnrollmentPermission(permissions, tenant, site, actor, deviceLock)(ctx, tx)

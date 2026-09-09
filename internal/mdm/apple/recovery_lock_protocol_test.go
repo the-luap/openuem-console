@@ -103,11 +103,17 @@ func TestRecoveryLockRequiresFreshNativeAuthority(t *testing.T) {
 	if reason := base.RecoveryLockReason(now); reason != "" {
 		t.Fatal(reason)
 	}
+	ade := base
+	ade.EnrollmentMethod = "automated_device"
+	if reason := ade.RecoveryLockReason(now); reason != "" {
+		t.Fatal("ADE lost its enrolled Mac authority", reason)
+	}
 	for name, mutate := range map[string]func(*Device){
 		"revoked": func(d *Device) { d.Status = "revoked" }, "phone": func(d *Device) { d.OSFamily = PlatformIOS; d.Model = "iPhone16,1" },
 		"user channel": func(d *Device) { d.EnrollmentMethod = "user" }, "rights": func(d *Device) { d.DeviceLockAllowed = false },
-		"malformed OS": func(d *Device) { d.OSVersion = "15garbage" },
-		"old OS":       func(d *Device) { d.OSVersion = "11.4" }, "missing OS": func(d *Device) { d.OSVersion = "" },
+		"missing enrollment method": func(d *Device) { d.EnrollmentMethod = "" },
+		"malformed OS":              func(d *Device) { d.OSVersion = "15garbage" },
+		"old OS":                    func(d *Device) { d.OSVersion = "11.4" }, "missing OS": func(d *Device) { d.OSVersion = "" },
 		"missing inventory": func(d *Device) { d.InventoryAt = nil }, "old inventory": func(d *Device) { d.InventoryAt = &old }, "future inventory": func(d *Device) { d.InventoryAt = &future },
 		"missing security": func(d *Device) { d.SecurityAt = nil }, "old security": func(d *Device) { d.SecurityAt = &old }, "future security": func(d *Device) { d.SecurityAt = &future },
 		"unknown hardware": func(d *Device) { d.AppleSilicon = nil }, "Intel": func(d *Device) { d.AppleSilicon = &no },
@@ -118,10 +124,13 @@ func TestRecoveryLockRequiresFreshNativeAuthority(t *testing.T) {
 		"short identity": func(d *Device) { d.CertificateExpiresAt = now.Add(time.Minute) },
 	} {
 		t.Run(name, func(t *testing.T) {
-			d := base
-			mutate(&d)
-			if d.RecoveryLockReason(now) == "" {
-				t.Fatal("unready Mac accepted")
+			for _, method := range []string{"manual_device", "automated_device"} {
+				d := base
+				d.EnrollmentMethod = method
+				mutate(&d)
+				if d.RecoveryLockReason(now) == "" {
+					t.Fatal("unready Mac accepted", method)
+				}
 			}
 		})
 	}

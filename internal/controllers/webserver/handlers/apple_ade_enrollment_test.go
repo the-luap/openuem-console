@@ -54,3 +54,21 @@ func TestADEEnrollmentFormsRejectAmbiguityAndScopeChanges(t *testing.T) {
 		}
 	}
 }
+
+func TestADEManagedAdministratorOptions(t *testing.T) {
+	f := url.Values{"site_id": {"1"}, "platform": {"macos"}, "removal": {"disallowed"}, "await_configuration": {"yes"}, "manage_admin": {"yes"}, "admin_short_name": {"localadmin"}, "admin_full_name": {"Managed Admin"}, "admin_primary_account": {"standard"}, "admin_rotation_days": {"30"}, "admin_hidden": {"yes"}}
+	o, err := adeProfileOptions(f, 1)
+	if err != nil || o.MacAdmin == nil || !o.MacAdmin.Hidden || o.MacAdmin.RotationDays != 30 {
+		t.Fatal("account policy lost", err)
+	}
+	for _, change := range []struct{ key, value string }{{"platform", "ios"}, {"await_configuration", ""}, {"admin_short_name", "root"}, {"admin_rotation_days", "-1"}, {"admin_rotation_days", "366"}, {"admin_rotation_days", "bad"}, {"admin_primary_account", "invalid"}, {"admin_hidden", "false"}, {"manage_admin", "false"}} {
+		next := url.Values{}
+		for key, value := range f {
+			next[key] = append([]string(nil), value...)
+		}
+		next.Set(change.key, change.value)
+		if _, err = adeProfileOptions(next, 1); err == nil {
+			t.Fatal("invalid account policy accepted", change.key)
+		}
+	}
+}

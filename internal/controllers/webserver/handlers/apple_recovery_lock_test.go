@@ -14,6 +14,8 @@ import (
 
 func TestRecoveryLockRoutesRequireDedicatedCapabilities(t *testing.T) {
 	for path, want := range map[string]access.Capability{
+		"/ios/:id/mac-admin":                           access.ManageDeviceSecurity,
+		"/ios/:id/mac-admin/passwords/:key/reveal":     access.RetrieveRecoveryKeys,
 		"/ios/:id/recovery-lock":                       access.ManageDeviceSecurity,
 		"/ios/:id/recovery-lock/passwords/:key/reveal": access.RetrieveRecoveryKeys,
 	} {

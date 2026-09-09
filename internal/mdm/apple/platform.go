@@ -191,6 +191,9 @@ func inventoryQueriesFor(d Device) []string {
 	}
 	if d.EnrollmentMethod == "automated_device" && ((d.Family() == PlatformMacOS && CompareVersions(d.OSVersion, "10.11") >= 0) || ((d.Family() == PlatformIOS || d.Family() == PlatformIPadOS) && CompareVersions(d.OSVersion, "9.0") >= 0)) {
 		queries = append(queries, "AwaitingConfiguration")
+		if d.Family() == PlatformMacOS {
+			queries = append(queries, "AutoSetupAdminAccounts")
+		}
 	}
 
 	return queries

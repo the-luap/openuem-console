@@ -14,6 +14,8 @@ type DeviceRow struct {
 }
 
 type Detail struct {
+	MacAdmin         *apple.MacAdminAccount
+	MacAdminKeys     []apple.MacAdminKey
 	ADE              *apple.ADEDeviceEnrollment
 	RecoveryLock     *apple.RecoveryLock
 	RecoveryLockKeys []apple.RecoveryLockKey

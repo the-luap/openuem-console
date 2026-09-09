@@ -57,7 +57,7 @@ func adeProfileOptions(f url.Values, site int) (apple.ADEProfileOptions, error) 
 	} else if value := f.Get("site_id"); value != "" && value != strconv.Itoa(site) {
 		return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "The selected site must match this page")
 	}
-	for _, k := range []string{"await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile"} {
+	for _, k := range []string{"await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "manage_admin", "admin_hidden"} {
 		if f.Get(k) != "" && f.Get(k) != "yes" {
 			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Invalid automated enrollment option")
 		}
@@ -65,7 +65,18 @@ func adeProfileOptions(f url.Values, site int) (apple.ADEProfileOptions, error) 
 	if f.Get("removal") != "allowed" && f.Get("removal") != "disallowed" {
 		return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Choose whether users may remove management")
 	}
-	return apple.ADEProfileOptions{SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}, nil
+	var admin *apple.MacAdminOptions
+	if f.Get("manage_admin") == "yes" {
+		days, e := strconv.Atoi(f.Get("admin_rotation_days"))
+		if e != nil {
+			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Choose administrator password rotation days")
+		}
+		admin = &apple.MacAdminOptions{ShortName: f.Get("admin_short_name"), FullName: f.Get("admin_full_name"), Hidden: f.Get("admin_hidden") == "yes", PrimaryAccount: f.Get("admin_primary_account"), RotationDays: days}
+		if admin.Validate() != nil || f.Get("platform") != "macos" || f.Get("await_configuration") != "yes" {
+			return apple.ADEProfileOptions{}, echo.NewHTTPError(400, "Managed administrator setup requires a valid Mac account policy and the Setup Assistant hold")
+		}
+	}
+	return apple.ADEProfileOptions{MacAdmin: admin, SiteID: site, Platform: apple.Platform(f.Get("platform")), Name: f.Get("name"), Department: f.Get("department"), SupportEmail: f.Get("support_email"), SupportPhone: f.Get("support_phone"), Removable: f.Get("removal") == "allowed", AwaitConfiguration: f.Get("await_configuration") == "yes", AllowDeviceLock: f.Get("allow_device_lock") == "yes", AutoAdvance: f.Get("auto_advance") == "yes", IgnoreBackupProfile: f.Get("ignore_backup_profile") == "yes", SkipSetupItems: strings.FieldsFunc(f.Get("skip_setup_items"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' || r == '\t' })}, nil
 }
 
 func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
@@ -81,7 +92,7 @@ func (h *Handler) AppleCreateADEProfile(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := adeEnrollmentForm(c, "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items")
+	f, err := adeEnrollmentForm(c, "site_id", "platform", "name", "department", "support_email", "support_phone", "removal", "await_configuration", "allow_device_lock", "auto_advance", "ignore_backup_profile", "skip_setup_items", "manage_admin", "admin_short_name", "admin_full_name", "admin_hidden", "admin_primary_account", "admin_rotation_days")
 	if err != nil {
 		return err
 	}

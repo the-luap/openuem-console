@@ -137,6 +137,7 @@ type Assignment struct {
 }
 
 type Command struct {
+	MacAdmin        bool       `json:"mac_admin"`
 	ADESetup        bool       `json:"ade_setup"`
 	RecoveryLock    bool       `json:"recovery_lock"`
 	FileVault       bool       `json:"filevault"`
