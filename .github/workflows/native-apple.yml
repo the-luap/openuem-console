@@ -51,6 +51,8 @@ jobs:
           go-version: '1.26.8'
           cache: true
       - run: go tool templ generate
+      - name: Compile protocol and console tests before long database checks
+        run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
       - name: Protocol, persistence, TLS, console routes and rendering
         run: go test -race -count=1 ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
         env:

@@ -179,8 +179,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	adminDetail := Detail{Device: &adminDevice, MacAdmin: adminAccount, ADE: &apple.ADEDeviceEnrollment{SetupState: "complete"}, MacAdminKeys: []apple.MacAdminKey{{ID: adminAccount.CurrentKeyID, Current: true, Operation: "create", Status: "acknowledged", CreatedAt: now}}, Commands: []apple.Command{{ID: "f0000000-0000-4000-8000-000000000012", MacAdmin: true, RequestType: "SetAutoAdminPassword", Status: "failed"}}}
 	pausedAdmin := *adminAccount
 	pausedAdmin.RotationPaused = true
-	pausedDetail := adminDetail
-	pausedDetail.MacAdmin = &pausedAdmin
+	pausedAdminDetail := adminDetail
+	pausedAdminDetail.MacAdmin = &pausedAdmin
 	uncertainAdmin := *adminAccount
 	uncertainAdmin.LatestStatus = "uncertain"
 	uncertainDetail := adminDetail
@@ -198,7 +198,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		required  []string
 	}{
 
-		{"mac-admin-paused", DeviceDetails(c, info, pausedDetail), []string{"Automatic rotation is paused", "Resume automatic rotation", "Not scheduled"}},
+		{"mac-admin-paused", DeviceDetails(c, info, pausedAdminDetail), []string{"Automatic rotation is paused", "Resume automatic rotation", "Not scheduled"}},
 		{"mac-admin-ready", DeviceDetails(c, info, adminDetail), []string{"Rotate administrator password", "Reveal password", "Managed &lt;Admin&gt;", "Last acknowledged password"}},
 		{"mac-admin-uncertain", DeviceDetails(c, info, uncertainDetail), []string{"outcome is unknown", "Reveal password"}},
 		{"mac-admin-failed", DeviceDetails(c, info, failedDetail), []string{"Retry account configuration"}},
