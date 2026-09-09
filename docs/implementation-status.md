@@ -69,10 +69,11 @@ the table's package summaries do not remove any detail from the roadmap.
   Always On applies these checks and local certificate bindings to every flat
   tunnel, including the iOS 14.2 minimum Diffie-Hellman group.
   A typed IKEv2 generator copies certificate configurations into System/User
-  profiles with local bindings and machine/EAP-TLS authentication; catalog
-  revision selection and its console editor remain pending.
+  profiles with local bindings and machine/EAP-TLS authentication. Protected
+  composition uses exact encrypted certificate revisions and atomic audit
+  provenance; its console editor remains pending.
   Isolated production tests and both full target/DNS workflows pass; full CI
-  execution for the later IKEv2, Always On and generator changes is pending.
+  execution for the later IKEv2, Always On, generator and composition changes is pending.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend

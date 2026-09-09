@@ -104,7 +104,7 @@ server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
 No cryptographic exchange is performed by saving a profile. Complete on-demand
 rules, provider schemas, Always On exceptions, further protocol options
-and a retained-revision composer/editor remain open.
+and a dedicated console editor remain open.
 
 ## Certificate profile generator
 
@@ -124,9 +124,14 @@ authentication `1`; machine authentication emits `0` and omits EAP TLS bounds.
 Neither mode emits passwords, shared secrets, on-demand rules or routing changes.
 Unexpected builder settings are rejected.
 
-This is a server-side generator. Protected catalog revision selection, composition
-provenance and the dedicated console form are still pending for VPN. Existing
-save/assignment paths encrypt generated profiles and preserve ACME client
+The store's `CreateIKEv2CertificateProfile` method composes exact retained
+certificate revisions with organization profile permission checked inside the
+transaction. Source updates and catalog deletion do not substitute a newer
+revision. A shared transaction implementation with EAP-TLS Wi-Fi saves the
+encrypted profile, retained snapshot and `apple.profile.compose` audit together.
+The audit records source profile/revision identifiers without credentials, and
+the profile description records copy provenance. The dedicated console form is
+still pending for VPN. Existing save/assignment paths preserve ACME client
 ownership and AD Mac-only target checks. Generation alone does not assign the
 profile, contact an issuer or establish a VPN connection.
 
@@ -164,6 +169,13 @@ and EAP-TLS modes, unchanged source credentials, new local bindings, omitted
 settings and invalid input. PostgreSQL tests cover encrypted persistence,
 System/User assignment, ACME ownership across copied profiles and AD target
 restrictions. Full CI for the generator is pending.
+
+The store composition tests cover both scopes, source update/deletion, exact
+retained credentials, permission denial, cross-organization and malformed-source
+rejection, typed option mapping, encrypted storage and audit-failure rollback.
+The existing Wi-Fi composition regression tests cover the shared transaction.
+Production SQL text is unchanged; extraction still identifies 306 statements.
+Full CI for the store composition change is pending.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

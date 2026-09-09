@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -48,8 +49,20 @@ func (s *Store) CreateWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiE
 }
 
 func (s *Store) createWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiEAPTLSOptions, actor string, authorize func(context.Context, *sql.Tx) error) (*Profile, error) {
-	if tenant <= 0 || actor == "" || o.Scope != "System" && o.Scope != "User" {
-		return nil, ErrWiFiProfile
+	settings := map[string]any{"SSID_STR": o.SSID, "EncryptionType": o.EncryptionType, "TLSMinimumVersion": o.TLSMinimum, "TLSMaximumVersion": o.TLSMaximum, "ServerNameLines": o.ServerNames, "UserName": o.UserName, "OuterIdentity": o.OuterIdentity, "AutoJoin": o.AutoJoin, "HIDDEN_NETWORK": o.Hidden}
+	return s.createCertificateNetworkProfile(ctx, tenant, certificateNetworkProfileOptions{Name: o.Name, Identifier: o.Identifier, Scope: o.Scope, Kind: "wifi-eap-tls", Settings: settings, Identity: o.Identity, Trust: o.Trust}, actor, ErrWiFiProfile, authorize)
+}
+
+type certificateNetworkProfileOptions struct {
+	Name, Identifier, Scope, Kind string
+	Settings                      map[string]any
+	Identity                      CertificateProfileReference
+	Trust                         *CertificateProfileReference
+}
+
+func (s *Store) createCertificateNetworkProfile(ctx context.Context, tenant int, o certificateNetworkProfileOptions, actor string, invalid error, authorize func(context.Context, *sql.Tx) error) (*Profile, error) {
+	if tenant <= 0 || actor == "" || o.Scope != "System" && o.Scope != "User" || o.Settings == nil || o.Kind != "wifi-eap-tls" && o.Kind != "vpn-ikev2-certificate" {
+		return nil, invalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -63,7 +76,7 @@ func (s *Store) createWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiE
 	}
 	load := func(ref CertificateProfileReference) (*Profile, string, error) {
 		if !profileRevisionUUID(ref.ProfileID) || ref.Revision <= 0 || ref.Revision > 2147483647 {
-			return nil, "", ErrWiFiProfile
+			return nil, "", invalid
 		}
 		var id string
 		if err := tx.QueryRowContext(ctx, `SELECT id FROM mdm_apple_profile_revisions WHERE tenant_id=$1 AND profile_id=$2 AND revision=$3`, tenant, ref.ProfileID, ref.Revision).Scan(&id); err != nil {
@@ -77,7 +90,8 @@ func (s *Store) createWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiE
 		return nil, err
 	}
 	defer clear(identity.Payload)
-	settings := map[string]any{"PayloadScope": o.Scope, "SSID_STR": o.SSID, "EncryptionType": o.EncryptionType, "TLSMinimumVersion": o.TLSMinimum, "TLSMaximumVersion": o.TLSMaximum, "ServerNameLines": o.ServerNames, "UserName": o.UserName, "OuterIdentity": o.OuterIdentity, "AutoJoin": o.AutoJoin, "HIDDEN_NETWORK": o.Hidden, "IdentityProfileData": identity.Payload}
+	settings := maps.Clone(o.Settings)
+	settings["PayloadScope"], settings["IdentityProfileData"] = o.Scope, identity.Payload
 	sources := []map[string]any{{"kind": "identity", "revision_id": identityRevision, "profile_id": identity.ID, "revision": identity.Revision}}
 	description := "Identity configuration copied from " + identity.Name + " (revision " + strconv.Itoa(identity.Revision) + ")."
 	if o.Trust != nil {
@@ -90,9 +104,9 @@ func (s *Store) createWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiE
 		sources = append(sources, map[string]any{"kind": "trust", "revision_id": revision, "profile_id": trust.ID, "revision": trust.Revision})
 		description += " Trust certificates copied from " + trust.Name + " (revision " + strconv.Itoa(trust.Revision) + ")."
 	}
-	data, err := BuildProfile(o.Name, o.Identifier, "wifi-eap-tls", settings)
+	data, err := BuildProfile(o.Name, o.Identifier, o.Kind, settings)
 	if err != nil {
-		return nil, errors.Join(ErrWiFiProfile, err)
+		return nil, errors.Join(invalid, err)
 	}
 	var root map[string]any
 	if _, err = plist.Unmarshal(data, &root); err != nil {
@@ -105,7 +119,7 @@ func (s *Store) createWiFiEAPTLSProfile(ctx context.Context, tenant int, o WiFiE
 	}
 	p, err := ParseProfile(data)
 	if err != nil {
-		return nil, errors.Join(ErrWiFiProfile, err)
+		return nil, errors.Join(invalid, err)
 	}
 	p.TenantID = tenant
 	if err = s.saveProfileRevisionTx(ctx, tx, p, false, actor, "", ""); err != nil {
