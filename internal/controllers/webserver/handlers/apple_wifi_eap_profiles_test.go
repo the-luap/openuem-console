@@ -49,6 +49,15 @@ func exerciseAppleWiFiEAPTLS(t *testing.T, h *Handler, ctx context.Context, tena
 	trust := source(tenant, "System", "apple-certificates")
 	userIdentity := source(tenant, "User", "apple-scep")
 	userTrust := source(tenant, "User", "apple-certificates")
+	// The desktop fixture creates the foreign organization without Apple
+	// settings. Seed its existing synthetic credentials with this tenant's
+	// encryption purpose before creating a foreign certificate catalog entry.
+	foreignSettings, err := h.Apple.Settings(ctx, tenant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreignSettings.TenantID = otherTenant
+	seedExistingAppleSettings(t, h.Model.DB, *foreignSettings)
 	foreign := source(otherTenant, "System", "apple-scep")
 	ref := func(p *apple.Profile) string { return p.ID + "/" + strconv.Itoa(p.Revision) }
 	form := func() url.Values {

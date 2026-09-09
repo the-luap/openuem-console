@@ -89,8 +89,13 @@ tests cover permissions, CSRF, confirmation, duplicate/query/unexpected fields,
 exact revision selection, trust scope, bounded errors and protected downloads.
 
 The isolated payload check and preparation of 306 production SQL statements
-against all 35 migrations pass. Full CI and browser checks for this change are
-pending. Profile installation or a synthetic protocol test does not establish
+against all 35 migrations pass. All 39 actual Chrome cases pass using the CI
+renderings at `1b70629`: System/User scope, existing/explicit trust, three TLS
+ranges and three viewport widths, plus reader views. These cover scope reset,
+UTF-8 limits, required outer identity, exact revision form data, keyboard review
+and submission, reset behavior and page overflow. Native OS select menus are not
+part of this automated check. Full CI remains pending after correcting the foreign
+organization's missing Apple-settings fixture. Profile installation or a synthetic protocol test does not establish
 successful certificate issuance or 802.1X authentication. Physical Mac, iPhone and
 iPad acceptance must verify issuance, RADIUS name/trust enforcement, rejected
 server certificates, selected TLS versions, roaming, renewal and removal.

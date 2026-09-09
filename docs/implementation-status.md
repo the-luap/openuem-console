@@ -64,8 +64,9 @@ the table's package summaries do not remove any detail from the roadmap.
 - [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted
   identity/trust certificate revisions with new local payload bindings, explicit
   TLS and trust settings, and System/User target checks. Isolated payload tests
-  and 306 production SQL preparations against 35 migrations pass. Full CI and
-  actual browser checks are pending; physical RADIUS authentication remains open.
+  and 306 production SQL preparations against 35 migrations pass. All 39 actual
+  browser cases pass. Full CI is pending after a fixture correction; physical
+  RADIUS authentication remains open.
 
 - [Certificate references in Apple profiles](apple-profile-certificate-references.md)
   check that Wi-Fi identities and EAP anchors resolve to unique, correctly typed
