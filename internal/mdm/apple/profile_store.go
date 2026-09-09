@@ -157,6 +157,9 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 		if err := validateFirewallProfile(p, current); err != nil {
 			return err
 		}
+		if err := validatePlatformSSOProfile(p, current); err != nil {
+			return err
+		}
 		for _, kind := range p.PayloadTypes {
 			if fileVaultPayloadType(kind) {
 				var owned bool

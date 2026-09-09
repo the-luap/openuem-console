@@ -93,6 +93,11 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if kind == "com.apple.extensiblesso" {
+			if err := validatePlatformSSOPayload(p, scope, nil); err != nil {
+				return nil, err
+			}
+		}
 		if scope == "User" {
 			if err := validateUserPayload(p, nil); err != nil {
 				return nil, err
@@ -159,6 +164,10 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	}
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	switch kind {
+	case "macos-platform-sso":
+		if err := buildPlatformSSOPayload(payload, settings, scope); err != nil {
+			return nil, err
+		}
 	case "macos-firewall":
 		if err := buildFirewallPayload(payload, settings, scope); err != nil {
 			return nil, err

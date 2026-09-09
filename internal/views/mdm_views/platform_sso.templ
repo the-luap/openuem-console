@@ -1,0 +1,32 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ PlatformSSOEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a Mac Platform SSO profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="macos-platform-sso"/>
+			<input type="hidden" name="payload_scope" value="System"/>
+			<p>Configure an installed identity-provider extension on macOS 14 or later. The Mac must report user-approved MDM. Use the provider's supported extension, authentication method and settings.</p>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company identity"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.identity"/></label>
+			<label>SSO extension bundle identifier<input class="uk-input" name="extension_identifier" maxlength="255" required placeholder="com.provider.application.ssoextension"/></label>
+			<label>Developer team identifier<input class="uk-input" name="team_identifier" pattern="[A-Z0-9]{10}" maxlength="10" required/></label>
+			<label>Identity-provider URL prefixes<textarea class="uk-textarea" name="sso_urls" rows="3" maxlength="16384" required placeholder="https://login.example.com/"></textarea></label>
+			<p>Enter one HTTP or HTTPS prefix per line, up to 64. Credentials, query parameters and fragments are not allowed. Use unique prefixes across the SSO profiles installed on a Mac.</p>
+			<label>Authentication method<select class="uk-select" name="authentication_method" required><option value="">Select the provider's supported method</option><option value="UserSecureEnclaveKey">Secure Enclave key</option><option value="Password">Password synchronization</option><option value="SmartCard">Smart card</option></select></label>
+			<label>Account display name (optional)<input class="uk-input" name="account_display_name" maxlength="255"/></label>
+			<label><input class="uk-checkbox" type="checkbox" name="shared_device_keys" value="yes"/>Use shared device signing and encryption keys</label>
+			<label><input class="uk-checkbox" type="checkbox" name="create_user_at_login" value="yes"/>Allow account creation at the login window</label>
+			<p>Account creation requires shared device keys and Password or Smart Card authentication. It does not create the first Setup Assistant account.</p>
+			<label>Provider registration token (optional)<input class="uk-input" type="password" name="registration_token" maxlength="8192" autocomplete="new-password"/></label>
+			<p>Use a token issued by the provider for the intended devices. The token is encrypted with the profile and is included in downloads available to authorized profile managers.</p>
+			<label>Provider extension data (optional JSON dictionary)<textarea class="uk-textarea" name="provider_data" rows="4" maxlength="16384" spellcheck="false" placeholder={ `{"ProviderSetting":"value"}` }></textarea></label>
+			<p>Use the provider's documented keys. Booleans, numbers, strings, arrays and nested dictionaries are supported. Profile installation confirms configuration delivery; successful identity registration must be verified separately.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/>Create this identity configuration with the selected provider and account settings.</label>
+			<button class="uk-button uk-button-primary" type="submit">Create Platform SSO profile</button>
+		</form>
+	</details>
+}

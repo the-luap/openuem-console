@@ -54,6 +54,11 @@ func userPayloadCapability(kind string) error {
 
 func validateUserPayload(payload map[string]any, d *Device) error {
 	kind := stringValue(payload, "PayloadType")
+	if kind == "com.apple.extensiblesso" {
+		if err := validatePlatformSSOPayload(payload, "User", d); err != nil {
+			return err
+		}
+	}
 	if err := userPayloadCapability(kind); err != nil {
 		return err
 	}

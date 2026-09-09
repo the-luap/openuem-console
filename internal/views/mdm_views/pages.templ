@@ -477,6 +477,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 					<div class="uk-card-header"><h2 class="uk-card-title">Create or upload a profile</h2></div>
 					<div class="uk-card-body">
 						@FirewallEditor(info)
+						@PlatformSSOEditor(info)
 						if info.Can(access.ManageProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } enctype="multipart/form-data" class="grid gap-4">
 								@CSRF(info)

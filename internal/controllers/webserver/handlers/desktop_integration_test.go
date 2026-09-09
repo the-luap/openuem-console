@@ -280,6 +280,7 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	exerciseAppleMacAdmin(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleApplications(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleFirewall(t, h, ctx, tenantID, siteID, request, writeArtifact)
+	exerciseApplePlatformSSO(t, h, ctx, tenantID, siteID, request)
 	runDesktopBrowserFixture(t, h, ctx)
 }
 
