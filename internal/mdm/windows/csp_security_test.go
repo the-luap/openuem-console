@@ -222,7 +222,7 @@ func TestCSPMigrationPreservesExistingSessions(t *testing.T) {
 	}
 	// Removing only the empty CSP extension produces the previous migration's
 	// schema while retaining issued enrollment, nonce state and encrypted packet.
-	if _, err := f.store.db.Exec(`DROP TABLE mdm_windows_update_audit,mdm_windows_csp_observations,mdm_windows_csp_audit,mdm_windows_csp_commands,mdm_windows_update_runs; DROP FUNCTION mdm_windows_keep_csp_command(); ALTER TABLE mdm_windows_syncml_packets DROP CONSTRAINT mdm_windows_syncml_packet_scope_message; DELETE FROM mdm_windows_migrations WHERE name IN ('migrations/005_csp_commands.sql','migrations/006_update_runs.sql')`); err != nil {
+	if _, err := f.store.db.Exec(`DROP TABLE mdm_windows_update_audit,mdm_windows_csp_observations,mdm_windows_csp_audit,mdm_windows_csp_commands,mdm_windows_update_runs; DROP FUNCTION mdm_windows_keep_csp_command(); ALTER TABLE mdm_windows_syncml_packets DROP CONSTRAINT mdm_windows_syncml_packet_scope_message; DELETE FROM mdm_windows_migrations WHERE name IN ('migrations/005_csp_commands.sql','migrations/006_update_runs.sql','migrations/007_update_verification_batches.sql')`); err != nil {
 		t.Fatal(err)
 	}
 	for n := 0; n < 2; n++ {

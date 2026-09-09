@@ -172,7 +172,7 @@ func TestUpdateReleaseSupportSeparatesEditionLifecycleAndESU(t *testing.T) {
 }
 
 func FuzzUpdatePolicy(f *testing.F) {
-	seed, _ := json.Marshal(updateTestPolicy())
+	seed, _ := json.Marshal(updateTestFullPolicy())
 	f.Add(seed)
 	f.Add([]byte(`{"quality_deadline_days":0,"quality_no_auto_reboot":false}`))
 	f.Add([]byte(`{"active_hours_start":22,"active_hours_end":6}`))
@@ -201,7 +201,27 @@ func FuzzUpdatePolicy(f *testing.F) {
 			if err != nil {
 				t.Fatal("accepted policy could not compile", err)
 			}
-			for _, spec := range []CSPCommandSpec{configure, verify} {
+			specs := []CSPCommandSpec{configure, verify}
+			for _, version := range []int{1, 2} {
+				commands, err := updateRunCommands(&updateIntent{Version: version, Policy: restored}, remove)
+				if err != nil || len(commands) < 3 || len(commands) > maxUpdateRunSteps {
+					t.Fatal("accepted intent failed versioned compilation", err)
+				}
+				specs = append(specs, commands...)
+				var reads []CSPCommandSpec
+				for _, command := range commands[2:] {
+					if version == 2 && (len(command.Commands) > 6 || len(command.Commands)%2 != 0) {
+						t.Fatal("versioned batch exceeded its fixed read-pair bound")
+					}
+					reads = append(reads, command.Commands...)
+				}
+				reassembled, _, err := encodeCSPRequest(CSPCommandSpec{Kind: "Sequence", Commands: reads})
+				original, _, originalErr := encodeCSPRequest(verify)
+				if err != nil || originalErr != nil || !bytes.Equal(reassembled, original) {
+					t.Fatal("versioned partition changed verification intent")
+				}
+			}
+			for _, spec := range specs {
 				payload, user, err := encodeCSPRequest(spec)
 				if err != nil || user {
 					t.Fatal("typed policy escaped its device command boundary", err)

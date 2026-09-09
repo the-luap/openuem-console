@@ -116,7 +116,7 @@ func TestUpdateMigrationPreservesExistingCustomDelivery(t *testing.T) {
 	f := syncMLTestStore(t)
 	queued := cspTestQueue(t, f, cspTestPolicy())
 	request, response := cspTestStart(t, f)
-	if _, err := f.store.db.Exec(`ALTER TABLE mdm_windows_csp_commands DROP COLUMN update_run_id,DROP COLUMN update_step; DROP TABLE mdm_windows_update_audit,mdm_windows_update_runs; DELETE FROM mdm_windows_migrations WHERE name='migrations/006_update_runs.sql'`); err != nil {
+	if _, err := f.store.db.Exec(`ALTER TABLE mdm_windows_csp_commands DROP COLUMN update_run_id,DROP COLUMN update_step; DROP TABLE mdm_windows_update_audit,mdm_windows_update_runs; DELETE FROM mdm_windows_migrations WHERE name IN ('migrations/006_update_runs.sql','migrations/007_update_verification_batches.sql')`); err != nil {
 		t.Fatal(err)
 	}
 	for n := 0; n < 2; n++ {

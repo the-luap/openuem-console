@@ -85,18 +85,29 @@ func updateTestReply(response *SyncMLMessage, policy UpdatePolicy, remove, drift
 }
 
 func TestUpdateRunOperatorDispatchReadbackRestartAndRemoval(t *testing.T) {
-	for _, mode := range []string{"apply", "drift", "remove"} {
+	for _, mode := range []string{"apply", "drift", "remove", "failed", "absent"} {
 		t.Run(mode, func(t *testing.T) {
 			f := syncMLTestStore(t)
-			policy := updateTestPolicy()
+			policy := updateTestFullPolicy()
 			run := updateTestQueue(t, f, policy, mode == "remove")
 			_, response := cspTestStart(t, f)
 			detail := updateTestRead(t, f, run.ID)
 			if detail.Phase != "preflight_pending" || detail.Steps[0].Phase != "sent" || detail.Steps[1].Phase != "queued" {
 				t.Fatal("mutation preceded platform evidence")
 			}
-			for step := 0; step < 3; step++ {
-				request := syncMLTestWire(t, updateTestReply(syncMLTestParsed(t, response), policy, mode == "remove", mode == "drift"))
+			for step := 0; step < len(detail.Steps); step++ {
+				if len(response) > 5000 {
+					t.Fatal("typed stage exceeded the default response limit", step, len(response))
+				}
+				reply := updateTestReply(syncMLTestParsed(t, response), policy, mode == "remove", mode == "drift")
+				if step == 2 && (mode == "failed" || mode == "absent") {
+					status := "500"
+					if mode == "absent" {
+						status = "404"
+					}
+					updateTestReadError(reply, updateConfigRoot+"DeferQualityUpdatesPeriodInDays", status)
+				}
+				request := syncMLTestWire(t, reply)
 				var err error
 				response, err = f.process(request)
 				if err != nil {
@@ -106,8 +117,11 @@ func TestUpdateRunOperatorDispatchReadbackRestartAndRemoval(t *testing.T) {
 				if step == 0 && (detail.Phase != "configuration_pending" || !detail.Platform.Compatible) {
 					t.Fatal("preflight did not unlock validated configuration", detail.Phase, detail.Reason)
 				}
-				if step == 1 && detail.Phase != "verification_pending" {
+				if step >= 1 && step < len(detail.Steps)-1 && detail.Phase != "verification_pending" {
 					t.Fatal("acknowledgment was confused with read-back", detail.Phase)
+				}
+				if step >= 2 && len(detail.Outcomes) != min((step-1)*3, 13) {
+					t.Fatal("completed batch evidence was lost while later reads progressed", step, len(detail.Outcomes))
 				}
 				if replay, err := f.process(request); err != nil || !bytes.Equal(replay, response) {
 					t.Fatal("update step replay changed bytes", err)
@@ -118,8 +132,8 @@ func TestUpdateRunOperatorDispatchReadbackRestartAndRemoval(t *testing.T) {
 				}
 			}
 			detail = updateTestRead(t, f, run.ID)
-			want := map[string]string{"apply": "verified", "drift": "drifted", "remove": "removed"}[mode]
-			if detail.Phase != want || len(detail.Outcomes) != 7 {
+			want := map[string]string{"apply": "verified", "drift": "drifted", "remove": "removed", "failed": "verification_failed", "absent": "drifted"}[mode]
+			if detail.Phase != want || len(detail.Outcomes) != 13 {
 				t.Fatal("typed result did not preserve effective state", detail.Phase)
 			}
 			if _, err := f.store.CSPCommandDetails(context.Background(), "operator", f.identity.Scope, f.identity.DeviceID, detail.Steps[0].ID); !errors.Is(err, access.ErrDenied) {
@@ -195,7 +209,7 @@ func TestUpdateRunScopeIdempotencyCancellationAndAtomicAudit(t *testing.T) {
 		t.Fatal("audit rollback left partial cancellation")
 	}
 	var runs, commands int
-	if err := f.store.db.QueryRow(`SELECT (SELECT count(*) FROM mdm_windows_update_runs),(SELECT count(*) FROM mdm_windows_csp_commands)`).Scan(&runs, &commands); err != nil || runs != 1 || commands != 3 {
+	if err := f.store.db.QueryRow(`SELECT (SELECT count(*) FROM mdm_windows_update_runs),(SELECT count(*) FROM mdm_windows_csp_commands)`).Scan(&runs, &commands); err != nil || runs != 1 || commands != len(detail.Steps) {
 		t.Fatal("audit rollback left orphan update steps", err)
 	}
 	if err := f.store.CancelUpdateRun(ctx, "operator", f.identity.Scope, f.identity.DeviceID, run.ID); err != nil {

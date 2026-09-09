@@ -1,6 +1,9 @@
 package windows
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 type UpdateSettingOutcome struct {
 	Name            string `json:"-" xml:"-"`
@@ -10,6 +13,9 @@ type UpdateSettingOutcome struct {
 	ConfigStatus    int    `json:"-" xml:"-"`
 	EffectiveStatus int    `json:"-" xml:"-"`
 	State           string `json:"-" xml:"-"`
+	// EvidenceReceivedAt is the server's completion time for this read batch,
+	// not a device clock or an assertion of a simultaneous policy snapshot.
+	EvidenceReceivedAt *time.Time `json:"-" xml:"-"`
 }
 
 func (UpdateSettingOutcome) String() string     { return "[protected Windows update setting outcome]" }
@@ -33,6 +39,12 @@ func evaluateUpdateReadback(policy UpdatePolicy, remove bool, state *cspSessionC
 	if err != nil {
 		return nil, "", err
 	}
+	return evaluateUpdateSettingsReadback(settings, remove, state)
+}
+
+// The complete policy is validated before partitioning. A batch may contain a
+// dependent setting whose prerequisite was already queried in a previous batch.
+func evaluateUpdateSettingsReadback(settings []updateSetting, remove bool, state *cspSessionCommand) ([]UpdateSettingOutcome, string, error) {
 	if state == nil || state.StopReason != "" {
 		return nil, "verification_incomplete", nil
 	}

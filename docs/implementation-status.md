@@ -162,6 +162,17 @@ the table's package summaries do not remove any detail from the roadmap.
   rings, scheduled group rollout, console/production wiring, continuous and
   asynchronous reconciliation, actual update/restart results and hardware
   acceptance remain open; verified policy values do not prove patch installation.
+- Windows update compiler version 2 partitions verification into ordered batches
+  of three Config/Result pairs. All 13 settings complete within the default
+  5,000-byte response budget in synthetic apply, drift and removal exchanges;
+  configuration remains a single Atomic group. Completed partial observations
+  and earlier errors survive later batches, with per-batch receipt times and a
+  15-minute collection window. Queue admission reserves all generated steps.
+  Migration 007 preserves version-1 command trees, immutable ciphertext and
+  idempotent retries. The full PostgreSQL 17/race suite passes in 69.105 seconds
+  at 85.5% coverage; extended compiler fuzzing passes 23,726 executions. The real
+  loopback TLS test verifies all seven steps. Vet and formatting pass; full CI
+  for this batching extension remains pending.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

@@ -52,7 +52,9 @@ The caller supplies a stable request UUID and a name of at most 128 UTF-8 bytes.
 Reusing the UUID is idempotent only for the same device, creator/revision, name,
 mode, policy and lifetime. New policy intent requires a new UUID. Lifetimes use
 the CSP range of one minute through seven days. A device's unresolved queue is
-bounded at 256 commands, including all three reserved update stages.
+bounded at 256 commands. Admission reserves the actual number of generated steps:
+three through seven for new runs, including preflight and configuration. An
+idempotent retry does not reserve new queue slots.
 
 ## Preflight and platform catalog
 
@@ -105,11 +107,36 @@ undelivered work with a reason. A new run is required for fresh preflight.
 
 ## Read-back and outcome meaning
 
-After configuration is acknowledged, a separate Sequence queries both
+After configuration is acknowledged, separate Sequence batches query both
 `Policy/Config/Update/...` and `Policy/Result/Update/...` for each selected setting.
 Config identifies this source's value; Result identifies the effective value
 after policy conflict resolution. This distinction follows the
 [Policy CSP](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-configuration-service-provider).
+
+New runs persist compiler version 2. Each verification batch contains at most
+three settings, keeping each Config/Result pair together. All 13 supported fields
+produce five read batches after one preflight and one Atomic configuration step.
+The full synthetic apply/drift/removal exchanges fit the default 5,000-byte
+response limit, including an exchange through real loopback TLS. Smaller client
+budgets or unusually long protocol headers can still block delivery with
+`message_size`; configuration is never silently split or changed to fit.
+
+Only a completed configuration unlocks verification. A completed read batch with
+404 or other failed Get statuses still permits later read-only batches, so the
+run retains evidence for the remaining settings. Sent or unknown work keeps the
+existing queue barrier. Until all batches complete, the run remains pending or
+reports its actual terminal interruption, with completed setting outcomes still
+available. Later matches cannot erase earlier drift or unreadable values.
+
+Each setting carries `EvidenceReceivedAt`, the server's completion time for its
+batch. This is neither a device timestamp nor a simultaneous snapshot. For
+version-2 runs, the whole collection must finish less than 15 minutes after the
+first verification delivery, with ordered delivery/receipt times. Otherwise a
+result that would be verified, removed or drifted is `verification_stale`; an
+existing failed/incomplete result remains failed/incomplete. All collected values
+remain available. This bounds gaps between sessions without pretending to
+provide continuous compliance. Reading historical evidence later does not age a
+completed run out of its original result.
 
 | Run outcome | Evidence |
 | --- | --- |
@@ -119,6 +146,7 @@ after policy conflict resolution. This distinction follows the
 | Drifted | A configured/effective value differs, is absent, or remains configured after requested removal |
 | Removed | Every selected Config node returns 404; effective values or absence are recorded separately |
 | Verification failed/incomplete | Required values/statuses cannot establish the result |
+| Verification stale | Version-2 observations exceed the collection window or lack ordered receipt/delivery times |
 | Failed, unknown, canceled, expired or abandoned | The underlying step retains its corresponding transport/lifecycle evidence |
 
 Removal does not claim that all effective policy disappeared. Another source or
@@ -147,6 +175,13 @@ Composite foreign keys bind each CSP step to its run's device, scope, creator,
 permission revision and exact creation/expiry timestamps. Step numbers preserve
 preflight/configuration/verification order for the common creation timestamp.
 Old custom CSP ciphertext keeps its original purpose and authority across upgrade.
+Migration 007 widens the step constraint from 0–2 to 0–6 without rewriting any
+run, request or result. Version-1 runs retain their original three command trees
+and result semantics. Retrying their original intent returns the same run after
+upgrade; it does not change the compiler version or repartition queued/sent work.
+Every version-2 batch is recompiled from protected intent and its exact step
+number before delivery, replay and protected reads. Swapping valid read trees
+between batches fails this binding just as substituting an arbitrary CSP does.
 
 Synthetic tests cover ranges/dependencies, explicit zero/false, separate apply
 and verification trees, removal, current platform/SKU/servicing evidence, support
@@ -154,12 +189,16 @@ dates, timezone boundaries and ESU separation. PostgreSQL tests exercise operato
 authority, multi-stage delivery, restart/replay, effective-value drift, removal,
 incompatible targets, scope/idempotency, cancellation/audit rollback, permission
 revision changes, substituted commands and upgrade of an existing CSP delivery.
-A real loopback TLS exchange advances all three typed stages on resumed
-connections and verifies the final policy result.
+Additional tests cover all 13 fields at 5,000 bytes, partial evidence, early
+404/500 statuses followed by later batches, exact queue capacity, cancellation
+with active/blocked reads, collection-window boundaries, reassigned read trees,
+and queued/sent legacy runs across migration. A real loopback TLS exchange
+advances all seven steps on resumed connections and verifies the full policy.
 
-The final local PostgreSQL 17/race suite passes in **51.294 seconds**, at **85.4%**
-package statement coverage. The typed policy fuzz target passes **502,874
-executions** in its 30-second local run. Vet and formatting checks pass.
+The full local PostgreSQL 17/race suite passes in **69.105 seconds**, at **85.5%**
+package statement coverage. The extended typed policy fuzz target, including both
+compiler versions and exact batch reassembly, passes **23,726 executions** in its
+30-second local run. Vet and formatting checks pass.
 CI includes the target, PostgreSQL/race tests, native Windows portable tests
 and both platform builds. Full CI for this update extension is pending.
 

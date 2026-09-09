@@ -3,6 +3,7 @@ package windows
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
@@ -12,7 +13,7 @@ type UpdateRunDetail struct {
 	Name     string                 `json:"-" xml:"-"`
 	Policy   UpdatePolicy           `json:"-" xml:"-"`
 	Platform UpdatePlatform         `json:"-" xml:"-"`
-	Steps    [3]CSPCommand          `json:"-" xml:"-"`
+	Steps    []CSPCommand           `json:"-" xml:"-"`
 	Outcomes []UpdateSettingOutcome `json:"-" xml:"-"`
 	Phase    string                 `json:"-" xml:"-"`
 	Reason   string                 `json:"-" xml:"-"`
@@ -58,8 +59,12 @@ func (s *Store) readUpdateRunDetails(ctx context.Context, tx *sql.Tx, actor stri
 	if err != nil {
 		return nil, err
 	}
-	detail := &UpdateRunDetail{Run: run.UpdateRun, Name: intent.Name, Policy: intent.Policy, Outcomes: []UpdateSettingOutcome{}}
-	var results [3]*cspStoredResult
+	commands, err := updateRunCommands(intent, run.Mode == "remove")
+	if err != nil {
+		return nil, err
+	}
+	detail := &UpdateRunDetail{Run: run.UpdateRun, Name: intent.Name, Policy: intent.Policy, Steps: make([]CSPCommand, len(commands)), Outcomes: []UpdateSettingOutcome{}}
+	results := make([]*cspStoredResult, len(commands))
 	for step := range detail.Steps {
 		command, result, err := s.updateRunStep(ctx, tx, run, step)
 		if err != nil {
@@ -68,38 +73,109 @@ func (s *Store) readUpdateRunDetails(ctx context.Context, tx *sql.Tx, actor stri
 		detail.Steps[step] = command.CSPCommand
 		results[step] = result
 	}
-	detail.Platform = assessUpdatePlatform(intent.Policy, results[0].Exchange)
-	for step, command := range detail.Steps {
-		names := [3]string{"preflight", "configuration", "verification"}
-		detail.Reason = results[step].Reason
-		switch command.Phase {
-		case "queued", "blocked", "sent":
-			detail.Phase = names[step] + "_pending"
-		case "unknown", "abandoned", "canceled", "expired":
-			detail.Phase = command.Phase
-		case "failed":
-			detail.Phase = names[step] + "_failed"
-		case "acknowledged":
-			if step == 0 && !detail.Platform.Compatible {
-				detail.Phase, detail.Reason = "unsupported", detail.Platform.Reason
-			} else if step != 2 {
-				continue
-			}
-		default:
-			return nil, ErrAuthoritySecret
-		}
-		if step == 2 && (command.Phase == "acknowledged" || command.Phase == "failed") {
-			detail.Outcomes, detail.Phase, err = evaluateUpdateReadback(intent.Policy, run.Mode == "remove", results[step].Exchange)
-			if err != nil {
-				return nil, err
-			}
-		}
-		break
+	if err := updateRunOutcome(detail, intent, results); err != nil {
+		return nil, err
 	}
 	if err := auditUpdateRun(ctx, tx, run, actor, "run.read"); err != nil {
 		return nil, err
 	}
 	return detail, nil
+}
+
+// Outcomes are historical, ordered observations. Later successful batches must
+// neither erase earlier drift/errors nor turn a partial collection into success.
+func updateRunOutcome(detail *UpdateRunDetail, intent *updateIntent, results []*cspStoredResult) error {
+	batches, err := updateVerificationSettings(intent)
+	if err != nil || len(results) != len(batches)+2 || len(detail.Steps) != len(results) {
+		return ErrAuthoritySecret
+	}
+	for _, result := range results {
+		if result == nil {
+			return ErrAuthoritySecret
+		}
+	}
+	detail.Outcomes = []UpdateSettingOutcome{}
+	detail.Platform = assessUpdatePlatform(intent.Policy, results[0].Exchange)
+	aggregate := "verified"
+	if detail.Run.Mode == "remove" {
+		aggregate = "removed"
+	}
+	aggregateReason := ""
+	for step, command := range detail.Steps {
+		name := "verification"
+		if step < 2 {
+			name = []string{"preflight", "configuration"}[step]
+		}
+		detail.Reason = results[step].Reason
+		switch command.Phase {
+		case "queued", "blocked", "sent":
+			detail.Phase = name + "_pending"
+			return nil
+		case "unknown", "abandoned", "canceled", "expired":
+			detail.Phase = command.Phase
+			return nil
+		case "failed", "acknowledged":
+			if step < 2 {
+				if command.Phase == "failed" {
+					detail.Phase = name + "_failed"
+					return nil
+				}
+				if step == 0 && !detail.Platform.Compatible {
+					detail.Phase, detail.Reason = "unsupported", detail.Platform.Reason
+					return nil
+				}
+				continue
+			}
+		default:
+			return ErrAuthoritySecret
+		}
+		outcomes, phase, err := evaluateUpdateSettingsReadback(batches[step-2], detail.Run.Mode == "remove", results[step].Exchange)
+		if err != nil {
+			return err
+		}
+		for i := range outcomes {
+			outcomes[i].EvidenceReceivedAt = command.CompletedAt
+		}
+		detail.Outcomes = append(detail.Outcomes, outcomes...)
+		if updateVerificationPriority(phase) > updateVerificationPriority(aggregate) {
+			aggregate, aggregateReason = phase, results[step].Reason
+		}
+	}
+	detail.Phase, detail.Reason = aggregate, aggregateReason
+	if intent.Version == 2 && updateVerificationPriority(aggregate) <= 1 && !updateVerificationWindow(detail.Steps[2:]) {
+		detail.Phase, detail.Reason = "verification_stale", "update_verification_window_exceeded"
+	}
+	return nil
+}
+
+func updateVerificationPriority(phase string) int {
+	switch phase {
+	case "verification_incomplete":
+		return 3
+	case "verification_failed":
+		return 2
+	case "drifted":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// Bound the entire collection from first delivery through last receipt, including
+// session gaps and chunked replies. Reading an old completed run does not change
+// its historical result merely because time has since elapsed.
+func updateVerificationWindow(steps []CSPCommand) bool {
+	if len(steps) == 0 || steps[0].DeliveredAt == nil {
+		return false
+	}
+	start, previous := *steps[0].DeliveredAt, *steps[0].DeliveredAt
+	for _, step := range steps {
+		if step.DeliveredAt == nil || step.CompletedAt == nil || step.DeliveredAt.Before(previous) || step.CompletedAt.Before(*step.DeliveredAt) || !step.CompletedAt.Before(start.Add(15*time.Minute)) {
+			return false
+		}
+		previous = *step.CompletedAt
+	}
+	return true
 }
 
 func (s *Store) UpdateRuns(ctx context.Context, actor string, scope access.Scope, deviceID string, offset, limit int) ([]*UpdateRunDetail, error) {
@@ -176,11 +252,16 @@ func (s *Store) CancelUpdateRun(ctx context.Context, actor string, scope access.
 	if err != nil {
 		return err
 	}
-	if _, err := s.openUpdateRun(run); err != nil {
+	intent, err := s.openUpdateRun(run)
+	if err != nil {
+		return err
+	}
+	commands, err := updateRunCommands(intent, run.Mode == "remove")
+	if err != nil {
 		return err
 	}
 	changed := false
-	for step := 0; step < 3; step++ {
+	for step := range commands {
 		c, result, err := s.updateRunStep(ctx, tx, run, step)
 		if err != nil {
 			return err
