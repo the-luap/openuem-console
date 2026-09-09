@@ -217,6 +217,7 @@ func TestProfileRevisionMigrationRetainsOnlyKnownLegacyPayload(t *testing.T) {
 	s := testStore(t)
 	testSettings(t, s, 1)
 	// Reconstruct the pre-029 schema only inside this isolated test database.
+	adeExec(t, s, `DROP TABLE mdm_apple_ade_sso_repairs; DROP TABLE mdm_apple_ade_device_sso; DROP TABLE mdm_apple_ade_profile_sso; DROP FUNCTION mdm_apple_ade_sso_repair_immutable(); DROP FUNCTION mdm_apple_ade_sso_requirement_guard(); DROP FUNCTION mdm_apple_ade_sso_policy_guard(); DELETE FROM mdm_apple_migrations WHERE name='migrations/031_ade_platform_sso.sql'`)
 	adeExec(t, s, `ALTER TABLE mdm_apple_profiles DROP CONSTRAINT mdm_apple_profile_current_revision; ALTER TABLE mdm_apple_profiles DROP COLUMN revision_id; DROP TABLE mdm_apple_profile_revisions; DROP FUNCTION mdm_apple_profile_revision_immutable(); DELETE FROM mdm_apple_migrations WHERE name='migrations/029_profile_revisions.sql'`)
 	p, err := ParseProfile(revisionWiFi(t, "Legacy configuration", "synthetic-legacy-secret"))
 	if err != nil {
