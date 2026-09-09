@@ -70,9 +70,7 @@ func certificateCompositionSource(data []byte, scope string, identity bool) ([]m
 			case "com.apple.security.pkcs12":
 				err = validatePKCS12Payload(p, scope, nil)
 			case "com.apple.ADCertificate.managed":
-				if !certificateText(p["CertServer"], 512, false) || !certificateText(p["CertTemplate"], 512, false) {
-					err = errors.New("Active Directory identities require a certificate server and template")
-				}
+				err = validateADCertificatePayload(p, scope, nil)
 			default:
 				err = errors.New("select an ACME, SCEP, PKCS12 or Active Directory certificate identity profile")
 			}

@@ -38,9 +38,10 @@ copies with new payload UUIDs: one issuer/client identity can serve only one
 enrollment. PKCS12 copies preserve the same imported private key and password.
 Private-key possession and password correctness remain device/issuer checks.
 
-Active Directory identities require macOS. Composition checks the required
-certificate server and template, while the broader AD Certificate property schema,
-directory binding and CA authorization remain outside this editor.
+Active Directory identities require macOS. Composition applies the
+[AD Certificate field and target checks](apple-ad-certificates.md), including
+credential prompting and automatic renewal restrictions. Directory binding and
+CA authorization remain external prerequisites.
 
 ## Network and trust settings
 

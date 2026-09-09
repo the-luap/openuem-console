@@ -30,8 +30,9 @@ revision and encrypted history without queuing a replacement.
 
 This checks binding and payload type. Existing certificate and channel validators
 retain their own responsibilities. It does not prove private-key possession,
-issuer acceptance, successful EAP authentication, or full Active Directory
-certificate schema coverage. The [EAP-TLS composer](apple-enterprise-wifi.md) now
+issuer acceptance or successful EAP authentication. Active Directory certificate
+fields and targets have [separate validation](apple-ad-certificates.md).
+The [EAP-TLS composer](apple-enterprise-wifi.md) now
 copies selected certificate revisions into one configuration, with local bindings
 and target checks. Broader Wi-Fi/VPN settings and physical network acceptance
 remain separate roadmap work.
