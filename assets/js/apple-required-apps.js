@@ -11,6 +11,7 @@
       const nextButton = root.querySelector("[data-app-next]");
       const maximum = Number(root.dataset.maximum);
       const selected = new Map();
+      const selectedButtons = new Map();
       let options = [], next = "", query = "", request;
       function button(label, action) {
         const element = document.createElement("button");
@@ -28,13 +29,17 @@
       }
       function render() {
         selectedList.replaceChildren();
+        selectedButtons.clear();
         selected.forEach(item => {
           const li = row(item.label), hidden = document.createElement("input");
           hidden.type = "hidden"; hidden.name = root.dataset.input; hidden.value = item.id;
-          li.append(hidden, button("Remove selection", () => {
+          const remove = button("Remove selection", () => {
             selected.delete(item.package); render(); input.focus();
             status.textContent = `${selected.size} revision(s) selected.`;
-          }));
+          });
+          remove.setAttribute("aria-label", `Remove ${item.label}`);
+          selectedButtons.set(item.id, remove);
+          li.append(hidden, remove);
           selectedList.append(li);
         });
         if (!selected.size) selectedList.append(row("No revisions selected."));
@@ -47,8 +52,9 @@
             if (maximum === 1) selected.clear();
             selected.set(item.package, item); render();
             status.textContent = `${selected.size} revision(s) selected.`;
-            selectedList.querySelector("button").focus();
+            selectedButtons.get(item.id).focus();
           });
+          select.setAttribute("aria-label", `${chosen?.id === item.id ? "Selected" : "Select revision"}: ${item.label}`);
           select.disabled = chosen?.id === item.id || maximum > 1 && (!!chosen || selected.size >= maximum);
           li.append(select); results.append(li);
         });
