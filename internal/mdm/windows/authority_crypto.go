@@ -51,10 +51,14 @@ func newAuthoritySecretBox(encoded string) (*authoritySecretBox, error) {
 }
 
 func (b *authoritySecretBox) seal(data []byte, purpose string) ([]byte, error) {
+	return b.sealBounded(data, purpose, maxAuthoritySecretBytes)
+}
+
+func (b *authoritySecretBox) sealBounded(data []byte, purpose string, maximum int) ([]byte, error) {
 	if b == nil {
 		return nil, ErrMasterKey
 	}
-	if len(data) == 0 || len(data) > maxAuthoritySecretBytes || len(purpose) == 0 || len(purpose) > 1024 {
+	if len(data) == 0 || len(data) > maximum || len(purpose) == 0 || len(purpose) > 1024 {
 		return nil, ErrAuthoritySecret
 	}
 	nonce := make([]byte, 1+b.aead.NonceSize())
@@ -66,11 +70,15 @@ func (b *authoritySecretBox) seal(data []byte, purpose string) ([]byte, error) {
 }
 
 func (b *authoritySecretBox) open(data []byte, purpose string) ([]byte, error) {
+	return b.openBounded(data, purpose, maxAuthoritySecretBytes)
+}
+
+func (b *authoritySecretBox) openBounded(data []byte, purpose string, maximum int) ([]byte, error) {
 	if b == nil {
 		return nil, ErrMasterKey
 	}
 	n := b.aead.NonceSize()
-	if len(data) <= 1+n+b.aead.Overhead() || len(data) > 1+n+b.aead.Overhead()+maxAuthoritySecretBytes || data[0] != 1 || len(purpose) == 0 || len(purpose) > 1024 {
+	if len(data) <= 1+n+b.aead.Overhead() || len(data) > 1+n+b.aead.Overhead()+maximum || data[0] != 1 || len(purpose) == 0 || len(purpose) > 1024 {
 		return nil, ErrAuthoritySecret
 	}
 	plain, err := b.aead.Open(nil, data[1:1+n], data[1+n:], []byte(purpose))

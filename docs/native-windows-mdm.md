@@ -5,12 +5,13 @@ WIN-02 is in progress. The first native protocol component is discovery in
 OpenUEM agent. The package currently contains a bounded SOAP/XML decoder, a
 discovery response builder, an immutable HTTPS discovery handler, an OnPremise
 XCEP request decoder, a PostgreSQL enrollment credential store, protected
-organization CAs and an authenticated XCEP policy handler. These components
+organization CAs, an authenticated XCEP policy handler and the [initial WSTEP
+issuance/provisioning service](native-windows-enrollment.md). These components
 are not registered in a production listener, gateway or console flow.
 
-This does not yet enroll Windows, issue a device certificate or apply a CSP.
-WSTEP issuance, durable device identities, provisioning,
-SyncML commands and results, policy/update workflows, certificate renewal,
+Initial certificate issuance and bootstrap provisioning are implemented and
+tested synthetically. A real Windows management session and applied CSP are
+not yet demonstrated. SyncML commands/results, policy/update workflows, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
 
@@ -82,8 +83,9 @@ Tests use synthetic accounts and local TLS servers. They cover wire namespaces,
 version and policy negotiation, endpoint binding, parser/HTTP rejection cases,
 exact body limits, complete HTTP/1.1 responses, SOAP faults, read-only probes and
 24 concurrent request correlations. Response XML is decoded independently with
-Go's standard namespace resolver. No device certificate is issued or installed, no
-Windows account/settings are changed and no external enrollment service is used.
+Go's standard namespace resolver. These discovery/policy cases do not issue or
+install a device certificate, change Windows settings or call an external service.
+The subsequent WSTEP tests issue certificates only inside isolated fixtures.
 
 The discovery-only local race baseline passes with 97.0% statement coverage.
 An initial 30-second parser
@@ -179,10 +181,11 @@ expired, revoked and already consumed credentials share one credential error.
 The private `withEnrollmentCredential` transaction helper locks an active
 invitation for update, holds its permission and site locks through the supplied
 issuance work, rechecks database time, records one consumption and audits it.
-Its tests use a synthetic issuance row. WSTEP still must connect verified CSR
-processing and the complete certificate/provisioning response to this transaction,
-including durable retries of the same CSR. The helper alone does not issue a
-certificate or establish a managed device identity.
+Its original tests use a synthetic issuance row. The subsequent `EnrollWindows`
+service now performs verified CSR processing, scoped certificate issuance and
+encrypted provisioning in a transaction using the same authorization/consumption
+boundaries. It adds durable, exact retries of the completed result; see
+[initial certificate enrollment](native-windows-enrollment.md).
 
 Concurrent consumption admits one callback. Issuer errors, audit errors,
 cancellation and expiry during the callback roll back all work and consumption.
@@ -214,8 +217,9 @@ Each test creates and removes its own random schema. It rejects other endpoints;
 GitHub Actions uses its declared disposable PostgreSQL service on port 5432.
 The Linux CI step now supplies this variable. The native Windows job runs the
 portable protocol tests without PostgreSQL, so it does not prove database
-execution on Windows. Physical enrollment, credential UI integration, device
-certificate issuance and public-route admission limits remain open.
+execution on Windows. Physical enrollment, credential UI integration and
+public-route admission limits remain open. Initial certificate issuance is now
+covered separately in the [WSTEP implementation](native-windows-enrollment.md).
 
 ## Protected organization CA and authenticated policy service
 
@@ -281,15 +285,17 @@ initializations, immutable SQL constraints, upgrade from the credential schema,
 audit rollback, credential expiry while policy audit waits, complete XCEP element
 order/namespaces/OID references, bounded HTTP rejection and real loopback HTTPS
 policy requests against PostgreSQL. Parallel requests preserve their individual
-correlations and produce read audits without consuming an invitation. Root
-certificates are generated only for isolated tests; none are installed and no
-device certificate is issued. The final local PostgreSQL 17 race suite passes in
-11.614 seconds with 91.9% combined package statement coverage. `go vet`, formatting,
-local documentation links and whitespace checks also pass. The current CA/policy
-change still needs its own complete CI execution evidence; the green credential
-runs above cover the preceding commit. CI runs the portable CA/protocol tests on native Windows and the
-complete database suite with race detection on Linux. Real Windows enrollment,
-WSTEP/CSR proof, provisioning, SyncML/CSP and physical acceptance remain open.
+correlations and produce read audits without consuming an invitation. The CA/policy
+baseline generated only test roots and installed no certificates. Its final local
+PostgreSQL 17 race suite passed in 11.614 seconds with 91.9% package coverage.
+Both complete workflows now pass for CA/policy commit `a1f6353`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34393147636),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34393152518)).
+They include native Windows checks, Linux PostgreSQL/race/fuzz tests, the existing
+console/browser regressions and both platform builds. The subsequent
+[WSTEP implementation](native-windows-enrollment.md) records its own local
+issuance/replay/provisioning evidence. Real Windows management sessions,
+SyncML/CSP and physical acceptance remain open.
 
 ## Sources
 

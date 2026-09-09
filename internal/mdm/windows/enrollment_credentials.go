@@ -176,7 +176,7 @@ func (s *Store) RevokeEnrollmentInvitation(ctx context.Context, actor string, sc
 
 // CheckPolicyCredential authorizes only the current read-only policy request.
 // It does not reserve or consume the invitation and is not an issuance grant.
-// WSTEP must use withEnrollmentCredential in its own issuance transaction.
+// WSTEP rechecks this credential in its own issuance/replay transaction.
 func (s *Store) CheckPolicyCredential(ctx context.Context, credential UsernameCredential) (*EnrollmentInvitation, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -194,6 +194,22 @@ func (s *Store) CheckPolicyCredential(ctx context.Context, credential UsernameCr
 }
 
 func (s *Store) authorizeEnrollmentCredential(ctx context.Context, tx *sql.Tx, credential UsernameCredential, consuming bool) (*EnrollmentInvitation, error) {
+	use := credentialPolicyRead
+	if consuming {
+		use = credentialFirstIssue
+	}
+	return s.authorizeEnrollmentCredentialUse(ctx, tx, credential, use)
+}
+
+type enrollmentCredentialUse uint8
+
+const (
+	credentialPolicyRead enrollmentCredentialUse = iota
+	credentialFirstIssue
+	credentialIssueOrReplay
+)
+
+func (s *Store) authorizeEnrollmentCredentialUse(ctx context.Context, tx *sql.Tx, credential UsernameCredential, use enrollmentCredentialUse) (*EnrollmentInvitation, error) {
 	if tx == nil || !validEnrollmentUsername(credential.Username) {
 		return nil, ErrCredential
 	}
@@ -230,10 +246,10 @@ func (s *Store) authorizeEnrollmentCredential(ctx context.Context, tx *sql.Tx, c
 		return nil, ErrCredential
 	}
 	lock := " FOR SHARE"
-	if consuming {
+	if use != credentialPolicyRead {
 		lock = " FOR UPDATE"
 	}
-	current, err := scanInvitation(tx.QueryRowContext(ctx, `SELECT `+invitationColumns+` FROM mdm_windows_invitations WHERE id=$1 AND created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND consumed_at IS NULL`+lock, id))
+	current, err := scanInvitation(tx.QueryRowContext(ctx, `SELECT `+invitationColumns+` FROM mdm_windows_invitations WHERE id=$1 AND created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND ($2 OR consumed_at IS NULL)`+lock, id, use == credentialIssueOrReplay))
 	if errors.Is(err, ErrNotFound) {
 		return nil, ErrCredential
 	}
@@ -242,7 +258,7 @@ func (s *Store) authorizeEnrollmentCredential(ctx context.Context, tx *sql.Tx, c
 	}
 	// Recheck the database clock after any wait for the row lock. A transaction
 	// start timestamp or a predicate evaluated before waiting can be stale.
-	if err := activeEnrollmentInvitation(ctx, tx, id); err != nil {
+	if err := activeEnrollmentInvitationUse(ctx, tx, id, use == credentialIssueOrReplay); err != nil {
 		return nil, err
 	}
 	return current, nil
@@ -250,8 +266,12 @@ func (s *Store) authorizeEnrollmentCredential(ctx context.Context, tx *sql.Tx, c
 
 // The invitation and its scope/permissions must already be locked by the caller.
 func activeEnrollmentInvitation(ctx context.Context, tx *sql.Tx, id string) error {
+	return activeEnrollmentInvitationUse(ctx, tx, id, false)
+}
+
+func activeEnrollmentInvitationUse(ctx context.Context, tx *sql.Tx, id string, allowReplay bool) error {
 	var active bool
-	if err := tx.QueryRowContext(ctx, `SELECT created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND consumed_at IS NULL FROM mdm_windows_invitations WHERE id=$1`, id).Scan(&active); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT created_at<=clock_timestamp() AND expires_at>clock_timestamp() AND revoked_at IS NULL AND (consumed_at IS NULL OR ($2 AND consumed_at<=clock_timestamp() AND consumed_at>clock_timestamp()-INTERVAL '10 minutes')) FROM mdm_windows_invitations WHERE id=$1`, id, allowReplay).Scan(&active); err != nil {
 		return err
 	}
 	if !active {
@@ -260,9 +280,9 @@ func activeEnrollmentInvitation(ctx context.Context, tx *sql.Tx, id string) erro
 	return nil
 }
 
-// Keep private until the WSTEP issuer persists a verified CSR and its complete
-// response through this transaction. A callback failure or late expiry rolls
-// back both work and consumption. A policy check alone never enters this path.
+// A callback failure or late expiry rolls back both work and consumption. This
+// helper exercises the first-use transaction boundary; WSTEP also supports a
+// strictly bound durable response replay through credentialIssueOrReplay.
 func (s *Store) withEnrollmentCredential(ctx context.Context, credential UsernameCredential, issue func(context.Context, *sql.Tx, EnrollmentInvitation) error) error {
 	if issue == nil {
 		return ErrInvitation
@@ -279,6 +299,13 @@ func (s *Store) withEnrollmentCredential(ctx context.Context, credential Usernam
 	if err := issue(ctx, tx, *invitation); err != nil {
 		return err
 	}
+	if err := consumeEnrollmentInvitation(ctx, tx, *invitation); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func consumeEnrollmentInvitation(ctx context.Context, tx *sql.Tx, invitation EnrollmentInvitation) error {
 	result, err := tx.ExecContext(ctx, `WITH stamp AS (SELECT clock_timestamp() AS at) UPDATE mdm_windows_invitations SET consumed_at=stamp.at FROM stamp WHERE id=$1 AND created_at<=stamp.at AND expires_at>stamp.at AND revoked_at IS NULL AND consumed_at IS NULL`, invitation.ID)
 	if err != nil {
 		return err
@@ -290,8 +317,5 @@ func (s *Store) withEnrollmentCredential(ctx context.Context, credential Usernam
 	if count != 1 {
 		return ErrCredential
 	}
-	if err := auditInvitation(ctx, tx, *invitation, "windows-enrollment", "invitation.consumed"); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return auditInvitation(ctx, tx, invitation, "windows-enrollment", "invitation.consumed")
 }
