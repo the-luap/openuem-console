@@ -30,11 +30,12 @@ func macAppRetireDispatched(t *testing.T, s *Store, d *Device, v *SoftwareVersio
 func TestMacAppReenrollmentRequiresExplicitImmutableStoppingEvidence(t *testing.T) {
 	s, old, v := macAppFixture(t)
 	scope := Scope{TenantID: 1, SiteID: 1}
+	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
 	attempt := macAppRetireDispatched(t, s, old, v)
 	current, _, _ := testEnrollPlatformWithKey(t, s, scope, "Reenrolled Mac", "Mac16,1", "15.0", old.UDID)
 	drainMacInventory(t, s, current)
 	// Case-folding also covers legacy rows whose spelling changed.
-	adeExec(t, s, `UPDATE mdm_apple_devices SET udid=upper(udid),site_id=2,name='Earlier <Site>' WHERE id=$1`, old.ID)
+	adeExec(t, s, `UPDATE mdm_apple_devices SET udid=upper(udid),site_id=3,name='Earlier <Site>' WHERE id=$1`, old.ID)
 	if err := s.installMacApp(t.Context(), scope, current.ID, v.ID, "admin", MacAppInstallOptions{}, nil); !errors.Is(err, ErrMacAppPriorEnrollment) {
 		t.Fatal("reenrollment replayed an unknown installer", err)
 	}
@@ -43,6 +44,29 @@ func TestMacAppReenrollmentRequiresExplicitImmutableStoppingEvidence(t *testing.
 	}
 	if risk, err := s.MacAppEnrollmentRisk(t.Context(), scope, current.ID); err != nil || !risk.Unresolved || risk.ActiveIdentity {
 		t.Fatal("missing earlier enrollment risk", risk, err)
+	}
+	// Only the same organization, physical identity and package share an
+	// unresolved mutation guard. Other scoped operations remain independent.
+	otherPackage := testMacAppPackage()
+	otherPackage.Identifier = "com.example.OtherEditor"
+	otherVersion, err := s.publishMacAppPackage(t.Context(), Scope{TenantID: 1}, otherPackage, "admin", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.installMacApp(t.Context(), scope, current.ID, otherVersion.ID, "admin", MacAppInstallOptions{}, nil); err != nil {
+		t.Fatal("unrelated package was blocked", err)
+	}
+	otherApps, _, err := s.MacApps(t.Context(), scope, current.ID, "")
+	if err != nil || len(otherApps) != 1 {
+		t.Fatal("independent package missing", err)
+	}
+	if err = s.changeMacApp(t.Context(), scope, current.ID, otherApps[0].ID, "cancel", "admin", nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, identity := range []Device{{TenantID: 2, ID: uuid.NewString(), UDID: current.UDID}, {TenantID: 1, ID: uuid.NewString(), UDID: uuid.NewString()}, {TenantID: 1, ID: uuid.NewString()}} {
+		if risk, err := macAppEnrollmentRisk(t.Context(), s.db, &identity, v.PackageID); err != nil || risk.Blocked() {
+			t.Fatal("risk crossed tenant or physical identity", risk, err)
+		}
 	}
 	if _, _, _, _, err := s.MacAppPriorAttempts(t.Context(), scope, current.ID, "", "admin", nil); !errors.Is(err, access.ErrDenied) {
 		t.Fatal("unauthorized history disclosed earlier site", err)
@@ -116,12 +140,13 @@ func TestMacAppReenrollmentRequiresExplicitImmutableStoppingEvidence(t *testing.
 func TestMacAppReenrollmentDeliveryGuardAndAtomicEvidence(t *testing.T) {
 	s, d, v := macAppFixture(t)
 	scope := Scope{TenantID: 1, SiteID: 1}
+	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
 	if err := s.installMacApp(t.Context(), scope, d.ID, v.ID, "admin", MacAppInstallOptions{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	// A legacy case-variant identity appears after this operation was queued.
 	other := uuid.NewString()
-	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,2,'Legacy duplicate','enrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 hour')`, other, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,3,'Legacy duplicate','enrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp()+interval '1 hour')`, other, d.UDID)
 	if wire := adeConnect(t, s, d, "Idle", "", nil); wire != nil {
 		t.Fatal("duplicate identity escaped delivery guard")
 	}
@@ -159,8 +184,9 @@ func TestMacAppReenrollmentDeliveryGuardAndAtomicEvidence(t *testing.T) {
 
 func TestADERequiredApplicationWaitsForPriorEnrollmentStoppingEvidence(t *testing.T) {
 	s, d, v, _ := adeAppFixture(t)
+	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
 	old, assignment, attempt := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,2,'Prior ADE Mac','unenrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp())`, old, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at) VALUES($1,1,3,'Prior ADE Mac','unenrolled',upper($2),'Mac16,1','15.0','manual_device','macos',clock_timestamp())`, old, d.UDID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status) VALUES($1,1,$2,$3,$4,'present','not_managed')`, assignment, old, v.PackageID, v.ID)
 	adeExec(t, s, `INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,dispatched_at) VALUES($1,1,$2,$3,$4,$5,'install','{}','uncertain','admin',clock_timestamp())`, attempt, old, v.PackageID, assignment, v.ID)
 	adeSetupReady(t, s, d)
@@ -187,5 +213,43 @@ func TestADERequiredApplicationWaitsForPriorEnrollmentStoppingEvidence(t *testin
 	wire = adeConnect(t, s, d, "Acknowledged", wire["CommandUUID"].(string), nil)
 	if wire = adeAppReports(t, s, d, wire, "42.0"); wire == nil || wire["Command"].(map[string]any)["RequestType"] != "DeviceConfigured" {
 		t.Fatal("verified resumed app did not release Setup Assistant")
+	}
+}
+
+func TestMacAppPriorEnrollmentHistoryIsBoundedAndScoped(t *testing.T) {
+	s, d, v := macAppFixture(t)
+	adeExec(t, s, `INSERT INTO sites VALUES(3,1)`)
+	adeExec(t, s, `INSERT INTO mdm_apple_devices(id,tenant_id,site_id,name,status,udid,model,os_version,enrollment_method,enrollment_platform,invite_expires_at)
+ SELECT md5('prior-device-'||n)::uuid,1,3,'Earlier Mac','unenrolled',$1,'Mac16,1','15.0','manual_device','macos',clock_timestamp() FROM generate_series(1,102) n`, d.UDID)
+	adeExec(t, s, `INSERT INTO mdm_apple_app_assignments(id,tenant_id,device_id,package_id,version_id,desired,status)
+ SELECT md5('prior-assignment-'||n)::uuid,1,md5('prior-device-'||n)::uuid,$1,$2,'present','not_managed' FROM generate_series(1,102) n`, v.PackageID, v.ID)
+	adeExec(t, s, `INSERT INTO mdm_apple_app_attempts(id,tenant_id,device_id,package_id,assignment_id,version_id,operation,options,status,requested_by,dispatched_at,created_at)
+ SELECT md5('prior-attempt-'||n)::uuid,1,md5('prior-device-'||n)::uuid,$1,md5('prior-assignment-'||n)::uuid,$2,'install','{}','uncertain','admin',clock_timestamp(),clock_timestamp()-n*interval '1 minute' FROM generate_series(1,102) n`, v.PackageID, v.ID)
+	scope := Scope{TenantID: 1, SiteID: 1}
+	_, risk, first, next, err := s.macAppPriorAttempts(t.Context(), scope, d.ID, "", nil)
+	if err != nil || !risk.Unresolved || len(first) != 100 || next != first[99].ID {
+		t.Fatal("prior history was not bounded", err)
+	}
+	_, _, last, after, err := s.macAppPriorAttempts(t.Context(), scope, d.ID, next, nil)
+	if err != nil || len(last) != 2 || after != "" {
+		t.Fatal("prior history cursor lost rows", err)
+	}
+	seen := map[string]bool{}
+	for _, item := range append(first, last...) {
+		if seen[item.ID] {
+			t.Fatal("history page repeated an operation")
+		}
+		seen[item.ID] = true
+	}
+	for _, foreign := range []Scope{{TenantID: 1, SiteID: 3}, {TenantID: 2}} {
+		if _, _, _, _, err = s.macAppPriorAttempts(t.Context(), foreign, d.ID, "", nil); !errors.Is(err, ErrNotFound) {
+			t.Fatal("history disclosed another scoped target", err)
+		}
+	}
+	if _, _, _, _, err = s.macAppPriorAttempts(t.Context(), scope, d.ID, uuid.NewString(), nil); !errors.Is(err, ErrNotFound) {
+		t.Fatal("unknown cursor accepted", err)
+	}
+	if _, _, _, _, err = s.macAppPriorAttempts(t.Context(), scope, d.ID, "invalid", nil); !errors.Is(err, ErrMacApp) {
+		t.Fatal("malformed cursor accepted", err)
 	}
 }
