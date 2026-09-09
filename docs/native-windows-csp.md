@@ -5,7 +5,9 @@ The Windows store now connects administrative command intent to the
 custom CSP operations, persists a scoped encrypted queue, delivers eligible work
 after mutual authentication and the DevId probe, and records correlated device
 statuses and Get results. All local device exchanges use synthetic fixtures.
-Production console/gateway wiring and physical Windows acceptance remain open.
+The [typed update extension](native-windows-updates.md) adds an operator-authorized
+preflight/configuration/read-back workflow on this service. Production
+console/gateway wiring and physical Windows acceptance remain open.
 
 ## Administrative command boundary
 
@@ -163,9 +165,11 @@ The final local PostgreSQL 17/race suite passes in **49.024 seconds**, with
 **86.4%** Windows package statement coverage. The compiler fuzz run passes after
 **622,469 executions** and the structured result-transition run after
 **21,261 executions**, each with a 30-second budget. Vet, formatting, whitespace
-and local documentation-target checks pass. Full CI for this CSP change is
-pending; the preceding session commit has both complete workflows green as
-recorded in the session document.
+and local documentation-target checks pass. Both complete workflows pass for CSP
+commit `a03800e`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34412236916),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34412241887)).
+The subsequent typed update extension records its own evidence separately.
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows ./internal/security/access
@@ -175,7 +179,8 @@ go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=30s -parallel=2 ./
 
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 No test executes a command, installs a profile/certificate or changes host settings.
-Remaining WIN-02 work includes typed configuration/update policies and verified
-read-back, update rings, outgoing chunking, command/result console views,
+The typed update extension adds selected update policies and verified read-back.
+Remaining WIN-02 work includes broader typed configuration policies, versioned
+update rings, outgoing chunking, command/result console views,
 production enrollment and gateway flows, renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

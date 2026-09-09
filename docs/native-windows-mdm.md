@@ -10,13 +10,14 @@ issuance/provisioning service](native-windows-enrollment.md), plus [direct TLS
 device identity and OMA DM digest verification](native-windows-management.md), and
 the [bounded SyncML XML codec](native-windows-syncml.md) and
 [durable authenticated sessions with a read-only identity probe](native-windows-sessions.md),
-plus [scoped CSP command delivery and results](native-windows-csp.md). These components
+plus [scoped CSP command delivery and results](native-windows-csp.md) and
+[typed update policy runs with effective-value verification](native-windows-updates.md). These components
 are not registered in a production listener, gateway or console flow.
 
 Initial certificate issuance and bootstrap provisioning are implemented and
 tested synthetically. A real Windows management session and applied CSP are
 not yet demonstrated on hardware. Administrative command/result views,
-typed policy/update workflows, certificate renewal,
+broader typed policies and versioned update rings, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
 

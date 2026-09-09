@@ -75,6 +75,8 @@ jobs:
         run: go test -run '^$' -fuzz='^FuzzCSPCompiler$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows CSP result transition fuzzing
         run: go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows typed update policy fuzzing
+        run: go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - run: go tool templ generate
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views

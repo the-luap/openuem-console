@@ -106,6 +106,8 @@ func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	_, result, key := managementTestEnrollment(t, s, options)
 	f := syncMLTestEnrolled(t, s, result, options)
 	queued := cspTestQueue(t, f, cspTestPolicy())
+	updatePolicy := UpdatePolicy{QualityDeadlineDays: updateTestInt(7)}
+	updateRun := updateTestQueue(t, f, updatePolicy, false)
 	var err error
 	handler, err = NewSyncMLHandler(s, options)
 	if err != nil {
@@ -166,6 +168,15 @@ func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	if !<-resumed {
 		t.Fatal("completion did not use resumed TLS")
 	}
+	for step := 0; step < 3; step++ {
+		final = post(syncMLTestWire(t, updateTestReply(syncMLTestParsed(t, final), updatePolicy, false, false)), http.StatusOK)
+		if !<-resumed {
+			t.Fatal("typed update step did not use resumed TLS")
+		}
+	}
+	if updateTestRead(t, f, updateRun.ID).Phase != "verified" {
+		t.Fatal("TLS update workflow did not verify effective policy")
+	}
 	if message := syncMLTestParsed(t, final); len(message.Commands) != 1 || message.Header.Credential != nil {
 		t.Fatal("unexpected completed exchange")
 	}
@@ -183,5 +194,5 @@ func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	if !<-resumed {
 		t.Fatal("revocation test did not use resumed TLS")
 	}
-	syncMLTestCounts(t, s, 1, 1, 3, 4)
+	syncMLTestCounts(t, s, 1, 1, 6, 4)
 }

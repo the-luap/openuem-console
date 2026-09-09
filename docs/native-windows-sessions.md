@@ -6,8 +6,10 @@ created by [WSTEP enrollment](native-windows-enrollment.md). It persists an
 authenticated exchange and an initial read-only `Get ./DevInfo/DevId` probe.
 It is not registered in a production gateway or console enrollment flow yet.
 The [CSP command extension](native-windows-csp.md) adds administrative queues and
-correlated results. Typed policies, updates, certificate renewal and unenrollment
-remain separate implementation work. WIN-02 remains in progress.
+correlated results. The [typed update extension](native-windows-updates.md) adds
+platform preflight and separate effective-policy read-back. Broader policies,
+update rings, certificate renewal and unenrollment remain open. WIN-02 remains
+in progress.
 
 ## HTTP and authorization
 

@@ -131,7 +131,7 @@ the table's package summaries do not remove any detail from the roadmap.
   commit `2c3c2ad`
   ([push](https://github.com/the-luap/openuem-console/actions/runs/34407599355),
   [pull request](https://github.com/the-luap/openuem-console/actions/runs/34407601208)).
-  Typed policy/update commands, console/gateway wiring, lifecycle and physical Windows
+  Broader typed policies, console/gateway wiring, lifecycle and physical Windows
   acceptance remain open; exchange completion does not prove policy compliance.
 - [Native Windows CSP commands](native-windows-csp.md) add an administrator-only
   compiler and scoped encrypted queue for Get/Add/Replace/Delete/Exec and bounded
@@ -142,10 +142,26 @@ the table's package summaries do not remove any detail from the roadmap.
   acknowledgment is separate from verified policy compliance. PostgreSQL, restart,
   real TLS, rollback, integrity and lifecycle tests pass. The final PostgreSQL/race
   suite passes in 49.024 seconds at 86.4% package coverage; compiler and structured
-  result-transition fuzzing pass after 622,469 and 21,261 executions. Full CI for
-  this CSP change is pending. Typed
-  policies/updates, command/result views, outgoing chunking, production wiring,
+  result-transition fuzzing pass after 622,469 and 21,261 executions. Both complete
+  workflows pass for CSP commit `a03800e`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34412236916),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34412241887)).
+  Broader typed policies, command/result views, outgoing chunking, production wiring,
   renewal/unenrollment and physical Windows acceptance remain open.
+- [Native Windows update policy runs](native-windows-updates.md) add explicit
+  deadlines, deferrals, grace periods, active hours, notifications and driver
+  policy. A scoped operator can create immutable apply/removal runs whose
+  generated CSP steps are bound to the saved typed intent. Authenticated current
+  platform/SKU evidence gates configuration; separate Config/Result reads detect
+  effective-value drift and source-specific removal. A dated release catalog
+  separates applicability, servicing support, LTSC dates and unknown ESU status.
+  PostgreSQL/race tests pass in 51.294 seconds at 85.4% package coverage, including
+  restart, cancellation/audit rollback, permission changes, substituted payloads,
+  migration and real TLS delivery of all three stages. The policy fuzz target
+  passes 502,874 executions; full CI for this extension is pending. Versioned
+  rings, scheduled group rollout, console/production wiring, continuous and
+  asynchronous reconciliation, actual update/restart results and hardware
+  acceptance remain open; verified policy values do not prove patch installation.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

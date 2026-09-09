@@ -64,7 +64,14 @@ func (s *Store) writeCSPResult(ctx context.Context, tx *sql.Tx, c *cspStoredComm
 }
 
 func (s *Store) authorizeCSPCreator(ctx context.Context, tx *sql.Tx, c *cspStoredCommand) error {
-	if err := s.permissions.AuthorizeTransaction(ctx, tx, c.CreatedBy, access.ManageWindowsCSP, c.Scope); err != nil {
+	capability := access.ManageWindowsCSP
+	if c.UpdateRunID != "" {
+		if _, _, err := s.updateRunForCommand(ctx, tx, c); err != nil {
+			return err
+		}
+		capability = access.ManageUpdates
+	}
+	if err := s.permissions.AuthorizeTransaction(ctx, tx, c.CreatedBy, capability, c.Scope); err != nil {
 		return err
 	}
 	var revision int64
@@ -105,6 +112,11 @@ func (s *Store) authorizeCSPReplay(ctx context.Context, tx *sql.Tx, identity Man
 	if err := checkCSPDeadline(ctx, tx, c); err != nil {
 		return nil, err
 	}
+	if reason, err := s.updateCommandEligibility(ctx, tx, c); err != nil {
+		return nil, err
+	} else if reason != "" {
+		return nil, ErrCSPAlreadySent
+	}
 	return c, nil
 }
 
@@ -124,6 +136,11 @@ func (s *Store) lockCurrentCSP(ctx context.Context, tx *sql.Tx, identity Managem
 	clear(payload)
 	if err != nil {
 		return nil, err
+	}
+	if c.UpdateRunID != "" {
+		if _, _, err := s.updateRunForCommand(ctx, tx, c); err != nil {
+			return nil, err
+		}
 	}
 	previous, err := s.openCSPResult(c)
 	if err != nil {
@@ -291,7 +308,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 		return nil, nil
 	}
 	for n := 0; n < 32; n++ {
-		c, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('queued','blocked') ORDER BY created_at,id LIMIT 1 FOR UPDATE`, identity.DeviceID, identity.TenantID, identity.SiteID))
+		c, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('queued','blocked') ORDER BY created_at,COALESCE(update_step,0),id LIMIT 1 FOR UPDATE`, identity.DeviceID, identity.TenantID, identity.SiteID))
 		if errors.Is(err, ErrNotFound) {
 			return nil, nil
 		}
@@ -325,6 +342,20 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 				return nil, err
 			}
 			if err := auditCSP(ctx, tx, c, "windows-device", "command."+cause); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if reason, err := s.updateCommandEligibility(ctx, tx, c); err != nil {
+			return nil, err
+		} else if reason != "" {
+			c.Revision++
+			c.Phase = "canceled"
+			c.CompletedAt = &c.UpdatedAt
+			if err := s.writeCSPResult(ctx, tx, c, cspStoredResult{Version: 1, Reason: reason}); err != nil {
+				return nil, err
+			}
+			if err := auditCSP(ctx, tx, c, "windows-device", "command.canceled"); err != nil {
 				return nil, err
 			}
 			continue
