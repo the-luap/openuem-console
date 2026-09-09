@@ -5,9 +5,25 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"unicode"
 )
 
 var errJSON = errors.New("invalid ADE response")
+
+// encoding/json matches struct fields with Unicode simple case folding. Detect
+// aliases before unmarshalling so differently cased keys cannot replace a
+// previously validated credential or response field.
+func foldedJSONName(s string) string {
+	name := []rune(s)
+	for i, r := range name {
+		minimum := r
+		for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
+			minimum = min(minimum, folded)
+		}
+		name[i] = minimum
+	}
+	return string(name)
+}
 
 // Apple can add response fields. Permit additive fields while rejecting duplicate
 // names, trailing objects and excessive structure before binding known fields.
@@ -35,6 +51,7 @@ func decodeJSON(data []byte, out any) error {
 			for d.More() {
 				k, err := d.Token()
 				name, ok := k.(string)
+				name = foldedJSONName(name)
 				if err != nil || !ok || keys[name] {
 					return errJSON
 				}

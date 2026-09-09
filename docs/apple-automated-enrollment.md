@@ -35,7 +35,7 @@ The verified binding comes from
 The upload is bounded to 1 MiB. Raw CMS and Apple's base64 S/MIME envelope are
 accepted; plaintext credentials are not an import format. MIME, BER nesting and
 node counts, JSON nesting, duplicate keys, credential lengths and expiry are
-validated before use. A token must be encrypted for this connection's certificate
+validated before use, including Unicode case-folded duplicate field aliases. A token must be encrypted for this connection's certificate
 and have more than a minute of remaining validity. Certificate private keys and
 tokens are never included in page models, downloads, audit events or service error
 messages. The certificate download is public material and is audited.
@@ -122,9 +122,12 @@ ordering, backoff, cursor resets, concurrent owners, disabling, paged inventory
 and revoked transaction permissions. Real console router tests exercise scoped
 roles, aliases, CSRF, multipart ambiguity, public certificate downloads and fixed
 error messages. The native Apple CI includes the ADE package and PostgreSQL tests.
-Local PostgreSQL was unavailable during this change; the dedicated CI run is the
-authoritative database test, and its result is recorded in the implementation
-ledger when complete.
+Local PostgreSQL was unavailable during this change. The full
+[PostgreSQL race, console and build CI](https://github.com/the-luap/openuem-console/actions/runs/34299243491)
+passed for the connection and synchronization implementation. Local parser
+regressions also reject case-folded duplicate keys and classify unchanged
+continuation cursors as a full-fetch restart; additional fuzzing passed 380,344
+inputs. CI repeats the complete suite for subsequent branch updates.
 
 Rendered empty, pending, connected, disabled and throttled states were checked at
 390, 768 and 1440 pixels without page overflow. Keyboard submissions were

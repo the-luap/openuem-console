@@ -145,7 +145,7 @@ func TestClientBoundsFailuresRedirectsAndCancellation(t *testing.T) {
 					t.Fatal("Retry-After shortened", err)
 				}
 			}
-			if mode == "invalid-cursor" && !errors.Is(err, ErrCursor) {
+			if (mode == "invalid-cursor" || mode == "cycle") && !errors.Is(err, ErrCursor) {
 				t.Fatal("expired cursor not distinguished")
 			}
 			if calls.Load() > 4 {

@@ -148,8 +148,11 @@ func (c *Client) Devices(ctx context.Context, cursor string, delta bool) (Page, 
 	if err := c.request(ctx, "POST", path, payload, &wire); err != nil {
 		return Page{}, err
 	}
-	if wire.More == nil || wire.Devices == nil || !opaque(wire.Cursor, 1000) || len(*wire.Devices) > PageLimit || *wire.More && wire.Cursor == cursor {
+	if wire.More == nil || wire.Devices == nil || !opaque(wire.Cursor, 1000) || len(*wire.Devices) > PageLimit {
 		return Page{}, ErrService
+	}
+	if *wire.More && wire.Cursor == cursor {
+		return Page{}, ErrCursor
 	}
 	for i := range *wire.Devices {
 		d := &(*wire.Devices)[i]
