@@ -97,8 +97,12 @@ stale-inventory cancellation, read isolation and missing-report recovery tests;
 their complete CI is pending. The initial console commit `7777f5a` passed
 39 synthetic browser checks across 13 states at 390, 768 and 1440 pixels, including
 keyboard confirmation, scoped reader controls and horizontal overflow. The
-subsequent bounded device search and additional negative tests are undergoing CI
-and browser validation. Actual signed-package
+bounded device search at `f48f2c0` also passed all 39 browser checks, including GET
+search submission and cursor navigation. The `7777f5a` PostgreSQL native Apple
+suite passed in 499.212 seconds; its route test identified the shared renderer
+weakening endpoint `no-store` to `no-cache`. The renderer now preserves explicit
+cache policies, with a reproducing regression test covering all eight rendering
+helpers. Complete CI for that fix and the added negative tests is still pending. Actual signed-package
 installation on an explicitly authorized Mac remains open.
 No package is downloaded or executed by these synthetic tests.
 
