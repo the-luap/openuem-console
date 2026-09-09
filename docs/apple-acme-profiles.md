@@ -123,7 +123,7 @@ shared-revision rollback, System/User ownership, historical migration conflicts,
 missing-archive blocking and protected review evidence. Console tests exercise
 the actual scoped router, roles, forms, secret-safe failures and history review.
 Linux/Windows builds and protected Windows protocol checks pass. All 36 actual
-browser cases pass using the rendered artifact from commit `7d5d0b1`: System/User
+browser cases pass using the rendered artifact from commit `461c235`: System/User
 scope with minimal, advanced, hardware-bound and RSA settings, plus unresolved,
 reviewed, restricted and empty history states, each at 390/768/1440 pixels. Checks
 include required fields, native URL/size limits, password controls, preserved

@@ -140,6 +140,9 @@ func validateUserProfile(p *Profile, d *Device) error {
 	if _, err := plist.Unmarshal(p.Payload, &root); err != nil {
 		return errors.New("invalid saved user profile")
 	}
+	if err := validateProfileCertificateReferences(root); err != nil {
+		return err
+	}
 	items, ok := root["PayloadContent"].([]any)
 	if !ok || len(items) == 0 {
 		return errors.New("empty user profile")

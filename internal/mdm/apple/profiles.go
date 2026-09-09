@@ -122,6 +122,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 			}
 		}
 	}
+	if err := validateProfileCertificateReferences(root); err != nil {
+		return nil, err
+	}
 	if _, err := systemExtensionRootRules(root, scope, nil); err != nil {
 		return nil, err
 	}

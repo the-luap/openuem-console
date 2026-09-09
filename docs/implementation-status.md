@@ -61,6 +61,12 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Certificate references in Apple profiles](apple-profile-certificate-references.md)
+  check that Wi-Fi identities and EAP anchors resolve to unique, correctly typed
+  certificate payloads in the same profile. Isolated parsing and reference tests
+  pass; System/User persistence and removal tests await CI. A composition editor,
+  broader network templates and physical authentication acceptance remain open.
+
 - [ACME certificate profiles](apple-acme-profiles.md) add typed issuer, identity,
   hardware and key settings, durable encrypted client ownership across profile
   removal/deletion, and protected review of historical archive gaps. Parser and
