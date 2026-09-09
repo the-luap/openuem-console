@@ -240,7 +240,12 @@ func (s *Store) ingestUserProfiles(ctx context.Context, tx *sql.Tx, u *UserChann
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_users SET installed_profiles=$2,profiles_at=clock_timestamp(),next_inventory_at=clock_timestamp()+interval '6 hours' WHERE id=$1`, u.ID, data); err != nil {
+	result, err := tx.ExecContext(ctx, `UPDATE mdm_apple_users SET installed_profiles=$2,profiles_at=clock_timestamp(),profiles_query_at=$3,next_inventory_at=clock_timestamp()+interval '6 hours' WHERE id=$1 AND (profiles_query_at IS NULL OR profiles_query_at<$3)`, u.ID, data, created)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil || changed == 0 {
 		return err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT a.profile_id,a.desired,p.identifier,p.payload_uuid FROM mdm_apple_user_assignments a JOIN mdm_apple_profile_revisions p ON p.tenant_id=a.tenant_id AND p.profile_id=a.profile_id AND p.revision=a.revision WHERE a.user_channel_id=$1 AND a.tenant_id=$3 AND a.status IN ('verifying','verified','drifted') AND a.updated_at<=$2`, u.ID, created, u.TenantID)

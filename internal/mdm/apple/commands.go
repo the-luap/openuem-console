@@ -716,7 +716,12 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 		if err != nil {
 			return err
 		}
-		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET installed_profiles=$1,profiles_at=now() WHERE id=$2`, data, d.ID); err != nil {
+		result, err := tx.ExecContext(ctx, `UPDATE mdm_apple_devices SET installed_profiles=$1,profiles_at=clock_timestamp(),profiles_query_at=$3 WHERE id=$2 AND (profiles_query_at IS NULL OR profiles_query_at<$3)`, data, d.ID, created)
+		if err != nil {
+			return err
+		}
+		changed, err := result.RowsAffected()
+		if err != nil || changed == 0 {
 			return err
 		}
 		if err := s.recoverEnrollmentLayout(ctx, tx, d, profiles); err != nil {

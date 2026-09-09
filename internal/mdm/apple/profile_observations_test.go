@@ -78,6 +78,9 @@ func TestSystemProfileObservationUsesAssignedRevisionAndPostAcknowledgementQuery
 		t.Fatal("old inventory was not delivered")
 	}
 	adeConnect(t, s, d, "NotNow", old, nil)
+	late := queueList()
+	profileObservationCommand(t, adeConnect(t, s, d, "Idle", "", nil), "ProfileList")
+	adeConnect(t, s, d, "NotNow", late, nil)
 	assignRetained("installed")
 	wire := adeConnect(t, s, d, "Idle", "", nil)
 	install := profileObservationCommand(t, wire, "InstallProfile")
@@ -95,6 +98,16 @@ func TestSystemProfileObservationUsesAssignedRevisionAndPostAcknowledgementQuery
 	profileObservationCommand(t, adeConnect(t, s, d, "Idle", "", nil), "ProfileList")
 	adeConnect(t, s, d, "Acknowledged", fresh, observed(first))
 	assertState("verified")
+	before, err := s.Device(t.Context(), scope, d.ID)
+	if err != nil || before.ProfilesAt == nil {
+		t.Fatal("missing accepted profile observation", err)
+	}
+	adeConnect(t, s, d, "Acknowledged", late, map[string]any{"ProfileList": []any{}})
+	assertState("verified")
+	after, err := s.Device(t.Context(), scope, d.ID)
+	if err != nil || len(after.InstalledProfiles) != 1 || !strings.EqualFold(after.InstalledProfiles[0].UUID, first.UUID) || after.ProfilesAt == nil || !after.ProfilesAt.Equal(*before.ProfilesAt) {
+		t.Fatal("late query replaced newer System inventory or its receipt time", err)
+	}
 
 	// A delayed empty observation must not verify a later removal.
 	old = queueList()
@@ -175,5 +188,46 @@ func TestMacUserProfileObservationRetainsVersionWithoutIsManaged(t *testing.T) {
 	items, err = s.UserAssignments(t.Context(), scope, d.ID, u.ID)
 	if err != nil || len(items) != 1 || items[0].Status != "verified" || items[0].Revision != 1 {
 		t.Fatal("retained Mac user profile required the absent IsManaged field", err)
+	}
+	// Distinct outstanding queries may complete out of order after NotNow.
+	// Both queries follow the assignment; the newer accepted inventory must win.
+	tx, err = s.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	old, err := s.enqueueUserCommand(t.Context(), tx, u, "ProfileList", nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := s.enqueueUserCommand(t.Context(), tx, u, "ProfileList", nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if id, kind := userCommand(t, s, d, u, userReply(d, u, "Idle", "")); id != old || kind != "ProfileList" {
+		t.Fatal("older user query was not delivered")
+	}
+	userCommand(t, s, d, u, userReply(d, u, "NotNow", old))
+	if id, kind := userCommand(t, s, d, u, userReply(d, u, "Idle", "")); id != fresh || kind != "ProfileList" {
+		t.Fatal("newer user query was not delivered")
+	}
+	ack["CommandUUID"] = fresh
+	userCommand(t, s, d, u, ack)
+	before, err := s.User(t.Context(), scope, d.ID, u.ID)
+	if err != nil || before.ProfilesAt == nil {
+		t.Fatal("missing accepted user observation", err)
+	}
+	ack["CommandUUID"], ack["ProfileList"] = old, []any{}
+	userCommand(t, s, d, u, ack)
+	after, err := s.User(t.Context(), scope, d.ID, u.ID)
+	if err != nil || len(after.InstalledProfiles) != 1 || !strings.EqualFold(after.InstalledProfiles[0].UUID, first.UUID) || after.ProfilesAt == nil || !after.ProfilesAt.Equal(*before.ProfilesAt) {
+		t.Fatal("late query replaced newer user inventory or its receipt time", err)
+	}
+	items, err = s.UserAssignments(t.Context(), scope, d.ID, u.ID)
+	if err != nil || len(items) != 1 || items[0].Status != "verified" {
+		t.Fatal("late user query reversed a newer verification", err)
 	}
 }
