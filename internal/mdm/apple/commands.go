@@ -32,6 +32,7 @@ func (s *Store) enqueue(ctx context.Context, tx *sql.Tx, d *Device, kind string,
 	if err != nil {
 		return "", err
 	}
+	defer clear(data)
 	data, err = s.secrets.seal(data, secretPurpose(d.TenantID, id, "command"))
 	if err != nil {
 		return "", err

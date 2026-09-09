@@ -56,7 +56,7 @@ func (s *Store) MacAdminKeys(ctx context.Context, scope Scope, id string) ([]Mac
 	if _, err := s.Device(ctx, scope, id); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT k.id,k.operation,k.status,COALESCE(k.id=a.current_key_id,false),k.created_at,k.completed_at FROM mdm_apple_mac_admin_keys k JOIN mdm_apple_mac_admin_accounts a ON a.device_id=k.device_id WHERE k.tenant_id=$1 AND k.device_id=$2 ORDER BY k.created_at DESC,k.id DESC LIMIT 128`, scope.TenantID, id)
+	rows, err := s.db.QueryContext(ctx, `SELECT k.id,k.operation,k.status,COALESCE(k.id=a.current_key_id,false),k.created_at,k.completed_at FROM mdm_apple_mac_admin_keys k JOIN mdm_apple_mac_admin_accounts a ON a.device_id=k.device_id JOIN mdm_apple_devices d ON d.id=k.device_id AND d.tenant_id=k.tenant_id WHERE k.tenant_id=$1 AND k.device_id=$2 AND ($3=0 OR d.site_id=$3) ORDER BY k.created_at DESC,k.id DESC LIMIT 128`, scope.TenantID, id, scope.SiteID)
 	if err != nil {
 		return nil, err
 	}

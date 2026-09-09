@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"sync"
 	"testing"
 	"time"
 )
@@ -290,7 +291,7 @@ func TestMacAdminInventoryIgnoresOldAndFutureRequests(t *testing.T) {
 		if err := s.RefreshInventory(t.Context(), scope, d.ID, "admin"); err != nil {
 			t.Fatal(err)
 		}
-		wire := adeConnect(t, s, d, "Idle", "", nil)
+		wire := macAdminDrive(t, s, d, nil, "DeviceInformation", false, []any{map[string]any{"shortName": "localadmin", "GUID": guid}})
 		if wire["Command"].(map[string]any)["RequestType"] != "DeviceInformation" {
 			t.Fatal("missing fresh inventory request")
 		}
@@ -351,5 +352,36 @@ func TestRecoveryLockAcceptsAuthenticatedADEMac(t *testing.T) {
 	}
 	if err = s.requestRecoveryLock(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, "set", "", nil, "admin", nil); err != nil {
 		t.Fatal("eligible ADE Mac rejected Recovery Lock", err)
+	}
+}
+
+func TestMacAdminConcurrentRotationKeepsOneCandidate(t *testing.T) {
+	s, d := macAdminFixture(t)
+	macAdminEstablished(t, s, d)
+	var wg sync.WaitGroup
+	results := make(chan error, 2)
+	for range 2 {
+		wg.Go(func() {
+			results <- s.requestMacAdmin(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID, "rotate", "admin", nil)
+		})
+	}
+	wg.Wait()
+	close(results)
+	successes, conflicts := 0, 0
+	for err := range results {
+		if err == nil {
+			successes++
+		} else if errors.Is(err, ErrConflict) {
+			conflicts++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatal("concurrent password requests were not serialized", successes, conflicts)
+	}
+	keys, err := s.MacAdminKeys(t.Context(), Scope{TenantID: 1, SiteID: 1}, d.ID)
+	if err != nil || len(keys) != 2 {
+		t.Fatal("duplicate password candidates persisted", err)
 	}
 }

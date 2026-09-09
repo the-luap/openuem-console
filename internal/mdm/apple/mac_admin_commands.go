@@ -50,11 +50,23 @@ func (s *Store) macAdminCommandResult(ctx context.Context, tx *sql.Tx, d *Device
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET creation_state=CASE WHEN $2='create' THEN $3 ELSE creation_state END,error=$4,current_key_id=CASE WHEN $3='accepted' THEN $5::uuid ELSE current_key_id END,accepted_at=CASE WHEN $2='create' AND $3='accepted' THEN clock_timestamp() ELSE accepted_at END,next_rotation_at=CASE WHEN $3='accepted' AND (options->>'rotation_days')::int>0 THEN clock_timestamp()+((options->>'rotation_days')::int * interval '1 day') ELSE NULL END,next_check_at=clock_timestamp() WHERE device_id=$1`, d.ID, operation, creation, detail, key); err != nil {
 		return false, err
 	}
-	if err = audit(ctx, tx, d.TenantID, "device:"+d.ID, "apple.mac_admin."+next, id); err != nil {
+	outcome := "success"
+	if next == "not_now" {
+		outcome = "deferred"
+	} else if next == "failed" {
+		outcome = "failure"
+	}
+	if err = auditOutcome(ctx, tx, d.TenantID, "device:"+d.ID, "apple.mac_admin."+next, id, outcome); err != nil {
 		return false, err
 	}
 	if next == "acknowledged" {
-		_, err = s.enqueue(ctx, tx, d, "DeviceInformation", map[string]any{"Queries": inventoryQueriesFor(*d)}, nil, nil)
+		var inventoryID string
+		inventoryID, err = s.enqueue(ctx, tx, d, "DeviceInformation", map[string]any{"Queries": inventoryQueriesFor(*d)}, nil, nil)
+		// PostgreSQL now() is the transaction start, before acceptance above. Mark
+		// this follow-up with its actual creation time for the evidence boundary.
+		if err == nil {
+			_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_commands SET created_at=clock_timestamp() WHERE id=$1`, inventoryID)
+		}
 	}
 	return next == "not_now", err
 }
@@ -93,7 +105,7 @@ func (s *Store) reconcileMacAdminExpiry(ctx context.Context, tx *sql.Tx, d *Devi
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET creation_state=CASE WHEN $2='create' THEN $3 ELSE creation_state END,error=$3,next_rotation_at=NULL WHERE device_id=$1`, d.ID, v.operation, next); err != nil {
 			return err
 		}
-		if err = audit(ctx, tx, d.TenantID, "system", "apple.mac_admin."+next, v.command); err != nil {
+		if err = auditOutcome(ctx, tx, d.TenantID, "system", "apple.mac_admin."+next, v.command, "failure"); err != nil {
 			return err
 		}
 	}
@@ -136,7 +148,7 @@ func (s *Store) prepareMacAdminDelivery(ctx context.Context, tx *sql.Tx, d *Devi
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_accounts SET creation_state=CASE WHEN $2='create' THEN 'expired' ELSE creation_state END,error='delivery_changed',next_rotation_at=NULL WHERE device_id=$1`, d.ID, operation); err != nil {
 			return false, err
 		}
-		return false, audit(ctx, tx, d.TenantID, "system", "apple.mac_admin.delivery.cancel", id)
+		return false, auditOutcome(ctx, tx, d.TenantID, "system", "apple.mac_admin.delivery.cancel", id, "cancelled")
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_mac_admin_keys SET status='sent',dispatched_at=clock_timestamp() WHERE command_id=$1`, id); err != nil {
 		return false, err

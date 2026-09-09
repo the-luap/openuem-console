@@ -86,7 +86,7 @@ func exerciseAppleMacAdmin(t *testing.T, h *Handler, ctx context.Context, tenant
 		t.Fatal("page leaked credentials or offered generic retry", page.Code)
 	}
 	var audited int
-	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_audit WHERE tenant_id=$1 AND action='apple.mac_admin.password.reveal' AND resource_id=$2`, tenant, key).Scan(&audited); err != nil || audited != 1 {
+	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_audit WHERE tenant_id=$1 AND action='apple.mac_admin.password.reveal' AND resource_id=$2 AND (details->>'site_id')::bigint=$3 AND details->>'result'='success'`, tenant, key, site).Scan(&audited); err != nil || audited != 1 {
 		t.Fatal("reveal was not audited once", audited, err)
 	}
 }
