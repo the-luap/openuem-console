@@ -12,8 +12,9 @@ The editor accepts the extension bundle identifier, developer team identifier,
 identity-provider URL prefixes, authentication method, account display name,
 shared device keys and optional login-window account creation. Login-window
 account creation requires shared device keys and Password or Smart Card
-authentication. The editor does not enable first-user creation during Setup
-Assistant or claim that the provider extension is already installed.
+authentication. Setup Assistant options retain their operating-system and
+provider defaults. The editor does not verify that the provider extension is
+already installed.
 
 Optional provider data is entered as a JSON dictionary and converted into plist
 values. The parser preserves booleans, integers, real numbers, strings, arrays

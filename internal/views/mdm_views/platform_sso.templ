@@ -20,7 +20,7 @@ templ PlatformSSOEditor(info *partials.CommonInfo) {
 			<label>Account display name (optional)<input class="uk-input" name="account_display_name" maxlength="255"/></label>
 			<label><input class="uk-checkbox" type="checkbox" name="shared_device_keys" value="yes"/>Use shared device signing and encryption keys</label>
 			<label><input class="uk-checkbox" type="checkbox" name="create_user_at_login" value="yes"/>Allow account creation at the login window</label>
-			<p>Account creation requires shared device keys and Password or Smart Card authentication. It does not create the first Setup Assistant account.</p>
+			<p>Login-window account creation requires shared device keys and Password or Smart Card authentication. Setup Assistant options keep their operating-system and provider defaults.</p>
 			<label>Provider registration token (optional)<input class="uk-input" type="password" name="registration_token" maxlength="8192" autocomplete="new-password"/></label>
 			<p>Use a token issued by the provider for the intended devices. The token is encrypted with the profile and is included in downloads available to authorized profile managers.</p>
 			<label>Provider extension data (optional JSON dictionary)<textarea class="uk-textarea" name="provider_data" rows="4" maxlength="16384" spellcheck="false" placeholder={ `{"ProviderSetting":"value"}` }></textarea></label>

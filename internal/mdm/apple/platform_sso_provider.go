@@ -12,11 +12,11 @@ import (
 // JSON is an editor input format only. Preserve booleans, integers, real
 // numbers, dictionaries and arrays as plist types. Null has no plist equivalent.
 func ParsePlatformSSOProviderData(raw string) (map[string]any, error) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, nil
-	}
 	if len(raw) > 16384 || !utf8.ValidString(raw) {
 		return nil, errors.New("SSO provider data must be valid UTF-8 and contain at most 16 KiB")
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
 	}
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.UseNumber()

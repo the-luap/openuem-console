@@ -24,6 +24,29 @@ func TestPlatformSSOProviderDataPreservesTypesAndRejectsAmbiguity(t *testing.T) 
 	platformSSOProfile(t, settings)
 }
 
+func FuzzPlatformSSOProviderData(f *testing.F) {
+	for _, seed := range []string{`{"ProviderFlag":true}`, `{"nested":[1,"text",false]}`, `null`, `{"a":1,"a":2}`, `{"integer":18446744073709551615}`, "\xff", strings.Repeat(" ", 16385)} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		data, err := ParsePlatformSSOProviderData(raw)
+		if len(raw) > 16384 && err == nil {
+			t.Fatal("oversized provider input accepted")
+		}
+		if err != nil || data == nil {
+			return
+		}
+		encoded, err := plist.Marshal(data, plist.XMLFormat)
+		if err != nil {
+			t.Fatal("accepted provider data cannot be encoded as a profile dictionary", err)
+		}
+		var decoded map[string]any
+		if _, err = plist.Unmarshal(encoded, &decoded); err != nil {
+			t.Fatal("accepted provider data produced an invalid plist", err)
+		}
+	})
+}
+
 func TestPlatformSSOStoredAssignmentAndRevisionSafety(t *testing.T) {
 	s := testStore(t)
 	testSettings(t, s, 1)
