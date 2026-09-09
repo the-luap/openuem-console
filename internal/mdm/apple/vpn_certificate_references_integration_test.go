@@ -34,6 +34,11 @@ func vpnCertificateProfileData(t *testing.T, scope, protocol, payloadType string
 	if protocol == "IKEv2" {
 		configuration["LocalIdentifier"], configuration["RemoteIdentifier"] = "device.example.test", "vpn.example.test"
 	}
+	if protocol == "DNS" {
+		vpn["VPNType"], vpn["VPNSubType"] = "VPN", "com.example.synthetic-provider"
+		vpn["VPN"] = map[string]any{"AuthenticationMethod": "Password", "RemoteAddress": "vpn.example.test"}
+		vpn["DNS"] = map[string]any{"DNSProtocol": "TLS", "ServerName": "resolver.example.test", "PayloadCertificateUUID": reference}
+	}
 	root["PayloadContent"] = append(root["PayloadContent"].([]any), vpn)
 	data, err := plist.Marshal(root, plist.XMLFormat)
 	if err != nil {
@@ -53,6 +58,7 @@ func TestVPNCertificateReferencesGuardUploadRevisionAndLegacyReassignment(t *tes
 		for _, tc := range []struct{ protocol, payloadType string }{
 			{"VPN", "com.apple.vpn.managed"}, {"IPSec", "com.apple.vpn.managed"}, {"IKEv2", "com.apple.vpn.managed"}, {"TransparentProxy", "com.apple.vpn.managed"},
 			{"VPN", "com.apple.vpn.managed.applayer"}, {"IPSec", "com.apple.vpn.managed.applayer"}, {"IKEv2", "com.apple.vpn.managed.applayer"},
+			{"DNS", "com.apple.vpn.managed"}, {"DNS", "com.apple.vpn.managed.applayer"},
 		} {
 			protocol := tc.protocol
 			bad := vpnCertificateProfileData(t, channel, protocol, tc.payloadType, true)

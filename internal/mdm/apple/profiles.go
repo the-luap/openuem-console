@@ -93,6 +93,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if err := validateVPNPayload(p, scope, nil); err != nil {
+			return nil, err
+		}
 		if err := validateWiFiEAPPayload(p, scope, nil); err != nil {
 			return nil, err
 		}

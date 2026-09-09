@@ -86,3 +86,30 @@ func TestAppLayerVPNReferencesUseTheSameLocalIdentityRules(t *testing.T) {
 		}
 	}
 }
+
+func TestVPNDNSIdentityIsResolvedIndependentlyFromTunnelIdentity(t *testing.T) {
+	for _, kind := range []string{"com.apple.vpn.managed", "com.apple.vpn.managed.applayer"} {
+		root, _, identity, anchor := vpnReferenceFixture("IKEv2")
+		vpn := root["PayloadContent"].([]any)[0].(map[string]any)
+		vpn["PayloadType"] = kind
+		dns := map[string]any{"DNSProtocol": "TLS", "ServerName": "resolver.example.test", "PayloadCertificateUUID": strings.ToUpper(identity["PayloadUUID"].(string))}
+		vpn["DNS"] = dns
+		if err := validateProfileCertificateReferences(root); err != nil {
+			t.Fatal(err)
+		}
+		for _, bad := range []any{root["PayloadUUID"], anchor["PayloadUUID"], "eeeeeeee-0000-4000-8000-000000000005", true} {
+			dns["PayloadCertificateUUID"] = bad
+			if err := validateProfileCertificateReferences(root); err == nil {
+				t.Fatal("valid tunnel identity masked invalid DNS identity")
+			}
+		}
+		delete(dns, "PayloadCertificateUUID")
+		if err := validateProfileCertificateReferences(root); err != nil {
+			t.Fatal("DNS without a reference acquired an identity requirement", err)
+		}
+		vpn["DNS"] = true
+		if err := validateProfileCertificateReferences(root); err == nil {
+			t.Fatal("malformed DNS dictionary bypassed reference validation")
+		}
+	}
+}

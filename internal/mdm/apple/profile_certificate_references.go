@@ -54,11 +54,11 @@ func validateProfileCertificateReferences(root map[string]any) error {
 		payload := item.(map[string]any)
 		kind := stringValue(payload, "PayloadType")
 		if kind == "com.apple.vpn.managed" || kind == "com.apple.vpn.managed.applayer" {
-			for _, key := range []string{"VPN", "IPSec", "IKEv2", "TransparentProxy"} {
+			for _, key := range []string{"VPN", "IPSec", "IKEv2", "TransparentProxy", "DNS"} {
 				if value, exists := payload[key]; exists {
 					configuration, ok := value.(map[string]any)
 					if !ok {
-						return errors.New("VPN protocol configuration must be a dictionary")
+						return errors.New("VPN protocol and DNS configurations must be dictionaries")
 					}
 					if reference, exists := configuration["PayloadCertificateUUID"]; exists {
 						if err := resolve(reference, true); err != nil {

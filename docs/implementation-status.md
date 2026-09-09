@@ -61,18 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
+  configuration, DNS types and property versions, App-Layer connection UUIDs,
+  transparent proxy Mac versions and fresh mobile supervision for Always On.
+  Isolated production tests pass; PostgreSQL and full CI execution are pending.
+  Protocol-specific schemas, complete editors and physical acceptance remain open.
+
 - [VPN certificate references](apple-profile-certificate-references.md) extend
   local identity binding checks to regular/App-Layer VPN, IPsec, IKEv2 and
-  transparent proxy configurations. Isolated tests pass; System/User PostgreSQL
-  regression execution is pending. Complete VPN templates, Always On references and physical tunnel
+  transparent proxy configurations. Isolated tests and both full workflows pass,
+  including 14 System/User PostgreSQL variants. The subsequent DNS reference
+  extension is pending in full CI. Complete VPN templates, Always On references and physical tunnel
   acceptance remain open.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks
   uploaded and composed AD identities, typed values, Mac property versions and
   manual-prompt/automatic-renewal restrictions. The dedicated creation form
   preserves omitted options and restricts enabled renewal to computer identities.
-  Isolated payload tests, scoped form tests and 15 browser cases pass; full
-  backend validation CI passes. Full regression CI for the form is pending.
+  Isolated payload tests, scoped form tests and 15 browser cases pass, as do both
+  complete workflows for the backend validation and the form.
   Physical AD/CA acceptance remains open.
 
 - [Enterprise Wi-Fi with EAP-TLS](apple-enterprise-wifi.md) composes exact encrypted

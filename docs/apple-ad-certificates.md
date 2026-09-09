@@ -59,7 +59,9 @@ also pass. The scoped form tests and all 15 actual Chrome cases pass at `b0e5134
 System/User scope, omitted/advanced options, three viewport widths and reader
 views. Browser checks cover notification bounds, renewal scope changes, retained
 zero/false values, confirmation, keyboard submission, reset and page overflow.
-Native OS select menus are not exercised. Full regression CI is still pending.
+Native OS select menus are not exercised. Both complete workflows for the form at
+`b0e5134` pass: [push](https://github.com/the-luap/openuem-console/actions/runs/34371465945)
+and [pull request](https://github.com/the-luap/openuem-console/actions/runs/34371472713).
 Physical AD/CA and Mac acceptance remain required.
 
 The preceding backend validation at `95c9b80` passes both complete workflows:

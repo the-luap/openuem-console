@@ -11,7 +11,8 @@ explicit anchor UUIDs pointing into another profile.
 Regular `com.apple.vpn.managed` and App-Layer
 `com.apple.vpn.managed.applayer` profiles receive the same identity-reference
 checks for `PayloadCertificateUUID` inside their `VPN`, `IPSec`, `IKEv2` and
-`TransparentProxy` dictionaries. Each present protocol configuration must be a dictionary, and each
+`TransparentProxy` dictionaries, plus the separate `DNS` resolver dictionary.
+Each present configuration must be a dictionary, and each
 present identity reference must identify a local identity payload. A VPN without
 such a reference does not acquire a new certificate requirement. This extension
 does not validate every VPN setting, require an identity for every authentication
@@ -67,8 +68,15 @@ The VPN extension passes isolated tests for all four protocol dictionaries,
 four identity payload types, plist serialization, case normalization, missing or
 ambiguous identities, public-certificate rejection and bounded errors. PostgreSQL
 tests cover 14 System/User and profile/protocol variants, including upload,
-revision and legacy reassignment rejection with removal preserved; execution in
-full CI is pending. No VPN client/provider or
+revision and legacy reassignment rejection with removal preserved. Both complete
+workflows at `538d72a` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34373056591) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34373062836).
+The subsequent DNS extension adds four System/User and regular/App-Layer variants;
+its full CI execution is pending. DNS references resolve independently of the
+tunnel identity, and a valid tunnel identity cannot mask an invalid resolver
+identity. [VPN target and DNS validation](apple-vpn-profiles.md) adds property
+version and configuration checks. No VPN client/provider or
 physical tunnel authentication has been exercised by these tests.
 
 References: [Apple Wi-Fi payload schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.wifi.managed.yaml),
