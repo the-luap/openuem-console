@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 )
+
+var ErrProfilePrerequisite = errors.New("profile assignment prerequisites are not met")
 
 const profileColumns = `id,tenant_id,name,identifier,payload_uuid,revision,payload_types,payload,updated_at,payload_scope`
 
@@ -113,7 +116,7 @@ func (s *Store) saveProfileRevisionTx(ctx context.Context, tx *sql.Tx, p *Profil
 		return err
 	}
 	if updating {
-		rows, err := tx.QueryContext(ctx, `SELECT d.id,d.site_id FROM mdm_apple_devices d JOIN mdm_apple_profile_assignments a ON a.device_id=d.id WHERE a.profile_id=$1 AND a.desired='installed' AND d.status='enrolled' ORDER BY d.id`, p.ID)
+		rows, err := tx.QueryContext(ctx, `SELECT d.id,d.site_id FROM mdm_apple_devices d JOIN mdm_apple_profile_assignments a ON a.device_id=d.id WHERE a.profile_id=$1 AND a.desired='installed' AND d.status='enrolled' AND NOT EXISTS(SELECT 1 FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions admission ON admission.device_id=r.device_id AND admission.tenant_id=r.tenant_id WHERE r.device_id=d.id AND r.profile_id=a.profile_id AND admission.setup_state<>'complete') ORDER BY d.id`, p.ID)
 		if err != nil {
 			return err
 		}
@@ -150,12 +153,16 @@ func (s *Store) saveProfileRevisionTx(ctx context.Context, tx *sql.Tx, p *Profil
 }
 
 func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired string) error {
+	return s.assignWithADERequirement(ctx, tx, d, p, desired, "")
+}
+
+func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, desired, requirement string) error {
 	if p.Scope != "System" {
-		return errors.New("User profiles must be assigned to a Mac user channel")
+		return fmt.Errorf("%w: User profiles must be assigned to a Mac user channel", ErrProfilePrerequisite)
 	}
 	if desired == "installed" {
 		if _, err := ParseProfile(p.Payload); err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
 		}
 	}
 	current, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, d.ID, d.TenantID))
@@ -163,17 +170,33 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 		return err
 	}
 	if current.Status != "enrolled" {
-		return errors.New("device is no longer enrolled")
+		return fmt.Errorf("%w: device is no longer enrolled", ErrProfilePrerequisite)
+	}
+	pinned, revision, err := activeADEProfileRequirement(ctx, tx, d.TenantID, d.ID, p.ID)
+	if err != nil {
+		return err
+	}
+	if pinned != "" || requirement != "" {
+		if pinned == "" || pinned != requirement || desired != "installed" {
+			return ErrADEPlatformSSO
+		}
+		stored, err := s.profileRevisionPayload(ctx, tx, d.TenantID, revision)
+		if err != nil {
+			return err
+		}
+		if stored.ID != p.ID || stored.Revision != p.Revision || stored.UUID != p.UUID {
+			return ErrADEPlatformSSO
+		}
 	}
 	if !current.Capabilities().Profiles {
-		return errors.New("refresh inventory to identify the platform and OS version before assigning profiles")
+		return fmt.Errorf("%w: refresh inventory to identify the platform and OS version before assigning profiles", ErrProfilePrerequisite)
 	}
 	if desired == "installed" {
 		if err := validateFirewallProfile(p, current); err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
 		}
 		if err := validatePlatformSSOProfile(p, current); err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrProfilePrerequisite, err)
 		}
 		for _, kind := range p.PayloadTypes {
 			if fileVaultPayloadType(kind) {
@@ -182,7 +205,7 @@ func (s *Store) assign(ctx context.Context, tx *sql.Tx, d *Device, p *Profile, d
 					return err
 				}
 				if owned {
-					return errors.New("Remove and verify removal of the managed FileVault policy before assigning another FileVault profile")
+					return fmt.Errorf("%w: remove and verify removal of the managed FileVault policy before assigning another FileVault profile", ErrProfilePrerequisite)
 				}
 			}
 		}
@@ -281,6 +304,12 @@ func (s *Store) DeleteProfile(ctx context.Context, tenant int, id, actor string)
 		return notFound(err)
 	}
 	var assigned bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_ade_profile_sso r JOIN mdm_apple_ade_profiles p ON p.id=r.ade_profile_id AND p.tenant_id=r.tenant_id WHERE r.tenant_id=$1 AND r.profile_id=$2 AND p.status<>'disabled') OR EXISTS(SELECT 1 FROM mdm_apple_ade_device_sso r JOIN mdm_apple_ade_admissions a ON a.device_id=r.device_id AND a.tenant_id=r.tenant_id JOIN mdm_apple_devices d ON d.id=r.device_id AND d.tenant_id=r.tenant_id WHERE r.tenant_id=$1 AND r.profile_id=$2 AND a.setup_state<>'complete' AND d.status IN ('authenticating','enrolled'))`, tenant, id).Scan(&assigned); err != nil {
+		return err
+	}
+	if assigned {
+		return ErrADEPlatformSSO
+	}
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_apple_profile_assignments a JOIN mdm_apple_devices d ON d.id=a.device_id WHERE a.profile_id=$1 AND d.status='enrolled' AND (a.desired<>'removed' OR a.status<>'verified'))`, id).Scan(&assigned); err != nil {
 		return err
 	}

@@ -216,6 +216,14 @@ func (s *Store) admitADE(ctx context.Context, selector string, info *ade.Machine
 			return nil, err
 		}
 	}
+	if p.PlatformSSO != nil && (platform != PlatformMacOS || CompareVersions(info.OSVersion, "26.0") < 0) {
+		clear(profile)
+		return nil, ErrADEPlatformSSO
+	}
+	if err = s.admitADEPlatformSSO(ctx, tx, tenant, deviceID, p); err != nil {
+		clear(profile)
+		return nil, err
+	}
 	if p.MacAdmin != nil {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_mac_admin_accounts(device_id,tenant_id,options) SELECT $1,tenant_id,admin_options FROM mdm_apple_ade_profiles WHERE id=$2 AND tenant_id=$3`, deviceID, p.ID, tenant); err != nil {
 			clear(profile)

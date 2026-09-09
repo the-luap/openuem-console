@@ -288,6 +288,9 @@ func (s *Store) installMacAppTx(ctx context.Context, tx *sql.Tx, d *Device, vers
 }
 
 func (s *Store) createMacAppAttempt(ctx context.Context, tx *sql.Tx, d *Device, assignment string, v SoftwareVersion, operation string, options MacAppInstallOptions, args map[string]any, actor string) error {
+	if err := guardADEProviderApplication(ctx, tx, d, v, operation); err != nil {
+		return err
+	}
 	if err := s.guardMacAppEnrollment(ctx, tx, d, v.PackageID); err != nil {
 		return err
 	}
