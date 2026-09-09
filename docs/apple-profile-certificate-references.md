@@ -75,7 +75,10 @@ workflows at `538d72a` pass:
 [push](https://github.com/the-luap/openuem-console/actions/runs/34373056591) and
 [pull request](https://github.com/the-luap/openuem-console/actions/runs/34373062836).
 The subsequent DNS extension adds four System/User and regular/App-Layer variants;
-its full CI execution is pending. DNS references resolve independently of the
+both full workflows at `f311fc2` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34374982861) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34374986708).
+DNS references resolve independently of the
 tunnel identity, and a valid tunnel identity cannot mask an invalid resolver
 identity. [VPN target and DNS validation](apple-vpn-profiles.md) adds property
 version and configuration checks. The subsequent Always On extension passes

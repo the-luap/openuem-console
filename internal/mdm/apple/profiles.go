@@ -201,6 +201,12 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	var additional []any
 	switch kind {
+	case "vpn-ikev2-certificate":
+		var err error
+		additional, err = buildIKEv2CertificatePayload(payload, settings, scope)
+		if err != nil {
+			return nil, err
+		}
 	case "apple-ad-certificate":
 		if err := buildADCertificatePayload(payload, settings, scope); err != nil {
 			return nil, err

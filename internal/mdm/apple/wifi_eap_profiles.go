@@ -42,7 +42,7 @@ func certificateCompositionSource(data []byte, scope string, identity bool) ([]m
 		storedScope = "System"
 	}
 	if scope != storedScope || scope != "System" && scope != "User" {
-		return nil, errors.New("source certificates and Wi-Fi must use the same profile scope")
+		return nil, errors.New("source certificates and the network configuration must use the same profile scope")
 	}
 	items, ok := root["PayloadContent"].([]any)
 	if !ok || len(items) == 0 || len(items) > 16 || identity && len(items) != 1 {

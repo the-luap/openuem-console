@@ -104,7 +104,31 @@ server's key policy. Additional key exchange arrays accept 1–7 integer methods
 0, 36 or 37 from OS 26; the fallback switch has the same version requirement.
 No cryptographic exchange is performed by saving a profile. Complete on-demand
 rules, provider schemas, Always On exceptions, further protocol options
-and a certificate composer/editor remain open.
+and a retained-revision composer/editor remain open.
+
+## Certificate profile generator
+
+The typed `BuildProfile` generator accepts `vpn-ikev2-certificate` with machine
+certificate or EAP-TLS authentication. It copies one SCEP, ACME, PKCS12 or AD
+identity configuration into a regular VPN profile, assigns new local payload
+identifiers/UUIDs and preserves source credentials. Optional public trust
+certificate payloads are copied separately. IKEv2 has no Wi-Fi anchor UUID array;
+the generator does not emit one. Sources and VPN use the same System/User scope.
+
+The caller supplies connection/server details, local/remote identifiers, the
+certificate algorithm and server issuer name. An optional server-name override
+is preserved. SCEP/AD RSA and ACME RSA/EC settings must match the selected
+algorithm; a PKCS12 archive's actual identity algorithm remains unverified by the
+bounded envelope parser. EAP-TLS emits explicit TLS 1.2 bounds and integer extended
+authentication `1`; machine authentication emits `0` and omits EAP TLS bounds.
+Neither mode emits passwords, shared secrets, on-demand rules or routing changes.
+Unexpected builder settings are rejected.
+
+This is a server-side generator. Protected catalog revision selection, composition
+provenance and the dedicated console form are still pending for VPN. Existing
+save/assignment paths encrypt generated profiles and preserve ACME client
+ownership and AD Mac-only target checks. Generation alone does not assign the
+profile, contact an issuer or establish a VPN connection.
 
 ## Validation evidence
 
@@ -113,8 +137,11 @@ empty default domains, resolver validation, DNS certificate bindings, protocol a
 dictionary checks, Mac/mobile version boundaries, User scope and supervision
 freshness. PostgreSQL tests cover System/User revision rollback without command
 or history changes, DNS certificate OS limits, supervised mobile assignment and
-removal after prerequisite changes. Full regression CI for these additions is
-pending. Console forms and assets are unchanged from the preceding 54 browser
+removal after prerequisite changes. Both complete workflows for the target/DNS
+change at `f311fc2` pass:
+[push](https://github.com/the-luap/openuem-console/actions/runs/34374982861) and
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34374986708).
+Console forms and assets are unchanged from the preceding 54 browser
 cases for AD certificates and EAP-TLS composition. No tunnel, DNS request or
 provider installation is performed by these tests.
 
@@ -131,6 +158,12 @@ versions and the iOS 14.2 group boundary. PostgreSQL cases cover a retained
 legacy group, its modern replacement, rejected restoration without command or
 history changes, and removal after an invalid historical reference. Their full CI
 is pending.
+
+The generator passes isolated tests for both scopes, four identity kinds, machine
+and EAP-TLS modes, unchanged source credentials, new local bindings, omitted
+settings and invalid input. PostgreSQL tests cover encrypted persistence,
+System/User assignment, ACME ownership across copied profiles and AD target
+restrictions. Full CI for the generator is pending.
 
 The tunnel field layout is recorded in Apple's *Configuration Profile Reference*,
 2019-03-25, page 103, preserved as an

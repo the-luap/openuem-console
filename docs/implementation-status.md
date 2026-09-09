@@ -68,14 +68,19 @@ the table's package summaries do not remove any detail from the roadmap.
   association parameters, post-quantum settings and removed-algorithm checks.
   Always On applies these checks and local certificate bindings to every flat
   tunnel, including the iOS 14.2 minimum Diffie-Hellman group.
-  Isolated production tests pass; PostgreSQL and full CI execution are pending.
+  A typed IKEv2 generator copies certificate configurations into System/User
+  profiles with local bindings and machine/EAP-TLS authentication; catalog
+  revision selection and its console editor remain pending.
+  Isolated production tests and both full target/DNS workflows pass; full CI
+  execution for the later IKEv2, Always On and generator changes is pending.
   Further protocol schemas, complete editors and physical acceptance remain open.
 
 - [VPN certificate references](apple-profile-certificate-references.md) extend
   local identity binding checks to regular/App-Layer VPN, IPsec, IKEv2 and
   transparent proxy configurations. Isolated tests and both full workflows pass,
   including 14 System/User PostgreSQL variants. The subsequent DNS reference
-  and Always On extensions are pending in full CI. Complete VPN templates and physical tunnel
+  extension also passes both complete workflows. Always On references pass
+  isolated tests and remain pending in full CI. Complete VPN templates and physical tunnel
   acceptance remain open.
 
 - [Active Directory certificate validation](apple-ad-certificates.md) checks
