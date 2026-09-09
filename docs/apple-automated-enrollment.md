@@ -3,9 +3,10 @@
 OpenUEM can connect an organization to an Apple Business Manager or Apple School
 Manager device management server, verify and renew its server token, and
 synchronize its assigned device inventory. This is the connection and inventory
-foundation of APP-02. It does not yet implement ADE enrollment profile creation
-or assignment, signed activation requests, Setup Assistant enrollment, or
-re-enrollment. An Apple assignment never creates an enrolled OpenUEM device or
+foundation of APP-02. The public workflow does not yet provide ADE enrollment
+profile creation or assignment, signed activation requests, Setup Assistant
+enrollment, or re-enrollment. Tested internal protocol primitives described below
+prepare that integration. An Apple assignment never creates an enrolled OpenUEM device or
 sets supervision evidence.
 
 ## Connect an Apple server
@@ -108,6 +109,60 @@ through 100 records at a time, scoped to the selected organization and connectio
 It shows both assigned and removed records, Apple profile status and observation
 time. Reading the ADE page is audited without storing inventory contents.
 
+## Enrollment protocol primitives
+
+The internal ADE client now supports defining an enrollment profile, reading its
+supported options, assigning or clearing a profile for a bounded batch, and
+refreshing individual device assignments. These operations are not yet connected
+to an administrator action, background enrollment workflow or public activation
+route. No existing connection starts assigning profiles because of this change.
+
+Profile definition does not include device assignments. A service error can leave
+an unknown creation outcome and is not automatically retried. Assignment and
+removal validate every requested device's response and preserve individual
+`SUCCESS`, `THROTTLED`, failure and unknown status values. Assignment throttling
+retains Apple's full retry duration without integer overflow or shortening the
+deadline. Missing device-detail records and any status other than `SUCCESS` are
+not affirmative ownership evidence. Profile retrieval rejects unsupported
+enrollment behavior instead of silently dropping security-relevant options.
+The relevant Apple interfaces are
+[Define a Profile](https://developer.apple.com/documentation/devicemanagement/define-profile),
+[Get a Profile](https://developer.apple.com/documentation/devicemanagement/fetch-profile),
+[Assign a Profile](https://developer.apple.com/documentation/devicemanagement/assign-profile),
+[Remove a Profile](https://developer.apple.com/documentation/devicemanagement/clear-device-profile)
+and [Get Device Details](https://developer.apple.com/documentation/devicemanagement/device-details).
+
+`ade.VerifyMachineInfo` verifies attached CMS device statements against the
+embedded Apple iPhone Device CA. Its SHA-256 fingerprint is
+`76f27d00e1333bc88de0e2916c38c9a7f2b75774c25a794c092a80e3c4c66cce`.
+Only a non-CA signing leaf directly issued by that exact public key is accepted;
+an Apple developer certificate, system trust root, same-name foreign issuer or
+caller-supplied production trust override is insufficient. This deliberately
+supports the documented device issuer; a different future Apple issuer requires
+an explicit reviewed trust update.
+
+Apple's documented exception for device certificate validity dates is confined
+to this pinned issuer. Legacy SHA-1 signatures remain supported alongside SHA-256,
+SHA-384 and SHA-512; this does not weaken TLS, SCEP or organization CA checks.
+The verifier requires one unambiguous signer, matching signature/digest algorithms
+and valid signed attributes when present. It rejects duplicate signed attributes,
+conflicting certificates, detached content and trailing ASN.1 data. CMS input is
+bounded to 128 KiB with bounded BER nesting and node counts. The attached XML or
+binary plist is limited to 64 KiB and 64 flat fields, with strict identity types,
+duplicate-key rejection and no recursive binary references. Older devices may
+omit `OS_VERSION`; a CMS signing timestamp is optional and is returned as evidence
+without inventing one. Apple documents the statement in
+[MachineInfo](https://developer.apple.com/documentation/devicemanagement/machineinfo)
+and publishes the device CA and date exception in its
+[OTA profile server documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/iPhoneOTAConfiguration/profile-service/profile-service.html).
+
+A verified statement is not hardware attestation, current ADE ownership or an
+enrolled MDM identity. The pending integration must still check the live Apple
+account/profile assignment, persist bounded admission and replay state, verify
+the device-generated SCEP key and subsequent check-in identity, and reconcile
+Setup Assistant from authenticated device evidence. The parser alone cannot
+authorize enrollment or release Setup Assistant.
+
 ## Verification and remaining acceptance
 
 Synthetic protocol tests cover a published OAuth signature vector, real local
@@ -115,6 +170,18 @@ TLS session renewal, header replacement, redirects, bounded failures, expired
 and invalid cursors, duplicate/incomplete JSON and S/MIME decryption with foreign
 recipient rejection. Parser fuzz seeds and the race detector run without an Apple
 account or a physical device.
+
+Enrollment protocol tests additionally exercise SHA-1/256/384/512 with RSA and
+ECDSA, XML/binary plists, bounded indefinite/chunked CMS, absent signing time,
+foreign issuers, invalid leaf purposes, multiple signers, altered statements,
+re-signed duplicate attributes and trailing ASN.1 fields. Synthetic HTTPS tests
+cover exact definition/assignment/removal/detail routes, partial results,
+unknown creation outcomes, omitted devices, malformed responses and overflow-safe
+throttling. Local race tests and vet pass; two parser fuzz runs completed 869,945
+and 302,482 inputs. An optional local test also verified a public Apple-signed
+protocol capture without copying device identifiers into this repository. That
+capture is compatibility evidence, not a live enrollment or physical acceptance
+test. The CI runs these synthetic protocol tests on Linux and Windows.
 
 PostgreSQL tests exercise migrations, encrypted token binding, failed renewal,
 account ownership, audit rollback, atomic full publication, incremental event
@@ -134,8 +201,8 @@ Rendered empty, pending, connected, disabled and throttled states were checked a
 intercepted locally; disabling required its confirmation checkbox. No credentials
 were sent to Apple and no real device or Apple assignment was changed.
 
-APP-02 remains open for enrollment profile definition/assignment and removal,
-signed MachineInfo verification, Setup Assistant handling, re-enrollment,
+APP-02 remains open for the administrator profile definition/assignment/removal
+workflow, persisted signed enrollment admission, Setup Assistant handling, re-enrollment,
 groups/rings and directory associations. Native managed administrator accounts
 require the corresponding ADE setup-time workflow; this inventory foundation
 does not provide account creation or password rotation. Apps & Books, production

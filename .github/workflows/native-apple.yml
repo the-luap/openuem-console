@@ -26,6 +26,8 @@ jobs:
         run: go test -count=1 -run TestAPNsCheck ./internal/mdm/apple
       - name: SCEP signatures, encryption and parser boundaries
         run: go test -count=1 -run TestSCEP ./internal/mdm/apple
+      - name: Automated Device Enrollment signatures and service protocol
+        run: go test -count=1 ./internal/mdm/ade
   test:
     runs-on: ubuntu-latest
     services:
