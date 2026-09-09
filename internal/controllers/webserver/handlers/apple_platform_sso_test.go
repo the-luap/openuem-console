@@ -64,6 +64,39 @@ func exerciseApplePlatformSSO(t *testing.T, h *Handler, ctx context.Context, ten
 	if !found {
 		t.Fatal("saved identity profile missing")
 	}
+	for _, key := range []string{"shared_device_keys", "create_user_at_login"} {
+		f := form()
+		f.Set("unattended_setup", "yes")
+		f.Del(key)
+		if rec := request("organization-admin", "POST", path, f); rec.Code != 400 {
+			t.Fatal("unattended editor accepted incomplete account setup", key, rec.Code)
+		}
+	}
+	f := form()
+	f.Set("identifier", "com.example.console-unattended")
+	f.Set("unattended_setup", "yes")
+	if rec := request("organization-admin", "POST", path, f); rec.Code != 303 {
+		t.Fatal("unattended profile editor failed", rec.Code)
+	}
+	profiles, err = h.Apple.Profiles(ctx, tenant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unattended := false
+	for _, p := range profiles {
+		if p.Identifier != "com.example.console-unattended" {
+			continue
+		}
+		var root map[string]any
+		if _, err = plist.Unmarshal(p.Payload, &root); err != nil {
+			t.Fatal(err)
+		}
+		settings := root["PayloadContent"].([]any)[0].(map[string]any)["PlatformSSO"].(map[string]any)
+		unattended = settings["EnableRegistrationDuringSetup"] == true && settings["EnableCreateFirstUserDuringSetup"] == false
+	}
+	if !unattended {
+		t.Fatal("unattended editor lost setup flags")
+	}
 	for _, user := range []string{"organization-admin", "scoped-viewer"} {
 		rec := request(user, "GET", path, nil)
 		if rec.Code != 200 || strings.Contains(rec.Body.String(), "synthetic-route-sso-token") || !strings.Contains(rec.Body.String(), "Identity &lt;provider&gt;") {

@@ -34,6 +34,20 @@ func buildPlatformSSOPayload(payload, settings map[string]any, scope string) err
 	if stringValue(configuration, "AuthenticationMethod") == "" {
 		return errors.New("select the provider's supported Platform SSO authentication method")
 	}
+	if raw, present := settings["UnattendedSetup"]; present {
+		unattended, ok := raw.(bool)
+		if !ok {
+			return errors.New("unattended Platform SSO setup must be a boolean")
+		}
+		if unattended {
+			method := stringValue(configuration, "AuthenticationMethod")
+			if configuration["UseSharedDeviceKeys"] != true || configuration["EnableCreateUserAtLogin"] != true || method != "Password" && method != "SmartCard" {
+				return errors.New("unattended setup requires shared device keys, login-window account creation and Password or Smart Card authentication")
+			}
+			configuration["EnableRegistrationDuringSetup"] = true
+			configuration["EnableCreateFirstUserDuringSetup"] = false
+		}
+	}
 	payload["PlatformSSO"] = configuration
 	return validatePlatformSSOPayload(payload, scope, nil)
 }

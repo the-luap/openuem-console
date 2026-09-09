@@ -7,7 +7,7 @@ import (
 )
 
 func applePlatformSSOSettings(c echo.Context, settings map[string]any) error {
-	f, err := adeEnrollmentForm(c, "editor", "name", "identifier", "payload_scope", "extension_identifier", "team_identifier", "sso_urls", "authentication_method", "registration_token", "account_display_name", "shared_device_keys", "create_user_at_login", "provider_data")
+	f, err := adeEnrollmentForm(c, "editor", "name", "identifier", "payload_scope", "extension_identifier", "team_identifier", "sso_urls", "authentication_method", "registration_token", "account_display_name", "shared_device_keys", "create_user_at_login", "unattended_setup", "provider_data")
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func applePlatformSSOSettings(c echo.Context, settings map[string]any) error {
 			settings[key] = value
 		}
 	}
-	for key, field := range map[string]string{"UseSharedDeviceKeys": "shared_device_keys", "EnableCreateUserAtLogin": "create_user_at_login"} {
+	for key, field := range map[string]string{"UseSharedDeviceKeys": "shared_device_keys", "EnableCreateUserAtLogin": "create_user_at_login", "UnattendedSetup": "unattended_setup"} {
 		value, err := softwareCheckbox(f, field)
 		if err != nil {
 			return err

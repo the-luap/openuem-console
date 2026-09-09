@@ -170,6 +170,36 @@ func TestPlatformSSOValidationRejectsInvalidProviderAndAccountPolicies(t *testin
 	platformSSOProfile(t, settings)
 }
 
+func TestPlatformSSOEditorPreparesExplicitUnattendedSetup(t *testing.T) {
+	for _, method := range []string{"Password", "SmartCard"} {
+		settings := platformSSOSettings()
+		settings["AuthenticationMethod"] = method
+		settings["UseSharedDeviceKeys"] = true
+		settings["EnableCreateUserAtLogin"] = true
+		settings["UnattendedSetup"] = true
+		p := platformSSOProfile(t, settings)
+		if err := validateADEPlatformSSOProfile(p); err != nil {
+			t.Fatal("editor did not produce an eligible unattended profile", err)
+		}
+		for _, key := range []string{"UseSharedDeviceKeys", "EnableCreateUserAtLogin"} {
+			settings[key] = false
+			if _, err := BuildProfile("unattended", "com.example.unattended", "macos-platform-sso", settings); err == nil {
+				t.Fatal("unattended editor accepted incomplete account setup")
+			}
+			settings[key] = true
+		}
+		settings["AuthenticationMethod"] = "UserSecureEnclaveKey"
+		if _, err := BuildProfile("unattended", "com.example.unattended", "macos-platform-sso", settings); err == nil {
+			t.Fatal("unattended account creation accepted incompatible authentication")
+		}
+	}
+	settings := platformSSOSettings()
+	settings["UnattendedSetup"] = "true"
+	if _, err := BuildProfile("unattended", "com.example.unattended", "macos-platform-sso", settings); err == nil {
+		t.Fatal("untyped unattended switch accepted")
+	}
+}
+
 func TestPlatformSSOAssignmentVersionAndApprovalBoundaries(t *testing.T) {
 	p := platformSSOProfile(t, platformSSOSettings())
 	now := time.Now()

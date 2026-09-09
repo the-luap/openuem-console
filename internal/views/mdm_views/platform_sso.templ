@@ -20,7 +20,9 @@ templ PlatformSSOEditor(info *partials.CommonInfo) {
 			<label>Account display name (optional)<input class="uk-input" name="account_display_name" maxlength="255"/></label>
 			<label><input class="uk-checkbox" type="checkbox" name="shared_device_keys" value="yes"/>Use shared device signing and encryption keys</label>
 			<label><input class="uk-checkbox" type="checkbox" name="create_user_at_login" value="yes"/>Allow account creation at the login window</label>
-			<p>Login-window account creation requires shared device keys and Password or Smart Card authentication. Setup Assistant options keep their operating-system and provider defaults.</p>
+			<p>Login-window account creation requires shared device keys and Password or Smart Card authentication.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="unattended_setup" value="yes"/>Prepare for unattended ADE on macOS 26 or later</label>
+			<p>Unattended setup requires shared keys, login-window account creation and Password or Smart Card authentication. It enables device registration during setup and leaves account creation to the login window. ADE must also install the provider app and provision a managed administrator before releasing setup.</p>
 			<label>Provider registration token (optional)<input class="uk-input" type="password" name="registration_token" maxlength="8192" autocomplete="new-password"/></label>
 			<p>Use a token issued by the provider for the intended devices. The token is encrypted with the profile and is included in downloads available to authorized profile managers.</p>
 			<label>Provider extension data (optional JSON dictionary)<textarea class="uk-textarea" name="provider_data" rows="4" maxlength="16384" spellcheck="false" placeholder={ `{"ProviderSetting":"value"}` }></textarea></label>
