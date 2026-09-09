@@ -79,7 +79,7 @@ func (s *Store) MacApps(ctx context.Context, scope Scope, device, after string) 
 }
 
 func macAppDeviceReady(d Device, now time.Time) bool {
-	return d.Status == "enrolled" && d.Family() == PlatformMacOS && (d.EnrollmentMethod == "manual_device" || d.EnrollmentMethod == "automated_device") && macAppOSPattern.MatchString(d.OSVersion) && CompareVersions(d.OSVersion, "11.0") >= 0 && d.InventoryAt != nil && !d.InventoryAt.After(now) && d.InventoryAt.After(now.Add(-24*time.Hour)) && d.CertificateExpiresAt != nil && d.CertificateExpiresAt.After(now.Add(time.Minute))
+	return d.Status == "enrolled" && d.Family() == PlatformMacOS && (d.EnrollmentMethod == "manual_device" || d.EnrollmentMethod == "automated_device") && macAppOSPattern.MatchString(d.OSVersion) && CompareVersions(d.OSVersion, "11.0") >= 0 && d.InventoryAt != nil && !d.InventoryAt.After(now) && d.InventoryAt.After(now.Add(-24*time.Hour)) && d.CertificateExpiresAt.After(now.Add(time.Minute))
 }
 
 func macAppCompatible(d Device, v SoftwareVersion) bool {
