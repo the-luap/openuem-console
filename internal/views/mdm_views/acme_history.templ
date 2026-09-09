@@ -1,0 +1,68 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ ACMEHistory(c echo.Context, info *partials.CommonInfo, items []apple.ACMELegacyProfile, next, state string, canReview bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "ACME historical review", Url: partials.GetNavigationUrl(info, "/ios/configurations/acme-history")}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">ACME historical profile review</h1><p class="mt-2">Some previously assigned or sent profile revisions lack a usable retained archive. New ACME assignments in this organization remain blocked until every unresolved entry is reviewed.</p><p class="mt-2">Review the original archive for the exact revision shown. This records attributed administrative evidence and reserves any ACME client identifiers it contains. It does not install the archive or prove what the device installed. Identifiers previously used by different enrollments remain retired.</p></div>
+			<nav class="flex flex-wrap gap-4" aria-label="Historical profile review status">
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/acme-history")) } aria-current={ strconv.FormatBool(state == "unresolved") }>Unresolved profiles</a>
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/acme-history?state=reviewed")) } aria-current={ strconv.FormatBool(state == "reviewed") }>Reviewed archives</a>
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Back to current profiles</a>
+			</nav>
+			if len(items) == 0 {
+				if state == "reviewed" {
+					<p>No reviewed archives in this organization.</p>
+				} else {
+					<p>No unresolved historical profiles in this organization.</p>
+				}
+			}
+			for _, v := range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">{ Show(v.Identifier) } · Revision { Number(v.Revision) }</h2><p>{ v.Scope } scope</p></div>
+					<div class="uk-card-body">
+						<dl class="uk-description-list">
+							<dt>Device enrollment</dt>
+							<dd>{ v.DeviceID }</dd>
+							<dt>Profile identifier in the catalog</dt>
+							<dd>{ v.ProfileID }</dd>
+							<dt>Review record</dt>
+							<dd>{ v.ID }</dd>
+						</dl>
+						if v.State == "reviewed" {
+							<p class="mt-4">Reviewed { When(v.ReviewedAt) } · { v.ReviewedBy }</p>
+							<p class="mt-2">{ v.Reason }</p>
+							<p class="mt-2">The submitted archive is retained encrypted as separate review evidence.</p>
+						} else if v.State == "unresolved" && canReview {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/acme-history/"+v.ID+"/review") } enctype="multipart/form-data" class="acme-history-review grid gap-4 mt-4">
+								@CSRF(info)
+								<input type="hidden" name="expected_revision" value={ Number(v.Revision) }/>
+								<label>Original profile archive for this revision (up to 2 MiB)<input class="uk-input" type="file" name="profile" accept=".mobileconfig,.plist" required/></label>
+								<label>Archive source and review reason<textarea class="uk-textarea" name="reason" rows="3" maxlength="1000" required></textarea></label>
+								<p>Keep credentials and client identifiers out of this explanation. This text is visible to organization profile managers.</p>
+								<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I checked the source and contents of the original archive against this profile revision and enrollment.</label>
+								<button class="uk-button uk-button-primary" type="submit">Record historical archive review</button>
+							</form>
+						} else if v.State == "pending" {
+							<p class="mt-4">Automatic history indexing is pending. Reload after it completes.</p>
+						} else {
+							<p class="mt-4">Organization profile management and assignment permissions are required to review this archive.</p>
+						}
+					</div>
+				</section>
+			}
+			if next != "" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/acme-history?state="+state+"&after="+next)) }>More historical profiles</a>
+			}
+		</main>
+	}
+}

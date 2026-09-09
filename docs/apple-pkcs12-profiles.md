@@ -63,8 +63,21 @@ Native cases cover mixed-platform delivery, Mac-only revision and assignment
 rejection, older-Mac and managed-user rollback, retained history, encrypted storage,
 audit privacy and verified removal. Console cases exercise real scoped multipart
 requests, permission/CSRF boundaries, ambiguous forms, extra files, safe errors,
-stored System/User settings and escaped display names. Full CI and browser checks
-for the identity editor are pending.
+stored System/User settings and escaped display names. Linux/Windows builds,
+native Windows checks, rendering and scoped console tests pass in the
+[`e6509ce` PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34356958916).
+Every job in that workflow and the [matching push workflow](https://github.com/the-luap/openuem-console/actions/runs/34356954198)
+passes, including native Apple race tests (535.774 s), handlers (13.342 s) and
+desktop lifecycles (26.178 s) in the push run.
+
+Twelve browser cases use that workflow's actual rendered page at 390/768/1440
+pixels for System/User scope with defaults and explicit Mac options. Required
+fields/file/review, multipart encoding, file metadata, exact empty or space/Unicode
+passwords, omitted or false key options, scoped submission and CSRF pass. Keyboard
+confirmation and submission work without horizontal overflow; the narrow layout
+was inspected. The harness injects a synthetic file and sets native selects
+directly; it does not independently verify the operating-system file picker or
+native dropdown arrow keys.
 
 Physical acceptance must verify the intended archive/password, certificate chain,
 key access/export, application authentication and removal on target OS versions.

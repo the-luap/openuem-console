@@ -72,6 +72,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/enroll", h.AppleInvite)
 		g.GET("/ios/configurations", h.AppleProfiles)
 		g.GET("/ios/configurations/history", h.AppleProfileRevisionHistory)
+		g.GET("/ios/configurations/acme-history", h.AppleACMEHistory)
+		g.POST("/ios/configurations/acme-history/:legacy/review", h.AppleReviewACMEHistory)
 		g.GET("/ios/configurations/:id/history", h.AppleProfileRevisionHistory)
 		g.GET("/ios/configurations/:id/revisions/:revision/download", h.AppleDownloadProfileRevision)
 		g.POST("/ios/configurations/:id/revisions/:revision/restore", h.AppleRestoreProfileRevision)
@@ -666,6 +668,11 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 		}
 		if c.FormValue("editor") == "apple-scep" {
 			if err = appleSCEPSettings(c, settings); err != nil {
+				return err
+			}
+		}
+		if c.FormValue("editor") == "apple-acme" {
+			if err = appleACMESettings(c, settings); err != nil {
 				return err
 			}
 		}

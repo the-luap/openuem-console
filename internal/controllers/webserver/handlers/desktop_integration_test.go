@@ -287,6 +287,8 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	exerciseApplePublicCertificates(t, h, ctx, tenantID, siteID, requestBody)
 	exerciseApplePKCS12(t, h, ctx, tenantID, siteID, requestBody)
 	exerciseAppleSCEPProfiles(t, h, ctx, tenantID, siteID, request)
+	exerciseAppleACMEProfiles(t, h, ctx, tenantID, siteID, request)
+	exerciseAppleACMEHistory(t, h, ctx, tenantID, siteID, request, requestBody)
 	exerciseADEPlatformSSORoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleProfileRevisions(t, h, ctx, tenantID, siteID, request)
 	runDesktopBrowserFixture(t, h, ctx)

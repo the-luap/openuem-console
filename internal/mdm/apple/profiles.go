@@ -93,6 +93,9 @@ func ParseProfile(data []byte) (*Profile, error) {
 				return nil, err
 			}
 		}
+		if err := validateACMECertificatePayload(p, scope, nil); err != nil {
+			return nil, err
+		}
 		if err := validatePKCS12Payload(p, scope, nil); err != nil {
 			return nil, err
 		}
@@ -186,6 +189,10 @@ func BuildProfile(name, identifier, kind string, settings map[string]any) ([]byt
 	payload := map[string]any{"PayloadIdentifier": identifier + ".settings", "PayloadUUID": uuid.NewString(), "PayloadVersion": 1, "PayloadDisplayName": name}
 	var additional []any
 	switch kind {
+	case "apple-acme":
+		if err := buildACMECertificatePayload(payload, settings, scope); err != nil {
+			return nil, err
+		}
 	case "apple-pkcs12":
 		if err := buildPKCS12Payload(payload, settings, scope); err != nil {
 			return nil, err

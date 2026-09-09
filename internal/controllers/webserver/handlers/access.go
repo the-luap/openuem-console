@@ -51,7 +51,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadProfiles, true
 		case "/ios/:id/applications/previous", "/ios/ade", "/ios/ade/software", "/ios/ade/platform-sso/profiles", "/ios/:id/setup/platform-sso/profiles", "/ios/ade/servers/:id/certificate", "/ios/setup/requests/:id/csr", "/ios/setup/requests/:id/portal":
 			return access.ManageCertificates, true
-		case "/ios/configurations/:id/download", "/ios/configurations/:id/revisions/:revision/download":
+		case "/ios/configurations/:id/download", "/ios/configurations/:id/revisions/:revision/download", "/ios/configurations/acme-history":
 			return access.ManageProfiles, true
 		}
 	}
@@ -67,7 +67,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ManageCertificates, true
 		case "/ios/enroll":
 			return access.EnrollDevices, true
-		case "/ios/configurations", "/ios/configurations/:id/delete", "/ios/configurations/:id/revisions/:revision/restore":
+		case "/ios/configurations", "/ios/configurations/:id/delete", "/ios/configurations/:id/revisions/:revision/restore", "/ios/configurations/acme-history/:legacy/review":
 			return access.ManageProfiles, true
 		case "/ios/configurations/:id/assign", "/ios/:id/users/:user/profiles", "/ios/:id/users/:user/commands/:command/retry":
 			return access.AssignProfiles, true

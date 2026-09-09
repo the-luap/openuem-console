@@ -1,0 +1,50 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ ACMEEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create an ACME certificate profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="acme-profile-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="apple-acme"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company device identity"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.acme"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole device</option><option value="User">Managed Mac user channel</option></select></label>
+			<p>Requires iOS/iPadOS 16 or macOS 13.1 or later. User scope requires a managed Mac user channel.</p>
+			<label>ACME directory URL<input class="uk-input" type="url" name="directory_url" maxlength="2048" required placeholder="https://ca.example.com/acme/directory"/></label>
+			<label>Client identifier<input class="uk-input" type="password" name="client_identifier" maxlength="8192" required autocomplete="new-password"/></label>
+			<p>Use an identifier approved by your issuer for one device enrollment. OpenUEM reserves it for that enrollment, including its Mac user channels, even after profile removal or catalog deletion. A new enrollment requires a new issuer-approved identifier. Use the same directory URL consistently for each issuer.</p>
+			<p>The client identifier is encrypted with the profile and included in downloads available to authorized profile managers. The issuer controls client approval, certificate issuance and permitted reuse.</p>
+			<label>Key type<select class="uk-select" name="key_type" required><option value="ECSECPrimeRandom">Elliptic curve</option><option value="RSA">RSA</option></select></label>
+			<label>Key size in bits<input class="uk-input" type="number" name="key_size" min="192" max="4096" step="1" value="256" required/></label>
+			<p>Elliptic curve keys support 192, 256, 384 or 521 bits. RSA supports 1024–4096 bits in multiples of 8; choose a size approved by your issuer. Hardware-bound keys require elliptic curve with 256 or 384 bits.</p>
+			<label>Hardware-bound key<select class="uk-select" name="hardware_bound" required><option value="false">No hardware binding</option><option value="true">Require hardware binding</option></select></label>
+			<p>On a Mac, hardware binding requires macOS 14 or later and fresh inventory identifying Apple silicon or a supported T2 model.</p>
+			<label>Request device attestation<select class="uk-select" name="attest"><option value="">Keep default</option><option value="false">Do not request attestation</option><option value="true">Request attestation</option></select></label>
+			<p>Attestation requires a hardware-bound key. T2 Macs ignore this request, and older iPhone/iPad hardware may also ignore it. Your issuer must enforce and verify its own attestation policy.</p>
+			<label>Subject attributes<textarea class="uk-textarea" name="subject" rows="4" maxlength="16384" placeholder="O=Company&#10;CN=Device identity"></textarea></label>
+			<p>Enter one attribute=value per line, using C, L, ST, O, OU, CN or a numeric OID. Leave empty only when your issuer accepts an empty subject. Values are preserved.</p>
+			<details>
+				<summary class="cursor-pointer">Alternative names, usages and Mac key access</summary>
+				<div class="grid gap-4 mt-4">
+					<p>Enter at most one alternative name of each type. The issuer decides which requested names it permits.</p>
+					<label>Email alternative name<input class="uk-input" name="san_email" maxlength="1024"/></label>
+					<label>DNS alternative name<input class="uk-input" name="san_dns" maxlength="1024"/></label>
+					<label>URI alternative name<input class="uk-input" name="san_uri" maxlength="1024"/></label>
+					<label>NT principal alternative name<input class="uk-input" name="san_principal" maxlength="1024"/></label>
+					<label>Extended key usages<textarea class="uk-textarea" name="extended_key_usage" rows="3" maxlength="16384" placeholder="1.3.6.1.5.5.7.3.2"></textarea></label>
+					<p>Enter one numeric OID per line, up to 64. Leave empty to omit this request.</p>
+					<label>Key usage<select class="uk-select" name="usage_flags"><option value="">Keep default</option><option value="1">Digital signature</option><option value="4">Key encryption</option><option value="5">Signature and encryption</option><option value="0">Unspecified usage</option></select></label>
+					<label>Private key export (Mac only)<select class="uk-select" name="key_extractable"><option value="">Keep default</option><option value="false">Prevent export from the keychain</option><option value="true">Allow export from the keychain</option></select></label>
+					<label>Private key access for applications (Mac only)<select class="uk-select" name="all_apps_access"><option value="">Keep default</option><option value="false">Keep application access controls</option><option value="true">Allow all applications to access the private key</option></select></label>
+					<p>Leave both Mac-only settings at their defaults for iPhone and iPad profiles.</p>
+				</div>
+			</details>
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/acme-history")) }>Review unresolved historical profiles</a>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the issuer, intended enrollment, requested identity and key settings.</label>
+			<p>Saving creates a profile without contacting the issuer. After assignment, the target requests its certificate. Profile delivery alone does not prove issuance, renewal or successful attestation.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create ACME certificate profile</button>
+		</form>
+	</details>
+}

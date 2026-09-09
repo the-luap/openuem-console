@@ -88,6 +88,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = s.indexLegacyACMEClients(ctx, tx); err != nil {
+		return fmt.Errorf("index historical ACME client references: %w", err)
+	}
 	return tx.Commit()
 }
 

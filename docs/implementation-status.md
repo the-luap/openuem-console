@@ -61,11 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [ACME certificate profiles](apple-acme-profiles.md) add typed issuer, identity,
+  hardware and key settings, durable encrypted client ownership across profile
+  removal/deletion, and protected review of historical archive gaps. Parser and
+  schema checks pass; native transaction, scoped console and browser acceptance
+  are pending for this change. Issuance, renewal and attestation still require
+  the intended issuer and physical-device acceptance.
+
 - [PKCS12 identity profiles](apple-pkcs12-profiles.md) add bounded archive uploads,
   protected passwords, System/User scope and Mac-only key options with revision
   checks. The server validates the outer envelope without executing archive KDFs
-  or claiming password/identity verification. Core tests pass; full CI and browser
-  checks remain pending, followed by physical certificate acceptance.
+  or claiming password/identity verification. Core/fuzz tests, builds, scoped
+  console checks and 12 actual browser cases pass. Both full workflows pass,
+  including protocol/regression CI. Physical certificate acceptance remains.
 
 - [SCEP certificate profiles](apple-scep-profiles.md) add typed external-CA settings,
   subject/alternative names, key controls and pinned HTTP or HTTPS configuration.
@@ -77,8 +85,8 @@ the table's package summaries do not remove any detail from the roadmap.
   import, separate certificate payloads, System/User scope and assignment-time
   validity checks with revision rollback. Core checks and template generation
   pass. Builds, scoped multipart console checks and six actual browser cases pass;
-  both complete workflows pass. PKCS12 imports are tracked separately; ACME
-  templates and physical trust/renewal acceptance remain separate work.
+  both complete workflows pass. PKCS12 and ACME templates are tracked separately;
+  physical trust/renewal acceptance remains open.
 
 - [Mac privacy profiles (PPPC/TCC)](macos-privacy.md) add typed application identities,
   all 24 privacy services, Apple Events receivers, grant/deny/user-choice policies

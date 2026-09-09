@@ -45,6 +45,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	vendorExpires := now.Add(24 * time.Hour)
 	d := &apple.Device{ID: "10000000-0000-0000-0000-000000000001", Name: "Sales iPhone", Model: "iPhone16,1", OSVersion: "18.6.2", BuildVersion: "22G100", SerialNumber: "EXAMPLE123", Supervised: true, Status: "enrolled", InventoryAt: &now, LastSeen: &now, AppsAt: &now, ProfilesAt: &now, CertificateExpiresAt: now.AddDate(1, 0, 0), PushStatus: "accepted", Apps: []apple.Application{{Identifier: "com.example.app", Name: "Example app", Version: "42", ShortVersion: "1.2"}}}
 	p := apple.Profile{ID: "20000000-0000-0000-0000-000000000001", Name: "Company Wi-Fi", Identifier: "eu.example.wifi", Revision: 2, PayloadTypes: []string{"com.apple.wifi.managed"}}
+	acmeHistory := apple.ACMELegacyProfile{ID: "30000000-0000-4000-8000-000000000019", DeviceID: d.ID, ProfileID: p.ID, Identifier: "com.example.<identity>", Scope: "System", State: "unresolved", Revision: 7, CreatedAt: now}
+	acmeReviewed := acmeHistory
+	acmeReviewed.State, acmeReviewed.ReviewedBy, acmeReviewed.Reason, acmeReviewed.ReviewedAt = "reviewed", "Administrator <reviewer>", "Original <approved> archive from the configuration repository", &now
 	policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
 	detail := Detail{Device: d, Profiles: []apple.Profile{p}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 2, Desired: "installed", Status: "verified"}}, Policy: policy, Compliance: "update_required", CatalogAt: &now, Releases: []apple.OSRelease{{Version: "18.7.1", Build: "22H100"}, {Version: "18.7.1", Build: "22H6100"}}}
 	detail.IdentityRenewals = []apple.IdentityRenewal{{ID: "40000000-0000-0000-0000-000000000001", Status: "issued", CommandID: "50000000-0000-0000-0000-000000000001", PreviousFingerprint: strings.Repeat("1a", 32), Fingerprint: strings.Repeat("2b", 32), CreatedAt: now, CertificateExpiresAt: &vendorExpires, TokenUpdatedAt: &now}, {ID: "40000000-0000-0000-0000-000000000002", Status: "confirmed", CommandID: "50000000-0000-0000-0000-000000000002", PreviousFingerprint: strings.Repeat("3c", 32), Fingerprint: strings.Repeat("1a", 32), CreatedAt: now.AddDate(-1, 0, 0), ConfirmedAt: &now}}
@@ -279,6 +282,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"profile-history-migrated", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileMigrated}, "", true), []string{"Existing revision captured during migration", "Earlier versions and their authors were not retained"}},
 		{"profile-history-reader", ProfileRevisionHistory(c, &reader, p.ID, []apple.ProfileRevision{profileRevision}, "", false), []string{"Profile revision history", "Identity &lt;configuration&gt;"}},
 		{"profile-history-empty", ProfileRevisionHistory(c, info, "", nil, "", true), []string{"No stored profile revisions"}},
+		{"acme-history-unresolved", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeHistory}, acmeHistory.ID, "unresolved", true), []string{"com.example.&lt;identity&gt;", "Record historical archive review", "More historical profiles", `enctype="multipart/form-data"`, `value="7"`, "test-csrf-token"}},
+		{"acme-history-reviewed", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeReviewed}, "", "reviewed", true), []string{"Original &lt;approved&gt; archive", "Administrator &lt;reviewer&gt;", "separate review evidence"}},
+		{"acme-history-manager", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeHistory}, "", "unresolved", false), []string{"assignment permissions are required"}},
+		{"acme-history-empty", ACMEHistory(c, info, nil, "", "unresolved", true), []string{"No unresolved historical profiles"}},
 		{"software-prior-unresolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, priorApp.ID), []string{"Earlier &lt;Site&gt;", "Record stopping evidence", `name="confirmed"`, "Older operations"}},
 		{"software-prior-resolved", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{}, []apple.MacAppPriorAttempt{resolvedApp}, ""), []string{"Stopping evidence recorded", "Synthetic erase &lt;evidence&gt;", "Operator &lt;A&gt;", "Old outcome unknown"}},
 		{"software-prior-duplicate", MacAppPreviousEnrollments(c, info, &appDevice, apple.MacAppEnrollmentRisk{ActiveIdentity: true, Unresolved: true}, []apple.MacAppPriorAttempt{priorApp}, ""), []string{"Another enrollment with this Mac identity is still active"}},
@@ -363,6 +370,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := b.String()
+			if strings.HasPrefix(tc.name, "acme-history-") && tc.name != "acme-history-unresolved" && strings.Contains(html, `name="profile"`) {
+				t.Fatal("unavailable ACME historical review form exposed")
+			}
+			if tc.name == "profiles" && (!strings.Contains(html, "Create an ACME certificate profile") || !strings.Contains(html, `name="client_identifier"`) || !strings.Contains(html, "Review unresolved historical profiles")) {
+				t.Fatal("ACME editor or history link missing")
+			}
 			if tc.name == "ade-sso-released" || tc.name == "ade-sso-complete" || tc.name == "ade-sso-reader" {
 				if strings.Contains(html, "Send retained profile revision") || strings.Contains(html, "Apply reviewed provider revisions") {
 					t.Fatal("repair exposed after release or without permission")

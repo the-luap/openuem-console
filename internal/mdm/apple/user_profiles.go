@@ -48,6 +48,9 @@ func (s *Store) assignUserProfile(ctx context.Context, tx *sql.Tx, d *Device, u 
 		}
 	}
 	if desired == "installed" {
+		if err := s.reserveACMEClients(ctx, tx, d, p); err != nil {
+			return err
+		}
 		if err := s.reserveSSORoutes(ctx, tx, d, u.ID, p); err != nil {
 			return err
 		}
