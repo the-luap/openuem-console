@@ -43,7 +43,9 @@ templ CSPCommands(c echo.Context, info *partials.CommonInfo, device windows.Devi
 										<td>{ cspState(command.Phase) }</td>
 										<td>{ scheduleTimestamp(command.CreatedAt) }<div>{ scheduleTimestamp(command.ExpiresAt) }</div></td>
 										<td>
-											if command.UpdateRunID!="" {
+											if command.UnenrollmentRequestID!="" {
+												<span>Disconnection request</span>
+											} else if command.UpdateRunID!="" {
 												<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+command.UpdateRunID)) }>Update policy run</a>
 												<div>{ updateStep(command.UpdateStep) }</div>
 											} else {
@@ -114,6 +116,9 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 					if detail.Command.CompletedAt!=nil {
 						<dl class="uk-description-list"><dt>Terminal state recorded</dt><dd>{ scheduleTimestamp(*detail.Command.CompletedAt) }</dd></dl>
 					}
+					if detail.Command.UnenrollmentRequestID!="" {
+						<p class="uk-alert uk-alert-warning">This fixed disconnection request belongs to the device lifecycle. A command acknowledgment does not prove local cleanup. Cancellation and review require device revocation permission.</p>
+					}
 					if detail.Command.UpdateRunID!="" {
 						<p class="my-3">This is a step in an immutable update policy run. Review its combined evidence and cancel remaining undelivered work from that run.</p>
 						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+detail.Command.UpdateRunID)) }>Open owning update policy run</a>
@@ -132,7 +137,7 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 					if detail.Command.Phase=="sent" || detail.Command.Phase=="unknown" {
 						<p class="my-3">This command prevents the next queued command from being delivered while its outcome remains unresolved. No automatic resend is performed after uncertain effects.</p>
 					}
-					if detail.Command.Phase=="unknown" {
+					if detail.Command.Phase=="unknown" && detail.Command.UnenrollmentRequestID=="" {
 						<details class="mt-4">
 							<summary>Record resolution and release queue</summary>
 							<p>The command may already have affected the device. Releasing it permits subsequent eligible work; it does not undo the operation, retry it or mark it successful. Record the evidence reviewed and the reason for accepting its unresolved effects.</p>

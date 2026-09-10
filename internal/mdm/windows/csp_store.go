@@ -20,21 +20,22 @@ type CSPCommand struct {
 	ID       string
 	DeviceID string
 	access.Scope
-	RequestKey         string
-	CreatedBy          string
-	CreatedByRevision  int64
-	UserTarget         bool
-	Revision           int64
-	Phase              string
-	CreatedAt          time.Time
-	ExpiresAt          time.Time
-	UpdatedAt          time.Time
-	DeliveredSessionID string
-	DeliveredMessage   int
-	DeliveredAt        *time.Time
-	CompletedAt        *time.Time
-	UpdateRunID        string
-	UpdateStep         int
+	RequestKey            string
+	CreatedBy             string
+	CreatedByRevision     int64
+	UserTarget            bool
+	Revision              int64
+	Phase                 string
+	CreatedAt             time.Time
+	ExpiresAt             time.Time
+	UpdatedAt             time.Time
+	DeliveredSessionID    string
+	DeliveredMessage      int
+	DeliveredAt           *time.Time
+	CompletedAt           *time.Time
+	UpdateRunID           string
+	UnenrollmentRequestID string
+	UpdateStep            int
 }
 
 func (CSPCommand) String() string     { return "[protected Windows CSP command metadata]" }
@@ -58,13 +59,13 @@ type cspProtectedRequest struct {
 func (cspProtectedRequest) String() string     { return "[protected Windows CSP request]" }
 func (v cspProtectedRequest) GoString() string { return v.String() }
 
-const cspCommandColumns = `id,device_id,tenant_id,site_id,request_key,request_digest,created_by,created_by_revision,user_target,revision,phase,encrypted_request,encrypted_result,created_at,expires_at,updated_at,COALESCE(delivered_session_id::text,''),COALESCE(delivered_message,0),delivered_at,completed_at,COALESCE(update_run_id::text,''),COALESCE(update_step,0)`
+const cspCommandColumns = `id,device_id,tenant_id,site_id,request_key,request_digest,created_by,created_by_revision,user_target,revision,phase,encrypted_request,encrypted_result,created_at,expires_at,updated_at,COALESCE(delivered_session_id::text,''),COALESCE(delivered_message,0),delivered_at,completed_at,COALESCE(update_run_id::text,''),COALESCE(update_step,0),COALESCE(unenrollment_request_id::text,'')`
 
 type cspScanner interface{ Scan(...any) error }
 
 func scanCSPCommand(row cspScanner) (*cspStoredCommand, error) {
 	c := &cspStoredCommand{}
-	err := row.Scan(&c.ID, &c.DeviceID, &c.TenantID, &c.SiteID, &c.RequestKey, &c.digest, &c.CreatedBy, &c.CreatedByRevision, &c.UserTarget, &c.Revision, &c.Phase, &c.request, &c.result, &c.CreatedAt, &c.ExpiresAt, &c.UpdatedAt, &c.DeliveredSessionID, &c.DeliveredMessage, &c.DeliveredAt, &c.CompletedAt, &c.UpdateRunID, &c.UpdateStep)
+	err := row.Scan(&c.ID, &c.DeviceID, &c.TenantID, &c.SiteID, &c.RequestKey, &c.digest, &c.CreatedBy, &c.CreatedByRevision, &c.UserTarget, &c.Revision, &c.Phase, &c.request, &c.result, &c.CreatedAt, &c.ExpiresAt, &c.UpdatedAt, &c.DeliveredSessionID, &c.DeliveredMessage, &c.DeliveredAt, &c.CompletedAt, &c.UpdateRunID, &c.UpdateStep, &c.UnenrollmentRequestID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -78,6 +79,9 @@ func cspPurpose(kind string, c *cspStoredCommand) string {
 	purpose := fmt.Sprintf("openuem/windows/csp/%s/v1/%s/%s/%d/%d/%s/%x/%x/%d/%t/%s/%s", kind, c.ID, c.DeviceID, c.TenantID, c.SiteID, c.RequestKey, c.digest, sha256.Sum256([]byte(c.CreatedBy)), c.CreatedByRevision, c.UserTarget, c.CreatedAt.UTC().Format(time.RFC3339Nano), c.ExpiresAt.UTC().Format(time.RFC3339Nano))
 	if c.UpdateRunID != "" {
 		purpose += fmt.Sprintf("/update-run/%s/%d", c.UpdateRunID, c.UpdateStep)
+	}
+	if c.UnenrollmentRequestID != "" {
+		purpose += "/unenrollment-request/" + c.UnenrollmentRequestID
 	}
 	return purpose
 }
@@ -114,6 +118,14 @@ func (s *Store) openCSPRequest(c *cspStoredCommand) ([]byte, SyncMLCommand, erro
 		return nil, SyncMLCommand{}, ErrAuthoritySecret
 	}
 	clear(envelope.Salt)
+	if c.UnenrollmentRequestID != "" {
+		command, err := decodeUnenrollmentRequest(envelope.Payload)
+		if err != nil || c.UnenrollmentRequestID != c.ID || c.UpdateRunID != "" || c.UserTarget {
+			clear(envelope.Payload)
+			return nil, SyncMLCommand{}, ErrAuthoritySecret
+		}
+		return envelope.Payload, command, nil
+	}
 	command, user, err := decodeCSPRequest(envelope.Payload)
 	if err != nil || user != c.UserTarget {
 		clear(envelope.Payload)
@@ -179,7 +191,7 @@ func (s *Store) EnqueueCSPCommand(ctx context.Context, actor string, scope acces
 	}
 	old, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND request_key=$4 FOR SHARE`, deviceID, scope.TenantID, scope.SiteID, requestKey))
 	if err == nil {
-		if old.UpdateRunID != "" || old.CreatedBy != actor || old.CreatedByRevision != revision || old.ExpiresAt.Sub(old.CreatedAt) != validFor {
+		if old.UpdateRunID != "" || old.UnenrollmentRequestID != "" || old.CreatedBy != actor || old.CreatedByRevision != revision || old.ExpiresAt.Sub(old.CreatedAt) != validFor {
 			return nil, ErrCSPConflict
 		}
 		stored, _, err := s.openCSPRequest(old)
@@ -213,7 +225,7 @@ func (s *Store) EnqueueCSPCommand(ctx context.Context, actor string, scope acces
 		return nil, ErrCSPCommand
 	}
 	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mdm_windows_csp_commands WHERE device_id=$1 AND phase IN ('queued','blocked','sent','unknown')`, deviceID).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mdm_windows_csp_commands WHERE device_id=$1 AND phase IN ('queued','blocked','sent','unknown') AND unenrollment_request_id IS NULL`, deviceID).Scan(&count); err != nil {
 		return nil, err
 	}
 	if count >= 256 {
@@ -235,7 +247,7 @@ func (s *Store) EnqueueCSPCommand(ctx context.Context, actor string, scope acces
 }
 
 // The caller holds live permission/scope/device locks and supplies either a
-// validated custom request or a tree generated from an immutable update run.
+// validated custom request, an immutable update run, or a fixed lifecycle action.
 func (s *Store) insertCSPCommand(ctx context.Context, tx *sql.Tx, c *cspStoredCommand, payload []byte) error {
 	salt := make([]byte, 32)
 	if _, err := rand.Read(salt); err != nil {
@@ -252,7 +264,7 @@ func (s *Store) insertCSPCommand(ctx context.Context, tx *sql.Tx, c *cspStoredCo
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_windows_csp_commands(id,device_id,tenant_id,site_id,request_key,request_digest,created_by,created_by_revision,user_target,revision,phase,encrypted_request,created_at,expires_at,updated_at,update_run_id,update_step) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,1,'queued',$10,$11,$12,$11,NULLIF($13,'')::uuid,CASE WHEN $13='' THEN NULL ELSE $14::smallint END)`, c.ID, c.DeviceID, c.TenantID, c.SiteID, c.RequestKey, c.digest, c.CreatedBy, c.CreatedByRevision, c.UserTarget, c.request, c.CreatedAt, c.ExpiresAt, c.UpdateRunID, c.UpdateStep)
+	_, err = tx.ExecContext(ctx, `INSERT INTO mdm_windows_csp_commands(id,device_id,tenant_id,site_id,request_key,request_digest,created_by,created_by_revision,user_target,revision,phase,encrypted_request,created_at,expires_at,updated_at,update_run_id,update_step,unenrollment_request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,1,'queued',$10,$11,$12,$11,NULLIF($13,'')::uuid,CASE WHEN $13='' THEN NULL ELSE $14::smallint END,NULLIF($15,'')::uuid)`, c.ID, c.DeviceID, c.TenantID, c.SiteID, c.RequestKey, c.digest, c.CreatedBy, c.CreatedByRevision, c.UserTarget, c.request, c.CreatedAt, c.ExpiresAt, c.UpdateRunID, c.UpdateStep, c.UnenrollmentRequestID)
 	if err != nil {
 		return err
 	}
@@ -380,6 +392,9 @@ func (s *Store) CancelCSPCommand(ctx context.Context, actor string, scope access
 	c, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE id=$1 AND device_id=$2 AND tenant_id=$3 AND site_id=$4 FOR UPDATE`, commandID, deviceID, scope.TenantID, scope.SiteID))
 	if err != nil {
 		return err
+	}
+	if c.UnenrollmentRequestID != "" {
+		return ErrUnenrollmentRequest
 	}
 	if c.Revision != expectedRevision {
 		return ErrCSPConflict

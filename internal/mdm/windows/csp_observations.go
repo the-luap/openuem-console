@@ -124,7 +124,7 @@ func (s *Store) readCSPObservations(ctx context.Context, actor string, scope acc
 		var state cspSessionCommand
 		err = decodeSyncMLProtectedJSON(plain, &state)
 		clear(plain)
-		if err != nil || state.validate() != nil || state.CommandID != c.ID || state.MessageID != strconv.Itoa(c.DeliveredMessage) || state.ObservedMessageID != strconv.Itoa(observation.MessageID) || len(state.StopReason) > 128 {
+		if err != nil || state.validate() != nil || state.CommandID != c.ID || state.UnenrollmentRequestID != c.UnenrollmentRequestID || state.MessageID != strconv.Itoa(c.DeliveredMessage) || state.ObservedMessageID != strconv.Itoa(observation.MessageID) || len(state.StopReason) > 128 {
 			return nil, ErrAuthoritySecret
 		}
 		if err := bindCSPDispatch(&syncMLSession{ID: observation.SessionID}, command, &state); err != nil {

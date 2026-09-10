@@ -235,7 +235,7 @@ func (s *Store) enqueueUpdatePolicyTx(ctx context.Context, tx *sql.Tx, actor str
 		return nil, ErrManagementIdentity
 	}
 	var count int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mdm_windows_csp_commands WHERE device_id=$1 AND phase IN ('queued','blocked','sent','unknown')`, deviceID).Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM mdm_windows_csp_commands WHERE device_id=$1 AND phase IN ('queued','blocked','sent','unknown') AND unenrollment_request_id IS NULL`, deviceID).Scan(&count); err != nil {
 		return nil, err
 	}
 	if count > 256-len(commands) {

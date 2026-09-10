@@ -35,7 +35,7 @@ func cspObservationOutcome(outcome string) string {
 }
 
 func canCancelCSP(command windows.CSPCommand) bool {
-	return command.UpdateRunID == "" && (command.Phase == "queued" || command.Phase == "blocked")
+	return command.UpdateRunID == "" && command.UnenrollmentRequestID == "" && (command.Phase == "queued" || command.Phase == "blocked")
 }
 
 type cspRequestRow struct {

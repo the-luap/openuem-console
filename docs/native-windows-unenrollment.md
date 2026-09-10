@@ -1,10 +1,11 @@
-# Native Windows disconnection notifications
+# Native Windows disconnection lifecycle
 
 The SyncML endpoint now accepts authenticated Windows disconnection notifications,
 retires the native identity's server access, preserves interrupted work and shows
-the report in device details and inventory. Server-requested disconnection,
-missing-notification recovery and physical Windows cleanup acceptance remain
-implementation work. This extension does not send an unenrollment command.
+the report in device details and inventory. A typed store workflow now queues
+server-requested disconnection and records explicit review when the notification
+is missing. Its dedicated console forms and physical Windows cleanup acceptance
+remain implementation work; the existing custom CSP editor cannot create it.
 
 ## Protocol meaning
 
@@ -120,5 +121,77 @@ Full CI for this extension is pending.
 
 These fixtures create no host enrollment, profile, certificate-store entry or
 physical device command. Real Windows disconnection behavior, local cleanup,
-server-requested unenrollment and cases where no notification arrives remain
+dedicated disconnection console actions and end-to-end recovery acceptance remain
 open in WIN-02.
+
+
+## Server-requested disconnection and explicit review
+
+`EnqueueUnenrollmentRequest` requires current `devices.revoke` permission at the
+exact device site. It queues a fixed `Exec` for
+`./Device/Vendor/MSFT/DMClient/Unenroll`, with the originally provisioned ProviderID
+as character data. The management options must come from the server configuration;
+opening the original enrollment's protected bootstrap verifies their binding.
+Custom CSP URI validation continues to reject DMClient, DMAcc, Enrollment and
+Provisioning roots. The protected result grammar admits only this single Exec
+when it carries the matching lifecycle owner.
+[Microsoft Unenroll node](https://learn.microsoft.com/en-us/windows/client-management/mdm/dmclient-csp#deviceunenroll)
+
+Migration `013_unenrollment_requests.sql` binds one immutable lifecycle request to
+its durable CSP command, exact device/site, caller request UUID, creator and access
+revision, and creation/expiry times. The reason and management options are sealed;
+release reasons have separate authenticated ciphertext. Request identity, reviews
+and lifecycle audit are append-only. Existing custom/update request ciphertext,
+protected session state and exact delivery replay remain compatible. Expiry is
+bounded to one minute through seven days. Reusing an exact request key returns the
+existing request; changed intent or creator revision conflicts. A device cannot
+have two unresolved disconnection requests. Its lifecycle slot is separate from
+the 256-command custom/update queue; released historical uncertainty does not
+consume normal queue capacity.
+
+The operation has priority over queued custom/update work. It can follow an older
+unrelated uncertain command after a fresh mutually authenticated session and
+identity probe, without changing that command's evidence. Delivery and exact
+packet replay recheck the creator's `devices.revoke` capability, original access
+revision and deadline. The final deadline check follows audit waits. An expired
+or unauthorized undelivered request is retired without sending its payload.
+
+Once delivered, a request holds subsequent command delivery until explicit review
+or an authenticated disconnection report retires access. A `200` Exec status means
+command acknowledgment; `202`, failure and missing responses retain their existing
+CSP meanings. None proves local cleanup or revokes access by itself. The separate
+incoming notification still uses its original proof and access-retirement rules,
+and cannot attribute who initiated the disconnection.
+
+`UnenrollmentRequests` and `UnenrollmentRequestDetails` provide protected, audited
+history under fresh `devices.revoke` permission. They verify the owning intent,
+original enrollment configuration, fixed request, current command result and any
+release record before returning data. `CancelUnenrollmentRequest` accepts only
+queued/blocked requests at their reviewed revision. Custom-command cancellation
+and abandonment reject lifecycle-owned requests, and their existing views hide
+those forms and identify the disconnection owner.
+
+`ReleaseUnenrollmentRequest` requires a reviewed command revision and a reason.
+It can release a delivered request after investigation; it does not retry, undo,
+or claim successful cleanup. A still-live delivery session becomes aborted,
+leaving unresolved effects unknown while preserving conclusive device outcomes.
+The immutable review records its actor, reviewed revision, time and protected
+reason. Further management needs a new authenticated session. The released Exec
+cannot be replayed; a later authenticated disconnection notification still
+retires access. Existing explicit server-side device revocation remains available
+when continued access is unwanted.
+
+Synthetic PostgreSQL tests cover concurrent idempotency, authority revision
+changes, fixed provider/configuration binding, raw-CSP isolation, priority over
+unrelated uncertainty, exact result correlation, absent/200/202/500 responses,
+late notifications, revision-checked cancellation/release, audit rollback,
+protected storage damage and immutable history. Migration tests preserve existing
+custom and update-owned encrypted deliveries. Deadline tests expire a synthetic
+request while delivery or replay waits on audit, and retain later device evidence.
+The complete Windows PostgreSQL/race suite passes in **130.999 seconds**, with
+protocol in **1.426 seconds**. After the final queue-capacity correction, the
+focused lifecycle and affected update-queue regression tests pass in **17.055
+seconds**. Full console integration and focused Windows handler tests pass in
+**12.629 seconds**, and Windows views in **2.994 seconds**. Vet and Linux/Windows
+builds pass. Full CI for this request extension is pending. The dedicated console
+workflow and physical acceptance remain pending.

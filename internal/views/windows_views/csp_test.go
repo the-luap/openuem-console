@@ -91,6 +91,17 @@ func TestWindowsCSPViewsPreserveUntrustedValuesAndOutcomeBoundaries(t *testing.T
 			}
 		})
 	}
+	for _, phase := range []string{"queued", "blocked", "unknown"} {
+		command := windows.CSPCommand{ID: "20000000-0000-4000-8000-000000000001", DeviceID: device.ID, UnenrollmentRequestID: "20000000-0000-4000-8000-000000000001", Scope: scope, Revision: 2, Phase: phase, CreatedAt: now, UpdatedAt: now, ExpiresAt: now.Add(time.Hour)}
+		var out bytes.Buffer
+		if err := CSPCommand(c, info, device, windows.CSPCommandDetail{Command: command, Request: windows.SyncMLCommand{Kind: "Exec"}}).Render(ctx, &out); err != nil {
+			t.Fatal(err)
+		}
+		html := out.String()
+		if canCancelCSP(command) || strings.Contains(html, `name="confirm_cancel"`) || strings.Contains(html, `name="confirm_abandon"`) || !strings.Contains(html, "A command acknowledgment does not prove local cleanup") {
+			t.Fatal("typed disconnection acquired raw actions or lost meaning")
+		}
+	}
 	if canCancelCSP(windows.CSPCommand{Phase: "queued", UpdateRunID: "owned-run"}) {
 		t.Fatal("typed step acquired raw cancellation")
 	}

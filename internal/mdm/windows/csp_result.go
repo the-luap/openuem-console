@@ -23,12 +23,13 @@ type cspOperationResult struct {
 }
 
 type cspSessionCommand struct {
-	Version           int
-	CommandID         string
-	MessageID         string
-	ObservedMessageID string
-	StopReason        string
-	Operations        []cspOperationResult
+	UnenrollmentRequestID string `json:",omitempty"`
+	Version               int
+	CommandID             string
+	MessageID             string
+	ObservedMessageID     string
+	StopReason            string
+	Operations            []cspOperationResult
 }
 
 func (cspOperationResult) String() string     { return "[protected Windows CSP operation result]" }
@@ -363,6 +364,9 @@ func (state *cspSessionCommand) validate() error {
 	if state.Version != 1 || !canonicalInvitationID(state.CommandID) || len(state.Operations) == 0 || len(state.Operations) > MaxCSPCommands {
 		return ErrAuthoritySecret
 	}
+	if state.UnenrollmentRequestID != "" && (state.UnenrollmentRequestID != state.CommandID || len(state.Operations) != 1 || state.Operations[0].Kind != "Exec" || state.Operations[0].URI != "./Device/Vendor/MSFT/DMClient/Unenroll" || state.Operations[0].ParentID != "") {
+		return ErrAuthoritySecret
+	}
 	message, err := strconv.Atoi(state.MessageID)
 	if err != nil || message < 1 || message > maxSyncMLSessionMessages || strconv.Itoa(message) != state.MessageID {
 		return ErrAuthoritySecret
@@ -383,7 +387,7 @@ func (state *cspSessionCommand) validate() error {
 			if operation.URI != "" || operation.HasResult {
 				return ErrAuthoritySecret
 			}
-		} else if _, err := validateCSPURI(operation.URI, operation.Kind); err != nil {
+		} else if _, err := validateCSPURI(operation.URI, operation.Kind); err != nil && state.UnenrollmentRequestID == "" {
 			return ErrAuthoritySecret
 		}
 		if operation.HasResult && operation.Kind != "Get" || operation.MoreData && !operation.HasResult {

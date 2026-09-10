@@ -106,6 +106,9 @@ func (h *Handler) WindowsCancelCSPCommand(c echo.Context) error {
 	}
 	// The immutable owner determines the cancellation workflow. Keep typed runs'
 	// all-step cancellation checks, including another step's sent/unknown barrier.
+	if command.UnenrollmentRequestID != "" {
+		return echo.NewHTTPError(409, "Review this command from its owning disconnection request")
+	}
 	if command.UpdateRunID != "" {
 		return echo.NewHTTPError(409, "Cancel remaining work from the owning update policy run")
 	}

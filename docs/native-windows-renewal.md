@@ -280,7 +280,9 @@ browser fixture verifies history paging, required confirmation, the actual
 CSRF-protected cancellation/redirect and escaped long reasons at 390, 768 and
 1440 pixels. The document does not overflow horizontally; the history table has
 its own keyboard-focusable scrolling region. The fixture and its isolated schema
-are removed after verification. Full CI for this console extension is pending.
+are removed after verification. Both complete workflows pass for `04f2b34`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34441003508),
+[PR](https://github.com/the-luap/openuem-console/actions/runs/34441007033)).
 
 ## Remaining lifecycle work
 

@@ -100,6 +100,9 @@ func (s *Store) AbandonCSPCommand(ctx context.Context, actor string, scope acces
 	if err != nil {
 		return err
 	}
+	if c.UnenrollmentRequestID != "" {
+		return ErrUnenrollmentRequest
+	}
 	if c.Revision != expectedRevision {
 		return ErrCSPConflict
 	}

@@ -39,7 +39,7 @@ func (s *Store) openCSPResult(c *cspStoredCommand) (*cspStoredResult, error) {
 	if decodeSyncMLProtectedJSON(plain, &result) != nil || result.Version != 1 || len(result.Reason) > 128 || len(result.Resolution) > 512 || result.Exchange.validate() != nil || c.DeliveredSessionID != "" && result.Exchange == nil {
 		return nil, ErrAuthoritySecret
 	}
-	if result.Exchange != nil && (result.Exchange.CommandID != c.ID || result.Exchange.MessageID != strconv.Itoa(c.DeliveredMessage)) {
+	if result.Exchange != nil && (result.Exchange.CommandID != c.ID || result.Exchange.UnenrollmentRequestID != c.UnenrollmentRequestID || result.Exchange.MessageID != strconv.Itoa(c.DeliveredMessage)) {
 		return nil, ErrAuthoritySecret
 	}
 	return &result, nil
@@ -63,6 +63,12 @@ func (s *Store) writeCSPResult(ctx context.Context, tx *sql.Tx, c *cspStoredComm
 
 func (s *Store) authorizeCSPCreator(ctx context.Context, tx *sql.Tx, c *cspStoredCommand) error {
 	capability := access.ManageWindowsCSP
+	if c.UnenrollmentRequestID != "" {
+		if _, _, err := s.unenrollmentForCommand(ctx, tx, c); err != nil {
+			return err
+		}
+		capability = access.RevokeDevices
+	}
 	if c.UpdateRunID != "" {
 		if _, _, err := s.updateRunForCommand(ctx, tx, c); err != nil {
 			return err
@@ -110,7 +116,7 @@ func (s *Store) authorizeCSPReplay(ctx context.Context, tx *sql.Tx, identity Man
 	if err := checkCSPDeadline(ctx, tx, c); err != nil {
 		return nil, err
 	}
-	if reason, err := s.updateCommandEligibility(ctx, tx, c); err != nil {
+	if reason, err := s.cspCommandEligibility(ctx, tx, c); err != nil {
 		return nil, err
 	} else if reason != "" {
 		return nil, ErrCSPAlreadySent
@@ -127,7 +133,7 @@ func (s *Store) lockCurrentCSP(ctx context.Context, tx *sql.Tx, identity Managem
 	if err != nil {
 		return nil, err
 	}
-	if !slices.Contains([]string{"sent", "unknown", "acknowledged", "failed", "abandoned"}, c.Phase) || c.DeliveredSessionID != session.ID || strconv.Itoa(c.DeliveredMessage) != state.MessageID {
+	if !slices.Contains([]string{"sent", "unknown", "acknowledged", "failed", "abandoned"}, c.Phase) || state.UnenrollmentRequestID != c.UnenrollmentRequestID || c.DeliveredSessionID != session.ID || strconv.Itoa(c.DeliveredMessage) != state.MessageID {
 		return nil, ErrAuthoritySecret
 	}
 	payload, command, err := s.openCSPRequest(c)
@@ -137,6 +143,11 @@ func (s *Store) lockCurrentCSP(ctx context.Context, tx *sql.Tx, identity Managem
 	}
 	if c.UpdateRunID != "" {
 		if _, _, err := s.updateRunForCommand(ctx, tx, c); err != nil {
+			return nil, err
+		}
+	}
+	if c.UnenrollmentRequestID != "" {
+		if _, _, err := s.unenrollmentForCommand(ctx, tx, c); err != nil {
 			return nil, err
 		}
 	}
@@ -298,20 +309,27 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 	if session.Phase != "completed" || !state.ClientAuthenticated || !state.ServerVerified || state.Probe == nil || state.Probe.Status != "200" || !state.Probe.HasResult || state.Probe.MoreData || session.LastMessage >= maxSyncMLSessionMessages {
 		return nil, nil
 	}
-	var unresolved bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('sent','unknown'))`, identity.DeviceID, identity.TenantID, identity.SiteID).Scan(&unresolved); err != nil {
+	if hold, err := s.unenrollmentHoldsDelivery(ctx, tx, identity.Scope, identity.DeviceID); err != nil {
 		return nil, err
-	}
-	if unresolved {
+	} else if hold {
 		return nil, nil
 	}
+	var unresolved bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('sent','unknown') AND unenrollment_request_id IS NULL)`, identity.DeviceID, identity.TenantID, identity.SiteID).Scan(&unresolved); err != nil {
+		return nil, err
+	}
 	for n := 0; n < 32; n++ {
-		c, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('queued','blocked') ORDER BY created_at,COALESCE(update_step,0),id LIMIT 1 FOR UPDATE`, identity.DeviceID, identity.TenantID, identity.SiteID))
+		c, err := scanCSPCommand(tx.QueryRowContext(ctx, `SELECT `+cspCommandColumns+` FROM mdm_windows_csp_commands WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND phase IN ('queued','blocked') ORDER BY (unenrollment_request_id IS NOT NULL) DESC,created_at,COALESCE(update_step,0),id LIMIT 1 FOR UPDATE`, identity.DeviceID, identity.TenantID, identity.SiteID))
 		if errors.Is(err, ErrNotFound) {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, err
+		}
+		// A fixed disconnection may follow an unrelated uncertain operation,
+		// after a new authenticated probe. Preserve the old uncertainty.
+		if unresolved && c.UnenrollmentRequestID == "" {
+			return nil, nil
 		}
 		plain, command, err := s.openCSPRequest(c)
 		clear(plain)
@@ -344,7 +362,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 			}
 			continue
 		}
-		if reason, err := s.updateCommandEligibility(ctx, tx, c); err != nil {
+		if reason, err := s.cspCommandEligibility(ctx, tx, c); err != nil {
 			return nil, err
 		} else if reason != "" {
 			c.Revision++
@@ -374,6 +392,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 			return nil, s.blockCSP(ctx, tx, c, "message_size")
 		}
 		state.CSP = newCSPSessionCommand(c.ID, response.Header.MessageID, candidate.Commands[len(candidate.Commands)-1])
+		state.CSP.UnenrollmentRequestID = c.UnenrollmentRequestID
 		state.LastResponse = sent
 		session.Phase = "active"
 		*response = candidate

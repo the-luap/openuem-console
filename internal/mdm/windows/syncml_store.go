@@ -95,7 +95,7 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 				if err := checkCSPDeadline(ctx, tx, command); err != nil {
 					return nil, err
 				}
-				if reason, err := s.updateCommandEligibility(ctx, tx, command); err != nil {
+				if reason, err := s.cspCommandEligibility(ctx, tx, command); err != nil {
 					return nil, err
 				} else if reason != "" {
 					return nil, ErrCSPAlreadySent
@@ -212,7 +212,7 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 		if err := checkCSPDeadline(ctx, tx, dispatched); err != nil {
 			return nil, err
 		}
-		if reason, err := s.updateCommandEligibility(ctx, tx, dispatched); err != nil {
+		if reason, err := s.cspCommandEligibility(ctx, tx, dispatched); err != nil {
 			return nil, err
 		} else if reason != "" {
 			return nil, ErrCSPAlreadySent
