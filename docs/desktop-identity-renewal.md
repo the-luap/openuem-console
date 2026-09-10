@@ -291,6 +291,18 @@ views pass in **1.940 seconds**. Vet, module consistency and complete Linux/Wind
 builds pass. These are synthetic PostgreSQL and signed-protocol checks, not
 physical FileVault execution.
 
+The resolved-uncertainty regression also covers older writers that recorded
+completion and resolution with separate database clock expressions. Both times
+must precede admission, but need not be identical. The original selected resolution
+and key history survive the new challenge. The regression fails against library
+`270602c` and passes with the corrected historical reader; the expanded registry
+subset passes in **5.766 seconds**, and console resolution continuity in
+**2.822 seconds**. The `270602c`
+[library CI](https://github.com/the-luap/openuem-nats/actions/runs/34489951243)
+passes Linux/PostgreSQL/race/fuzz and native Windows checks; the timestamp follow-up
+and final console integration require their own CI results. All historical console
+tests pass against the corrected published library in **18.115 seconds**.
+
 After handoff, original receipts, ordinals and encrypted recovery keys remain.
 The agent must register a fresh recipient epoch against its new certificate while
 retaining its original local installation/replay anchor and recipient key.

@@ -330,3 +330,30 @@ func TestFileVaultHistoricalAdmissionAndNonKeyReleaseRecheckExpiryAfterAudit(t *
 		})
 	}
 }
+
+func TestFileVaultHistoricalResolvedUncertaintyPreservesOriginalResolution(t *testing.T) {
+	f := newFileVaultRotationFixture(t)
+	rotation := queueFileVaultRotation(t, f)
+	reportFileVaultRotation(t, f, rotation, "uncertain", nil, true)
+	if err := f.s.checkFileVaultRotation(t.Context(), f.scope, f.d.ID, rotation.Context.Binding.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	resolution := f.queue(t)
+	f.report(t, "valid")
+	f.reconcile(t)
+	eraseSyntheticHistoricalAcknowledgement(t, f, rotation.Context.Binding.TaskID)
+	if _, err := f.s.db.Exec(`UPDATE uem_agent_rotation_tasks SET resolved_at=clock_timestamp() WHERE id=$1`, rotation.Context.Binding.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	history := f.queue(t)
+	if history == resolution {
+		t.Fatal("old resolution proof reused as historical challenge")
+	}
+	f.report(t, "valid")
+	f.reconcile(t)
+	historicalAcknowledgementState(t, f, rotation.Context.Binding.TaskID, true)
+	var retained bool
+	if err := f.s.db.QueryRow(`SELECT t.resolution_task_id=$2 AND v.status='resolved' AND octet_length(v.reply_private)=0 AND (SELECT count(*) FROM mdm_apple_filevault_keys)=1 FROM uem_agent_rotation_tasks t JOIN mdm_apple_filevault_rotations v ON v.id=t.id WHERE t.id=$1`, rotation.Context.Binding.TaskID, resolution).Scan(&retained); err != nil || !retained {
+		t.Fatal("historical processing rewrote uncertainty resolution", err)
+	}
+}

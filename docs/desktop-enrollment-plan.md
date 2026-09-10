@@ -98,7 +98,10 @@ without another claim. [Windows/macOS/Linux CI passed](https://github.com/the-lu
 including full builds and native command help without service startup. Tests never
 install or execute fixture packages. See [command authorization, recovery and limits](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
 
-Positive signed-release activation acceptance, guided end-user consent, installer integration, renewal,
+Automatic installed-service identity renewal, authoritative startup recovery and
+historical FileVault reconciliation are now implemented and tested; see
+[the desktop identity lifecycle](desktop-identity-renewal.md).
+Positive signed-release activation acceptance, guided end-user consent, installer integration,
 signed updater commands, inherited handler execution bounds and reference
 console/deployment wiring remain open.
 

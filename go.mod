@@ -148,4 +148,4 @@ require (
 
 tool github.com/a-h/templ/cmd/templ
 
-replace github.com/open-uem/nats => github.com/the-luap/openuem-nats v0.11.1-0.20260910143425-270602caf6a5
+replace github.com/open-uem/nats => github.com/the-luap/openuem-nats v0.11.1-0.20260910144356-2840163f1271
