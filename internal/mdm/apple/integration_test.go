@@ -63,6 +63,11 @@ func testStoreBeforeMigration(t *testing.T, before string) *Store {
 		}
 		admin.Close()
 	})
+	return initializeTestStore(t, db, before)
+}
+
+func initializeTestStore(t *testing.T, db *sql.DB, before string) *Store {
+	t.Helper()
 	s, err := NewStore(db, "integration-test-master-key-32-bytes-minimum")
 	if err != nil {
 		t.Fatal(err)

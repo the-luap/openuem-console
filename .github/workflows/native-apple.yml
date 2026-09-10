@@ -20,6 +20,8 @@ jobs:
           cache: true
       - name: Native protected bootstrap key provisioning
         run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
+      - name: Native encrypted recovery files and command boundaries
+        run: go test -count=1 ./internal/recovery ./cmd/openuem-recovery
       - name: Native protected vendor signing files
         run: go test -count=1 -run "VendorSigningFiles|VendorPrivateKey" ./internal/mdm/apple
       - name: APNs certificate connection protocol
@@ -53,6 +55,20 @@ jobs:
         with:
           go-version: '1.26.8'
           cache: true
+      - name: PostgreSQL 17 backup clients on the disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+      - name: Encrypted backup, CLI restore and existing platform identities
+        env:
+          OPENUEM_RECOVERY_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+          OPENUEM_RECOVERY_TEST_PG_DUMP: /usr/lib/postgresql/17/bin/pg_dump
+          OPENUEM_RECOVERY_TEST_PG_RESTORE: /usr/lib/postgresql/17/bin/pg_restore
+        run: |
+          go test -race -count=1 ./internal/recovery ./cmd/openuem-recovery
+          go test -race -count=1 -run 'Test(Apple|Windows|Desktop)Recovery' ./internal/mdm/apple ./internal/mdm/windows ./internal/desktop
+      - name: Bounded recovery bundle grammar fuzzing
+        run: go test -run '^$' -fuzz='^FuzzRecoveryBundle$' -fuzztime=15s -parallel=2 ./internal/recovery
       - name: Native Windows enrollment, authenticated SyncML and CSP persistence
         run: go test -race -count=1 ./internal/mdm/windows/...
       - name: Bounded Windows discovery parser fuzzing

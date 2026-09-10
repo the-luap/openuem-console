@@ -114,8 +114,9 @@ in **2.412 seconds**, and webserver/startup tests in **1.918 seconds**. The actu
 console route fixture passes in **12.598 seconds**; its live browser/race run
 passes in **107.408 seconds**, including manual browser interaction. Vet and
 complete Linux/Windows builds pass. The full Windows PostgreSQL/race suite also
-passes in **161.787 seconds**, with protocol tests in **1.411 seconds**. Full CI
-for this extension is pending.
+passes in **161.787 seconds**, with protocol tests in **1.411 seconds**. Both full workflows pass for `26ee438`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34457649525),
+[PR](https://github.com/the-luap/openuem-console/actions/runs/34457653660)).
 
 The full console fixture uses the actual Windows migrations and synthetic
 protocol-created parent records for every source. It demonstrates independent

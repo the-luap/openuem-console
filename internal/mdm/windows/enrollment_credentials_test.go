@@ -84,7 +84,14 @@ func credentialTestStoreBeforeMigration(t *testing.T) *Store {
 			t.Error(err)
 		}
 	})
-	_, err = db.ExecContext(ctx, `CREATE TABLE users(uid TEXT PRIMARY KEY); CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT REFERENCES tenants(id)); INSERT INTO users VALUES('admin'),('operator'),('viewer'),('foreign'),('second'); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(11,1),(12,1),(21,2); CREATE TABLE simulated_windows_issuance(id UUID PRIMARY KEY,tenant_id BIGINT NOT NULL,site_id BIGINT NOT NULL)`)
+	return initializeCredentialTestStore(t, db)
+}
+
+func initializeCredentialTestStore(t *testing.T, db *sql.DB) *Store {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	_, err := db.ExecContext(ctx, `CREATE TABLE users(uid TEXT PRIMARY KEY); CREATE TABLE tenants(id BIGINT PRIMARY KEY); CREATE TABLE sites(id BIGINT PRIMARY KEY,tenant_sites BIGINT REFERENCES tenants(id)); INSERT INTO users VALUES('admin'),('operator'),('viewer'),('foreign'),('second'); INSERT INTO tenants VALUES(1),(2); INSERT INTO sites VALUES(11,1),(12,1),(21,2); CREATE TABLE simulated_windows_issuance(id UUID PRIMARY KEY,tenant_id BIGINT NOT NULL,site_id BIGINT NOT NULL)`)
 	if err != nil {
 		t.Fatal(err)
 	}
