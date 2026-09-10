@@ -22,6 +22,20 @@ func TestInstallationSecretsDatabasePostgresCommand(t *testing.T) {
 		t.Skip("requires the compiled database bootstrap command")
 	}
 	f := startDatabaseFixtureWithTLS(t, true)
+	// The bootstrap runtime receives completed credentials without write access.
+	entries, err := os.ReadDir(f.directory)
+	if err != nil {
+		t.Fatal("cannot inspect credential fixture")
+	}
+	for _, entry := range entries {
+		if os.Chmod(filepath.Join(f.directory, entry.Name()), 0400) != nil {
+			t.Fatal("cannot protect read-only credential fixture")
+		}
+	}
+	if os.Chmod(f.directory, 0500) != nil {
+		t.Fatal("cannot protect read-only credential directory")
+	}
+	t.Cleanup(func() { _ = os.Chmod(f.directory, 0700) })
 	data, _ := json.Marshal(f.config)
 	configPath := filepath.Join(f.root, "database.json")
 	if keyfile.Create(configPath, data) != nil {

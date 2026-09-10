@@ -71,6 +71,9 @@ main installation generator does not create database accounts. The separate
 [database credential provisioner](database-credentials.md) now creates independent
 bootstrap/application passwords and the protected URL file.
 
+The installation, database credential and database bootstrap commands also have
+[separate setup container images](setup-containers.md).
+
 Files must be protected regular files owned by the service or system
 administrator; Unix group/other access and untrusted Windows ACLs are rejected.
 The loader rejects final symbolic links, replacement during open, excessive
@@ -103,7 +106,7 @@ Back up the provisioning source with the installation's protected recovery
 material. Do not run this initializer against a new empty directory as a recovery
 procedure for an existing database: it would create a different installation.
 Restore the original secrets, installation identifier and database together.
-Rotation, database credential provisioning, service-specific volume
+Rotation, service-specific volume
 ownership and complete reference composition remain separate work. This command
 does not claim a completed fresh-stack or disaster-recovery acceptance test.
 

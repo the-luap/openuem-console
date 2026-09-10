@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Separate setup container images](setup-containers.md) now distribute one
+  command per unprivileged scratch image for installation secrets, database
+  credentials and online database bootstrap. All three image filesystem,
+  entrypoint, runtime UID and no-listener checks pass. The offline process
+  fixture passes (0.03 seconds), as does initial creation/retry on a private
+  Docker volume mounted below a read-only runtime root. The actual bootstrap
+  distribution binary passes PostgreSQL startup/retry/SIGTERM with read-only
+  credential permissions and generated private TLS (0.87 seconds); the full
+  isolated PostgreSQL interruption/drift/recovery suite passes, including actual
+  console schema initialization (0.40 seconds). Existing credential input
+  inspection is now strictly read-only. Secret/command race tests pass
+  (3.941/1.335/1.330 seconds), as does the installation CLI suite (1.453 seconds).
+  Full Linux/Windows builds and affected Vet checks pass. Native CI now extracts
+  the distribution binary for its PostgreSQL fixture and audits all three images.
+  Automatic service ownership, full reference composition and signed release
+  publication remain open.
 - Private database TLS is now supplied by the certificate manager's optional,
   immutable `--database-dns` configuration at
   [revision 938ea1a](https://github.com/the-luap/openuem-cert-manager/commit/938ea1a77eba4c9eb4517db629fc42ef2f8b96ad).
@@ -74,7 +90,12 @@ the table's package summaries do not remove any detail from the roadmap.
   database bootstrap command (0.49 seconds) and normal console schema migration
   (0.56 seconds). Both validate TLS, password separation and process/restart
   behavior. Console CI pins that certificate-manager revision for native
-  amd64/arm64 acceptance. Full reference wiring, service mount ownership,
+  amd64/arm64 acceptance. The certificate manager's
+  [native PKI CI](https://github.com/the-luap/openuem-cert-manager/actions/runs/34521690446)
+  passes on amd64/arm64, as does its existing broker setup workflow.
+  The console's [combined PKI/database pipeline](https://github.com/the-luap/openuem-console/actions/runs/34521873749)
+  also passes on native Linux amd64/arm64 and Windows.
+  Full reference wiring, service mount ownership,
   administrator/device authorities and restore/migration acceptance remain open.
 - [Resumable database bootstrap](database-bootstrap.md) now creates the production
   application role and database from completed protected credentials. A private

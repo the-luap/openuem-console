@@ -44,7 +44,12 @@ jobs:
         run: |
           set -euo pipefail
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/database-credentials.test" ./internal/setup/secrets
-          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/database-bootstrap" ./cmd/openuem-database-bootstrap
+          docker build -f Dockerfile.setup --target database-bootstrap -t setup-database-bootstrap:check .
+          container=$(docker create setup-database-bootstrap:check --help)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          docker cp "$container:/openuem-database-bootstrap" "$RUNNER_TEMP/database-bootstrap"
+          docker rm "$container"
+          trap - EXIT
           (
             cd .database-pki-source
             CGO_ENABLED=0 go build -mod=readonly -o "$RUNNER_TEMP/database-private-pki" .
@@ -63,3 +68,45 @@ jobs:
             --entrypoint /test \
             postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 \
             -test.v -test.run '^TestInstallationSecretsDatabasePostgres' -test.timeout=4m
+      - name: Verify separate setup images and unprivileged offline commands
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in installation-secrets database-credentials; do
+            docker build -f Dockerfile.setup --target "$target" -t "setup-$target:check" .
+          done
+          docker build -f Dockerfile.setup --target smoke -t setup-smoke:check .
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 128m \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m setup-smoke:check | tee setup-smoke.log
+          grep -q '^--- PASS: TestSetupContainerCommands ' setup-smoke.log
+          python3 - <<'PY'
+          import json, pathlib, re, subprocess, tarfile, tempfile
+          def call(*args):
+              return subprocess.check_output(args, text=True).strip()
+          for target in ('installation-secrets', 'database-credentials', 'database-bootstrap'):
+              image = 'setup-' + target + ':check'
+              executable = 'openuem-' + target
+              config = json.loads(call('docker', 'image', 'inspect', '--format', '{{json .Config}}', image))
+              assert config['User'] == '65532:65532'
+              assert not config.get('ExposedPorts')
+              assert config['Entrypoint'] == ['/' + executable]
+              assert config['Cmd'] == ['--help']
+              help_text = call('docker', 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image, '--help')
+              assert 'Usage:' in help_text
+              container = call('docker', 'create', image, '--help')
+              try:
+                  with tempfile.TemporaryDirectory() as directory:
+                      archive = str(pathlib.Path(directory) / 'runtime.tar')
+                      subprocess.run(['docker', 'export', '-o', archive, container], check=True)
+                      with tarfile.open(archive) as stream:
+                          names = [entry.name.lstrip('./') for entry in stream if entry.isfile()]
+                      assert executable in names and 'licenses/openuem-console.LICENSE' in names
+                      assert [name for name in names if name.startswith('openuem-')] == [executable]
+                      forbidden = r'(^|/)(setup\.test|sh|bash|go\.mod|go\.sum|identity\.json|credentials\.json|secrets\.json|manifest\.json|.*\.(pem|key|seed|pfx|url))$'
+                      assert not any(re.search(forbidden, name) for name in names)
+              finally:
+                  subprocess.run(['docker', 'rm', '-f', container], check=True, stdout=subprocess.DEVNULL)
+              print(target + ': private runtime boundary verified')
+          PY

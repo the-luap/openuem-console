@@ -20,6 +20,9 @@ openuem-database-bootstrap \
   --state /private/openuem/database-bootstrap
 ```
 
+The separate [setup container image](setup-containers.md) provides the same command
+without a shell or Go toolchain in the runtime.
+
 Use the exact protected metadata used to create the credentials. The configured
 host and CA file path must be accessible from this command's environment as well
 as the console's environment. PostgreSQL's `postgres` account must already use

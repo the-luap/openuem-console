@@ -19,23 +19,36 @@ type provisioningDirectory struct {
 	identity   os.FileInfo
 	present    map[string]bool
 	afterWrite func(string) error
+	readOnly   bool
 }
 
 func openProvisioning(ctx context.Context, path string, names []string, afterWrite func(string) error) (*provisioningDirectory, error) {
+	return provisioning(ctx, path, names, afterWrite, true)
+}
+
+func readProvisioning(ctx context.Context, path string, names []string) (*provisioningDirectory, error) {
+	return provisioning(ctx, path, names, nil, false)
+}
+
+func provisioning(ctx context.Context, path string, names []string, afterWrite func(string) error, create bool) (*provisioningDirectory, error) {
 	if !supported() || !filepath.IsAbs(path) || filepath.Clean(path) != path || path == filepath.Dir(path) {
 		return nil, ErrConfiguration
 	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	if keyfile.CreateDirectory(path) != nil || syncDirectory(filepath.Dir(path)) != nil {
+	if create {
+		if keyfile.CreateDirectory(path) != nil || syncDirectory(filepath.Dir(path)) != nil {
+			return nil, ErrState
+		}
+	} else if keyfile.CheckDirectory(path) != nil {
 		return nil, ErrState
 	}
 	identity, err := os.Lstat(path)
 	if err != nil {
 		return nil, ErrState
 	}
-	d := &provisioningDirectory{ctx: ctx, path: path, identity: identity, present: map[string]bool{}, afterWrite: afterWrite}
+	d := &provisioningDirectory{ctx: ctx, path: path, identity: identity, present: map[string]bool{}, afterWrite: afterWrite, readOnly: !create}
 	if err := d.check(); err != nil {
 		return nil, err
 	}
@@ -73,6 +86,9 @@ func (d *provisioningDirectory) read(name string, limit int64) ([]byte, error) {
 }
 
 func (d *provisioningDirectory) write(name string, value []byte) error {
+	if d.readOnly {
+		return ErrState
+	}
 	if err := d.check(); err != nil {
 		return err
 	}

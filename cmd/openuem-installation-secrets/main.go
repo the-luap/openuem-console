@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -12,10 +13,16 @@ import (
 )
 
 func run(args []string, output io.Writer) error {
+	if output == nil {
+		return secrets.ErrConfiguration
+	}
 	flags := flag.NewFlagSet("openuem-installation-secrets", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	directory := flags.String("directory", "", "Absolute private directory under a trusted parent (Linux/macOS)")
-	if flags.Parse(args) != nil || flags.NArg() != 0 || output == nil {
+	if err := flags.Parse(args); errors.Is(err, flag.ErrHelp) {
+		_, err = io.WriteString(output, "Usage: openuem-installation-secrets --directory <private-directory>\nGenerates or verifies retained installation credentials on Linux/macOS.\n")
+		return err
+	} else if err != nil || flags.NArg() != 0 {
 		return secrets.ErrConfiguration
 	}
 	result, err := secrets.Initialize(context.Background(), *directory)

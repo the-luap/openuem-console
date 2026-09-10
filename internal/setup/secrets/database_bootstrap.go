@@ -44,7 +44,7 @@ func bootstrapDatabase(ctx context.Context, credentialsDirectory, stateDirectory
 	if config.Validate() != nil || keyfile.CheckDirectory(credentialsDirectory) != nil {
 		return Result{}, ErrDatabaseBootstrap
 	}
-	source, err := openProvisioning(ctx, credentialsDirectory, append([]string{"credentials.json", "manifest.json"}, databaseArtifacts...), nil)
+	source, err := readProvisioning(ctx, credentialsDirectory, append([]string{"credentials.json", "manifest.json"}, databaseArtifacts...))
 	if err != nil || !source.present["manifest.json"] {
 		return Result{}, ErrDatabaseBootstrap
 	}
