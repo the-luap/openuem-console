@@ -21,7 +21,7 @@ func TestInstallationSecretsDatabasePostgresCommand(t *testing.T) {
 	if binary == "" {
 		t.Skip("requires the compiled database bootstrap command")
 	}
-	f := startDatabaseFixture(t)
+	f := startDatabaseFixtureWithTLS(t, true)
 	data, _ := json.Marshal(f.config)
 	configPath := filepath.Join(f.root, "database.json")
 	if keyfile.Create(configPath, data) != nil {

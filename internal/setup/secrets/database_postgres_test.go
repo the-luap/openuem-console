@@ -35,7 +35,7 @@ import (
 // Run only inside an explicitly configured disposable PostgreSQL image. The
 // cluster, TLS authority and both database roles are synthetic and loopback-only.
 func TestInstallationSecretsDatabasePostgres(t *testing.T) {
-	f := startDatabaseFixture(t)
+	f := startDatabaseFixtureWithTLS(t, true)
 	ctx, config, credentialDirectory, connection, administratorPassword := f.ctx, f.config, f.directory, f.connection, f.administratorPassword
 	state := filepath.Join(f.root, "bootstrap")
 	if _, err := secrets.BootstrapDatabase(ctx, credentialDirectory, state, config); err != nil {
@@ -116,6 +116,11 @@ type databaseFixture struct {
 
 func startDatabaseFixture(t *testing.T) databaseFixture {
 	t.Helper()
+	return startDatabaseFixtureWithTLS(t, false)
+}
+
+func startDatabaseFixtureWithTLS(t *testing.T, productionPKI bool) databaseFixture {
+	t.Helper()
 	initdb, postgres := os.Getenv("OPENUEM_DATABASE_TEST_INITDB"), os.Getenv("OPENUEM_DATABASE_TEST_POSTGRES")
 	if initdb == "" || postgres == "" {
 		t.Skip("requires the disposable PostgreSQL credential container")
@@ -123,14 +128,30 @@ func startDatabaseFixture(t *testing.T) databaseFixture {
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 	t.Cleanup(cancel)
 	root := t.TempDir()
-	caFile, certificateFile, keyFile := databaseTLS(t, root)
+	var caFile, certificateFile, keyFile string
+	host := "127.0.0.1"
+	if binary := os.Getenv("OPENUEM_DATABASE_TEST_PRIVATE_PKI"); productionPKI && binary != "" {
+		directory := filepath.Join(root, "private-pki")
+		command := exec.CommandContext(ctx, binary, "private-pki", "--directory", directory, "--database-dns", "database.internal")
+		command.Stdout, command.Stderr = io.Discard, io.Discard
+		if command.Run() != nil {
+			t.Fatal("production private database PKI initialization failed")
+		}
+		caFile = filepath.Join(directory, "trust/backend-ca.pem")
+		certificateFile = filepath.Join(directory, "database/server.pem")
+		keyFile = filepath.Join(directory, "database/server.key")
+		host = "database.internal"
+		t.Log("using the production private PKI command for database TLS")
+	} else {
+		caFile, certificateFile, keyFile = databaseTLS(t, root)
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal("cannot allocate a fixture port")
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	listener.Close()
-	config := secrets.DatabaseConfig{Version: 1, Installation: strings.Repeat("1", 32), Host: "127.0.0.1", Port: port, Database: "openuem", User: "console", TrustFile: caFile}
+	config := secrets.DatabaseConfig{Version: 1, Installation: strings.Repeat("1", 32), Host: host, Port: port, Database: "openuem", User: "console", TrustFile: caFile}
 	credentialDirectory := filepath.Join(root, "credentials")
 	if _, err := secrets.InitializeDatabaseCredentials(ctx, credentialDirectory, config); err != nil {
 		t.Fatal("credential provisioning failed", err)

@@ -93,5 +93,7 @@ configuration parsing and protected file loading also run natively on Windows.
 
 Automatic, resumable production role/database creation has its own protected
 journal and PostgreSQL interruption, rollback, drift and process lifecycle tests.
-Server certificate provisioning, service mount ownership and full
+The [private PKI initializer](database-bootstrap.md) now also generates a separate
+PostgreSQL server key and certificate. The actual process and console migration
+fixtures use its generated identity. Service mount ownership and full
 fresh-stack/restore acceptance remain open.

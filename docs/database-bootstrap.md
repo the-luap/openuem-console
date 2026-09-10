@@ -34,6 +34,16 @@ Only the bootstrap job receives the administrator password. The console receives
 its protected `database.url` through `DATABASE_URL_FILE` and the public CA file.
 Start the console only after the bootstrap job exits successfully.
 
+For a fresh private PKI, the certificate manager at
+[revision 938ea1a](https://github.com/the-luap/openuem-cert-manager/commit/938ea1a77eba4c9eb4517db629fc42ef2f8b96ad)
+or later accepts `private-pki --database-dns database.internal`. Its separate
+`database/server.pem` and `database/server.key` are the PostgreSQL TLS identity;
+its public `trust/backend-ca.pem` is mounted at the configured client CA path.
+Database DNS names are fixed when the PKI is first created; adding this option to
+existing PKI state is rejected. See the
+[private PKI instructions](https://github.com/the-luap/openuem-cert-manager/blob/938ea1a77eba4c9eb4517db629fc42ef2f8b96ad/docs/private-pki.md)
+for the complete invocation and per-service mount boundaries.
+
 Success prints one JSON object containing only `installation`. Failure exits
 nonzero with a fixed diagnostic that excludes passwords, URLs and SQL text. The
 command has a two-minute deadline and handles interruption and `SIGTERM`. A
@@ -114,12 +124,14 @@ reconstruction of derived phase files and rejection of a different cluster bindi
 
 The actual compiled command creates the application database, repeats successfully,
 emits only public metadata and exits promptly on `SIGTERM` while a real database
-lock blocks it. The real console model migrates and initializes the resulting
-database over verified TLS. CI runs the isolated PostgreSQL image on native Linux
+lock blocks it. Both process and console migration fixtures use the actual pinned
+private PKI command to generate the PostgreSQL server certificate and PKCS#8 key.
+The real console model migrates and initializes the resulting database over
+verified TLS. CI runs the isolated PostgreSQL image on native Linux
 amd64/arm64; argument handling, SCRAM validation and runtime configuration also
 have native platform checks. These fixtures use synthetic clusters and no
 external network, host port, host trust installation or existing database.
 
-Reference deployment wiring, server TLS provisioning, container mount ownership,
-full fresh-stack acceptance and restore/migration acceptance remain open in the
+Reference deployment wiring, container mount ownership, full fresh-stack acceptance
+and restore/migration acceptance remain open in the
 [implementation ledger](implementation-status.md).

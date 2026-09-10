@@ -17,6 +17,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check out the pinned private database PKI initializer
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: the-luap/openuem-cert-manager
+          ref: 938ea1a77eba4c9eb4517db629fc42ef2f8b96ad
+          path: .database-pki-source
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.8'
@@ -37,15 +45,21 @@ jobs:
           set -euo pipefail
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/database-credentials.test" ./internal/setup/secrets
           CGO_ENABLED=0 go build -o "$RUNNER_TEMP/database-bootstrap" ./cmd/openuem-database-bootstrap
-          docker run --rm --network none --read-only --cap-drop ALL \
+          (
+            cd .database-pki-source
+            CGO_ENABLED=0 go build -mod=readonly -o "$RUNNER_TEMP/database-private-pki" .
+          )
+          docker run --rm --network none --add-host database.internal:127.0.0.1 --read-only --cap-drop ALL \
             --security-opt no-new-privileges --pids-limit 128 --memory 768m \
             --shm-size 64m --user postgres --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m \
             --env GOMAXPROCS=2 \
             --env OPENUEM_DATABASE_TEST_BOOTSTRAP=/bootstrap \
+            --env OPENUEM_DATABASE_TEST_PRIVATE_PKI=/private-pki \
             --env OPENUEM_DATABASE_TEST_INITDB=/usr/lib/postgresql/17/bin/initdb \
             --env OPENUEM_DATABASE_TEST_POSTGRES=/usr/lib/postgresql/17/bin/postgres \
             --mount "type=bind,source=$RUNNER_TEMP/database-credentials.test,destination=/test,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/database-bootstrap,destination=/bootstrap,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/database-private-pki,destination=/private-pki,readonly" \
             --entrypoint /test \
             postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 \
             -test.v -test.run '^TestInstallationSecretsDatabasePostgres' -test.timeout=4m

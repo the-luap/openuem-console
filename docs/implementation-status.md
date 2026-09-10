@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Private database TLS is now supplied by the certificate manager's optional,
+  immutable `--database-dns` configuration at
+  [revision 938ea1a](https://github.com/the-luap/openuem-cert-manager/commit/938ea1a77eba4c9eb4517db629fc42ef2f8b96ad).
+  The generated PostgreSQL server leaf has distinct DNS names, a separate P-256
+  key and server-only usage. Existing backend-only state keeps its exact encoding
+  and cannot silently acquire database identities. PKI/command race tests pass
+  (12.590/2.153 seconds), including all fourteen export interruptions, committed
+  database material loss, hostname verification and rejected configuration changes.
+  The actual private PKI/gateway smoke container still passes (0.30 seconds).
+  Native Linux arm64 PostgreSQL uses the actual PKI executable with the actual
+  database bootstrap command (0.49 seconds) and normal console schema migration
+  (0.56 seconds). Both validate TLS, password separation and process/restart
+  behavior. Console CI pins that certificate-manager revision for native
+  amd64/arm64 acceptance. Full reference wiring, service mount ownership,
+  administrator/device authorities and restore/migration acceptance remain open.
 - [Resumable database bootstrap](database-bootstrap.md) now creates the production
   application role and database from completed protected credentials. A private
   journal and PostgreSQL control table bind the cluster and original object OIDs;
@@ -74,8 +89,9 @@ the table's package summaries do not remove any detail from the roadmap.
   real console model migrates/initializes the resulting database over verified TLS
   (0.32 seconds). Affected secret and command race suites pass (3.232, 1.363 and
   1.327 seconds); full Linux/Windows builds and affected Vet checks pass.
-  Native CI now includes the command and full PostgreSQL suite.
-  Server TLS provisioning, service mounts, full reference installation and
+  The [native bootstrap CI](https://github.com/the-luap/openuem-console/actions/runs/34520905792)
+  passes on Linux amd64/arm64 and Windows, including the full isolated PostgreSQL
+  suite on Linux. Service mounts, full reference installation and
   restore/migration acceptance remain open.
 - [Persistent database credentials](database-credentials.md) generates independent
   bootstrap/application passwords and a verify-full URL with explicit CA trust,
@@ -89,7 +105,7 @@ the table's package summaries do not remove any detail from the roadmap.
   The existing generated-secret administrator/router lifecycle also passes
   (11.847 seconds), as do full Linux/Windows builds and affected Vet checks.
   The original fixture's manual role/database setup is now replaced by the
-  production bootstrap above. Server TLS provisioning, service mounts and full
+  production bootstrap above. Service mounts and full
   reference installation/restore acceptance remain open. The
   [credential configuration pipeline](https://github.com/the-luap/openuem-console/actions/runs/34517852043)
   passes on native Linux amd64/arm64 and Windows.
