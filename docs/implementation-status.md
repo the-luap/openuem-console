@@ -61,6 +61,31 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [reference maintenance controller](reference-maintenance.md) now reviews
+  and resumes the known retained broker worker-grant migration across the actual
+  seven-service project. It binds the rendered Compose model, exact local images,
+  protected mount recipients and container identities to an explicit review;
+  private leased journals record joined shutdown, configuration publication,
+  broker recreation, bounded readiness and completion. PostgreSQL remains running.
+  Actual Linux arm64 distribution acceptance passes with the historical initializer:
+  the current worker rejects its old grant, then maintenance preserves a synthetic
+  device identity, administrator access, one pending message and its consumer
+  across interruption immediately after publication and CLI resume. Stale reviews
+  and competing leases are rejected; completed retry preserves container IDs and
+  start times. Fresh current configuration returns unchanged without operation
+  state, followed by the complete retained restart and live WSS revocation checks.
+  The separate minimal readiness image checks actual worker subscription boundaries,
+  private health and pinned gateway discovery. Go race/TLS/broker/cancellation,
+  Python protected metadata and failed-shutdown recovery, native Linux probe,
+  setup smoke, image audit, affected vet and Windows cross-build checks pass locally.
+  CI now covers fresh and retained-maintenance fixtures on Linux amd64/arm64 and
+  portable readiness tests on Windows. Current-commit CI remains required.
+  General image upgrade/rollback, full installation/restore orchestration,
+  external ingress and physical endpoint acceptance remain open.
+- The preceding [d4c7a87 console workflow](https://github.com/the-luap/openuem-console/actions/runs/34538874140)
+  passes Linux amd64, Linux arm64 and Windows. The pinned PKI revision `b06bac1`
+  passes both its [broker upgrade workflow](https://github.com/the-luap/openuem-cert-manager/actions/runs/34538787901)
+  and [private PKI workflow](https://github.com/the-luap/openuem-cert-manager/actions/runs/34538787915).
 - The PKI component's [broker upgrade c3a5943](https://github.com/the-luap/openuem-cert-manager/commit/c3a5943431c4c6542cdfc38e9eb94405ff7cab49)
   adds a read-only review plan and a hash-bound, resumable migration of the known
   preceding worker grant. It retains all six service seeds, TLS/listener settings,
@@ -76,7 +101,7 @@ the table's package summaries do not remove any detail from the roadmap.
   also passes Linux amd64/arm64 process upgrades and Linux/Windows setup checks.
   Console CI pins the `b06bac1` documentation follow-up and the full reference
   lifecycle passes with the new initializer and an unchanged preview of fresh state.
-  Production maintenance orchestration, complete restore and physical device
+  General image maintenance, complete restore and physical device
   acceptance remain open.
 - The [aadf9c3 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34537016525)
   passes on Linux amd64, Linux arm64 and Windows, including generated retained

@@ -32,6 +32,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/agent"
@@ -364,6 +365,9 @@ func TestReferenceDevice(t *testing.T) {
 		t.Fatal("individual endpoint did not authenticate through gateway WSS and the authorization service")
 	}
 	defer connection.Close()
+	if os.Getenv("OPENUEM_REFERENCE_ACTION") == "connect" {
+		return
+	}
 	subject, _ := enrollment.RequestSubject(record.ID, "wingetcfg.exclude")
 	body, _ := json.Marshal(openuem.DeployAction{AgentId: record.ID, PackageId: "reference-fixture-package"})
 	response, err := connection.Request(subject, body, 5*time.Second)
@@ -419,4 +423,68 @@ func TestReferenceBrokerReady(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatal("private broker did not become ready for an authenticated service")
+}
+
+// A command remains pending while the broker is upgraded. The fixture never
+// dispatches this synthetic payload to a real agent or acknowledges it.
+func TestReferencePendingCommand(t *testing.T) {
+	fixture(t)
+	var record deviceRecord
+	data, err := os.ReadFile("/device/record.json")
+	if err != nil || json.Unmarshal(data, &record) != nil {
+		t.Fatal("pending command device is unavailable")
+	}
+	connect := func(path string) *nats.Conn {
+		t.Helper()
+		seed, err := keyfile.Read(path, 512)
+		if err != nil {
+			t.Fatal("pending command service identity is unavailable")
+		}
+		defer clear(seed)
+		key, err := nkeys.FromSeed(seed)
+		if err != nil {
+			t.Fatal("pending command service identity is invalid")
+		}
+		defer key.Wipe()
+		public, _ := key.PublicKey()
+		connection, err := nats.Connect("tls://broker.internal:4222", nats.Nkey(public, key.Sign), nats.RootCAs("/run/backend-ca.pem"), nats.NoReconnect(), nats.Timeout(time.Second))
+		if err != nil {
+			t.Fatal("pending command service could not authenticate")
+		}
+		return connection
+	}
+	if os.Getenv("OPENUEM_REFERENCE_ACTION") == "publish" {
+		connection := connect("/run/console.seed")
+		defer connection.Close()
+		js, err := jetstream.New(connection)
+		if err != nil {
+			t.Fatal("command publisher is unavailable")
+		}
+		if _, err := js.Publish(t.Context(), "agent.report."+record.ID, []byte("synthetic retained maintenance command")); err != nil {
+			t.Fatal("synthetic command was not persisted")
+		}
+	}
+	connection := connect("/run/provisioner.seed")
+	defer connection.Close()
+	js, err := jetstream.New(connection)
+	if err != nil {
+		t.Fatal("command inspection is unavailable")
+	}
+	name, _ := enrollment.ConsumerName(record.ID)
+	consumer, err := js.Consumer(t.Context(), "AGENTS_STREAM", name)
+	if err != nil {
+		t.Fatal("retained command consumer is missing")
+	}
+	info, err := consumer.Info(t.Context())
+	if err != nil || info.NumPending != 1 {
+		t.Fatal("maintenance lost the pending command")
+	}
+	stream, err := js.Stream(t.Context(), "AGENTS_STREAM")
+	if err != nil {
+		t.Fatal("retained command stream is missing")
+	}
+	state, err := stream.Info(t.Context())
+	if err != nil || state.State.Msgs != 1 || state.State.LastSeq != 1 {
+		t.Fatal("maintenance changed the retained stream message")
+	}
 }

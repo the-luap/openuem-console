@@ -4,9 +4,11 @@ ENV GOTOOLCHAIN=local
 COPY go.mod go.sum ./
 COPY cmd/openuem-installation-secrets ./cmd/openuem-installation-secrets
 COPY cmd/openuem-protocol-keys ./cmd/openuem-protocol-keys
+COPY cmd/openuem-reference-probe ./cmd/openuem-reference-probe
 COPY cmd/openuem-database-credentials ./cmd/openuem-database-credentials
 COPY cmd/openuem-database-bootstrap ./cmd/openuem-database-bootstrap
 COPY internal/setup/secrets ./internal/setup/secrets
+COPY internal/setup/readiness ./internal/setup/readiness
 COPY internal/security/access ./internal/security/access
 ARG TARGETOS
 ARG TARGETARCH
@@ -14,7 +16,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o /out/ \
-      ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap
+      ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-reference-probe ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap
 
 FROM build AS test-build
 COPY internal/setup/containertest ./internal/setup/containertest
@@ -38,6 +40,11 @@ COPY --from=build /out/openuem-protocol-keys /openuem-protocol-keys
 ENTRYPOINT ["/openuem-protocol-keys"]
 CMD ["--help"]
 
+FROM base AS reference-probe
+COPY --from=build /out/openuem-reference-probe /openuem-reference-probe
+ENTRYPOINT ["/openuem-reference-probe"]
+CMD ["--help"]
+
 FROM base AS database-credentials
 COPY --from=build /out/openuem-database-credentials /openuem-database-credentials
 ENTRYPOINT ["/openuem-database-credentials"]
@@ -51,6 +58,7 @@ CMD ["--help"]
 # Only the fixture contains all setup commands and the process test executable.
 # Each distribution target above contains one command and its license.
 FROM base AS smoke
+COPY --from=build /out/openuem-reference-probe /openuem-reference-probe
 COPY --from=build /out/openuem-protocol-keys /openuem-protocol-keys
 COPY --from=build /out/openuem-installation-secrets /openuem-installation-secrets
 COPY --from=build /out/openuem-database-credentials /openuem-database-credentials

@@ -26,7 +26,7 @@ func TestSetupContainerCommands(t *testing.T) {
 		command := exec.CommandContext(t.Context(), binary, args...)
 		return command.CombinedOutput()
 	}
-	for _, binary := range []string{"/openuem-installation-secrets", "/openuem-protocol-keys", "/openuem-database-credentials", "/openuem-database-bootstrap"} {
+	for _, binary := range []string{"/openuem-installation-secrets", "/openuem-protocol-keys", "/openuem-reference-probe", "/openuem-database-credentials", "/openuem-database-bootstrap"} {
 		if output, err := run(binary, "--help"); err != nil || !bytes.Contains(output, []byte("Usage:")) {
 			t.Fatal("runtime command help failed")
 		}

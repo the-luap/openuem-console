@@ -1,12 +1,12 @@
 # Installation setup container images
 
-`Dockerfile.setup` builds four separate setup images. Each runtime contains one
+`Dockerfile.setup` builds five separate setup/readiness images. Each runtime contains one
 statically linked command and the console license, runs as UID/GID 65532, exposes
 no port, and includes no shell, source tree, test executable or credentials. Build
 the intended target explicitly:
 
 ```sh
-for target in installation-secrets protocol-keys database-credentials database-bootstrap; do
+for target in installation-secrets protocol-keys reference-probe database-credentials database-bootstrap; do
   docker build -f Dockerfile.setup --target "${target}" \
     -t "openuem-${target}:local" .
 done
@@ -21,6 +21,7 @@ requires explicit paths and configuration.
 | --- | --- | --- |
 | `installation-secrets` | Generate or verify the retained installation identifier, JWT/master keys and first password | One private output directory; no network |
 | `protocol-keys` | Generate or verify installation-bound Windows encryption and desktop bootstrap signing keys | Complete installation credentials read-only; separate private output directory; no network |
+| `reference-probe` | Verify bounded private service, broker grant or gateway discovery readiness | Explicit private network; only the selected public trust or worker key files read-only; no output directory |
 | `database-credentials` | Generate or verify independent database passwords and a verify-full URL | Protected public metadata read-only; separate private output directory; no network |
 | `database-bootstrap` | Create or verify the bound PostgreSQL application role/database | Completed credentials, metadata and public CA read-only; separate journal writable; private database network |
 
@@ -28,8 +29,9 @@ See [installation secrets](installation-secrets.md),
 [protocol keys](protocol-keys.md),
 [database credentials](database-credentials.md) and
 [database bootstrap](database-bootstrap.md) for their configuration and recovery
-rules. All four commands preserve existing committed state; rebuilding an image
-does not rotate keys or passwords.
+rules. The four provisioning commands preserve existing committed state;
+rebuilding an image does not rotate keys or passwords. The separate
+[reference maintenance probe](reference-maintenance.md) writes no installation state.
 
 ## Storage and startup order
 

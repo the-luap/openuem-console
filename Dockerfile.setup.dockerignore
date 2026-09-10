@@ -3,6 +3,8 @@
 !go.sum
 !LICENSE
 !cmd/
+!cmd/openuem-reference-probe/
+!cmd/openuem-reference-probe/*.go
 !cmd/openuem-protocol-keys/
 !cmd/openuem-protocol-keys/*.go
 !cmd/openuem-installation-secrets/
@@ -13,6 +15,8 @@
 !cmd/openuem-database-bootstrap/*.go
 !internal/
 !internal/setup/
+!internal/setup/readiness/
+!internal/setup/readiness/*.go
 !internal/setup/secrets/
 !internal/setup/secrets/*.go
 !internal/setup/containertest/

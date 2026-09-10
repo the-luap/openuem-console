@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import types
 
 
 def command(stage, *args, environment=None, check=True, timeout=60):
@@ -45,7 +46,11 @@ def main():
                  "authorization", "commands", "worker", "gateway"):
         parser.add_argument(name + "_image")
     parser.add_argument("test_binary", type=pathlib.Path)
+    parser.add_argument("--legacy-broker-image")
+    parser.add_argument("--maintenance-probe-image")
     args = parser.parse_args()
+    if args.legacy_broker_image and not args.maintenance_probe_image:
+        raise RuntimeError("legacy maintenance acceptance requires a readiness image")
     if os.name != "posix" or os.getuid() == 0 or not args.test_binary.is_file():
         raise RuntimeError("reference composition requires a non-root POSIX account and its Linux probe")
     repository = pathlib.Path(__file__).resolve().parent.parent
@@ -87,7 +92,7 @@ def main():
                 "private-pki", "--directory", "/work/state", "--name", "reference-composition",
                 "--console-dns", "console.internal", "--broker-dns", "broker.internal",
                 "--database-dns", "database.internal")
-        command("broker setup", *offline, *mount(root / "broker", "/work", False), args.pki_image,
+        command("broker setup", *offline, *mount(root / "broker", "/work", False), args.legacy_broker_image or args.pki_image,
                 "individual-broker", "--directory", "/work/state", "--name", "reference-composition",
                 "--listen", "0.0.0.0:4222", "--websocket-listen", "0.0.0.0:9222",
                 "--tls-cert", "/run/broker-tls/server.pem", "--tls-key", "/run/broker-tls/server.key",
@@ -97,7 +102,10 @@ def main():
         broker_plan = json.loads(command("current broker upgrade inspection", *offline,
                                          *mount(root / "broker/state", "/broker"), args.pki_image,
                                          "individual-broker-upgrade", "--directory", "/broker", "--check").stdout)
-        if broker_plan != {"version": 1, "before_sha256": broker_digest, "after_sha256": broker_digest,
+        if args.legacy_broker_image:
+            if not broker_plan["change_required"] or broker_plan["before_sha256"] != broker_digest or broker_plan["added_worker_requests"] != ["hardware", "recovery", "rotation"]:
+                raise RuntimeError("the actual legacy broker setup did not require the supported migration")
+        elif broker_plan != {"version": 1, "before_sha256": broker_digest, "after_sha256": broker_digest,
                            "change_required": False, "added_worker_requests": []}:
             raise RuntimeError("fresh broker configuration unexpectedly requires a migration")
         protected(root / "pg_hba.conf", "local all all trust\nhostssl all all all scram-sha-256\nhostnossl all all all reject\n")
@@ -222,7 +230,12 @@ def main():
                 time.sleep(0.1)
             raise RuntimeError("reference worker subscriptions did not become ready")
 
-        health()
+        if args.legacy_broker_image:
+            worker = compose("old worker identity", "ps", "--all", "--quiet", "worker").stdout.strip()
+            if command("old worker grant rejection", "docker", "wait", worker, timeout=30).stdout.strip() == "0":
+                raise RuntimeError("current worker unexpectedly accepted the old broker grant")
+        else:
+            health()
         trust = mount(root / "public-ca.pem", "/trust.pem")
         probe("public route separation", "TestReferencePublicRoutes", edge, trust,
               [("OPENUEM_REFERENCE_FORGED_SOURCE", administrator_ip)])
@@ -234,6 +247,92 @@ def main():
         device = [*trust, *mount(root / "device", "/device")]
         probe("synthetic registry admission", "TestReferenceRegistry", data_network, private,
               [("OPENUEM_REFERENCE_ACTION", "enroll")])
+        if args.maintenance_probe_image:
+            script = repository / "scripts/maintain-reference-broker.py"
+            maintenance_args = ["--project-name", project, "--project-directory", str(root),
+                                "--file", str(repository / "deploy/reference/compose.yaml"), "--file", str(override),
+                                "--setup-image", args.pki_image, "--probe-image", args.maintenance_probe_image]
+            def runtime_identity():
+                identities = compose("maintenance identities", "ps", "--all", "--quiet").stdout.split()
+                values = json.loads(command("maintenance runtime", "docker", "inspect", *identities).stdout)
+                return {item["Config"]["Labels"]["com.docker.compose.service"]: (item["Id"], item["State"]["StartedAt"]) for item in values}
+        if args.legacy_broker_image:
+            probe("pre-upgrade device WSS admission", "TestReferenceDevice", edge, device, [("OPENUEM_REFERENCE_ACTION", "connect")])
+            pending = [*mount(root / "broker/state/console-user.seed", "/run/console.seed"),
+                       *mount(root / "broker/state/provisioner-user.seed", "/run/provisioner.seed"),
+                       *mount(root / "pki/state/trust/backend-ca.pem", "/run/backend-ca.pem"),
+                       *mount(root / "device", "/device")]
+            probe("pre-upgrade pending command", "TestReferencePendingCommand", project + "_messaging", pending,
+                  [("OPENUEM_REFERENCE_ACTION", "publish")])
+            reviewed = command("maintenance review", "python3", str(script), *maintenance_args, "--check", environment=environment, check=False)
+            if reviewed.returncode:
+                raise RuntimeError("maintenance review failed: " + reviewed.stderr.strip())
+            review = json.loads(reviewed.stdout)
+            original_ids = compose("pre-maintenance identities", "ps", "--all", "--quiet").stdout.split()
+            if not review["change_required"] or (root / "maintenance").exists():
+                raise RuntimeError("maintenance preview changed state or missed the old grant")
+            rejected = command("stale review rejection", "python3", str(script), *maintenance_args, "--apply", "--expected-review", "0" * 64,
+                               environment=environment, check=False)
+            if rejected.returncode == 0 or (root / "maintenance").exists():
+                raise RuntimeError("stale maintenance review was applied")
+            module = types.ModuleType("reference_maintenance_fixture")
+            exec(compile(script.read_text(), str(script), "exec"), module.__dict__)
+            operation_state = root / "maintenance" / module.OPERATION
+            module.ensure_directory(operation_state.parent)
+            module.ensure_directory(operation_state)
+            lease = os.open(operation_state / "lease", os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            try:
+                module.fcntl.flock(lease, module.fcntl.LOCK_EX | module.fcntl.LOCK_NB)
+                competing = command("concurrent maintenance refusal", "python3", str(script), *maintenance_args,
+                                    "--apply", "--expected-review", review["review_sha256"], environment=environment, check=False)
+                if competing.returncode == 0 or (operation_state / "review.json").exists():
+                    raise RuntimeError("maintenance bypassed the held operation lease")
+            finally:
+                os.close(lease)
+            class Interrupted(Exception):
+                pass
+            def interrupt(step):
+                if step == "configuration-applied":
+                    raise Interrupted()
+            parsed = module.arguments([*maintenance_args, "--apply", "--expected-review", review["review_sha256"]])
+            operation = module.Maintenance(parsed, module.Docker(environment), interrupt)
+            try:
+                operation.apply(review["review_sha256"])
+            except Interrupted:
+                pass
+            else:
+                raise RuntimeError("maintenance interruption was not exercised")
+            interrupted_states = json.loads(command("interrupted runtime verification", "docker", "inspect", *original_ids).stdout)
+            if any(item["State"]["Running"] for item in interrupted_states if item["Config"]["Labels"]["com.docker.compose.service"] != "database"):
+                raise RuntimeError("interrupted migration left a public or application service running")
+            resumed = command("maintenance resume", "python3", str(script), *maintenance_args, "--apply", "--expected-review", review["review_sha256"],
+                              environment=environment, timeout=150, check=False)
+            if resumed.returncode:
+                raise RuntimeError("maintenance resume failed: " + resumed.stderr.strip())
+            result = json.loads(resumed.stdout)
+            if result.get("status") != "complete" or result.get("ready") is not True:
+                raise RuntimeError("maintenance did not establish readiness")
+            health()
+            administrator(True)
+            probe("retained pending command after maintenance", "TestReferencePendingCommand", project + "_messaging", pending)
+            retained_runtime = runtime_identity()
+            completed_review = json.loads(command("completed maintenance review", "python3", str(script), *maintenance_args,
+                                                  "--check", environment=environment).stdout)
+            repeated = json.loads(command("completed maintenance retry", "python3", str(script), *maintenance_args,
+                                          "--apply", "--expected-review", review["review_sha256"], environment=environment).stdout)
+            if completed_review["maintenance_pending"] or completed_review["change_required"] or repeated.get("status") != "already-complete" or runtime_identity() != retained_runtime:
+                raise RuntimeError("completed maintenance changed retained runtime or lost its receipt")
+            print("reference maintenance: reviewed old grant, retained interruption, container recreation and pending command passed", flush=True)
+        elif args.maintenance_probe_image:
+            before = runtime_identity()
+            review = json.loads(command("fresh maintenance review", "python3", str(script), *maintenance_args, "--check", environment=environment).stdout)
+            result = json.loads(command("fresh unchanged maintenance", "python3", str(script), *maintenance_args, "--apply",
+                                        "--expected-review", review["review_sha256"], environment=environment).stdout)
+            if review["change_required"] or review["maintenance_pending"] or result.get("status") != "unchanged" or (root / "maintenance").exists():
+                raise RuntimeError("fresh maintenance created migration state or required an unnecessary change")
+            if runtime_identity() != before:
+                raise RuntimeError("unchanged maintenance restarted a reference container")
+            print("reference maintenance: current grant review and apply left fresh state unchanged", flush=True)
         probe("public device worker request", "TestReferenceDevice", edge, device)
         probe("durable worker and consumer state", "TestReferenceRegistry", data_network, private,
               [("OPENUEM_REFERENCE_ACTION", "verify")])

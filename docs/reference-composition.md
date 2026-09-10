@@ -81,10 +81,12 @@ The reference runner invokes its read-only preview against freshly generated
 configuration and requires an exact unchanged result before starting services.
 The separate upgrade distribution test runs the actual previous initializer and
 stock broker, retaining service keys, messages and a durable consumer across
-configuration publication and process restart. Complete reference maintenance
-orchestration remains separate work. Verify the configuration visible through a
-single-file bind against the upgrade's target hash and remount/recreate the
-broker if its container runtime still exposes the old file.
+configuration publication and process restart. The
+[reference maintenance controller](reference-maintenance.md) now reviews and
+resumes that migration across all seven services, retains PostgreSQL and queued
+commands, recreates the broker from a frozen definition, and establishes readiness
+before publishing its completion receipt. General image upgrades and complete
+installation/restore orchestration remain separate work.
 
 Database, JetStream and authentication-log storage are persistent private bind
 mounts. The console's temporary cache/PID directory uses a private tmpfs. Every
@@ -124,6 +126,10 @@ The fixture checks:
   administrator, device, database and JetStream state.
 - Revocation of a live WSS session, completed consumer reconciliation and an
   explicit authorization denial when the same endpoint tries to reconnect.
+- In maintenance mode, actual old worker-grant rejection, protected review and
+  lease handling, interruption after configuration publication, CLI resume with
+  retained administrator/device/message state, and a completed retry without
+  another container restart.
 
 The trusted registry probe admits a synthetic device directly through the
 registry API. This does not claim a completed public signed-installer claim,
