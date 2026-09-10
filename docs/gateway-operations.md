@@ -98,7 +98,9 @@ go build -trimpath -o openuem-gateway ./cmd/openuem-gateway
 The separate [gateway container image](gateway-container.md) provides a minimal
 unprivileged runtime and an isolated test of the actual gateway process.
 
-Provide the following existing credentials until automated PKI setup is delivered:
+Prepare public HTTPS with the [DNS-01 issuer](gateway-acme.md) and private backend
+identities with the [protected PKI initializer](https://github.com/the-luap/openuem-cert-manager/blob/272d58538f2854efd65cbba81c3bbf469ee3e595/docs/private-pki.md).
+The gateway consumes these separate credentials:
 
 1. A public HTTPS certificate/key for the canonical hostname.
 2. Valid backend server certificates whose DNS names match the configured private

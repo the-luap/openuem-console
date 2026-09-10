@@ -61,6 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Private backend PKI initialization](https://github.com/the-luap/openuem-cert-manager/blob/272d58538f2854efd65cbba81c3bbf469ee3e595/docs/private-pki.md)
+  adds a protected CA and distinct console, broker and gateway identities, retained
+  original key/certificate records, configuration binding, exclusive initialization,
+  immutable exports and a final readiness manifest. Interrupted exports preserve
+  exact identities; missing committed keys, foreign data, corruption, expiry and
+  changed configuration stop initialization. Native macOS race/Vet and complete
+  Linux/Windows builds pass. The actual initializer and actual console gateway
+  pass a network-isolated Linux arm64 process fixture in 0.17 seconds, covering
+  generated private TLS, exact gateway pins, public admin denial and shutdown.
+  Its separate scratch runtime has no exposed port, shell or credential material.
+  Gateway `1f7a657` fixes explicit CA-issued client selection under exact-leaf
+  issuer hints; the real NATS/race suite passes in 5.524 seconds. Both native
+  [gateway image jobs](https://github.com/the-luap/openuem-console/actions/runs/34505625003)
+  and [ACME issuer jobs](https://github.com/the-luap/openuem-console/actions/runs/34505625021)
+  pass. The certificate-manager's new native
+  [amd64/arm64 PKI pipeline](https://github.com/the-luap/openuem-cert-manager/actions/runs/34506116559)
+  and existing [Linux/Windows broker pipeline](https://github.com/the-luap/openuem-cert-manager/actions/runs/34506116623)
+  also pass;
+  full reference composition, first-administrator setup, other authority roles
+  and coordinated private certificate renewal remain open.
 - [Automatic gateway DNS-01](gateway-acme.md) adds a separate pinned lego v5.4.1
   runtime and issuer executable with explicit protected provider configuration,
   bounded attempts, ARI-aware periodic renewal and atomic validated publication.
