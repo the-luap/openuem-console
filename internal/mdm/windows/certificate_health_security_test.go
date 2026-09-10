@@ -18,9 +18,21 @@ func TestWindowsCertificateHealthAuthenticatesIssuerAfterExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	encrypted := certificateHealthTestBackdateIssuer(t, s, a, time.Now().Add(-6*365*24*time.Hour))
+	r, err := s.CertificateHealth(t.Context(), "admin", access.Scope{TenantID: 1}, certificateHealthTestOptions())
+	if err != nil || r.Authority == nil || r.Authority.State != "expired" || len(r.Devices) != 0 {
+		t.Fatal("expired issuer could not be assessed", err)
+	}
+	if signer, err := s.decryptAuthority(*a, encrypted, r.AssessedAt); !errors.Is(err, ErrAuthorityUnavailable) || signer != nil {
+		t.Fatal("health read enabled expired issuance", err)
+	}
+}
+
+func certificateHealthTestBackdateIssuer(t *testing.T, s *Store, a *EnrollmentAuthority, created time.Time) []byte {
+	t.Helper()
 	// Replace only this unused synthetic issuer with a fully authenticated old
 	// issuer. Health must remain readable when issuance itself is unavailable.
-	a.CreatedAt = time.Now().Add(-6 * 365 * 24 * time.Hour).UTC().Truncate(time.Microsecond)
+	a.CreatedAt = created.UTC().Truncate(time.Microsecond)
 	der, private, err := generateAuthorityCertificate(*a, a.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
@@ -46,13 +58,7 @@ func TestWindowsCertificateHealthAuthenticatesIssuerAfterExpiry(t *testing.T) {
 	if _, err := s.db.Exec(`ALTER TABLE mdm_windows_authorities ENABLE TRIGGER mdm_windows_authority_identity`); err != nil {
 		t.Fatal(err)
 	}
-	r, err := s.CertificateHealth(t.Context(), "admin", access.Scope{TenantID: 1}, certificateHealthTestOptions())
-	if err != nil || r.Authority == nil || r.Authority.State != "expired" || len(r.Devices) != 0 {
-		t.Fatal("expired issuer could not be assessed", err)
-	}
-	if signer, err := s.decryptAuthority(*a, encrypted, r.AssessedAt); !errors.Is(err, ErrAuthorityUnavailable) || signer != nil {
-		t.Fatal("health read enabled expired issuance", err)
-	}
+	return encrypted
 }
 
 func TestWindowsCertificateHealthRejectsTamperingAndAuditFailure(t *testing.T) {
@@ -158,6 +164,7 @@ func TestWindowsCertificateHealthMigrationPreservesExistingAudit(t *testing.T) {
 	if err := f.store.db.QueryRow(`SELECT json_agg(a ORDER BY id)::text FROM mdm_windows_console_audit a`).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
+	certificateReminderTestRemoveMigration(t, f.store)
 	if _, err := f.store.db.Exec(`ALTER TABLE mdm_windows_console_audit DROP CONSTRAINT mdm_windows_console_audit_action_check; ALTER TABLE mdm_windows_console_audit ADD CONSTRAINT mdm_windows_console_audit_action_check CHECK(action IN ('invitations.list','devices.list','device.read','device.revoked','authority.status')); DELETE FROM mdm_windows_migrations WHERE name='migrations/014_certificate_health.sql'`); err != nil {
 		t.Fatal(err)
 	}

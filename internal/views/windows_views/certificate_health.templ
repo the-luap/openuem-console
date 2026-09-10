@@ -16,6 +16,7 @@ templ CertificateHealth(c echo.Context, info *partials.CommonInfo, report window
 		<main class="windows-management grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">Windows certificate health</h1>
+				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-reminders")) }>Expiry reminder history</a>
 				<p class="mt-2">Review certificate expiry and pending replacements in the selected organization and site.</p>
 				<p>Expiry assessed at { scheduleTimestamp(report.AssessedAt) }. Refresh this page for a new assessment.</p>
 				<p class="uk-text-muted">The renewal window shows when the server accepts renewal requests. It does not confirm that Windows has scheduled a renewal or that a device is online.</p>

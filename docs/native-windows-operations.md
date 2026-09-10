@@ -122,3 +122,12 @@ go test -race -count=1 ./internal/mdm/windows/...
 go test -race -count=1 ./internal/gateway ./internal/security/clientidentity
 go test -race -count=1 ./internal/controllers/webserver
 ```
+
+## Certificate reminder worker
+
+A configured native Windows runtime starts persistent certificate reminders
+alongside update scheduling. Both workers share its cancellation lifecycle and
+are joined on shutdown. The reminders use current organization SMTP settings and
+verified certificate-administrator accounts; delivery state survives restart.
+See [certificate reminders](native-windows-certificate-reminders.md) for staged
+deadlines, retry behavior, recipient checks and SMTP acceptance limits.

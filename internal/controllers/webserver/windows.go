@@ -92,7 +92,9 @@ func (w *WebServer) startWindows(certFile, keyFile string, identity clientidenti
 	}
 	server := public.Server(config.address)
 	server.TLSConfig.Certificates = []tls.Certificate{certificate}
-	runtime, err := startWindowsRuntime(server, store.RunUpdateSchedules)
+	runtime, err := startWindowsRuntime(server, func(ctx context.Context, logger *slog.Logger) {
+		runWindowsMaintenance(ctx, logger, store, windowsCertificateSender(w.Handler.EncryptionMasterKey))
+	})
 	if err != nil {
 		return err
 	}

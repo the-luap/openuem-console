@@ -212,6 +212,9 @@ func (s *Store) CertificateHealth(ctx context.Context, actor string, scope acces
 	return report, nil
 }
 
+// An empty actor is reserved for internal reminder assessment, whose persisted
+// reminder and delivery events provide the disclosure audit. Console callers
+// always pass their already-authorized actor to audit protected history reads.
 func (s *Store) deviceCertificateHealth(ctx context.Context, tx *sql.Tx, scope access.Scope, deviceID, certificateID string, authority EnrollmentAuthority, asOf time.Time, withinDays int, actor string) (*DeviceCertificateHealth, error) {
 	var count int
 	var selectedID string
@@ -297,8 +300,10 @@ func (s *Store) deviceCertificateHealth(ctx context.Context, tx *sql.Tx, scope a
 			health.Replacement = &RenewalCertificateMetadata{ID: r.RenewedCertificateID, AuthorityID: replacement.identity.AuthorityID, FingerprintSHA256: replacement.identity.FingerprintSHA256, IssuedAt: replacement.issued, ExpiresAt: replacement.certificate.NotAfter, RevokedAt: revoked}
 			health.ReplacementState = certificateTimeState(asOf, replacement.certificate.NotBefore, replacement.certificate.NotAfter, revoked)
 		}
-		if err = auditCertificateRenewal(ctx, tx, r, actor, "renewal.read"); err != nil {
-			return nil, err
+		if actor != "" {
+			if err = auditCertificateRenewal(ctx, tx, r, actor, "renewal.read"); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if certificateID != anchor && health.ConfirmedRenewalID == "" {
@@ -310,8 +315,10 @@ func (s *Store) deviceCertificateHealth(ctx context.Context, tx *sql.Tx, scope a
 			return nil, err
 		}
 		health.Device.Unenrollment = &report.UnenrollmentReport
-		if err = auditUnenrollment(ctx, tx, report, actor, "unenrollment.read"); err != nil {
-			return nil, err
+		if actor != "" {
+			if err = auditUnenrollment(ctx, tx, report, actor, "unenrollment.read"); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return health, nil

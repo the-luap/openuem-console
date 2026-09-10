@@ -292,7 +292,8 @@ and history. It requires:
 - Configured account-authenticated renewal, including its distinct request
   content encoding and expired-certificate recovery rules, and any required
   additional CMS/CMC compatibility.
-- Renewal scheduling configuration and deployment expiry notifications. The
+- Renewal scheduling configuration and production acceptance of
+  [persistent expiry reminders](native-windows-certificate-reminders.md). The
   [certificate health overview](native-windows-certificate-health.md) provides
   scoped on-demand expiry warnings and separates pending replacements.
 - Actual supported Windows client/PKI acceptance, including the documented

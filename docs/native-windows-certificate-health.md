@@ -79,5 +79,12 @@ pixels, covering valid, due, soon-expiring, expired, retired and empty states.
 Long escaped names and fingerprints remain contained. The browser checks verify
 one selected filter, labeled controls, keyboard focus and GET submission with
 search/warning values and reset pagination. These are synthetic checks, not
-physical Windows renewal acceptance. Deployment notification delivery, automatic
-renewal configuration, CA rotation and the remaining WIN-02/PKI-01 work stay open.
+physical Windows renewal acceptance. Production SMTP/inbox acceptance, automatic
+renewal configuration, CA rotation and remaining WIN-02/PKI-01 work stay open.
+
+## Persistent reminders
+
+**Expiry reminder history** links to audited delivery history. The native Windows
+service independently queues staged reminders for current device certificates,
+CA expiry and the full-lifetime issuance deadline. See
+[certificate expiry reminders](native-windows-certificate-reminders.md).

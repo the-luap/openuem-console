@@ -26,7 +26,7 @@ func TestWindowsConsoleRoutesHaveExplicitCapabilities(t *testing.T) {
 	for _, route := range []string{"GET /windows/:id/commands/:command/observations", "GET /windows/:id/commands/:command/observations/:message", "GET /windows/:id/commands/new", "POST /windows/:id/commands/preview", "POST /windows/:id/commands/create", "GET /windows/:id/commands", "GET /windows/:id/commands/:command", "POST /windows/:id/commands/:command/cancel", "POST /windows/:id/commands/:command/abandon"} {
 		want[route] = access.ManageWindowsCSP
 	}
-	for _, route := range []string{"GET /windows/certificate-health", "GET /windows/:id/renewals", "GET /windows/:id/renewals/:renewal", "POST /windows/:id/renewals/:renewal/cancel"} {
+	for _, route := range []string{"GET /windows/certificate-reminders", "GET /windows/certificate-health", "GET /windows/:id/renewals", "GET /windows/:id/renewals/:renewal", "POST /windows/:id/renewals/:renewal/cancel"} {
 		want[route] = access.ManageCertificates
 	}
 	count := 0
