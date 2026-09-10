@@ -3,8 +3,9 @@
 Cryptographic verification, persistent issuance/handoff and certificate-authenticated
 SOAP renewal are implemented. The registered WSTEP endpoint distinguishes initial
 Issue from Renew and requires the actual device TLS certificate for renewal,
-directly or through the pinned gateway. Account/federated renewal, operator
-lifecycle screens and scheduling remain implementation work. No automatic renewal
+directly or through the pinned gateway. Scoped console history, certificate
+details and pending cancellation are also implemented. Account/federated renewal
+and scheduling remain implementation work. No automatic renewal
 setting is enabled. Calling the pure proof verifier does not issue a certificate
 or modify a device.
 
@@ -161,8 +162,10 @@ certificate store, device enrollment or physical client is involved.
 The complete Windows PostgreSQL/race suite for this persistence extension passes
 in **99.851 seconds**, with the protocol package in **1.407 seconds**. Scoped
 Windows handler and view regressions pass in **2.094/2.525 seconds**. Vet and
-Linux/Windows builds pass. Full CI for this persistence extension is pending.
-The following extension adds SOAP admission; physical Windows acceptance remains
+Linux/Windows builds pass. Both the
+[push workflow](https://github.com/the-luap/openuem-console/actions/runs/34438407740)
+and [PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34438409922)
+pass for persistence commit `e68fa65`. The following extension adds SOAP admission; physical Windows acceptance remains
 unverified.
 
 ## Certificate-authenticated SOAP admission
@@ -222,6 +225,60 @@ seconds**. SOAP parser fuzzing passes **298,640 executions** in **30.813 seconds
 Vet and Linux/Windows builds pass. Full CI for this SOAP extension is pending;
 synthetic TLS/protocol evidence does not establish physical Windows acceptance.
 
+## Review and cancel a replacement in the console
+
+Open a native Windows device at a concrete organization/site and select
+**Certificate renewals**. This entry and all history, detail and cancellation
+routes require `certificates.manage` in the device scope. Device readers and CSP
+operators do not inherit certificate authority. An all-sites selection must be
+narrowed to a concrete site before opening this history.
+
+History shows ten replacements per page, newest first. Each row identifies its
+issuance time, phase and completion time. Open a row to review the previous and
+replacement certificate IDs, SHA-256 fingerprints, issuance/expiry times and
+recorded revocations. All times are explicitly UTC. The current device access
+status is separate from a historical replacement's outcome. A confirmed record
+shows the authenticating SyncML session/message and explains that later renewals
+may have replaced its certificate again.
+
+For a pending, unrevoked replacement, enter a short single-line cancellation
+reason, check **Cancel this replacement certificate**, then select
+**Confirm replacement cancellation**. The reviewed revision is submitted with
+body CSRF protection. The store rechecks current permission, scope, revision and
+phase atomically. A stale form conflicts; it cannot cancel a confirmed handoff.
+Successful cancellation redirects to the retained history and removes the form.
+The reason is protected in storage and displayed as escaped text. Cancellation
+revokes only the pending certificate and preserves the source certificate's
+existing access, expiry, protocol sessions and queued commands. It does not
+restore access previously revoked for another reason.
+
+`CertificateRenewalDetails` authenticates the sealed record, proof, provisioning,
+certificate identity and confirmation evidence under the scoped device locks.
+It checks that confirmed source revocation or canceled replacement revocation
+matches the sealed completion timestamp, and commits a read audit before returning
+metadata. It returns no CSR, CMS proof, provisioning, bootstrap credential or raw
+certificate document. Generic formatting and serialization remain protected.
+
+Database tests cover pending/canceled/confirmed details, scoped access, protected
+resolution, revoked-device history, failed read-audit rollback and inconsistent
+revocation metadata. Full-router tests create a separate synthetic organization
+with a supported short-lifetime issuer and eleven genuinely issued renewal
+intents. They check role/sibling/foreign-scope boundaries, strict query/form
+parsing, CSRF, stale revisions, escaped output and ten-row pagination. After
+console cancellation, the original transport identity remains admitted and the
+canceled candidate is denied. View tests distinguish later revocation from
+historical confirmation and suppress actions for readers and terminal states.
+
+The complete Windows PostgreSQL/race suite passes in **114.820 seconds**, with
+protocol tests in **1.427 seconds**. Full console integration plus focused route
+boundaries pass under the race detector in **10.772 seconds**; Windows view tests
+pass in **3.523 seconds**. Vet and Linux/Windows builds pass. An owned loopback
+browser fixture verifies history paging, required confirmation, the actual
+CSRF-protected cancellation/redirect and escaped long reasons at 390, 768 and
+1440 pixels. The document does not overflow horizontally; the history table has
+its own keyboard-focusable scrolling region. The fixture and its isolated schema
+are removed after verification. Full CI for this console extension is pending.
+
 ## Remaining lifecycle work
 
 The full renewal path must preserve device identity, pending commands, settings
@@ -230,8 +287,7 @@ and history. It requires:
 - Configured account-authenticated renewal, including its distinct request
   content encoding and expired-certificate recovery rules, and any required
   additional CMS/CMC compatibility.
-- Renewal scheduling configuration and an operator interface for protected
-  lifecycle history/cancellation and expiry reporting.
+- Renewal scheduling configuration and broader expiry reporting.
 - Actual supported Windows client/PKI acceptance, including the documented
   Microsoft PKI constraint before enabling automatic ROBO configuration.
 

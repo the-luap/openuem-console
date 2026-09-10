@@ -22,6 +22,8 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/windows/:id/renewals", "/windows/:id/renewals/:renewal":
+			return access.ManageCertificates, true
 		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new", "/windows/:id/commands/:command/observations", "/windows/:id/commands/:command/observations/:message":
 			return access.ManageWindowsCSP, true
 		case "/windows", "/windows/:id":
@@ -37,7 +39,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon", "/windows/:id/commands/preview", "/windows/:id/commands/create":
 			return access.ManageWindowsCSP, true
-		case "/windows/setup":
+		case "/windows/setup", "/windows/:id/renewals/:renewal/cancel":
 			return access.ManageCertificates, true
 		case "/windows/invitations", "/windows/invitations/:id/revoke":
 			return access.EnrollDevices, true
@@ -71,6 +73,9 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.GET("/windows/update-schedules/:schedule", h.WindowsUpdateSchedule)
 		g.POST("/windows/update-schedules/:schedule/cancel", h.WindowsCancelUpdateSchedule)
 		g.GET("/windows/:id", h.WindowsDevice)
+		g.GET("/windows/:id/renewals", h.WindowsCertificateRenewals)
+		g.GET("/windows/:id/renewals/:renewal", h.WindowsCertificateRenewal)
+		g.POST("/windows/:id/renewals/:renewal/cancel", h.WindowsCancelCertificateRenewal)
 		g.GET("/windows/:id/commands", h.WindowsCSPCommands)
 		g.GET("/windows/:id/commands/new", h.WindowsNewCSPCommand)
 		g.POST("/windows/:id/commands/preview", h.WindowsPreviewCSPCommand)
@@ -175,7 +180,7 @@ func (h *Handler) windowsInfo(c echo.Context) (*partials.CommonInfo, access.Scop
 	scope := access.Scope{TenantID: tenant, SiteID: site}
 	needed := scope
 	capability, ok := windowsCapability(c.Request().Method, c.Path())
-	if capability == access.ManageCertificates {
+	if capability == access.ManageCertificates && appleRoute(c.Path()) == "/windows/setup" {
 		needed.SiteID = 0
 	}
 	if !ok || !p.Can(capability, needed) {

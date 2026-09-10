@@ -134,7 +134,11 @@ add protected request/result reads, undelivered custom-command cancellation and
 explicit resolution of uncertain outcomes under the separate CSP administrator
 capability. Custom JSON command drafts now have shared-compiler previews, confirmed
 admission and idempotent retries. Protected observation history preserves each
-earlier cumulative snapshot, with separate partial and complete values. The
-roadmap still requires retention/export, broader CSP policies, certificate renewal
-and unenrollment, key rotation/restore, verified
+earlier cumulative snapshot, with separate partial and complete values.
+[Certificate renewal history and cancellation](native-windows-renewal.md#review-and-cancel-a-replacement-in-the-console)
+show protected source/replacement metadata and confirmed handoff evidence, with
+revision-checked cancellation of unconfirmed replacements under the certificate
+administrator capability. The roadmap still requires retention/export, broader
+CSP policies, account-authenticated renewal, scheduling and unenrollment, key
+rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.
