@@ -145,3 +145,8 @@ Database tests cover exact restarts, conflicting initializers, changed/missing
 keys, marker rollback and loss, occupied registries and retained account history.
 An actual worker test verifies that switching to legacy mode and requesting an
 account reset cannot bypass a bound database.
+
+The [protocol key provisioner](protocol-keys.md) reads this completed directory
+without modifying it and creates separate retained Windows authority encryption
+and desktop bootstrap signing keys. The existing three-secret format stays
+unchanged. Keep the additional journal separate from runtime mounts.

@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -99,19 +98,9 @@ func TestReferencePrepare(t *testing.T) {
 	write(t, "/state/public-ca.pem", caPEM)
 	_, _, adminCA := makeCA("Independent administrator fixture")
 	write(t, "/state/administrator-ca.pem", adminCA)
-	windowsKey := make([]byte, 32)
-	if _, err := rand.Read(windowsKey); err != nil {
-		t.Fatal(err)
-	}
-	defer clear(windowsKey)
-	write(t, "/state/windows.key", []byte(base64.StdEncoding.EncodeToString(windowsKey)))
-	_, bootstrap, _ := ed25519.GenerateKey(rand.Reader)
-	defer clear(bootstrap)
-	encoded, _ := x509.MarshalPKCS8PrivateKey(bootstrap)
-	write(t, "/state/desktop-bootstrap.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: encoded}))
 	release, signing, _ := ed25519.GenerateKey(rand.Reader)
 	defer clear(signing)
-	encoded, _ = x509.MarshalPKIXPublicKey(release)
+	encoded, _ := x509.MarshalPKIXPublicKey(release)
 	write(t, "/state/release-keys.pem", pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: encoded}))
 }
 

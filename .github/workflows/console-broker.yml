@@ -40,12 +40,12 @@ jobs:
       - name: Generate console templates
         run: go tool templ generate
       - name: Native console configuration, broker and route gates
-        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Linux race and lifecycle checks
         if: runner.os == 'Linux'
-        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Vet affected startup paths
-        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./cmd/openuem-agent-auth ./cmd/openuem-agent-commands ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./cmd/openuem-agent-auth ./cmd/openuem-agent-commands ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Resumable database bootstrap, console migrations and private service processes
         if: runner.os == 'Linux'
         shell: bash
@@ -135,7 +135,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for target in installation-secrets database-credentials; do
+          for target in installation-secrets protocol-keys database-credentials; do
             docker build -f Dockerfile.setup --target "$target" -t "setup-$target:check" .
           done
           docker build -f Dockerfile.setup --target smoke -t setup-smoke:check .
@@ -147,7 +147,7 @@ jobs:
           import json, pathlib, re, subprocess, tarfile, tempfile
           def call(*args):
               return subprocess.check_output(args, text=True).strip()
-          for target in ('installation-secrets', 'database-credentials', 'database-bootstrap'):
+          for target in ('installation-secrets', 'protocol-keys', 'database-credentials', 'database-bootstrap'):
               image = 'setup-' + target + ':check'
               executable = 'openuem-' + target
               config = json.loads(call('docker', 'image', 'inspect', '--format', '{{json .Config}}', image))
@@ -190,7 +190,7 @@ jobs:
           CGO_ENABLED=0 go test -mod=readonly -c -o "$RUNNER_TEMP/reference.test" ./internal/setup/reference
           docker build -f Dockerfile.gateway --target runtime -t reference-gateway:check .
           python3 scripts/check-reference-composition.py \
-            setup-installation-secrets:check setup-database-credentials:check \
+            setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
             database-private-pki:check setup-database-bootstrap:check \
             private-console:check private-broker:check \
             private-service-authorization:check private-service-commands:check \

@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [protocol key provisioner](protocol-keys.md) now supplies retained,
+  independent Windows authority encryption and desktop bootstrap signing keys.
+  It verifies an existing complete installation without writing to that input,
+  binds output to its exact credential manifest, preserves completed writes on
+  retry and rejects damaged state or replacement foundation credentials.
+  Its separate scratch distribution command is integrated into the seven-service
+  reference setup with only the two exported files mounted into the console.
+  Lifecycle/crypto, concurrency, cancellation, CLI privacy and read-only-source
+  tests pass, including race checks; the actual container smoke and reference
+  lifecycle pass locally on Linux arm64. A reproduced bind-alias input mutation
+  is prevented by directory identity checks and covered by the container fixture.
+  This removes synthetic Windows/bootstrap key generation from the reference
+  probe. Public TLS, administrator authority, release trust and full guided
+  installation/restore acceptance remain separate work.
+- The preceding [0b716ae native workflow](https://github.com/the-luap/openuem-console/actions/runs/34535362093)
+  passes on Linux amd64, Linux arm64 and Windows, including the full separate
+  reference composition on both Linux runners.
 - The [reference composition](reference-composition.md) now runs seven separate
   distribution containers with explicit private networks and credential mounts.
   Its isolated Linux arm64 acceptance passes generated setup/database bootstrap,

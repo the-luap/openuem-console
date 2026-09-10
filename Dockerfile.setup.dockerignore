@@ -3,6 +3,8 @@
 !go.sum
 !LICENSE
 !cmd/
+!cmd/openuem-protocol-keys/
+!cmd/openuem-protocol-keys/*.go
 !cmd/openuem-installation-secrets/
 !cmd/openuem-installation-secrets/*.go
 !cmd/openuem-database-credentials/

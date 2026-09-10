@@ -26,7 +26,7 @@ func TestSetupContainerCommands(t *testing.T) {
 		command := exec.CommandContext(t.Context(), binary, args...)
 		return command.CombinedOutput()
 	}
-	for _, binary := range []string{"/openuem-installation-secrets", "/openuem-database-credentials", "/openuem-database-bootstrap"} {
+	for _, binary := range []string{"/openuem-installation-secrets", "/openuem-protocol-keys", "/openuem-database-credentials", "/openuem-database-bootstrap"} {
 		if output, err := run(binary, "--help"); err != nil || !bytes.Contains(output, []byte("Usage:")) {
 			t.Fatal("runtime command help failed")
 		}
@@ -61,6 +61,13 @@ func TestSetupContainerCommands(t *testing.T) {
 		}
 	}
 	checkPrivacy(installation, output, "jwt.key", "encryption.key", "initial-password")
+	protocol := filepath.Join(root, "protocol")
+	protocolArgs := []string{"--directory", protocol, "--installation", installation}
+	protocolOutput, err := run("/openuem-protocol-keys", protocolArgs...)
+	if err != nil || !bytes.Equal(output, protocolOutput) {
+		t.Fatal("protocol keys do not bind the same installation")
+	}
+	checkPrivacy(protocol, protocolOutput, "windows.key", "desktop-bootstrap.key", "secrets.json")
 	config, err := json.Marshal(map[string]any{"version": 1, "installation": metadata.Installation, "host": "database.internal", "port": 5432, "database": "openuem", "user": "console", "trust_file": "/run/trust/database.pem"})
 	if err != nil {
 		t.Fatal(err)
@@ -98,12 +105,25 @@ func TestSetupContainerCommands(t *testing.T) {
 		}
 		return result
 	}
-	installationBefore, databaseBefore := snapshot(installation), snapshot(database)
+	installationBefore, databaseBefore, protocolBefore := snapshot(installation), snapshot(database), snapshot(protocol)
 	if retry, err := run("/openuem-installation-secrets", "--directory", installation); err != nil || !bytes.Equal(retry, output) {
 		t.Fatal("actual installation retry failed")
 	}
 	if retry, err := run("/openuem-database-credentials", args...); err != nil || !bytes.Equal(retry, output) {
 		t.Fatal("actual database credential retry failed")
+	}
+	if retry, err := run("/openuem-protocol-keys", protocolArgs...); err != nil || !bytes.Equal(retry, output) {
+		t.Fatal("actual protocol key retry failed")
+	}
+	if !reflect.DeepEqual(protocolBefore, snapshot(protocol)) {
+		t.Fatal("runtime retry replaced protocol keys")
+	}
+	if err := os.Remove(filepath.Join(protocol, "windows.key")); err != nil {
+		t.Fatal("cannot remove synthetic committed key")
+	}
+	protocolDamaged := snapshot(protocol)
+	if _, err := run("/openuem-protocol-keys", protocolArgs...); err == nil || !reflect.DeepEqual(protocolDamaged, snapshot(protocol)) {
+		t.Fatal("runtime repaired a missing committed protocol key")
 	}
 	if !reflect.DeepEqual(installationBefore, snapshot(installation)) || !reflect.DeepEqual(databaseBefore, snapshot(database)) {
 		t.Fatal("runtime retry replaced a retained credential")

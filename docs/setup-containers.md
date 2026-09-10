@@ -1,12 +1,12 @@
 # Installation setup container images
 
-`Dockerfile.setup` builds three separate setup images. Each runtime contains one
+`Dockerfile.setup` builds four separate setup images. Each runtime contains one
 statically linked command and the console license, runs as UID/GID 65532, exposes
 no port, and includes no shell, source tree, test executable or credentials. Build
 the intended target explicitly:
 
 ```sh
-for target in installation-secrets database-credentials database-bootstrap; do
+for target in installation-secrets protocol-keys database-credentials database-bootstrap; do
   docker build -f Dockerfile.setup --target "${target}" \
     -t "openuem-${target}:local" .
 done
@@ -20,13 +20,15 @@ requires explicit paths and configuration.
 | Target | Job | Required access |
 | --- | --- | --- |
 | `installation-secrets` | Generate or verify the retained installation identifier, JWT/master keys and first password | One private output directory; no network |
+| `protocol-keys` | Generate or verify installation-bound Windows encryption and desktop bootstrap signing keys | Complete installation credentials read-only; separate private output directory; no network |
 | `database-credentials` | Generate or verify independent database passwords and a verify-full URL | Protected public metadata read-only; separate private output directory; no network |
 | `database-bootstrap` | Create or verify the bound PostgreSQL application role/database | Completed credentials, metadata and public CA read-only; separate journal writable; private database network |
 
 See [installation secrets](installation-secrets.md),
+[protocol keys](protocol-keys.md),
 [database credentials](database-credentials.md) and
 [database bootstrap](database-bootstrap.md) for their configuration and recovery
-rules. All three commands preserve existing committed state; rebuilding an image
+rules. All four commands preserve existing committed state; rebuilding an image
 does not rotate keys or passwords.
 
 ## Storage and startup order
@@ -46,8 +48,9 @@ private server key and initialization password. Do not broaden file permissions
 to work around different service UIDs. Full deployment ownership wiring is a
 separate remaining reference-installation step.
 The [reference database ownership fixture](reference-database-ownership.md)
-exercises all setup images and the official PostgreSQL entrypoint under one
-explicit non-root UID/GID, with private bind mounts and retained restart state.
+exercises the installation/database setup images and the official PostgreSQL
+entrypoint under one explicit non-root UID/GID, with private bind mounts and
+retained restart state.
 
 For example, after provisioning `/srv/openuem/installation` for the selected UID:
 
@@ -103,7 +106,8 @@ generated private PKI and provisioned application role. The service process
 fixture requires all six test/runtime binary paths and explicit pass markers;
 an incomplete or skipped child fixture cannot pass CI.
 
-These checks use only synthetic material. Complete reference composition,
-automatic service ownership preparation, signed release publication and full
-fresh-install/restore acceptance remain open in the
+The [seven-container reference composition](reference-composition.md) also uses
+the protocol key distribution command. These checks use synthetic material.
+Guided installation, signed release publication and full fresh-install/restore
+acceptance remain open in the
 [implementation ledger](implementation-status.md).

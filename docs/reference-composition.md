@@ -50,20 +50,25 @@ domain/organization, administrator source networks and generated installation
 identity. It never supplies default credentials. Missing bind sources are
 errors; Compose must not create replacement input directories.
 
-Prepare the installation secrets, database credentials, private service PKI and
-broker configuration with their actual setup commands. Retain their provisioning
+Prepare the installation secrets, [protocol keys](protocol-keys.md), database
+credentials, private service PKI and broker configuration with their actual setup
+commands. Retain their provisioning
 journals separately from runtime mounts. PostgreSQL receives its administrator
 password and database TLS identity; application processes receive only the
 application URL and public database trust. Keep the generated `verify-full`
 hostname and trust-file path consistent with the manifest.
 
+The dedicated Windows encryption and desktop bootstrap signing keys come from
+the retained `protocol-keys` setup command under `protocol/state`. It receives
+only a read-only installation foundation and a separate writable output. Runtime
+mounts contain the two exported keys; its journal stays outside the console.
+The Windows key uses `WINDOWS_MDM_MASTER_KEY_FILE`, preserving canonical Base64
+without placing the secret in container environment metadata.
+
 Additional inputs include public HTTPS files, independent administrator public
-trust, a dedicated native Windows encryption key, desktop bootstrap signing key,
-approved release public keys and the release repository. The console's Windows
-key now uses `WINDOWS_MDM_MASTER_KEY_FILE`, preserving its canonical Base64
-contract without placing the key in container environment metadata. The test
-driver generates synthetic versions of these additional inputs. That driver is
-an acceptance fixture, not an ACME, administrator PKI or release provisioner.
+trust, approved release public keys and the release repository. The fixture
+generates synthetic versions of these inputs. That driver is an acceptance
+fixture, not an ACME, administrator PKI or release provisioner.
 
 Use the broker initializer revision pinned by the console workflow. The separate
 container test exposed an older initializer grant without `hardware`, `recovery`

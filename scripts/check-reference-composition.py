@@ -40,7 +40,7 @@ def protected(path, data):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("installation", "credentials", "pki", "bootstrap", "console", "broker",
+    for name in ("installation", "protocol", "credentials", "pki", "bootstrap", "console", "broker",
                  "authorization", "commands", "worker", "gateway"):
         parser.add_argument(name + "_image")
     parser.add_argument("test_binary", type=pathlib.Path)
@@ -58,11 +58,23 @@ def main():
         root = pathlib.Path(directory)
         if "," in directory:
             raise RuntimeError("reference state needs a path without commas")
-        for name in ("installation", "credentials", "pki", "broker", "journal", "database", "jetstream",
+        for name in ("installation", "protocol", "credentials", "pki", "broker", "journal", "database", "jetstream",
                      "console-logs", "public", "releases", "device", "ready"):
             (root / name).mkdir(mode=0o700)
         public = json.loads(command("installation secrets", *offline, *mount(root / "installation", "/work", False),
                                     args.installation_image, "--directory", "/work/state").stdout)
+        source = root / "installation/state"
+        alias = command("protocol foundation alias rejection", *offline, *mount(source, "/installation"),
+                        *mount(source, "/alias", False), args.protocol_image,
+                        "--directory", "/alias/nested", "--installation", "/installation", check=False)
+        if alias.returncode == 0 or (source / "nested").exists():
+            raise RuntimeError("protocol output entered an alias of the installation foundation")
+        for _ in range(2):
+            keys = json.loads(command("retained protocol keys", *offline, *mount(root / "protocol", "/work", False),
+                                      *mount(root / "installation/state", "/installation"), args.protocol_image,
+                                      "--directory", "/work/state", "--installation", "/installation").stdout)
+            if keys != public:
+                raise RuntimeError("protocol keys do not match the installation")
         metadata = root / "database.json"
         protected(metadata, json.dumps({"version": 1, "installation": public["installation"],
                                        "host": "database.internal", "port": 5432, "database": "openuem",
@@ -240,8 +252,8 @@ def main():
             "console": {**service_database, "/run/jwt.key": "installation/state/jwt.key",
                         "/run/encryption.key": "installation/state/encryption.key", "/run/initial-password": "installation/state/initial-password",
                         "/run/console.seed": "broker/state/console-user.seed", "/run/console-tls": "pki/state/console",
-                        "/run/administrator-ca.pem": "administrator-ca.pem", "/run/windows.key": "windows.key",
-                        "/run/desktop-bootstrap.key": "desktop-bootstrap.key", "/run/release-keys.pem": "release-keys.pem",
+                        "/run/administrator-ca.pem": "administrator-ca.pem", "/run/windows.key": "protocol/state/windows.key",
+                        "/run/desktop-bootstrap.key": "protocol/state/desktop-bootstrap.key", "/run/release-keys.pem": "release-keys.pem",
                         "/run/releases": "releases", "/var/log/openuem-server": "console-logs"}}
         writable = {("database", "/var/lib/postgresql/data"), ("broker", "/var/lib/openuem/jetstream"),
                     ("console", "/var/log/openuem-server")}

@@ -48,57 +48,64 @@ func Initialize(ctx context.Context, path string) (Result, error) {
 }
 
 func initialize(ctx context.Context, path string, afterWrite func(string) error) (Result, error) {
-	d, err := openProvisioning(ctx, path, append([]string{"secrets.json", "manifest.json"}, artifacts...), afterWrite)
+	result, _, err := provisionInstallation(ctx, path, afterWrite, true)
+	return result, err
+}
+
+// The read-only mode verifies an already completed foundation without creating
+// directories, resuming interrupted exports or repairing missing files.
+func provisionInstallation(ctx context.Context, path string, afterWrite func(string) error, create bool) (Result, [32]byte, error) {
+	d, err := provisioning(ctx, path, append([]string{"secrets.json", "manifest.json"}, artifacts...), afterWrite, create)
 	if err != nil {
-		return Result{}, err
+		return Result{}, [32]byte{}, err
 	}
 	present := d.present
 	if !present["secrets.json"] {
-		if len(present) != 0 {
-			return Result{}, ErrState
+		if !create || len(present) != 0 {
+			return Result{}, [32]byte{}, ErrState
 		}
 		state, err := generate()
 		if err != nil {
-			return Result{}, err
+			return Result{}, [32]byte{}, err
 		}
 		encoded, err := json.Marshal(state)
 		if err != nil {
-			return Result{}, ErrState
+			return Result{}, [32]byte{}, ErrState
 		}
 		defer clear(encoded)
 		if err := d.write("secrets.json", encoded); err != nil {
-			return Result{}, err
+			return Result{}, [32]byte{}, err
 		}
 	}
 	encoded, err := d.read("secrets.json", 2048)
 	if err != nil {
-		return Result{}, err
+		return Result{}, [32]byte{}, err
 	}
 	defer clear(encoded)
 	var state journal
 	if json.Unmarshal(encoded, &state) != nil || !valid(state) {
-		return Result{}, ErrState
+		return Result{}, [32]byte{}, ErrState
 	}
 	canonical, err := json.Marshal(state)
 	defer clear(canonical)
 	if err != nil || !bytes.Equal(encoded, canonical) {
-		return Result{}, ErrState
+		return Result{}, [32]byte{}, ErrState
 	}
 	values := []string{state.JWT, state.Master, state.Password}
 	marker := manifest{Version: 1, Installation: state.Installation, Files: map[string]string{}}
 	for index, name := range artifacts {
 		if err := d.check(); err != nil {
-			return Result{}, err
+			return Result{}, [32]byte{}, err
 		}
 		value := []byte(values[index])
 		if !present[name] {
-			if present["manifest.json"] {
+			if !create || present["manifest.json"] {
 				clear(value)
-				return Result{}, ErrState
+				return Result{}, [32]byte{}, ErrState
 			}
 			if err := d.write(name, value); err != nil {
 				clear(value)
-				return Result{}, err
+				return Result{}, [32]byte{}, err
 			}
 		}
 		actual, err := d.read(name, 128)
@@ -107,26 +114,28 @@ func initialize(ctx context.Context, path string, afterWrite func(string) error)
 		digest := sha256.Sum256(value)
 		clear(value)
 		if err != nil || !equal {
-			return Result{}, ErrState
+			return Result{}, [32]byte{}, ErrState
 		}
 		marker.Files[name] = hex.EncodeToString(digest[:])
 	}
 	data, err := json.Marshal(marker)
 	if err != nil {
-		return Result{}, ErrState
+		return Result{}, [32]byte{}, ErrState
 	}
 	if present["manifest.json"] {
 		actual, err := d.read("manifest.json", 2048)
 		if err != nil || !bytes.Equal(data, actual) {
-			return Result{}, ErrState
+			return Result{}, [32]byte{}, ErrState
 		}
+	} else if !create {
+		return Result{}, [32]byte{}, ErrState
 	} else if err := d.write("manifest.json", data); err != nil {
-		return Result{}, err
+		return Result{}, [32]byte{}, err
 	}
 	if err := d.check(); err != nil {
-		return Result{}, err
+		return Result{}, [32]byte{}, err
 	}
-	return Result{Installation: state.Installation}, nil
+	return Result{Installation: state.Installation}, sha256.Sum256(data), nil
 }
 
 func generate() (journal, error) {
