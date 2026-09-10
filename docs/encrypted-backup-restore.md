@@ -236,5 +236,7 @@ Native Windows recovery-file/CLI/process checks pass in CI for `18fd1a8`.
 The initial Linux job stopped before tests because the hosted image lacked the
 PostgreSQL 17 client package source. CI now explicitly configures the official
 signed [PostgreSQL Apt repository](https://www.postgresql.org/download/linux/ubuntu/)
-and installs client-only packages on the disposable runner. Full corrected CI
-is pending.
+and installs client-only packages on the disposable runner. Both corrected workflows
+for `c5336c3` pass: [push CI](https://github.com/the-luap/openuem-console/actions/runs/34463014418)
+and [pull-request CI](https://github.com/the-luap/openuem-console/actions/runs/34463018453),
+including Linux database/platform drills, native Windows checks and builds.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/registry"
 )
 
 type fileVaultRotationExpectation struct {
@@ -146,7 +147,10 @@ func (s *Store) reconcileFileVaultRotation(ctx context.Context, tx *sql.Tx, d *D
 		return finish("rejected")
 	}
 	if receipt.Outcome != "rotated" && receipt.Outcome != "unverified" {
-		return s.finishFileVaultRotation(ctx, tx, d, e, receipt.Outcome, "", *completed, true)
+		if err := s.finishFileVaultRotation(ctx, tx, d, e, receipt.Outcome, "", *completed, true); err != nil {
+			return err
+		}
+		return s.acknowledgeFileVaultRotation(ctx, tx, d, e, wire)
 	}
 	private, err := s.secrets.open(e.Private, secretPurpose(d.TenantID, d.ID+"/"+id, "filevault_rotation_reply_key"))
 	if err != nil {
@@ -200,7 +204,20 @@ func (s *Store) reconcileFileVaultRotation(ctx context.Context, tx *sql.Tx, d *D
 	} else {
 		outcome = "superseded"
 	}
-	return s.finishFileVaultRotation(ctx, tx, d, e, outcome, key, *completed, true)
+	if err := s.finishFileVaultRotation(ctx, tx, d, e, outcome, key, *completed, true); err != nil {
+		return err
+	}
+	return s.acknowledgeFileVaultRotation(ctx, tx, d, e, wire)
+}
+
+// This runs only after verified receipt handling, returned-key retention (when
+// present) and final console audit in the same native-device/agent transaction.
+// A routing worker's completed row alone must never release certificate renewal.
+func (s *Store) acknowledgeFileVaultRotation(ctx context.Context, tx *sql.Tx, d *Device, e *fileVaultRotationExpectation, receipt []byte) error {
+	if s.agentRegistry == nil {
+		return ErrFileVault
+	}
+	return s.agentRegistry.AcknowledgeRotationReconciliationInTransaction(ctx, tx, registry.Scope{TenantID: d.TenantID, SiteID: d.SiteID}, e.Context.Binding.Identity.AgentID, e.Context.Binding.TaskID, digest(receipt), e.Actor)
 }
 
 var errRotationHistoryFull = errors.New("FileVault recovery history is full")

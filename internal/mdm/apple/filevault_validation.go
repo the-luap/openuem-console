@@ -355,6 +355,7 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 	if err != nil || !bytes.Equal(canonical, result) || receipt.Context != *c || subtle.ConstantTimeCompare([]byte(hex.EncodeToString(hash[:])), []byte(e.NonceHash)) != 1 || enrollment.VerifyRecoveryResult(receipt, cert, *completed) != nil {
 		return finish("rejected")
 	}
+	var resolvedRotation *fileVaultRotationExpectation
 	if receipt.Outcome == "valid" {
 		if e.RotationID != "" {
 			rotation, err := loadFileVaultRotation(ctx, tx, d, e.RotationID)
@@ -377,12 +378,23 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 			if err = s.finishFileVaultRotation(ctx, tx, d, rotation, "resolved", c.KeyID, *completed, true); err != nil {
 				return err
 			}
+			resolvedRotation = rotation
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_keys SET verified_at=GREATEST(verified_at,$2) WHERE id=$1 AND tenant_id=$3 AND device_id=$4`, c.KeyID, *completed, d.TenantID, d.ID); err != nil {
 			return err
 		}
 	}
-	return s.finishFileVaultValidation(ctx, tx, e, receipt.Outcome, *completed)
+	if err := s.finishFileVaultValidation(ctx, tx, e, receipt.Outcome, *completed); err != nil {
+		return err
+	}
+	if resolvedRotation != nil {
+		var original []byte
+		if err := tx.QueryRowContext(ctx, `SELECT result FROM uem_agent_rotation_tasks WHERE id=$1 AND device_id=$2`, resolvedRotation.Context.Binding.TaskID, resolvedRotation.Context.Binding.Identity.AgentID).Scan(&original); err != nil {
+			return err
+		}
+		return s.acknowledgeFileVaultRotation(ctx, tx, d, resolvedRotation, original)
+	}
+	return nil
 }
 
 // ReconcileFileVaultValidations accepts a timely signed receipt even if this

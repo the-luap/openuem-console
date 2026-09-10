@@ -64,7 +64,7 @@ successful timestamp remains historical evidence in recovery-key history.
 
 Shared protocol `2e8eb22e1208`, worker `ba586d5` and agent `50b7e14` implement
 private recovery validation and rotation transport. The console applies registry
-migrations 004–006 during desktop startup and generates the individual `recovery`
+migrations 004–009 during desktop startup and generates the individual `recovery`
 and `rotation` RPC permissions. No durable command stream filters change.
 Update the console/authorization service and broker configuration first, then
 the worker and agent; reconnect agents to obtain current broker permissions.
@@ -167,6 +167,15 @@ disk decryption is used to resolve uncertainty. There are at most 128 immutable
 attempts per individual identity. If recovery history fills after queueing, the
 console retains the encrypted receipt and return key, reports the history limit
 and blocks another request instead of discarding the candidate.
+
+The console also authenticates a permanent acknowledgement of the exact rotation
+receipt after retaining its key/final result and audit in the same transaction.
+This prevents [desktop identity renewal](desktop-identity-renewal.md) from retiring
+the certificate before returned-key processing finishes. A completed worker row
+alone is insufficient. Audit failure rolls back both acknowledgement and key
+processing; verified uncertainty resolution uses the same boundary. Registry
+migration 009 is required for rotation readiness. Older completed attempts receive
+no automatic acknowledgement; their historical reconciliation remains separate work.
 
 ## Recovery access
 

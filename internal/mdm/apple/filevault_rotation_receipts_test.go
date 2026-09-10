@@ -11,6 +11,35 @@ import (
 	"github.com/open-uem/nats/enrollment"
 )
 
+func rotationReconciliationState(t *testing.T, f *validationFixture, task string, acknowledged bool) {
+	t.Helper()
+	expected := 0
+	if acknowledged {
+		expected = 1
+	}
+	var rows, audits int
+	if err := f.s.db.QueryRow(`SELECT (SELECT count(*) FROM uem_agent_rotation_reconciliations WHERE task_id=$1),(SELECT count(*) FROM uem_agent_audit WHERE resource_id=$1 AND action='recovery.rotation.reconciled')`, task).Scan(&rows, &audits); err != nil || rows != expected || audits != expected {
+		t.Fatal("incorrect durable key processing acknowledgement", rows, audits, err)
+	}
+	if !acknowledged {
+		return
+	}
+	var receipt []byte
+	if err := f.s.db.QueryRow(`SELECT result FROM uem_agent_rotation_tasks WHERE id=$1`, task).Scan(&receipt); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := f.s.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	// The separately constructed registry must authenticate the console's exact
+	// acknowledgement using the shared configured master key after a restart.
+	if err := f.registry.AcknowledgeRotationReconciliationInTransaction(t.Context(), tx, f.identity.Scope, f.identity.ID, task, digest(receipt), "test-restarted-key-processor"); err != nil {
+		t.Fatal("registry cannot authenticate console reconciliation", err)
+	}
+}
+
 func queueFileVaultRotation(t *testing.T, f *validationFixture) *enrollment.RotationTask {
 	t.Helper()
 	if err := f.s.requestFileVaultRotation(t.Context(), f.scope, f.d.ID, f.keyID, "admin", nil); err != nil {
@@ -78,6 +107,7 @@ func TestFileVaultRotationReceiptsRetainKeysAndRespectNativeEscrowOrdering(t *te
 				outcome = mode
 			}
 			reportFileVaultRotation(t, f, task, outcome, newKey)
+			rotationReconciliationState(t, f, task.Context.Binding.TaskID, false)
 			if mode == "newer_unrelated" {
 				nativeFileVaultCandidate(t, f, []byte("2222-3333-4444-5555-6666-7777"))
 			}
@@ -92,6 +122,7 @@ func TestFileVaultRotationReceiptsRetainKeysAndRespectNativeEscrowOrdering(t *te
 				if err := f.s.db.QueryRow(`SELECT status='queued' AND octet_length(reply_private)>0 AND (SELECT count(*) FROM mdm_apple_filevault_keys)=1 FROM mdm_apple_filevault_rotations WHERE id=$1`, task.Context.Binding.TaskID).Scan(&rolledBack); err != nil || !rolledBack {
 					t.Fatal("receipt transaction partly committed", err)
 				}
+				rotationReconciliationState(t, f, task.Context.Binding.TaskID, false)
 				if _, err := f.s.db.Exec(`ALTER TABLE mdm_apple_audit DROP CONSTRAINT rotation_receipt_audit_failure`); err != nil {
 					t.Fatal(err)
 				}
@@ -106,6 +137,7 @@ func TestFileVaultRotationReceiptsRetainKeysAndRespectNativeEscrowOrdering(t *te
 				expect = "superseded"
 			}
 			rotationState(t, f, task.Context.Binding.TaskID, expect)
+			rotationReconciliationState(t, f, task.Context.Binding.TaskID, true)
 			var candidate, current string
 			var erased, verified bool
 			if err := f.s.db.QueryRow(`SELECT r.candidate_key_id,p.current_key_id,octet_length(r.reply_private)=0,k.verified_at IS NOT NULL FROM mdm_apple_filevault_rotations r JOIN mdm_apple_filevault_policies p ON p.device_id=r.device_id JOIN mdm_apple_filevault_keys k ON k.id=r.candidate_key_id WHERE r.id=$1`, task.Context.Binding.TaskID).Scan(&candidate, &current, &erased, &verified); err != nil || !erased || verified != (outcome == "rotated") {
@@ -173,6 +205,7 @@ func TestFileVaultRotationUncertaintyNeedsIndependentCurrentKeyProof(t *testing.
 	f.report(t, "valid")
 	f.reconcile(t)
 	rotationState(t, f, task.Context.Binding.TaskID, "resolved")
+	rotationReconciliationState(t, f, task.Context.Binding.TaskID, true)
 	var retained bool
 	if err := f.s.db.QueryRow(`SELECT t.status='completed' AND t.resolved_at IS NOT NULL AND octet_length(t.result)>0 AND octet_length(r.reply_private)=0 FROM uem_agent_rotation_tasks t JOIN mdm_apple_filevault_rotations r ON r.id=t.id WHERE t.id=$1`, task.Context.Binding.TaskID).Scan(&retained); err != nil || !retained {
 		t.Fatal("resolution lost receipt/proof", err)
@@ -286,6 +319,7 @@ func TestFileVaultRotationReceiptRejectsIndependentContextAndSignatureChanges(t 
 				t.Fatal(err)
 			}
 			rotationState(t, f, task.Context.Binding.TaskID, "rejected")
+			rotationReconciliationState(t, f, task.Context.Binding.TaskID, false)
 			var unchanged bool
 			if err := f.s.db.QueryRow(`SELECT current_key_id=$2 AND (SELECT count(*) FROM mdm_apple_filevault_keys)=1 FROM mdm_apple_filevault_policies WHERE device_id=$1`, f.d.ID, f.keyID).Scan(&unchanged); err != nil || !unchanged {
 				t.Fatal("rejected receipt changed key", err)

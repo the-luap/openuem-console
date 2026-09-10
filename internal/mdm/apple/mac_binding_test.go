@@ -16,7 +16,7 @@ func macBindingFixture(t *testing.T) (*Store, *Device, *registry.Store) {
 	t.Helper()
 	s := testStore(t)
 	testSettings(t, s, 1)
-	r, err := registry.NewStore(s.db, "isolated-mac-association-registry-master-key")
+	r, err := registry.NewStore(s.db, "integration-test-master-key-32-bytes-minimum")
 	if err != nil {
 		t.Fatal(err)
 	}

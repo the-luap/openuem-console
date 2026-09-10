@@ -33,7 +33,7 @@ func rotationSchemaReady(ctx context.Context, q fileVaultQuery) bool {
 		return false
 	}
 	var ready bool
-	err := q.QueryRowContext(ctx, `SELECT to_regclass('mdm_apple_filevault_rotations') IS NOT NULL AND to_regclass('uem_agent_rotation_tasks') IS NOT NULL AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='uem_agent_rotation_tasks' AND column_name='resolution_task_id')`).Scan(&ready)
+	err := q.QueryRowContext(ctx, `SELECT to_regclass('mdm_apple_filevault_rotations') IS NOT NULL AND to_regclass('uem_agent_rotation_tasks') IS NOT NULL AND to_regclass('uem_agent_rotation_reconciliations') IS NOT NULL AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='uem_agent_rotation_tasks' AND column_name='resolution_task_id')`).Scan(&ready)
 	return err == nil && ready
 }
 

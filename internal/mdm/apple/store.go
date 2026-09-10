@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"sort"
 
+	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/mdm/ade"
 )
 
@@ -19,6 +20,7 @@ var migrations embed.FS
 type Store struct {
 	db                   *sql.DB
 	secrets              *secretBox
+	agentRegistry        *registry.Store
 	vendor               *VendorTrust
 	pushTrust            *pushCertificateTrust
 	checkPushConnection  func(context.Context, *Settings) error
@@ -40,6 +42,10 @@ func NewStoreWithVendor(db *sql.DB, masterKey string, vendor *VendorTrust) (*Sto
 	if err != nil {
 		return nil, err
 	}
+	agentRegistry, err := registry.NewStore(db, masterKey)
+	if err != nil {
+		return nil, err
+	}
 	if vendor != nil && (vendor.root == nil || len(vendor.pins) == 0) {
 		return nil, ErrVendorNotConfigured
 	}
@@ -47,7 +53,7 @@ func NewStoreWithVendor(db *sql.DB, masterKey string, vendor *VendorTrust) (*Sto
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db, secrets: box, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection, adeService: func(t *ade.Token) ade.Service { return ade.NewClient(t) }, verifyADEMachineInfo: ade.VerifyMachineInfo}, nil
+	return &Store{db: db, secrets: box, agentRegistry: agentRegistry, vendor: vendor, pushTrust: pushTrust, checkPushConnection: checkAPNsConnection, adeService: func(t *ade.Token) ade.Service { return ade.NewClient(t) }, verifyADEMachineInfo: ade.VerifyMachineInfo}, nil
 }
 
 // Migrate is additive and serialized across console replicas. It never runs
