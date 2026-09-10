@@ -24,7 +24,9 @@ import (
 	"time"
 
 	"github.com/alexedwards/argon2id"
-	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
+	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/openuem-console/internal/setup/secrets"
 )
 
@@ -35,6 +37,10 @@ func TestInstallationSecretsDatabasePostgresConsole(t *testing.T) {
 	}
 	if os.Getenv("OPENUEM_DATABASE_TEST_PRIVATE_PKI") == "" || filepath.Dir(binary) != "/" || os.Geteuid() == 0 {
 		t.Fatal("console process fixture requires private PKI, a root-level executable and a non-root runtime")
+	}
+	brokerBinary := os.Getenv("OPENUEM_DATABASE_TEST_BROKER")
+	if brokerBinary == "" {
+		t.Fatal("console process fixture requires the stock broker distribution executable")
 	}
 	installationDirectory := filepath.Join(t.TempDir(), "installation")
 	installation, err := secrets.Initialize(t.Context(), installationDirectory)
@@ -64,19 +70,46 @@ func TestInstallationSecretsDatabasePostgresConsole(t *testing.T) {
 	if initialize.Run() != nil {
 		t.Fatal("production individual broker initialization failed")
 	}
-	options, err := server.ProcessConfigFile(filepath.Join(brokerDirectory, "broker.json"))
+	seed, err := keyfile.Read(filepath.Join(brokerDirectory, "provisioner-user.seed"), 512)
 	if err != nil {
-		t.Fatal("production broker configuration is invalid")
+		t.Fatal("cannot read the private broker provisioning identity")
 	}
-	options.NoLog, options.NoSigs = true, true
-	broker, err := server.NewServer(options)
+	provisioner, err := nkeys.FromSeed(seed)
+	clear(seed)
 	if err != nil {
-		t.Fatal("cannot create the private console broker")
+		t.Fatal("private broker provisioning identity is invalid")
 	}
-	broker.Start()
-	t.Cleanup(func() { broker.Shutdown(); broker.WaitForShutdown() })
-	if !broker.ReadyForConnections(5 * time.Second) {
-		t.Fatal("private console broker did not start")
+	defer provisioner.Wipe()
+	provisionerPublic, _ := provisioner.PublicKey()
+	startBroker := func() func() {
+		return startConsoleFixtureProcess(t, f.ctx, "broker", brokerBinary,
+			[]string{"--config", filepath.Join(brokerDirectory, "broker.json")}, []string{"GOMAXPROCS=2"}, f.root)
+	}
+	awaitBroker := func() *nats.Conn {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+			connection, err := nats.Connect("tls://nats.internal:"+brokerPort,
+				nats.RootCAs(filepath.Join(pki, "trust/backend-ca.pem")),
+				nats.Nkey(provisionerPublic, provisioner.Sign), nats.NoReconnect(), nats.Timeout(500*time.Millisecond))
+			if err == nil {
+				return connection
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		t.Fatal("stock broker did not accept the private TLS provisioning identity")
+		return nil
+	}
+	stopBroker := startBroker()
+	brokerConnection := awaitBroker()
+	stream, err := brokerConnection.JetStream()
+	if err != nil {
+		brokerConnection.Close()
+		t.Fatal("stock broker did not expose the private JetStream service")
+	}
+	_, err = stream.AddStream(&nats.StreamConfig{Name: "AGENTS_STREAM", Subjects: []string{"agent.>"}, Storage: nats.FileStorage})
+	brokerConnection.Close()
+	if err != nil {
+		t.Fatal("stock broker rejected authorized command stream provisioning")
 	}
 	// Administrator certificate trust is deliberately a separate synthetic CA.
 	// This fixture verifies password login; it does not claim administrator PKI
@@ -123,35 +156,7 @@ func TestInstallationSecretsDatabasePostgresConsole(t *testing.T) {
 		"--console-port", consolePort, "--auth-port", authPort, "--cacert", administratorCA,
 		"--cert", filepath.Join(pki, "console/server.pem"), "--key", filepath.Join(pki, "console/server.key")}
 	startConsole := func() func() {
-		t.Helper()
-		ctx, cancel := context.WithCancel(f.ctx)
-		command := exec.CommandContext(ctx, binary, arguments...)
-		command.Env, command.Dir = environment, f.root
-		command.Stdout, command.Stderr = io.Discard, io.Discard
-		command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
-		command.WaitDelay = 5 * time.Second
-		if command.Start() != nil {
-			cancel()
-			t.Fatal("console distribution process could not start")
-		}
-		done := make(chan error, 1)
-		go func() { done <- command.Wait() }()
-		stopped := false
-		t.Cleanup(func() {
-			cancel()
-			if !stopped {
-				<-done
-			}
-		})
-		return func() {
-			t.Helper()
-			cancel()
-			err := <-done
-			stopped = true
-			if err != nil && !errors.Is(err, context.Canceled) || command.ProcessState == nil || !command.ProcessState.Success() {
-				t.Fatal("console did not complete graceful SIGTERM shutdown")
-			}
-		}
+		return startConsoleFixtureProcess(t, f.ctx, "console", binary, arguments, environment, f.root)
 	}
 	certificate, err := tls.LoadX509KeyPair(filepath.Join(pki, "gateway/client.pem"), filepath.Join(pki, "gateway/client.key"))
 	if err != nil {
@@ -274,6 +279,19 @@ func TestInstallationSecretsDatabasePostgresConsole(t *testing.T) {
 		t.Fatal("console lost the generated installation binding")
 	}
 	stop()
+	stopBroker()
+	stopBroker = startBroker()
+	brokerConnection = awaitBroker()
+	stream, err = brokerConnection.JetStream()
+	if err != nil {
+		brokerConnection.Close()
+		t.Fatal("restarted broker did not expose JetStream")
+	}
+	info, err := stream.StreamInfo("AGENTS_STREAM")
+	brokerConnection.Close()
+	if err != nil || info.Config.Storage != nats.FileStorage {
+		t.Fatal("stock broker restart did not retain its provisioned command stream")
+	}
 	stop = startConsole()
 	awaitLogin()
 	awaitStartupCheck()
@@ -282,4 +300,37 @@ func TestInstallationSecretsDatabasePostgresConsole(t *testing.T) {
 		t.Fatal("console restart reset the administrator credential")
 	}
 	stop()
+	stopBroker()
+}
+
+func startConsoleFixtureProcess(t *testing.T, parent context.Context, name, binary string, arguments, environment []string, directory string) func() {
+	t.Helper()
+	ctx, cancel := context.WithCancel(parent)
+	command := exec.CommandContext(ctx, binary, arguments...)
+	command.Env, command.Dir = environment, directory
+	command.Stdout, command.Stderr = io.Discard, io.Discard
+	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
+	command.WaitDelay = 5 * time.Second
+	if command.Start() != nil {
+		cancel()
+		t.Fatal(name, "distribution process could not start")
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	stopped := false
+	t.Cleanup(func() {
+		cancel()
+		if !stopped {
+			<-done
+		}
+	})
+	return func() {
+		t.Helper()
+		cancel()
+		err := <-done
+		stopped = true
+		if err != nil && !errors.Is(err, context.Canceled) || command.ProcessState == nil || !command.ProcessState.Success() {
+			t.Fatal(name, "did not complete graceful SIGTERM shutdown")
+		}
+	}
 }

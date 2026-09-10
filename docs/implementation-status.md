@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [private broker reference image](broker-container.md) builds the stock
+  NATS 2.14.6 command from this repository's pinned module graph into a non-root
+  scratch runtime. The exact executable/license audit and offline version/help
+  checks pass. The console PostgreSQL fixture now uses this separate distribution
+  process, authenticates a provisioner through TLS/NKey, creates a command stream,
+  and proves retained JetStream configuration and administrator state across
+  clean broker/console SIGTERM restarts. The complete Linux arm64 PostgreSQL
+  suite and affected vet checks pass locally. Native amd64/arm64 CI now requires this distribution and process
+  boundary; complete multi-container installation and restore acceptance remain
+  open.
 - The [console reference image](console-container.md) now retains CGO/SQLite
   support with pinned Go and Distroless runtime inputs, a non-root account,
   versioned static assets, public trust and explicit writable cache/auth-log

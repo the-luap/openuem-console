@@ -60,6 +60,8 @@ jobs:
           python3 scripts/check-service-images.py private-service-authorization:check private-service-commands:check
           docker build -f Dockerfile.console --target runtime -t private-console:check .
           python3 scripts/check-console-image.py private-console:check
+          docker build -f Dockerfile.broker --target runtime -t private-broker:check .
+          python3 scripts/check-broker-image.py private-broker:check
           docker build -f Dockerfile.console --target smoke -t private-console-smoke:check .
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --pids-limit 64 --memory 256m \
@@ -80,6 +82,7 @@ jobs:
           extract_binary private-service-authorization:check openuem-agent-auth agent-auth
           extract_binary private-service-commands:check openuem-agent-commands agent-commands
           extract_binary private-console:check openuem-console console console-assets
+          extract_binary private-broker:check nats-server broker
           docker build -f Dockerfile.setup --target database-bootstrap -t setup-database-bootstrap:check .
           container=$(docker create setup-database-bootstrap:check --help)
           trap 'docker rm -f "$container" >/dev/null' EXIT
@@ -108,6 +111,7 @@ jobs:
             --env OPENUEM_DATABASE_TEST_INITDB=/usr/lib/postgresql/17/bin/initdb \
             --env OPENUEM_DATABASE_TEST_POSTGRES=/usr/lib/postgresql/17/bin/postgres \
             --env OPENUEM_CONSOLE_TEST_BINARY=/console \
+            --env OPENUEM_DATABASE_TEST_BROKER=/broker \
             --env OPENUEM_AUTH_SERVICE_TESTS=/auth.test --env OPENUEM_AUTH_SERVICE_TEST_BINARY=/auth \
             --env OPENUEM_COMMAND_SERVICE_TESTS=/commands.test --env OPENUEM_COMMAND_SERVICE_TEST_BINARY=/commands \
             --env OPENUEM_WORKER_TESTS=/worker.test --env OPENUEM_WORKER_TEST_BINARY=/worker \
@@ -115,6 +119,7 @@ jobs:
             --mount "type=bind,source=$RUNNER_TEMP/database-bootstrap,destination=/bootstrap,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/database-private-pki,destination=/private-pki,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/console,destination=/console,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/broker,destination=/broker,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/console-assets,destination=/assets,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/agent-auth.test,destination=/auth.test,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/agent-auth,destination=/auth,readonly" \

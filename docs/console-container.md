@@ -40,7 +40,8 @@ Mount only the console's own inputs read-only:
 The database administrator password, private CA key, other service NKeys and
 provisioning journals are not console mounts. See
 [protected installation credentials](installation-secrets.md),
-[private service images](private-service-containers.md) and
+[private service images](private-service-containers.md),
+[the private broker image](broker-container.md) and
 [database ownership](reference-database-ownership.md).
 
 The existing foreground console requires two writable locations with private
@@ -84,11 +85,13 @@ docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-
 
 Native console CI extracts the distribution executable and its assets for the
 isolated PostgreSQL suite. The console process uses generated installation
-credentials, the provisioned application database and actual private PKI/broker
-initializers. It serves the English login and image assets through pinned gateway
-TLS, rejects direct clients on both backend listeners, requires password
+credentials, the provisioned application database, actual private PKI/broker
+initializers and the separately started stock broker distribution. It serves the
+English login and image assets through pinned gateway TLS, rejects direct clients
+on both backend listeners, requires password
 replacement at first login, persists the new hash and installation binding, and
-retains the administrator password across a clean SIGTERM stop/restart.
+retains the administrator password across a clean SIGTERM stop/restart of both
+console and broker. The broker retains its provisioned JetStream stream.
 
 Foreground startup registers shutdown signals before starting listeners. Its
 release requests share the shutdown context, so an in-flight catalog request
