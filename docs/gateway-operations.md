@@ -95,6 +95,9 @@ Build with the repository's pinned toolchain:
 go build -trimpath -o openuem-gateway ./cmd/openuem-gateway
 ```
 
+The separate [gateway container image](gateway-container.md) provides a minimal
+unprivileged runtime and an isolated test of the actual gateway process.
+
 Provide the following existing credentials until automated PKI setup is delivered:
 
 1. A public HTTPS certificate/key for the canonical hostname.
