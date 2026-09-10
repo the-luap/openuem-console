@@ -11,9 +11,10 @@ passes native Windows checks and Linux/PostgreSQL/race/fuzz tests.
 
 This dependency and the console integration below are implementation components.
 Automatic endpoint renewal is not enabled yet. The HTTPS client, console routes
-and pinned gateway transport are implemented. Protected candidate/activation
-journals, scheduling, broker runtime reconnect and agent/worker/service release
-integration remain necessary.
+and pinned gateway transport are implemented, as are the agent's protected
+candidate/activation journals. Service scheduling, coordinated credential handoff,
+startup recovery, broker runtime reconnect, authoritative cancellation and
+agent/worker/service release integration remain necessary.
 
 ## HTTPS and gateway transport
 
@@ -66,6 +67,45 @@ A timeout, cancellation or error response can follow a committed activation;
 never discard the candidate or restore old credentials solely on that result or
 preparation expiry. Retain the exact target and retry with a fresh candidate proof.
 These transport methods do not install credentials or supply that protected journal.
+
+## Protected endpoint journal
+
+Agent [`4b782a1`](https://github.com/the-luap/openuem-agent/commit/4b782a1b6ca3fab8ebf7e7c5c03c1236a859fe74)
+adds the [native renewal journal and caller contract](https://github.com/the-luap/openuem-agent/blob/4b782a1b6ca3fab8ebf7e7c5c03c1236a859fe74/docs/individual-identity-renewal.md).
+The store preserves candidate keys and request ID before preparation, exact
+verified issuance afterward, one exclusive confirmation-or-abandonment decision,
+and verified activation before returning replacement credentials. Every record is
+bound to the original protected installation and exact ordinal/predecessor; all
+128 bounded attempt slots are checked for missing stages, gaps and later fragments.
+DPAPI and noninteractive Keychain use their existing immutable publication rules.
+
+An unresolved confirmation decision prevents `Load` from returning original
+credentials, including after cancellation, a lost server reply or original
+certificate/preparation expiry. A fresh candidate proof can recover a committed
+result. Earlier confirmations cannot replace a later generation. Abandonment can
+win only before confirmation intent and cannot cancel a server reservation.
+A confirmation that never committed and has passed server expiry remains retained;
+an authoritative server cancellation/recovery contract is still needed to resolve
+that state without risking rollback or a later stale confirmation.
+
+The original release/executable checkpoint, enrollment anchors, X25519 recipient
+key and FileVault attempt ordinals remain unchanged. Historical receipts are
+verified with their exact original certificate at its authenticated retirement
+time, while only the selected current certificate must remain unexpired. Historical
+reads cannot admit another mutation; new intent/result publication rechecks the
+durably selected identity and rejects stale journal handles or handoff uncertainty.
+The service must still stop and join existing credential/security users before
+confirmation and recreate its broker connection and server recipient epoch afterward.
+
+The final local native macOS race suite passes: protected store **30.632 seconds**,
+runtime **9.053**, bootstrap installation **1.555**, enrollment command **1.826**,
+activation **4.516**, lifecycle **1.292** and Mac service **3.456**. Tests include
+real SDK HTTP/2, both missing-response boundaries, native publication failures,
+concurrent confirm/abandon decisions, source expiry, multiple generations,
+exhausted capacity and FileVault continuity. Vet, module consistency, Windows test
+compilation and Linux/Windows/native-macOS builds pass. The
+[agent journal CI](https://github.com/the-luap/openuem-agent/actions/runs/34476393712)
+was started and must be checked independently for native Windows execution.
 
 ## Registry lifecycle
 
@@ -172,7 +212,9 @@ The complete transport regression passes with `-race -count=1`: desktop in
 Affected-package Vet, unchanged `go mod tidy -diff` and full Linux/Windows builds
 also pass. Handler capability checks pass in **1.737 seconds**; the real console
 router/PostgreSQL test, including desktop permissions, passes in **12.097 seconds**.
-These local results do not substitute for the subsequent console CI run.
+Console `3a49b79` also passes its
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34472852010) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34472855743).
 
 These tests use disposable PostgreSQL schemas and synthetic keys/certificates.
 They do not install an agent, execute FileVault on a physical volume, contact a
