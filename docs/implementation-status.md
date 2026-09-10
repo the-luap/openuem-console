@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Private service images](private-service-containers.md) now provide separate
+  unprivileged scratch runtimes for authorization, command provisioning and the
+  individual worker, with pinned builders and restricted build contexts. The
+  image boundary checks pass for the actual default UID, read-only root, offline
+  help/rejected startup, fixed entrypoint, no exposed ports and exact permitted
+  filesystem. The three image-extracted executables pass the isolated native
+  Linux arm64 PostgreSQL/private TLS process fixture (6.69 seconds), including
+  authorization/revocation, command reconciliation, authenticated Windows/Mac
+  worker requests and SIGTERM shutdown. Console CI pins
+  [worker revision 4a5462e](https://github.com/the-luap/openuem-worker/commit/4a5462e832d9896816a7759af9a9a9453fc302c9)
+  and now extracts the actual service image binaries. Worker CI likewise tests
+  its distribution executable and audits native amd64/arm64 images. These checks
+  do not yet prove full multi-container composition, automatic mount ownership,
+  console/admin authority integration or complete installation/restore acceptance.
 - Protected service credential files now cover the authorization service, command
   provisioner and individual agent worker, using the shared reader at
   [revision 87aa1bd](https://github.com/the-luap/openuem-nats/commit/87aa1bdf56ea7776f170c9d09de870b30be7d263).

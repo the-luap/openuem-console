@@ -90,7 +90,8 @@ database. CI also requires an explicit pass from the offline smoke fixture.
 
 The same isolated PostgreSQL suite starts the actual authorization and command
 service executables and the pinned individual worker at
-`4f6629381090c91884bec08f90c77ea1288cf9d1`. Each consumes a protected application
+`4a5462e832d9896816a7759af9a9a9453fc302c9`. Each executable is extracted from its
+[separate service distribution image](private-service-containers.md), and consumes a protected application
 database URL file; the worker also receives a protected task encryption key file.
 Their existing real TLS broker fixtures exercise authorization/revocation,
 durable command reconciliation and authenticated Windows/Mac worker requests,
