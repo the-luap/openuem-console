@@ -24,9 +24,25 @@ jobs:
       - name: Generate console templates
         run: go tool templ generate
       - name: Native console configuration, broker and route gates
-        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Linux race and lifecycle checks
         if: runner.os == 'Linux'
-        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Vet affected startup paths
-        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./cmd/openuem-database-credentials ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Generated credentials against isolated PostgreSQL and console migrations
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/database-credentials.test" ./internal/setup/secrets
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 128 --memory 768m \
+            --shm-size 64m --user postgres --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m \
+            --env GOMAXPROCS=2 \
+            --env OPENUEM_DATABASE_TEST_INITDB=/usr/lib/postgresql/17/bin/initdb \
+            --env OPENUEM_DATABASE_TEST_POSTGRES=/usr/lib/postgresql/17/bin/postgres \
+            --mount "type=bind,source=$RUNNER_TEMP/database-credentials.test,destination=/test,readonly" \
+            --entrypoint /test \
+            postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 \
+            -test.v -test.run '^TestInstallationSecretsDatabasePostgres$' -test.timeout=2m

@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Persistent database credentials](database-credentials.md) generates independent
+  bootstrap/application passwords and a verify-full URL with explicit CA trust,
+  bound to the installation and immutable deployment metadata. The offline command
+  never emits credentials or changes database roles. Recovery, concurrency,
+  corruption and the shared installation source tests pass under the race detector
+  (26.089 seconds); command privacy/restart tests pass (1.374 seconds). An isolated
+  native Linux arm64 PostgreSQL 17 process authenticates both generated roles,
+  runs actual console schema migrations as the application owner and proves TLS,
+  rejected role creation, password separation and hostname validation (0.90 seconds).
+  The existing generated-secret administrator/router lifecycle also passes
+  (11.847 seconds), as do full Linux/Windows builds and affected Vet checks.
+  Production role/database creation, server TLS provisioning, service mounts and
+  full reference installation/restore acceptance remain open.
 - [Persistent installation secrets](installation-secrets.md) adds an offline
   private provisioner with a durable source and completion manifest, independent
   JWT/master/start-password values, exact resumable completed writes and no
@@ -86,7 +99,9 @@ the table's package summaries do not remove any detail from the roadmap.
   [binding configuration pipeline](https://github.com/the-luap/openuem-console/actions/runs/34514993895)
   passes on Linux amd64/arm64 and Windows. Database URL/file race tests pass
   in 28.800 seconds. Legacy binding migration, database credential provisioning,
-  distribution, rotation and full reference composition remain open.
+  distribution, rotation and full reference composition remain open. The protected
+  database URL [native configuration workflow](https://github.com/the-luap/openuem-console/actions/runs/34515734079)
+  passes on Linux amd64/arm64 and Windows.
 - [Protected first-administrator bootstrap](first-administrator-bootstrap.md)
   creates the initial account, grant, audit and retained completion binding in
   one transaction, from a bounded private file without password logging. CLI
@@ -105,6 +120,8 @@ the table's package summaries do not remove any detail from the roadmap.
   [configuration and protected-file CI passes](https://github.com/the-luap/openuem-console/actions/runs/34512524550).
   Secret distribution, administrator PKI, the full setup wizard
   and reference composition remain open.
+  The initial protected administrator/password proof commit also passes the full
+  [PostgreSQL, protocol, browser and native build workflow](https://github.com/the-luap/openuem-console/actions/runs/34512524496).
 - [Individual console broker startup](individual-console-broker.md) connects the
   CLI and installed Linux/Windows service through a separate console NKey before
   listener startup, with explicit private TLS origins, no legacy fallback and no

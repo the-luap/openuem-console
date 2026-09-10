@@ -67,7 +67,9 @@ optional LF/CRLF terminator. Percent-encode reserved characters in credentials.
 Configure the intended TLS mode and trust parameters in that URL. Parser errors
 never echo the URL or its password. Raw `DATABASE_URL` / `--dburl` and a URL file
 are mutually exclusive; missing files cannot trigger a legacy fallback. The
-offline generator does not create database accounts or their password/URL file.
+main installation generator does not create database accounts. The separate
+[database credential provisioner](database-credentials.md) now creates independent
+bootstrap/application passwords and the protected URL file.
 
 Files must be protected regular files owned by the service or system
 administrator; Unix group/other access and untrusted Windows ACLs are rejected.

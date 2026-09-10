@@ -9,12 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
-	"os"
-	"path/filepath"
-	"slices"
-
-	"github.com/open-uem/nats/enrollment/keyfile"
 )
 
 const (
@@ -54,60 +48,11 @@ func Initialize(ctx context.Context, path string) (Result, error) {
 }
 
 func initialize(ctx context.Context, path string, afterWrite func(string) error) (Result, error) {
-	if !supported() || !filepath.IsAbs(path) || filepath.Clean(path) != path || path == filepath.Dir(path) {
-		return Result{}, ErrConfiguration
-	}
-	if ctx.Err() != nil {
-		return Result{}, ctx.Err()
-	}
-	if keyfile.CreateDirectory(path) != nil {
-		return Result{}, ErrState
-	}
-	if syncDirectory(filepath.Dir(path)) != nil {
-		return Result{}, ErrState
-	}
-	identity, err := os.Lstat(path)
+	d, err := openProvisioning(ctx, path, append([]string{"secrets.json", "manifest.json"}, artifacts...), afterWrite)
 	if err != nil {
-		return Result{}, ErrState
-	}
-	check := func() error {
-		current, err := os.Lstat(path)
-		if err != nil || !os.SameFile(identity, current) || keyfile.CheckDirectory(path) != nil {
-			return ErrState
-		}
-		return ctx.Err()
-	}
-	if err := check(); err != nil {
 		return Result{}, err
 	}
-	directory, err := os.Open(path)
-	if err != nil {
-		return Result{}, ErrState
-	}
-	entries, err := directory.ReadDir(6)
-	directory.Close()
-	if err != nil && err != io.EOF || len(entries) > 5 {
-		return Result{}, ErrState
-	}
-	present := map[string]bool{}
-	for _, entry := range entries {
-		if !slices.Contains(artifacts, entry.Name()) && entry.Name() != "secrets.json" && entry.Name() != "manifest.json" {
-			return Result{}, ErrState
-		}
-		present[entry.Name()] = true
-	}
-	write := func(name string, data []byte) error {
-		if err := check(); err != nil {
-			return err
-		}
-		if keyfile.Create(filepath.Join(path, name), data) != nil || syncDirectory(path) != nil {
-			return ErrState
-		}
-		if afterWrite != nil {
-			return afterWrite(name)
-		}
-		return nil
-	}
+	present := d.present
 	if !present["secrets.json"] {
 		if len(present) != 0 {
 			return Result{}, ErrState
@@ -121,11 +66,11 @@ func initialize(ctx context.Context, path string, afterWrite func(string) error)
 			return Result{}, ErrState
 		}
 		defer clear(encoded)
-		if err := write("secrets.json", encoded); err != nil {
+		if err := d.write("secrets.json", encoded); err != nil {
 			return Result{}, err
 		}
 	}
-	encoded, err := read(filepath.Join(path, "secrets.json"), 2048)
+	encoded, err := d.read("secrets.json", 2048)
 	if err != nil {
 		return Result{}, err
 	}
@@ -142,7 +87,7 @@ func initialize(ctx context.Context, path string, afterWrite func(string) error)
 	values := []string{state.JWT, state.Master, state.Password}
 	marker := manifest{Version: 1, Installation: state.Installation, Files: map[string]string{}}
 	for index, name := range artifacts {
-		if err := check(); err != nil {
+		if err := d.check(); err != nil {
 			return Result{}, err
 		}
 		value := []byte(values[index])
@@ -151,12 +96,12 @@ func initialize(ctx context.Context, path string, afterWrite func(string) error)
 				clear(value)
 				return Result{}, ErrState
 			}
-			if err := write(name, value); err != nil {
+			if err := d.write(name, value); err != nil {
 				clear(value)
 				return Result{}, err
 			}
 		}
-		actual, err := read(filepath.Join(path, name), 128)
+		actual, err := d.read(name, 128)
 		equal := bytes.Equal(value, actual)
 		clear(actual)
 		digest := sha256.Sum256(value)
@@ -171,14 +116,14 @@ func initialize(ctx context.Context, path string, afterWrite func(string) error)
 		return Result{}, ErrState
 	}
 	if present["manifest.json"] {
-		actual, err := read(filepath.Join(path, "manifest.json"), 2048)
+		actual, err := d.read("manifest.json", 2048)
 		if err != nil || !bytes.Equal(data, actual) {
 			return Result{}, ErrState
 		}
-	} else if err := write("manifest.json", data); err != nil {
+	} else if err := d.write("manifest.json", data); err != nil {
 		return Result{}, err
 	}
-	if err := check(); err != nil {
+	if err := d.check(); err != nil {
 		return Result{}, err
 	}
 	return Result{Installation: state.Installation}, nil
