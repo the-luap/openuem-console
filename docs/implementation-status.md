@@ -80,9 +80,13 @@ the table's package summaries do not remove any detail from the roadmap.
   initializers, marker rollback/loss and occupied registries pass PostgreSQL/race
   tests with the full administrator lifecycle (32.530 seconds). An actual Linux
   arm64 worker against disposable PostgreSQL also rejects a mode/reset downgrade
-  (2.59 seconds). Legacy binding migration, database
-  credential provisioning, distribution, rotation and full reference composition
-  remain open.
+  (2.59 seconds). Console
+  database URLs now also support protected file inputs with parser-error privacy,
+  bounded content and no competing sources or legacy fallback. The native
+  [binding configuration pipeline](https://github.com/the-luap/openuem-console/actions/runs/34514993895)
+  passes on Linux amd64/arm64 and Windows. Database URL/file race tests pass
+  in 28.800 seconds. Legacy binding migration, database credential provisioning,
+  distribution, rotation and full reference composition remain open.
 - [Protected first-administrator bootstrap](first-administrator-bootstrap.md)
   creates the initial account, grant, audit and retained completion binding in
   one transaction, from a bounded private file without password logging. CLI

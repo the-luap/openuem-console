@@ -21,7 +21,7 @@ import (
 )
 
 func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
-	for _, name := range []string{"JWT_KEY", "JWT_KEY_FILE", "ENCRYPTION_MASTER_KEY", "ENCRYPTION_MASTER_KEY_FILE"} {
+	for _, name := range []string{"JWT_KEY", "JWT_KEY_FILE", "ENCRYPTION_MASTER_KEY", "ENCRYPTION_MASTER_KEY_FILE", "DATABASE_URL", "DATABASE_URL_FILE"} {
 		t.Setenv(name, "")
 	}
 	t.Setenv("OPENUEM_INSTALLATION_ID", strings.Repeat("1", 32))
@@ -54,10 +54,15 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	}
 	jwt, master := strings.Repeat("j", 43), strings.Repeat("m", 32)
 	jwtPath, masterPath := filepath.Join(directory, "jwt.key"), filepath.Join(directory, "master.key")
+	databasePath := filepath.Join(directory, "database.url")
+	databaseURL := "postgres://console:synthetic-password@db.internal/openuem?sslmode=verify-full"
 	if keyfile.Create(jwtPath, []byte(jwt)) != nil || keyfile.Create(masterPath, []byte(master)) != nil {
 		t.Fatal("could not create protected fixture credentials")
 	}
-	args := []string{"test", "--cacert", certFile, "--cert", certFile, "--key", keyFile, "--sftpkey", filepath.Join(directory, "missing-sftp.key"), "--dburl", "postgres://unused", "--domain", "example.test", "--org-name", "Test"}
+	if err := keyfile.Create(databasePath, []byte(databaseURL)); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"test", "--cacert", certFile, "--cert", certFile, "--key", keyFile, "--sftpkey", filepath.Join(directory, "missing-sftp.key"), "--dburl-file", databasePath, "--domain", "example.test", "--org-name", "Test"}
 	baseArgs := append([]string{}, args...)
 	args = append(args, "--jwt-key-file", jwtPath, "--encryption-master-key-file", masterPath)
 	if err := run(args); err != nil {
@@ -69,8 +74,11 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	if w.ProtectedAdministrator == nil || w.ProtectedAdministrator.UserID != "first-admin" || w.ProtectedAdministrator.PasswordFile != "/private/first-password" {
 		t.Fatal("CLI lost protected administrator configuration")
 	}
-	if w.JWTKey != jwt || w.EncryptionMasterKey != master || w.InstallationID != strings.Repeat("1", 32) {
+	if w.JWTKey != jwt || w.EncryptionMasterKey != master || w.InstallationID != strings.Repeat("1", 32) || w.DBUrl != databaseURL {
 		t.Fatal("CLI did not consume protected runtime credentials")
+	}
+	if err := run(append(append([]string{}, args...), "--dburl", "postgres://ambiguous")); err == nil {
+		t.Fatal("CLI allowed competing database sources")
 	}
 	if err := run(append(append([]string{}, args...), "--jwt-key", "ambiguous")); err == nil {
 		t.Fatal("CLI allowed competing credential sources")

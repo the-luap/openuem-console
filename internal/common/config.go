@@ -23,7 +23,7 @@ func (w *Worker) GenerateConsoleConfig() error {
 		return err
 	}
 
-	w.DBUrl, err = utils.CreatePostgresDatabaseURL()
+	w.DBUrl, err = installedDatabaseURL(utils.CreatePostgresDatabaseURL)
 	if err != nil {
 		log.Printf("[ERROR]: %v", err)
 		return err

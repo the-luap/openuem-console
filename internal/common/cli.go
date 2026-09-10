@@ -22,7 +22,10 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 		return err
 	}
 
-	w.DBUrl = cCtx.String("dburl")
+	w.DBUrl, err = secrets.DatabaseURL(cCtx.String("dburl"), cCtx.String("dburl-file"))
+	if err != nil {
+		return err
+	}
 
 	w.CACertPath = cCtx.String("cacert")
 	_, err = utils.ReadPEMCertificate(w.CACertPath)

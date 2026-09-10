@@ -34,10 +34,14 @@ func StartConsoleFlags() []cli.Flag {
 			EnvVars: []string{"NATS_SERVERS"},
 		},
 		&cli.StringFlag{
-			Name:     "dburl",
-			Usage:    "the Postgres database connection url e.g (postgres://user:password@host:5432/openuem)",
-			EnvVars:  []string{"DATABASE_URL"},
-			Required: true,
+			Name:    "dburl",
+			Usage:   "the Postgres database connection URL; use dburl-file for a protected credential source",
+			EnvVars: []string{"DATABASE_URL"},
+		},
+		&cli.StringFlag{
+			Name:    "dburl-file",
+			Usage:   "protected file containing the database connection URL; mutually exclusive with dburl",
+			EnvVars: []string{"DATABASE_URL_FILE"},
 		},
 		&cli.StringFlag{
 			Name:    "jwt-key",

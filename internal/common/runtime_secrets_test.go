@@ -51,3 +51,36 @@ func TestInstallationSecretsInstalledService(t *testing.T) {
 		t.Fatal("legacy configuration changed", err)
 	}
 }
+
+func TestInstallationSecretsInstalledDatabase(t *testing.T) {
+	value := "postgres://console:synthetic-password@db.internal/openuem?sslmode=verify-full"
+	path := filepath.Join(t.TempDir(), "database.url")
+	if err := keyfile.Create(path, []byte(value)); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("DATABASE_URL_FILE", path)
+	called := false
+	unavailable := errors.New("synthetic unavailable legacy database credentials")
+	legacy := func() (string, error) { called = true; return "", unavailable }
+	actual, err := installedDatabaseURL(legacy)
+	if err != nil || actual != value || called {
+		t.Fatal("mounted database credentials required the legacy store", err)
+	}
+	t.Setenv("DATABASE_URL", value)
+	if _, err := installedDatabaseURL(legacy); !errors.Is(err, secrets.ErrConfiguration) || called {
+		t.Fatal("ambiguous installed database credentials accepted", err)
+	}
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("DATABASE_URL_FILE", filepath.Join(t.TempDir(), "missing"))
+	if _, err := installedDatabaseURL(legacy); !errors.Is(err, secrets.ErrConfiguration) || called {
+		t.Fatal("missing database file fell back to legacy storage", err)
+	}
+	t.Setenv("DATABASE_URL_FILE", "")
+	if _, err := installedDatabaseURL(legacy); !errors.Is(err, unavailable) || !called {
+		t.Fatal("legacy database failure ignored", err)
+	}
+	if actual, err := installedDatabaseURL(func() (string, error) { return value, nil }); err != nil || actual != value {
+		t.Fatal("legacy database configuration changed", err)
+	}
+}

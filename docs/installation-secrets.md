@@ -58,6 +58,17 @@ file never falls back to a legacy value. Individual mode requires both runtime
 keys, a JWT of at least 32 bytes and an encryption key of exactly 32 bytes.
 Legacy raw-input behavior remains available outside that mode.
 
+The console also accepts `--dburl-file` / `DATABASE_URL_FILE` for a separately
+provisioned database connection URL. Installed services use the same environment
+setting and skip their legacy database credential lookup when a file is selected.
+The URL must use `postgres://` or `postgresql://`, specify a network host and a
+database, and contain at most 8192 printable non-space ASCII characters, with an
+optional LF/CRLF terminator. Percent-encode reserved characters in credentials.
+Configure the intended TLS mode and trust parameters in that URL. Parser errors
+never echo the URL or its password. Raw `DATABASE_URL` / `--dburl` and a URL file
+are mutually exclusive; missing files cannot trigger a legacy fallback. The
+offline generator does not create database accounts or their password/URL file.
+
 Files must be protected regular files owned by the service or system
 administrator; Unix group/other access and untrusted Windows ACLs are rejected.
 The loader rejects final symbolic links, replacement during open, excessive

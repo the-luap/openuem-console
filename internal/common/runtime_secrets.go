@@ -6,6 +6,17 @@ import (
 	"github.com/open-uem/openuem-console/internal/setup/secrets"
 )
 
+func installedDatabaseURL(legacy func() (string, error)) (string, error) {
+	if path := os.Getenv("DATABASE_URL_FILE"); path != "" {
+		return secrets.DatabaseURL(os.Getenv("DATABASE_URL"), path)
+	}
+	value, err := legacy()
+	if err != nil {
+		return "", err
+	}
+	return secrets.DatabaseURL(value, "")
+}
+
 // A mounted JWT file makes the legacy INI/credential-store lookup unnecessary.
 // Explicit raw environment input alongside that file is still ambiguous.
 func installedSecrets(required bool, legacyJWT func() (string, error)) (secrets.Runtime, error) {
