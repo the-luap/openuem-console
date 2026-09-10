@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reference database ownership](reference-database-ownership.md) now has a
+  container acceptance fixture using the host's non-root UID/GID for the actual
+  installation, database credential, private PKI and bootstrap distribution
+  images plus the official pinned PostgreSQL entrypoint. Local macOS/Docker
+  arm64 checks pass for protected creation/exact retries, unchanged ownership
+  and source contents, verified TLS bootstrap, cleartext denial, private Unix
+  socket access, clean stop/restart and retained journal verification. Native
+  Linux CI additionally requires denied access to a bound password by another
+  runtime UID; Docker Desktop bind semantics cannot establish that negative
+  Linux gate. No runtime receives the offline private CA or installation source.
+  This is synthetic installation groundwork; dedicated account creation,
+  persistent ownership preparation and full reference/restore acceptance remain open.
 - [Private service images](private-service-containers.md) now provide separate
   unprivileged scratch runtimes for authorization, command provisioning and the
   individual worker, with pinned builders and restricted build contexts. The

@@ -150,3 +150,13 @@ jobs:
                   subprocess.run(['docker', 'rm', '-f', container], check=True, stdout=subprocess.DEVNULL)
               print(target + ': private runtime boundary verified')
           PY
+      - name: Non-root setup and PostgreSQL ownership with private bind mounts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f .database-pki-source/Dockerfile.private-pki --target runtime \
+            -t database-private-pki:check .database-pki-source
+          python3 scripts/check-reference-database.py \
+            setup-installation-secrets:check setup-database-credentials:check \
+            database-private-pki:check setup-database-bootstrap:check

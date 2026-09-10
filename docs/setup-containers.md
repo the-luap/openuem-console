@@ -45,6 +45,9 @@ inputs and outputs. PostgreSQL's runtime account must be able to read its own
 private server key and initialization password. Do not broaden file permissions
 to work around different service UIDs. Full deployment ownership wiring is a
 separate remaining reference-installation step.
+The [reference database ownership fixture](reference-database-ownership.md)
+exercises all setup images and the official PostgreSQL entrypoint under one
+explicit non-root UID/GID, with private bind mounts and retained restart state.
 
 For example, after provisioning `/srv/openuem/installation` for the selected UID:
 
