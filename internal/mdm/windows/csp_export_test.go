@@ -132,7 +132,10 @@ func testCSPExportSnapshots(t *testing.T, f syncMLStoreFixture, commandID string
 	if err := f.store.db.QueryRow(`SELECT count(*) FROM mdm_windows_csp_audit WHERE action LIKE '%exported'`).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	for _, byteLimit := range []int{1, wholeSize - 1} {
+	// Each export receives a new audit ID and timestamp; RFC 3339 fraction
+	// lengths can shrink between calls. Keep this transactional overflow check
+	// below that variable header size. The buffer test checks the exact byte edge.
+	for _, byteLimit := range []int{1, wholeSize - 64} {
 		if value, err := f.store.exportCSPCommand(ctx, "admin", f.identity.Scope, f.identity.DeviceID, commandID, command.Revision, 0, byteLimit); !errors.Is(err, ErrCSPExportTooLarge) || value != nil {
 			t.Fatal("oversize export escaped", err)
 		}
