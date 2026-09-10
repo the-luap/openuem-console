@@ -47,7 +47,7 @@ func TestWindowsConfigurationRequiresCompleteOptIn(t *testing.T) {
 	if err != nil || c.certFile != "windows-cert" || c.keyFile != "windows-key" {
 		t.Fatal("TLS override not used as a pair")
 	}
-	for _, name := range []string{"WINDOWS_MDM_LISTEN_ADDR", "WINDOWS_MDM_MASTER_KEY", "WINDOWS_MDM_PROVIDER_ID", "WINDOWS_MDM_DISPLAY_NAME", "WINDOWS_MDM_TLS_CERT", "WINDOWS_MDM_TLS_KEY"} {
+	for _, name := range []string{"WINDOWS_MDM_LISTEN_ADDR", "WINDOWS_MDM_MASTER_KEY", "WINDOWS_MDM_MASTER_KEY_FILE", "WINDOWS_MDM_PROVIDER_ID", "WINDOWS_MDM_DISPLAY_NAME", "WINDOWS_MDM_TLS_CERT", "WINDOWS_MDM_TLS_KEY"} {
 		t.Setenv(name, "")
 	}
 	w := &WebServer{Handler: &handlers.Handler{}}

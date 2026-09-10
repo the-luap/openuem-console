@@ -19,6 +19,7 @@ Set these options on the console process before startup:
 | `OPENUEM_PUBLIC_ORIGIN` | Canonical public HTTPS origin, for example `https://uem.example.test`; shared with the gateway and console |
 | `WINDOWS_MDM_LISTEN_ADDR` | Enable the native Windows listener, for example `127.0.0.1:1329` |
 | `WINDOWS_MDM_MASTER_KEY` | Canonical standard Base64 encoding of 32 independently generated random bytes; protects native Windows CA, enrollment, command and update records |
+| `WINDOWS_MDM_MASTER_KEY_FILE` | Alternative protected file containing the same canonical Base64 value, optionally followed by one LF or CRLF; mount read-only in containers |
 | `WINDOWS_MDM_PROVIDER_ID` | Optional immutable enrollment provider identity; defaults to `OpenUEM` |
 | `WINDOWS_MDM_DISPLAY_NAME` | Optional enrollment display name; defaults to `OpenUEM Windows Management` |
 | `WINDOWS_MDM_TLS_CERT`, `WINDOWS_MDM_TLS_KEY` | Optional PEM server identity override; both are required together, otherwise the console TLS files are used |
@@ -30,6 +31,12 @@ enrollment identity, TLS files and encrypted store, then migrates Windows tables
 after the existing access schema. Listener binding must succeed before the
 worker starts. Initialization errors use fixed messages without submitted key,
 certificate or database details.
+
+Select exactly one master-key source. A selected file must be privately owned
+and readable through the shared protected-file implementation; missing,
+unprotected, oversized or malformed files fail startup without falling back to
+an environment value. The file input keeps the key out of container environment
+metadata. Keep its contents and ownership intact across restarts and backups.
 
 The Windows master key uses a different encoding contract from the legacy
 `ENCRYPTION_MASTER_KEY`; do not substitute a raw 32-character string. Preserve
