@@ -10,10 +10,12 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/setup/administrator"
 	"github.com/open-uem/utils"
 )
 
 type Worker struct {
+	ProtectedAdministrator            *administrator.Config
 	IndividualAgentService            *openuem.ServiceConnection
 	Model                             *models.Model
 	Logger                            *utils.OpenUEMLogger

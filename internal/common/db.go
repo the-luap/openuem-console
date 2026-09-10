@@ -65,9 +65,8 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Println("[WARN]: could not default nickname to default site")
 		}
 
-		// Create argon2 default password for openuem admin if not exist
-		if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-			log.Println("[WARN]: could not create default openuem password")
+		if err := w.InitializeAdministrator(); err != nil {
+			return err
 		}
 
 		// Encrypt sensitive fields if they're set in clear and we have a master key
@@ -158,9 +157,9 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Println("[WARN]: could not default nickname to default site")
 				}
 
-				// Create argon2 default password for openuem admin if not exist
-				if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-					log.Println("[WARN]: could not create default openuem password")
+				if err := w.InitializeAdministrator(); err != nil {
+					log.Print("[ERROR]: first-administrator startup failed")
+					return
 				}
 
 				// Encrypt sensitive fields if they're set in clear and we have a master key

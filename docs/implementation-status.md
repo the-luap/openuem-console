@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Protected first-administrator bootstrap](first-administrator-bootstrap.md)
+  creates the initial account, grant, audit and retained completion binding in
+  one transaction, from a bounded private file without password logging. CLI
+  and installed individual service startup use it before listeners, reject
+  implicit resets and preserve existing accounts, MFA and revoked privileges.
+  PostgreSQL/race initializer and actual console password-route tests pass in
+  4.555 seconds; shared access tests pass in 1.402 seconds. Affected PostgreSQL
+  handler and webserver race suites pass in 13.430 and 1.955 seconds. Password replacement
+  now requires a bounded verified session proof tied to the current credentials;
+  unverified or superseded recovery codes, stale sessions and competing requests
+  cannot replace a new password. The same transaction consumes recovery and
+  invitation records and retires session rows; reusing the current password is
+  rejected. The local email fixture sends no mail. An isolated Linux arm64 process
+  checks actual startup configuration and reset rejection. Full Linux/Windows
+  builds and affected Vet checks pass. Secret generation/distribution,
+  administrator PKI, the full setup wizard
+  and reference composition remain open.
 - [Individual console broker startup](individual-console-broker.md) connects the
   CLI and installed Linux/Windows service through a separate console NKey before
   listener startup, with explicit private TLS origins, no legacy fallback and no

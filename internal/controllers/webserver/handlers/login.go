@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -126,8 +128,8 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 		}
 
 		// Create a session as we'll require the user to change the password
-		if err := h.CreateForgotPasswordSession(c, user); err != nil {
-			log.Printf("[ERROR]: could not create a forgot password session for user %s, reason: %v", user.ID, err)
+		if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementInitial, "", time.Time{}); err != nil {
+			return err
 		}
 
 		return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
@@ -151,6 +153,10 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 }
 
 func (h *Handler) LoginPasswordChange(c echo.Context) error {
+	proof, err := h.passwordReplacementProof(c)
+	if err != nil {
+		return err
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -192,15 +198,12 @@ func (h *Handler) LoginPasswordChange(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.password_complexity_invalid"), true))
 	}
 
-	if err := h.Model.ChangePassword(username, password); err != nil {
+	if err := h.Model.ChangePasswordWithProof(c.Request().Context(), username, password, proof); err != nil {
+		if errors.Is(err, models.ErrPasswordUnchanged) {
+			return RenderError(c, partials.ErrorMessage("Choose a password different from the current password.", true))
+		}
 		log.Printf("[ERROR]: could not save the new password %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_save_new_password"), true))
-	}
-
-	// Invalidate code to set new password
-	if err := h.Model.RemoveForgotCode(username); err != nil {
-		log.Printf("[ERROR]: could not remove forgot code, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_remove_forgot_code"), true))
 	}
 
 	// Password has been changed
@@ -632,7 +635,7 @@ func (h *Handler) ForgotPasswordEmail(c echo.Context) error {
 			MessageText:      fmt.Sprintf("Here’s your confirmation code: %s. You can copy it into the open browser window or click the link below to confirm this request", code),
 			MessageGreeting:  "You or someone else has indicated that you have forgotten your login password",
 			MessageAction:    "Generate a new password",
-			MessageActionURL: c.Request().Header.Get("Origin") + fmt.Sprintf("/login/forgotverify?code=%s", code),
+			MessageActionURL: h.consoleOrigin() + fmt.Sprintf("/login/forgotverify?code=%s", code),
 		}
 
 		data, err := json.Marshal(notification)
@@ -710,14 +713,14 @@ func (h *Handler) VerifyForgotPasswordCode(c echo.Context) error {
 		}
 	}
 
-	valid := h.Model.IsForgotCodeValid(username, confirmCode)
-	if !valid {
-		log.Printf("[ERROR]: %s is not a valid code", confirmCode)
-		if c.Request().Method == "GET" {
-			return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.forgot_verify_error"))
-		} else {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.forgot_verify_error"), true))
-		}
+	user, err := h.Model.GetUserById(username)
+	valid := false
+	if err == nil && user.ForgotPasswordCode != "" && user.ForgotPasswordCodeExpiresAt.After(time.Now()) {
+		valid, err = argon2id.ComparePasswordAndHash(confirmCode, user.ForgotPasswordCode)
+	}
+	if err != nil || !valid {
+		log.Print("[WARN]: password recovery proof rejected")
+		return echo.NewHTTPError(http.StatusUnauthorized, "Password recovery authorization is invalid or expired.")
 	}
 
 	csrfToken, ok := c.Get("csrf").(string)
@@ -725,36 +728,15 @@ func (h *Handler) VerifyForgotPasswordCode(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "authentication.csrf_token_not_found"))
 	}
 
+	if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementRecovery, models.PasswordReplacementDigest(user.ForgotPasswordCode), user.ForgotPasswordCodeExpiresAt); err != nil {
+		return err
+	}
+
 	return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 }
 
 func (h *Handler) CreateForgotPasswordSession(c echo.Context, user *ent.User) error {
-	msg := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if msg != user.ID {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		h.SessionManager.Manager.Put(c.Request().Context(), "forgot", true)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-		if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-	}
-
-	return nil
+	return h.createPasswordReplacementSession(c, user, nil)
 }
 
 func (h *Handler) UpdateForgotPasswordSession(c echo.Context, user *ent.User) error {
@@ -792,7 +774,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 
 	if claims, ok := token.Claims.(*MyCustomClaims); ok {
 		// Is the token expired?
-		if time.Now().After(claims.ExpiresAt.Time) {
+		if claims.ExpiresAt == nil || time.Now().After(claims.ExpiresAt.Time) {
 			return echo.NewHTTPError(http.StatusForbidden, "token has expired, please contact your administrator to request a new email to set your initial password")
 		}
 
@@ -802,6 +784,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
+		invitationBinding := models.PasswordReplacementDigest(user.NewUserToken)
 		// Check if token exists in database for this user
 		if h.EncryptionMasterKey != "" {
 			isNewUserTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.NewUserToken, h.EncryptionMasterKey)
@@ -821,18 +804,13 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusForbidden, "token is not valid, please contact your administrator to request a new email to set your initial password")
 		}
 
-		// Delete token
-		if err := h.Model.DeleteNewAccountToken(user.ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "could not delete token")
-		}
-
 		// Create a session as we'll require the user to change the password
 		csrfToken, ok := c.Get("csrf").(string)
 		if !ok || csrfToken == "" {
 			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "authentication.csrf_token_not_found"))
 		}
 
-		if err := h.CreateForgotPasswordSession(c, user); err != nil {
+		if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementInvitation, invitationBinding, claims.ExpiresAt.Time); err != nil {
 			return err
 		}
 

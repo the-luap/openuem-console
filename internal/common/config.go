@@ -2,10 +2,12 @@ package common
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
+	"github.com/open-uem/openuem-console/internal/setup/administrator"
 	"github.com/open-uem/utils"
 	"gopkg.in/ini.v1"
 )
@@ -13,6 +15,10 @@ import (
 func (w *Worker) GenerateConsoleConfig() error {
 	var err error
 	w.IndividualAgentService, err = consolebroker.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil)
 	if err != nil {
 		return err
 	}
@@ -191,8 +197,11 @@ func (w *Worker) GenerateConsoleConfig() error {
 		return err
 	}
 	w.Version = key.String()
+	if w.IndividualAgentService != nil {
+		w.EncryptionMasterKey = os.Getenv("ENCRYPTION_MASTER_KEY")
+	}
 
-	return nil
+	return w.validateAdministratorReset()
 }
 
 func (w *Worker) StartGenerateConsoleConfigJob() error {

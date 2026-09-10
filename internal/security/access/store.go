@@ -97,17 +97,7 @@ func (s *Store) Bootstrap(ctx context.Context, userID string) error {
 	if !exists {
 		return errors.New("initial administrator account does not exist")
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_access_revisions(user_id,revision) VALUES($1,1)`, userID); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_access_grants(user_id,role) VALUES($1,'administrator')`, userID); err != nil {
-		return err
-	}
-	after, _ := json.Marshal([]Grant{{Role: Administrator}})
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_access_audit(actor,subject,action,before_grants,after_grants) VALUES('installation',$1,'bootstrap','[]',$2)`, userID, after); err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_access_migrations(name) VALUES('bootstrap')`); err != nil {
+	if err = recordBootstrap(ctx, tx, userID); err != nil {
 		return err
 	}
 	return tx.Commit()

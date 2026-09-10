@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
+	"github.com/open-uem/openuem-console/internal/setup/administrator"
 	"github.com/open-uem/utils"
 	"github.com/urfave/cli/v2"
 )
@@ -11,6 +12,10 @@ import (
 func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	var err error
 	w.IndividualAgentService, err = consolebroker.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil)
 	if err != nil {
 		return err
 	}
@@ -71,5 +76,5 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	w.Version = "0.12.0"
 	w.EncryptionMasterKey = cCtx.String("encryption-master-key")
 
-	return nil
+	return w.validateAdministratorReset()
 }

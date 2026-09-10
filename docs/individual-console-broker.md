@@ -21,8 +21,9 @@ The broker's private CA is independent of `--cacert` / `Certificates.CACert`,
 which remains the console authentication server's administrator trust input.
 Do not substitute backend trust for administrator trust. The console's database,
 session encryption, JWT key, listener certificates and remaining CLI/INI settings
-are still required. This connection mode does not initialize the first account
-or provide the complete reference installation.
+are still required. The [protected administrator bootstrap](first-administrator-bootstrap.md)
+initializes the first account from a private provisioning file. The complete
+reference installation and automatic secret distribution remain separate work.
 
 If a private broker additionally requires a client TLS identity, configure both
 `OPENUEM_AGENT_BROKER_CLIENT_CERT_FILE` and

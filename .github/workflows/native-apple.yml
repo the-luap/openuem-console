@@ -152,6 +152,8 @@ jobs:
           path: ${{ runner.temp }}/apple-mdm-browser
           if-no-files-found: ignore
           retention-days: 7
+      - name: Atomic protected first-administrator bootstrap
+        run: go test -race -count=1 ./internal/setup/administrator ./internal/common
       - name: Scoped console routes and response privacy
         run: go test -race -count=1 ./internal/controllers/webserver/handlers
       - name: Bounded custom Windows CSP editor JSON fuzzing
