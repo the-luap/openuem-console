@@ -213,6 +213,21 @@ func TestCSPUncertainOutcomeBlocksQueueUntilAuditedAbandonment(t *testing.T) {
 			if detail.Command.Phase != "abandoned" || detail.Resolution == "" || detail.Command.CompletedAt == nil {
 				t.Fatal("explicit uncertainty resolution was not preserved")
 			}
+			history, err := f.store.CSPObservations(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID, 0, 11)
+			if err != nil {
+				t.Fatal("resolved command lost observation history", err)
+			}
+			if end == "202" || end == "516" {
+				if len(history.Observations) != 1 || history.Observations[0].Outcome != "unknown" {
+					t.Fatal("administrative resolution rewrote device evidence")
+				}
+				observation, err := f.store.CSPObservationDetails(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID, history.Observations[0].MessageID)
+				if err != nil || observation.Observations[0].Outcome != "unknown" {
+					t.Fatal("resolved historical value read failed", err)
+				}
+			} else if len(history.Observations) != 0 {
+				t.Fatal("session termination invented an operation observation")
+			}
 			response := cspTestNextSession(t, f)
 			if len(syncMLTestParsed(t, response).Commands) != 2 || cspTestRead(t, f, next.ID).Command.Phase != "sent" {
 				t.Fatal("resolved queue remained blocked")

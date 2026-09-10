@@ -6,11 +6,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
@@ -246,7 +244,7 @@ func (s *Store) observeCSP(ctx context.Context, tx *sql.Tx, identity ManagementD
 			return ErrAuthoritySecret
 		}
 		defer clear(plain)
-		purpose := cspPurpose("observation", c) + fmt.Sprintf("/%s/%s/%x/%s", session.ID, requestMessageID, requestDigest, c.UpdatedAt.UTC().Format(time.RFC3339Nano))
+		purpose := cspObservationPurpose(c, session.ID, requestMessageID, requestDigest, c.UpdatedAt)
 		encrypted, err := s.secrets.sealBounded(plain, purpose, maxCSPProtectedBytes)
 		if err != nil {
 			return err

@@ -73,6 +73,22 @@ func TestWindowsCSPViewsPreserveUntrustedValuesAndOutcomeBoundaries(t *testing.T
 			if phase == "abandoned" && !strings.Contains(html, "&lt;script&gt;resolution&lt;/script&gt;") {
 				t.Fatal("resolution history lost")
 			}
+			out.Reset()
+			observation := windows.CSPObservation{SessionID: "synthetic-session", MessageID: 3, ReceivedAt: now, Outcome: "", StopReason: "<script>stop</script>", Outcomes: detail.Outcomes}
+			if err := CSPObservation(c, info, device, command, observation).Render(ctx, &out); err != nil {
+				t.Fatal(err)
+			}
+			html = out.String()
+			for _, value := range []string{"PARTIAL_VALUE_MUST_NOT_ESCAPE", "<script>stop</script>", "<script>device</script>", `<img src="x"`, `name="confirm_abandon"`, `name="confirm_cancel"`, cspState(phase)} {
+				if strings.Contains(html, value) {
+					t.Fatal("historical view exposed content, action or later state", value)
+				}
+			}
+			for _, want := range []string{"Evidence incomplete", "&lt;script&gt;stop&lt;/script&gt;", "Incomplete result; partial value withheld.", "Empty value", "No complete result received.", "2026-09-10 12:13:14.123456 UTC", "516"} {
+				if !strings.Contains(html, want) {
+					t.Fatal("historical evidence distinction lost", want)
+				}
+			}
 		})
 	}
 	if canCancelCSP(windows.CSPCommand{Phase: "queued", UpdateRunID: "owned-run"}) {

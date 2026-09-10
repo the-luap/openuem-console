@@ -162,28 +162,8 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">Correlated device evidence</h2>
 					<p>Status 202 is asynchronous acceptance; 516 reports failed rollback. Neither establishes successful completion. Partial Get values are withheld until the complete object is received. Empty values and absent results remain distinct.</p>
-					if len(detail.Outcomes)==0 {
-						<p class="my-3">No operation evidence has been received.</p>
-					}
-					for _, outcome := range detail.Outcomes {
-						<section class="windows-csp-observation my-4">
-							<h3 class="font-semibold">{ outcome.Kind } · { outcome.CommandID }</h3>
-							<dl class="uk-description-list"><dt>Parent command</dt><dd>{ outcome.ParentID }</dd><dt>Target node</dt><dd>{ outcome.URI }</dd><dt>Device status</dt><dd>{ cspStatus(outcome.Status) }</dd></dl>
-							if outcome.OriginalError!="" {
-								<p>Original device error (diagnostic only)</p>
-								<pre class="windows-csp-value" tabindex="0" aria-label="Original device error">{ outcome.OriginalError }</pre>
-							}
-							if outcome.Kind=="Get" {
-								if outcome.Incomplete {
-									<p>Incomplete result; partial value withheld.</p>
-								} else if outcome.Data==nil {
-									<p>No complete result received.</p>
-								} else {
-									<dl class="uk-description-list"><dt>Reported format / MIME</dt><dd>{ outcome.Format } · { outcome.MIME }</dd></dl>@cspData(outcome.Data)
-								}
-							}
-						</section>
-					}
+					<a class="uk-button uk-button-default my-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+detail.Command.ID+"/observations")) }>Observation history</a>
+					@cspOutcomes(detail.Outcomes)
 				</div>
 			</section>
 		</main>
@@ -204,5 +184,30 @@ templ cspIntent(command windows.SyncMLCommand, expanded bool) {
 				@cspData(item.Data)
 			}
 		</details>
+	}
+}
+
+templ cspOutcomes(outcomes []windows.CSPOperationOutcome) {
+	if len(outcomes)==0 {
+		<p class="my-3">No operation evidence has been received.</p>
+	}
+	for _, outcome := range outcomes {
+		<section class="windows-csp-observation my-4">
+			<h3 class="font-semibold">{ outcome.Kind } · { outcome.CommandID }</h3>
+			<dl class="uk-description-list"><dt>Parent command</dt><dd>{ outcome.ParentID }</dd><dt>Target node</dt><dd>{ outcome.URI }</dd><dt>Device status</dt><dd>{ cspStatus(outcome.Status) }</dd></dl>
+			if outcome.OriginalError!="" {
+				<p>Original device error (diagnostic only)</p>
+				<pre class="windows-csp-value" tabindex="0" aria-label="Original device error">{ outcome.OriginalError }</pre>
+			}
+			if outcome.Kind=="Get" {
+				if outcome.Incomplete {
+					<p>Incomplete result; partial value withheld.</p>
+				} else if outcome.Data==nil {
+					<p>No complete result received.</p>
+				} else {
+					<dl class="uk-description-list"><dt>Reported format / MIME</dt><dd>{ outcome.Format } · { outcome.MIME }</dd></dl>@cspData(outcome.Data)
+				}
+			}
+		</section>
 	}
 }

@@ -108,9 +108,39 @@ base64 data is displayed in its received encoding rather than decoded as a file.
 **Command acknowledged** means the required protocol evidence was received. It
 does not prove effective configuration, compliance, installed patches or reboot.
 Status 202 is asynchronous acceptance, while 516 reports failed rollback. Failed
-groups can leave other operations applied. The view shows the latest correlated
-snapshot, not an observation-by-observation timeline or a continuous compliance
-assessment. The backend retains its separate append-only observation history.
+groups can leave other operations applied. The command detail shows the latest
+correlated snapshot; **Observation history** opens earlier stored evidence.
+
+## Review the observation history
+
+The history lists ten immutable snapshots per page, in ascending device-message
+order. Each snapshot contains cumulative operation evidence after one authenticated
+device packet. Its timestamp is the server's recorded receipt time in UTC. Open a
+message to inspect the status, original diagnostic error and complete Get value
+available at that point. A later completed result does not fill an earlier partial
+snapshot. Administrative release of an uncertain command does not change its
+historical uncertainty. Device revocation preserves authorized historical reads.
+
+An observation is not a copy of every transport packet or a log of every queue or
+administrator action. Pure housekeeping, session expiration and administrative
+resolution do not invent operation observations. An empty history makes no claim
+about whether device effects occurred. **Current command and original intent**
+returns to the current command; historical pages contain no mutation controls.
+
+`CSPObservations` authenticates at most eleven encrypted snapshots per call: ten
+visible entries and one pagination lookahead. The list omits operation values.
+`CSPObservationDetails` opens one selected message, with the same complete-value
+and escaped text/XML rendering as the current result. Both reads require current
+`ManageWindowsCSP` authority and commit a `command.read` audit before returning
+data. Their transaction locks the scoped device and command while checking the
+original request, current result, observation and referenced packet.
+
+Observation authentication preserves the existing ciphertext format. Its bound
+context includes immutable command intent, session, message, packet digest and
+receipt timestamp. Reads check the referenced packet digest, the original command
+tree and dispatched operation identifiers. Substituted metadata, ciphertext or
+protected snapshot structure fails closed. The storage remains append-only; no
+migration, new packet write or change to device delivery is required.
 
 ## Cancel an undelivered custom command
 
@@ -143,7 +173,7 @@ owning run link and historical uncertain evidence after release.
 
 ## Routes and failure boundaries
 
-All seven routes exist without a prefix and under `/tenant/:tenant` and
+All nine routes exist without a prefix and under `/tenant/:tenant` and
 `/tenant/:tenant/site/:site`, with a concrete selected site:
 
 | Method and path | Behavior |
@@ -153,6 +183,8 @@ All seven routes exist without a prefix and under `/tenant/:tenant` and
 | `POST /windows/:id/commands/preview` | Compile/review or return to editing without queue writes |
 | `POST /windows/:id/commands/create` | Confirm atomic, idempotent command admission |
 | `GET /windows/:id/commands/:command` | Protected intent and latest correlated outcomes |
+| `GET /windows/:id/commands/:command/observations` | Audited ten-entry historical evidence page |
+| `GET /windows/:id/commands/:command/observations/:message` | One protected historical snapshot |
 | `POST /windows/:id/commands/:command/cancel` | Revision-checked cancellation of undelivered custom intent |
 | `POST /windows/:id/commands/:command/abandon` | Revision-checked resolution of an unknown outcome |
 
@@ -166,6 +198,10 @@ forms retain their existing 8 KiB limit. Reads
 return no protected data if required auditing fails. Cancellation and abandonment
 fully roll back if their final write audit fails. Errors expose neither storage
 details nor protected payloads. Responses use `no-store` and `strict-origin`.
+Observation pages accept only a unique canonical `offset` from 0 through 64.
+Snapshot identifiers are canonical message integers from 1 through 64 and accept
+no query parameters. Missing snapshots return 404, malformed requests return 400,
+and unauthorized or unaudited reads return no history or values.
 
 ## Verification and remaining work
 
@@ -233,6 +269,31 @@ views passing in **3.045/1.883 seconds**. Its earlier duplicate-field rejection
 returns the expected HTTP 400; the final page has no console warnings/errors.
 Complete CI for the creation extension is pending.
 
-An observation timeline, retention/export, broader typed policies and physical
-Windows acceptance remain implementation work.
+Observation-history tests cover partial/completed snapshots, restart and exact
+packet replay, ascending pagination, empty histories, current versus historical
+outcomes, uncertainty after administrative release, scoped permissions, revoked
+identities, audit failure and redaction. Corruption tests alter ciphertext, packet
+digest, timestamp, command/message references, target, operation identifier,
+parent and protected version in the owned random schema; both list and detail
+reject each substitution. The full Windows PostgreSQL/race suite passes in
+**82.425 seconds**, with the protocol package passing in **1.412 seconds**.
+The final handler/race suite passes in **10.156 seconds**, including malformed and
+empty pagination-query rejection; Windows/shared views pass in **2.917/2.041
+seconds**. Vet and Linux/Windows builds pass.
+
+The console fixture produces twelve genuine observations through the synthetic
+enrollment/SyncML peer. Set `OPENUEM_WINDOWS_CSP_OBSERVATION_BROWSER_FIXTURE` to a
+private URL file to inspect this fixture; its `.stop` sibling releases the server
+and permits schema cleanup. Browser navigation covers first/last pages, return
+pagination, an earlier partial snapshot and the final escaped value with exact
+surrounding whitespace. History and complete detail remain contained at
+390/768/1440 pixels; the partial detail is also checked at 390 pixels. The narrow
+table scrolls within its keyboard-focusable region, and the 768-pixel complete
+detail passes visual inspection. Only the fixture's missing favicon is reported
+in the browser console. The complete fixture/handler race run passes in
+**127.374 seconds**, including manual inspection; Windows/shared view suites pass
+in **3.166/1.883 seconds**. Full CI for the observation extension is pending.
+
+Retention/export, broader typed policies and physical Windows acceptance remain
+implementation work.
 The full WIN-02 roadmap also retains lifecycle, integration and deployment work.

@@ -66,15 +66,7 @@ func (s *Store) CSPCommandDetails(ctx context.Context, actor string, scope acces
 		return nil, err
 	}
 	detail := &CSPCommandDetail{Command: c.CSPCommand, Request: command, Reason: result.Reason, Resolution: result.Resolution, Outcomes: []CSPOperationOutcome{}}
-	if result.Exchange != nil {
-		for _, operation := range result.Exchange.Operations {
-			outcome := CSPOperationOutcome{CommandID: operation.WireID, ParentID: operation.ParentID, Kind: operation.Kind, URI: operation.URI, Status: operation.Status, OriginalError: operation.OriginalError, Incomplete: operation.MoreData, Format: operation.Format, MIME: operation.MIME}
-			if operation.HasResult && !operation.MoreData {
-				outcome.Data = &SyncMLData{Text: operation.Text, XML: operation.XML}
-			}
-			detail.Outcomes = append(detail.Outcomes, outcome)
-		}
-	}
+	detail.Outcomes = cspOperationOutcomes(result.Exchange)
 	if err := auditCSP(ctx, tx, c, actor, "command.read"); err != nil {
 		return nil, err
 	}

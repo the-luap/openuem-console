@@ -22,7 +22,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new":
+		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new", "/windows/:id/commands/:command/observations", "/windows/:id/commands/:command/observations/:message":
 			return access.ManageWindowsCSP, true
 		case "/windows", "/windows/:id":
 			return access.ReadDevices, true
@@ -76,6 +76,8 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/:id/commands/preview", h.WindowsPreviewCSPCommand)
 		g.POST("/windows/:id/commands/create", h.WindowsCreateCSPCommand)
 		g.GET("/windows/:id/commands/:command", h.WindowsCSPCommand)
+		g.GET("/windows/:id/commands/:command/observations", h.WindowsCSPObservations)
+		g.GET("/windows/:id/commands/:command/observations/:message", h.WindowsCSPObservation)
 		g.POST("/windows/:id/commands/:command/cancel", h.WindowsCancelCSPCommand)
 		g.POST("/windows/:id/commands/:command/abandon", h.WindowsAbandonCSPCommand)
 		g.POST("/windows/setup", h.WindowsAuthority)

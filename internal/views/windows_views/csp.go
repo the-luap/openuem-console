@@ -27,6 +27,13 @@ func cspStatus(status int) string {
 	return fmt.Sprint(status)
 }
 
+func cspObservationOutcome(outcome string) string {
+	if outcome == "" {
+		return "Evidence incomplete"
+	}
+	return cspState(outcome)
+}
+
 func canCancelCSP(command windows.CSPCommand) bool {
 	return command.UpdateRunID == "" && (command.Phase == "queued" || command.Phase == "blocked")
 }

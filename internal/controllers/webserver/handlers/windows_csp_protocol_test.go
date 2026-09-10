@@ -175,7 +175,32 @@ func windowsCSPConsolePeer(t *testing.T, h *Handler, ctx context.Context, scope 
 			return message
 		}
 		delivery := process(reply(process(initial), "200"))
-		if status != "" {
+		if status == "chunks" {
+			// Twelve genuine correlated snapshots exercise history pagination.
+			first := reply(delivery, "200")
+			result := first.Commands[len(first.Commands)-1]
+			if result.Kind != "Results" {
+				t.Fatal("chunk fixture requires a Get")
+			}
+			value := "  <script>historical result</script>  "
+			size := uint64(len(value))
+			first.Final = false
+			first.Commands[len(first.Commands)-1].Items = []windows.SyncMLItem{{Source: result.Items[0].Source, Meta: &windows.SyncMLMeta{Format: "chr", Size: &size}, Data: &windows.SyncMLData{Text: value[:2]}, MoreData: true}}
+			response := process(first)
+			for part := 1; part < 12; part++ {
+				next := reply(response, "200")
+				next.Final = part == 11
+				end := (part + 1) * 2
+				if next.Final {
+					end = len(value)
+				}
+				chunk := result
+				chunk.ID = strconv.Itoa(len(next.Commands) + 1)
+				chunk.Items = []windows.SyncMLItem{{Source: result.Items[0].Source, Data: &windows.SyncMLData{Text: value[part*2 : end]}, MoreData: !next.Final}}
+				next.Commands = append(next.Commands, chunk)
+				response = process(next)
+			}
+		} else if status != "" {
 			process(reply(delivery, status))
 		}
 		detail, err := h.Windows.CSPCommandDetails(ctx, "organization-admin", scope, deviceID, queued.ID)

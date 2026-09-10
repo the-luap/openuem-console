@@ -146,13 +146,16 @@ Failed audit, invalid evidence, cancellation and expiry roll back the transactio
 | Expired/unauthorized entries skipped per exchange | 32 |
 | Delivery lifetime | 1 minute through 7 days, whole seconds |
 | Metadata list page | 1–100 entries; offset at most 100,000 |
+| Observation history page | 10 visible entries; 11 authenticated snapshots per call; offset at most 64 |
 | Resolution note | 320 UTF-8 bytes, no surrounding whitespace or control characters |
 
 `CSPCommandDetails` provides an audited current request/result read. Results and
 original device errors are untrusted content; console views escape them as text.
-The console shows the original request and latest correlated result. Observation
-history is preserved in the database; an observation-by-observation timeline and
-administrative retention/export lifecycle remain future work.
+The console shows the original request and latest correlated result, with a
+separate [observation history](native-windows-csp-console.md#review-the-observation-history)
+for immutable earlier snapshots. List and single-message reads authenticate the
+existing encrypted history, preserve partial/completed distinctions and require
+current scoped authority plus audit. Administrative retention/export remains work.
 
 ## Verification and remaining work
 
@@ -189,6 +192,6 @@ The typed update extension adds selected update policies and verified read-back.
 The [enrollment/device console](native-windows-console.md) provides CA setup,
 one-time credentials, scoped inventory and native access revocation.
 Remaining WIN-02 work includes broader typed configuration policies, automatic
-ring promotion, outgoing large-object chunking, observation timeline forms,
+ring promotion, outgoing large-object chunking,
 renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

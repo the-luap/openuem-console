@@ -133,7 +133,8 @@ pending cancellation. [CSP command history and queue controls](native-windows-cs
 add protected request/result reads, undelivered custom-command cancellation and
 explicit resolution of uncertain outcomes under the separate CSP administrator
 capability. Custom JSON command drafts now have shared-compiler previews, confirmed
-admission and idempotent retries. The roadmap still requires observation timeline
-forms, broader CSP
-policies, certificate renewal and unenrollment, key rotation/restore, verified
+admission and idempotent retries. Protected observation history preserves each
+earlier cumulative snapshot, with separate partial and complete values. The
+roadmap still requires retention/export, broader CSP policies, certificate renewal
+and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.
