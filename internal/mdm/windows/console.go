@@ -24,6 +24,8 @@ type DeviceMetadata struct {
 	CreatedAt, CertificateExpiresAt                                 time.Time
 	RevokedAt, CertificateRevokedAt                                 *time.Time
 	FingerprintSHA256                                               string
+	UnenrollmentReportedAt                                          *time.Time
+	Unenrollment                                                    *UnenrollmentReport
 }
 
 func (s *Store) authorizeConsole(ctx context.Context, tx *sql.Tx, actor string, scope access.Scope, capability access.Capability) error {
@@ -115,22 +117,26 @@ func (s *Store) EnrollmentAvailable(ctx context.Context, actor string, scope acc
 	return available, nil
 }
 
-const deviceMetadataColumns = `d.id,d.tenant_id,d.site_id,d.invitation_id,d.reported_device_id,d.device_name,d.enrollment_type,d.os_version,d.os_edition,d.created_at,d.revoked_at,c.expires_at,c.revoked_at,encode(c.fingerprint,'hex')`
+const deviceMetadataColumns = `d.id,d.tenant_id,d.site_id,d.invitation_id,d.reported_device_id,d.device_name,d.enrollment_type,d.os_version,d.os_edition,d.created_at,d.revoked_at,c.expires_at,c.revoked_at,encode(c.fingerprint,'hex'),u.received_at`
 const deviceMetadataJoin = ` FROM mdm_windows_devices d
  JOIN mdm_windows_enrollments e ON e.device_id=d.id AND e.invitation_id=d.invitation_id AND e.tenant_id=d.tenant_id AND e.site_id=d.site_id
  JOIN mdm_windows_device_certificates c ON c.device_id=d.id AND c.tenant_id=d.tenant_id AND c.site_id=d.site_id
  AND (c.id=e.certificate_id OR EXISTS(SELECT 1 FROM mdm_windows_certificate_renewals r WHERE r.renewed_certificate_id=c.id AND r.device_id=d.id AND r.tenant_id=d.tenant_id AND r.site_id=d.site_id AND r.phase='confirmed'))
  AND NOT EXISTS(SELECT 1 FROM mdm_windows_certificate_renewals r WHERE r.source_certificate_id=c.id AND r.phase='confirmed')
- JOIN sites site ON site.id=d.site_id AND site.tenant_sites=d.tenant_id `
+ JOIN sites site ON site.id=d.site_id AND site.tenant_sites=d.tenant_id
+ LEFT JOIN mdm_windows_unenrollment_reports u ON u.device_id=d.id AND u.tenant_id=d.tenant_id AND u.site_id=d.site_id `
 
 func scanDeviceMetadata(row interface{ Scan(...any) error }) (*DeviceMetadata, error) {
 	var d DeviceMetadata
-	err := row.Scan(&d.ID, &d.TenantID, &d.SiteID, &d.InvitationID, &d.ReportedDeviceID, &d.Name, &d.EnrollmentType, &d.OSVersion, &d.OSEdition, &d.CreatedAt, &d.RevokedAt, &d.CertificateExpiresAt, &d.CertificateRevokedAt, &d.FingerprintSHA256)
+	err := row.Scan(&d.ID, &d.TenantID, &d.SiteID, &d.InvitationID, &d.ReportedDeviceID, &d.Name, &d.EnrollmentType, &d.OSVersion, &d.OSEdition, &d.CreatedAt, &d.RevokedAt, &d.CertificateExpiresAt, &d.CertificateRevokedAt, &d.FingerprintSHA256, &d.UnenrollmentReportedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if d.UnenrollmentReportedAt != nil && (d.RevokedAt == nil || !d.RevokedAt.Equal(*d.UnenrollmentReportedAt)) {
+		return nil, ErrAuthoritySecret
 	}
 	return &d, nil
 }
@@ -187,6 +193,16 @@ func (s *Store) Device(ctx context.Context, actor string, scope access.Scope, id
 	d, err := scanDeviceMetadata(tx.QueryRowContext(ctx, `SELECT `+deviceMetadataColumns+deviceMetadataJoin+`WHERE d.id=$1 AND d.tenant_id=$2 AND d.site_id=$3 FOR SHARE OF d,c,e`, id, scope.TenantID, scope.SiteID))
 	if err != nil {
 		return nil, err
+	}
+	if d.UnenrollmentReportedAt != nil {
+		report, err := s.readUnenrollmentReport(ctx, tx, scope, id)
+		if err != nil {
+			return nil, err
+		}
+		d.Unenrollment = &report.UnenrollmentReport
+		if err := auditUnenrollment(ctx, tx, report, actor, "unenrollment.read"); err != nil {
+			return nil, err
+		}
 	}
 	if err := auditWindowsConsole(ctx, tx, actor, scope, "device.read", id); err != nil {
 		return nil, err

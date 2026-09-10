@@ -139,6 +139,13 @@ earlier cumulative snapshot, with separate partial and complete values.
 show protected source/replacement metadata and confirmed handoff evidence, with
 revision-checked cancellation of unconfirmed replacements under the certificate
 administrator capability. The roadmap still requires retention/export, broader
-CSP policies, account-authenticated renewal, scheduling and unenrollment, key
-rotation/restore, verified
+CSP policies, account-authenticated renewal, scheduling and server-requested
+unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.
+
+[Authenticated disconnection reports](native-windows-unenrollment.md) now show the
+reported start of Windows disconnection, server access retirement and protected
+report/certificate metadata in device details. Inventory retains a separate
+disconnection status, and interrupted command effects remain uncertain. Local
+cleanup is explicitly unverified; no remote unenrollment command is sent by this
+extension.

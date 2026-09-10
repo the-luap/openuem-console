@@ -25,6 +25,12 @@ import (
 // a network listener. TLS state is supplied by httptest, not a real handshake.
 func windowsCSPConsolePeer(t *testing.T, h *Handler, ctx context.Context, scope access.Scope) (string, func(windows.CSPCommandSpec, string) *windows.CSPCommandDetail) {
 	t.Helper()
+	id, deliver, _ := windowsConsoleProtocolPeer(t, h, ctx, scope)
+	return id, deliver
+}
+
+func windowsConsoleProtocolPeer(t *testing.T, h *Handler, ctx context.Context, scope access.Scope) (string, func(windows.CSPCommandSpec, string) *windows.CSPCommandDetail, func()) {
+	t.Helper()
 	invitation, credential, err := h.Windows.CreateEnrollmentInvitation(ctx, "organization-admin", scope, "csp-console-peer@example.test", time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +136,7 @@ func windowsCSPConsolePeer(t *testing.T, h *Handler, ctx context.Context, scope 
 		}
 		return parsed
 	}
-	return deviceID, func(spec windows.CSPCommandSpec, status string) *windows.CSPCommandDetail {
+	deliver := func(spec windows.CSPCommandSpec, status string) *windows.CSPCommandDetail {
 		t.Helper()
 		queued, err := h.Windows.EnqueueCSPCommand(ctx, "organization-admin", scope, deviceID, uuid.NewString(), spec, time.Hour)
 		if err != nil {
@@ -208,5 +214,19 @@ func windowsCSPConsolePeer(t *testing.T, h *Handler, ctx context.Context, scope 
 			t.Fatal(err)
 		}
 		return detail
+	}
+	return deviceID, deliver, func() {
+		t.Helper()
+		rawNonce, err := base64.StdEncoding.DecodeString(nonce)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inner := md5.Sum([]byte(deviceID + ":" + secret))
+		outer := md5.Sum(append([]byte(base64.StdEncoding.EncodeToString(inner[:])+":"), rawNonce...))
+		notification := &windows.SyncMLMessage{Header: windows.SyncMLHeader{SessionID: "1", MessageID: "1", Source: windows.SyncMLLocation{URI: "urn:uuid:synthetic-csp-console-peer", Name: deviceID}, Target: windows.SyncMLLocation{URI: h.WindowsOptions.ManagementURL}, Credential: &windows.SyncMLCredential{Digest: base64.StdEncoding.EncodeToString(outer[:])}}, Final: true, Commands: []windows.SyncMLCommand{{Kind: "Alert", ID: "1", Data: &windows.SyncMLData{Text: "1226"}, Items: []windows.SyncMLItem{{Meta: &windows.SyncMLMeta{Type: "com.microsoft:mdm.unenrollment.userrequest", Format: "int"}, Data: &windows.SyncMLData{Text: "1"}}}}}}
+		response := process(notification)
+		if len(response.Commands) != 2 || response.Commands[1].Data.Text != "200" {
+			t.Fatal("synthetic disconnection was not acknowledged")
+		}
 	}
 }

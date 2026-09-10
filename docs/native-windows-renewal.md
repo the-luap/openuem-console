@@ -222,8 +222,11 @@ The focused PostgreSQL/race tests pass in **9.579 seconds**. The full Windows
 PostgreSQL/race suite passes in **107.712 seconds**, with protocol in **1.430
 seconds**. Separate client-identity/gateway regressions pass in **1.333/3.037
 seconds**. SOAP parser fuzzing passes **298,640 executions** in **30.813 seconds**.
-Vet and Linux/Windows builds pass. Full CI for this SOAP extension is pending;
-synthetic TLS/protocol evidence does not establish physical Windows acceptance.
+Vet and Linux/Windows builds pass. Both the
+[push workflow](https://github.com/the-luap/openuem-console/actions/runs/34439425052)
+and [PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34439427708)
+pass for SOAP commit `2a5b139`; synthetic TLS/protocol evidence does not establish
+physical Windows acceptance.
 
 ## Review and cancel a replacement in the console
 

@@ -29,6 +29,10 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	if err != nil {
 		return nil, err
 	}
+	unenrollment, err := syncMLUnenrollmentAlert(request)
+	if err != nil {
+		return nil, err
+	}
 	messageID, err := strconv.Atoi(request.Header.MessageID)
 	if err != nil || messageID > maxSyncMLSessionMessages {
 		return nil, ErrSyncMLSession
@@ -69,6 +73,9 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	}
 	if record.CreatedAt.After(now) {
 		return nil, ErrAuthoritySecret
+	}
+	if unenrollment != nil {
+		return s.acceptUnenrollment(ctx, tx, device, record, session, request, unenrollment, data, options, secrets)
 	}
 	requestDigest := sha256.Sum256(data)
 	if session != nil && session.WireID == request.Header.SessionID && messageID <= session.LastMessage {

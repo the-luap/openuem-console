@@ -97,8 +97,10 @@ An exchange can finish with a successful result, a device-reported probe error,
 an abort or a failure. `completed` describes protocol completion. It does not
 mean a policy was applied or a failed probe succeeded: the protected probe status
 and result remain separate. Other device-originated mutations receive rejection
-statuses and are never executed. Unenrollment alerts are not acknowledged as
-completed unenrollment.
+statuses and are never executed. A separate
+[authenticated disconnection notification](native-windows-unenrollment.md) now
+retires server access and preserves interrupted work. Its acknowledgment does
+not assert completed local cleanup.
 
 ## Persistence and replay
 

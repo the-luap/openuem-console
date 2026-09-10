@@ -37,6 +37,9 @@ func invitationStatus(i windows.EnrollmentInvitation) string {
 	return "Available"
 }
 func DeviceStatus(d windows.DeviceMetadata) string {
+	if d.UnenrollmentReportedAt != nil && d.RevokedAt != nil {
+		return "Disconnection reported; access revoked"
+	}
 	if d.RevokedAt != nil || d.CertificateRevokedAt != nil {
 		return "Access revoked"
 	}

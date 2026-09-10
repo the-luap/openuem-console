@@ -202,8 +202,11 @@ cancellation and expiry during the callback roll back all work and consumption.
 Expiry is also checked after waiting for the invitation row lock. PostgreSQL
 constraints and a trigger prevent invitation reassignment, lifetime extension,
 secret/issuer replacement and rearming after consumption or revocation. Revoking
-an invitation closes enrollment access; device-certificate revocation and
-unenrollment remain separate unfinished lifecycle operations.
+an invitation closes enrollment access. Later extensions add
+[device access revocation](native-windows-console.md),
+[certificate renewal](native-windows-renewal.md) and
+[authenticated disconnection reports](native-windows-unenrollment.md).
+Server-requested unenrollment remains separate lifecycle work.
 
 The additive migration uses its own ledger and advisory lock. Upstream
 organization/site/user tables and console access migrations must already exist.

@@ -75,6 +75,8 @@ jobs:
         run: go test -run '^$' -fuzz='^FuzzSyncMLDataCodec$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows SyncML session transition fuzzing
         run: go test -run '^$' -fuzz='^FuzzSyncMLSessionTransition$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows disconnection notification fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsUnenrollment$' -fuzztime=15s -fuzzminimizetime=1s -parallel=2 ./internal/mdm/windows
       - name: Windows CSP compiler fuzzing
         run: go test -run '^$' -fuzz='^FuzzCSPCompiler$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows CSP result transition fuzzing

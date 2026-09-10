@@ -206,6 +206,23 @@ templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetad
 					</dl>
 				</div>
 			</section>
+			if data.Unenrollment!=nil {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Device disconnection reported</h2>
+						<p class="my-3">Windows reported that disconnection had started. This native identity can no longer authenticate or receive management commands. Local removal of policies, certificates and managed data has not been independently verified.</p>
+						<dl class="uk-description-list">
+							<dt>Reported and access revoked (UTC)</dt>
+							<dd>{ scheduleTimestamp(data.Unenrollment.ReceivedAt) }</dd>
+							<dt>Report ID</dt>
+							<dd>{ data.Unenrollment.ID }</dd>
+							<dt>Reporting certificate fingerprint (SHA-256)</dt>
+							<dd class="font-mono break-all">{ data.Unenrollment.FingerprintSHA256 }</dd>
+						</dl>
+						<p class="my-3">Enrollment, certificate and command history remain available. A separate OpenUEM agent keeps its own identity.</p>
+					</div>
+				</section>
+			}
 			if data.RevokedAt==nil && info.Can(access.RevokeDevices) {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body">
