@@ -232,4 +232,9 @@ The platform drills pass in **2.854** (Apple), **2.318** (Windows) and **2.098 s
 **247.525**, **162.006** and **19.527 seconds**, respectively; the Windows protocol
 suite passes in **1.422 seconds**. Bundle fuzzing passes **861,386 executions** in
 **31.449 seconds**. Vet, module consistency and complete Linux/Windows builds pass.
-Full GitHub CI for this extension is pending.
+Native Windows recovery-file/CLI/process checks pass in CI for `18fd1a8`.
+The initial Linux job stopped before tests because the hosted image lacked the
+PostgreSQL 17 client package source. CI now explicitly configures the official
+signed [PostgreSQL Apt repository](https://www.postgresql.org/download/linux/ubuntu/)
+and installs client-only packages on the disposable runner. Full corrected CI
+is pending.

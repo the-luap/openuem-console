@@ -74,7 +74,10 @@ the table's package summaries do not remove any detail from the roadmap.
   suites pass in 6.049/1.748 seconds; platform drills pass in 2.854/2.318/2.098
   seconds. Complete Apple/Windows/desktop regression passes in
   247.525/162.006/19.527 seconds. Fuzzing passes 861,386 executions; Vet, module
-  consistency and complete Linux/Windows builds pass. Full CI is pending.
+  consistency and complete Linux/Windows builds pass. Native Windows recovery
+  checks also pass in CI. The initial Linux run lacked the PostgreSQL 17 client
+  repository; the workflow now configures official signed PGDG explicitly.
+  Full corrected CI is pending.
   Physical recovery, deployment activation, CA/master-key rotation and the full
   PKI-01 package remain open.
 - [Native Windows audit integration](native-windows-audit.md) adds twelve original
