@@ -71,8 +71,11 @@ the table's package summaries do not remove any detail from the roadmap.
   builds. The actual issuer/lego/Pebble Linux arm64 container fixture passes
   provider failure, real DNS validation/cleanup, retained account, ARI renewal,
   gateway handoff and SIGTERM/restart in 9.75 seconds, without external networking.
-  The Compose component validates and publishes no ports. Dedicated native
-  amd64/arm64 CI is added; its result is tracked after this change is pushed.
+  The Compose component validates and publishes no ports. Both native amd64/arm64
+  [issuer CI jobs pass](https://github.com/the-luap/openuem-console/actions/runs/34503036882)
+  for `735c310`, including race/Vet, the actual DNS-01 fixture and the runtime
+  filesystem/entrypoint checks. The same head also passes both native
+  [gateway container jobs](https://github.com/the-luap/openuem-console/actions/runs/34503041557).
   The prior console head `dbdf906` also passes the complete
   [Native Apple workflow](https://github.com/the-luap/openuem-console/actions/runs/34497358714).
 - [Public gateway TLS renewal](gateway-operations.md#public-tls-renewal) loads complete certificate/key generations without restarting HTTP/2 or authenticated NATS streams. Invalid, partial, mismatched or expired material cannot replace the active pair; new handshakes, including session resumption, recheck its lifetime. Tests cover issuer constraints, optional client certificates, concurrent handshakes, native archive switches, bounded files and joined watcher recovery. The [separate minimal container](gateway-container.md) adds a pinned builder, source-only build context and unprivileged runtime; an isolated Linux arm64 process fixture passes actual-command TLS renewal, source-network denial and SIGTERM shutdown. Both native amd64/arm64 [image CI jobs pass](https://github.com/the-luap/openuem-console/actions/runs/34497033584). Live DNS/ACME provider operations and a complete one-port reference installation remain open.
