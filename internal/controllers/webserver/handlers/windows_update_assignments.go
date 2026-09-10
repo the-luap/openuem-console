@@ -63,7 +63,11 @@ func windowsAssignmentNames() []string {
 }
 
 func (h *Handler) windowsAssignmentRing(c echo.Context, scope access.Scope, revision int64) (*windows.UpdateRingRevision, error) {
-	rings, err := h.Windows.UpdateRingRevisions(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision+1, 1)
+	return h.windowsRingRevision(c, scope, c.Param("ring"), revision)
+}
+
+func (h *Handler) windowsRingRevision(c echo.Context, scope access.Scope, id string, revision int64) (*windows.UpdateRingRevision, error) {
+	rings, err := h.Windows.UpdateRingRevisions(c.Request().Context(), h.appleActor(c), scope, id, revision+1, 1)
 	if err != nil {
 		return nil, windowsFailure(err)
 	}
@@ -74,6 +78,14 @@ func (h *Handler) windowsAssignmentRing(c echo.Context, scope access.Scope, revi
 }
 
 func (h *Handler) WindowsNewUpdateAssignment(c echo.Context) error {
+	return h.windowsNewAssignment(c, false)
+}
+
+func (h *Handler) WindowsNewUpdateSchedule(c echo.Context) error {
+	return h.windowsNewAssignment(c, true)
+}
+
+func (h *Handler) windowsNewAssignment(c echo.Context, scheduled bool) error {
 	info, scope, err := h.windowsRingContext(c)
 	if err != nil {
 		return err
@@ -93,15 +105,31 @@ func (h *Handler) WindowsNewUpdateAssignment(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return renderApple(c, windows_views.UpdateAssignmentForm(c, info, windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring}))
+	if scheduled {
+		form.Set("not_before", time.Now().UTC().Add(time.Hour).Truncate(time.Minute).Format(windowsScheduleTimeLayout))
+		form.Set("activation_minutes", "60")
+	}
+	return renderApple(c, windows_views.UpdateAssignmentForm(c, info, windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring, Scheduled: scheduled}))
 }
 
 func (h *Handler) WindowsPreviewUpdateAssignment(c echo.Context) error {
+	return h.windowsPreviewAssignment(c, false)
+}
+
+func (h *Handler) WindowsPreviewUpdateSchedule(c echo.Context) error {
+	return h.windowsPreviewAssignment(c, true)
+}
+
+func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error {
 	info, scope, err := h.windowsRingContext(c)
 	if err != nil {
 		return err
 	}
-	form, err := windowsForm(c, append(windowsAssignmentNames(), "edit_assignment")...)
+	names := windowsAssignmentNames()
+	if scheduled {
+		names = windowsScheduleNames()
+	}
+	form, err := windowsForm(c, append(names, "edit_assignment")...)
 	if err != nil {
 		return err
 	}
@@ -114,7 +142,14 @@ func (h *Handler) WindowsPreviewUpdateAssignment(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	draft := windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring}
+	draft := windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring, Scheduled: scheduled}
+	if scheduled {
+		var timingErr error
+		draft.NotBefore, draft.ActivationWindow, timingErr = parseWindowsScheduleTiming(form)
+		if parseErr == nil {
+			parseErr = timingErr
+		}
+	}
 	if parseErr != nil {
 		c.Response().Status = 400
 		draft.Error = parseErr.Error()
@@ -125,6 +160,14 @@ func (h *Handler) WindowsPreviewUpdateAssignment(c echo.Context) error {
 	}
 	if form.Get("edit_assignment") != "" {
 		return echo.NewHTTPError(400, "Invalid assignment review action")
+	}
+	if scheduled {
+		now := time.Now().UTC()
+		if draft.NotBefore.Before(now.Add(-time.Minute)) || draft.NotBefore.After(now.Add(90*24*time.Hour)) || !draft.NotBefore.Add(draft.ActivationWindow).After(now) {
+			c.Response().Status = 400
+			draft.Error = "Choose an activation time within the next 90 days and an activation window that is still open. All times are UTC."
+			return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))
+		}
 	}
 	if form.Get("mode") == "apply" {
 		current, err := h.Windows.UpdateRingRevisions(c.Request().Context(), h.appleActor(c), scope, ring.RingID, 0, 1)

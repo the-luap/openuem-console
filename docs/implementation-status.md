@@ -48,7 +48,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
-| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history | Raw CSP and schedule forms, broader typed policies, automatic ring promotion, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
+| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history; UTC schedule preview/confirmation, protected plan history and revision-checked pending cancellation | Raw CSP forms, broader typed policies, automatic ring promotion, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
@@ -264,8 +264,7 @@ the table's package summaries do not remove any detail from the roadmap.
   Vet and both builds pass; the complete push workflow passes for `f10b60b`
   ([run](https://github.com/the-luap/openuem-console/actions/runs/34427128033));
   its [pull-request workflow](https://github.com/the-luap/openuem-console/actions/runs/34427131094)
-  also passes. Scheduling,
-  raw CSP views and the remaining WIN-02 requirements stay open.
+  also passes. Raw CSP views and the remaining WIN-02 requirements stay open.
 - [Windows ring administration](native-windows-update-console.md#versioned-update-rings)
   now provides current lists, immutable history and create/edit forms with all 13
   typed settings, enabled state and exact reviewed revisions. Preview/edit never
@@ -278,8 +277,9 @@ the table's package summaries do not remove any detail from the roadmap.
   responsive forms pass, including long-name wrapping. Vet and Linux/Windows
   builds pass. The ring PR workflow failed during Chrome startup before the
   console tests; see the linked validation record and bounded startup/diagnostic
-  correction `7d80f5f`. Complete CI remains pending. Schedule forms, dynamic
-  groups, promotion gates and actual patch/restart evidence remain open.
+  correction `7d80f5f`. The ring push workflow and both later cohort workflows
+  pass; the latter include the startup correction. Dynamic groups, promotion
+  gates and actual patch/restart evidence remain open.
 - [Windows explicit cohort assignment](native-windows-update-console.md#assign-an-exact-revision-to-devices)
   adds reviewed apply/removal for 1–100 native device UUIDs and exact ring revisions.
   Preview resolves scoped device metadata; confirmed admission uses the atomic
@@ -290,8 +290,28 @@ the table's package summaries do not remove any detail from the roadmap.
   8.503 seconds; Windows/shared views pass in 1.984/2.028 seconds. Browser tests
   confirm stale-apply rejection, multiline draft preservation, two-device source
   removal and exact history links at narrow and wide viewports. Vet and both
-  builds pass; full CI is pending. Scheduling forms, dynamic groups, automatic
-  promotion and actual patch/restart evidence remain open.
+  builds pass. Both complete workflows pass for `d6fb091`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34429700762),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34429703551)).
+  Dynamic groups, automatic promotion and actual patch/restart evidence remain open.
+- [Windows schedule console](native-windows-update-schedules.md#schedule-from-the-console)
+  adds UTC timing and explicit-device preview/edit, confirmed future-plan creation,
+  paginated history, original source/target detail and pending cancellation with
+  the reviewed state revision. All six routes use scoped `ManageUpdates`, CSRF,
+  bounded unique forms and audited store operations. Future creation queues no
+  device commands; exact retries preserve the plan after source or state changes.
+  Tests cover timing syntax/bounds, midnight rollover, two-device intent, worker
+  activation and authority blocking, historical removal, scope/revision conflicts,
+  complete audit rollback and six-state protected rendering. The full handler/race
+  suite passes in 9.028 seconds; Windows/shared views pass in 2.543/1.987 seconds.
+  The final browser-fixture/race run passes in 303.907 seconds including manual
+  inspection, with views passing in 2.652/2.122 seconds. Real browser checks cover
+  invalid draft correction, edit preservation, certificate-expiry advisories,
+  confirmed creation and retained cancellation history. History is contained at
+  390/768/1440 pixels, and the 768-pixel form passes visual inspection.
+  Vet and Linux/Windows builds pass. Full CI for this extension is pending.
+  Raw CSP forms, dynamic groups, promotion gates, lifecycle operations and actual
+  Windows patch/restart acceptance remain work; WIN-02 stays in progress.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

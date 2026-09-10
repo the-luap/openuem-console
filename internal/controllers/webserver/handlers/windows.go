@@ -20,11 +20,16 @@ import (
 
 func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
-	if method == http.MethodGet && (route == "/windows" || route == "/windows/:id") {
-		return access.ReadDevices, true
-	}
-	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new" || route == "/windows/update-rings" || route == "/windows/update-rings/new" || route == "/windows/update-rings/:ring" || route == "/windows/update-rings/:ring/edit" || route == "/windows/update-rings/:ring/assign" || route == "/windows/update-rollouts/:rollout") {
-		return access.ManageUpdates, true
+	if method == http.MethodGet {
+		switch route {
+		case "/windows", "/windows/:id":
+			return access.ReadDevices, true
+		case "/windows/:id/updates", "/windows/:id/updates/:run", "/windows/:id/updates/new",
+			"/windows/update-rings", "/windows/update-rings/new", "/windows/update-rings/:ring", "/windows/update-rings/:ring/edit",
+			"/windows/update-rings/:ring/assign", "/windows/update-rollouts/:rollout",
+			"/windows/update-rings/:ring/schedule", "/windows/update-schedules", "/windows/update-schedules/:schedule":
+			return access.ManageUpdates, true
+		}
 	}
 	if method == http.MethodPost {
 		switch route {
@@ -34,7 +39,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/windows/:id/revoke":
 			return access.RevokeDevices, true
-		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save", "/windows/update-rings/:ring/assign/preview", "/windows/update-rings/:ring/assign/create":
+		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save", "/windows/update-rings/:ring/assign/preview", "/windows/update-rings/:ring/assign/create", "/windows/update-rings/:ring/schedule/preview", "/windows/update-rings/:ring/schedule/create", "/windows/update-schedules/:schedule/cancel":
 			return access.ManageUpdates, true
 		}
 	}
@@ -55,6 +60,12 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/update-rings/:ring/assign/preview", h.WindowsPreviewUpdateAssignment)
 		g.POST("/windows/update-rings/:ring/assign/create", h.WindowsCreateUpdateAssignment)
 		g.GET("/windows/update-rollouts/:rollout", h.WindowsUpdateRollout)
+		g.GET("/windows/update-rings/:ring/schedule", h.WindowsNewUpdateSchedule)
+		g.POST("/windows/update-rings/:ring/schedule/preview", h.WindowsPreviewUpdateSchedule)
+		g.POST("/windows/update-rings/:ring/schedule/create", h.WindowsCreateUpdateSchedule)
+		g.GET("/windows/update-schedules", h.WindowsUpdateSchedules)
+		g.GET("/windows/update-schedules/:schedule", h.WindowsUpdateSchedule)
+		g.POST("/windows/update-schedules/:schedule/cancel", h.WindowsCancelUpdateSchedule)
 		g.GET("/windows/:id", h.WindowsDevice)
 		g.POST("/windows/setup", h.WindowsAuthority)
 		g.POST("/windows/invitations", h.WindowsInvitation)

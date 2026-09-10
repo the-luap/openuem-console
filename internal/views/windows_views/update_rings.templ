@@ -14,6 +14,7 @@ templ ringNavigation(info *partials.CommonInfo) {
 	<nav aria-label="Windows update rings" class="flex flex-wrap gap-3 my-4">
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a>
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules")) }>Update schedules</a>
 	</nav>
 }
 
@@ -80,8 +81,10 @@ templ UpdateRingHistory(c echo.Context, info *partials.CommonInfo, id string, ri
 						<div class="flex flex-wrap gap-3 my-4">
 							if before==0 && i==0 && ring.Enabled {
 								<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/assign?revision=%d&mode=apply", id, ring.Revision))) }>Assign this revision</a>
+								<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/schedule?revision=%d&mode=apply", id, ring.Revision))) }>Schedule this revision</a>
 							}
 							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/assign?revision=%d&mode=remove", id, ring.Revision))) }>Remove this revision's settings</a>
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/schedule?revision=%d&mode=remove", id, ring.Revision))) }>Schedule source removal</a>
 						</div>
 						<details class="mt-4" open?={ i==0 }>
 							<summary>Reviewed policy settings</summary>@ringPolicyValues(ring.Policy)

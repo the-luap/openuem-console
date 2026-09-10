@@ -65,8 +65,9 @@ disabling a ring does not assign devices, cancel admitted work or remove Windows
 configuration. A later apply assignment requires the current enabled revision.
 Historical source removal and already admitted work retain the backend's existing
 [ring semantics](native-windows-update-rings.md). The separate assignment form below
-creates device work; ring creation alone never creates commands. Scheduling forms
-remain implementation work.
+creates device work; ring creation alone never creates commands. The separate
+[schedule flow](native-windows-update-schedules.md#schedule-from-the-console)
+saves reviewed future intent and activates it through the existing worker.
 
 These additional routes use the same prefixes and require a concrete site and
 `ManageUpdates` throughout:
@@ -141,6 +142,23 @@ the same three console prefixes. The unique-field/CSRF/no-query POST boundary
 also applies here. Names are escaped, and failed audited reads expose neither
 protected payloads nor internal SQL messages.
 
+## Schedule a reviewed cohort
+
+Choose **Schedule this revision** or **Schedule source removal** from ring
+history. The form shares explicit source/device selection with immediate
+assignment and adds a UTC activation time and bounded activation window.
+Preview shows both UTC boundaries, every target and current certificate expiry;
+editing preserves the draft. Confirmed creation saves the original plan without
+queuing device work. Exact retries preserve its identity and cannot rearm it.
+
+**Update schedules** provides protected, paginated history and original intent,
+worker state/reason and links to activated cohorts. Pending cancellation requires
+the reviewed state revision and retains canceled history. The
+[schedule guide](native-windows-update-schedules.md#schedule-from-the-console)
+describes routes, timing limits, permissions, audit boundaries and verification.
+Activation timing governs cohort creation; installation and restart behavior
+remain separate Windows policy and acceptance concerns.
+
 ## Review a run
 
 The list displays 25 runs per page, with bounded offsets and links to exact
@@ -170,8 +188,7 @@ simultaneous snapshot or current continuous compliance.
 reboot. The UI links to Microsoft's
 [Update Policy CSP definitions](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update)
 for setting meanings. Policy changes create new immutable runs; existing run
-history is retained. Scheduling forms and actual update/restart
-evidence remain separate work.
+history is retained. Actual update/restart evidence remains separate work.
 
 ## Cancel undelivered work
 
@@ -257,7 +274,10 @@ the reason Chrome failed to publish a port within the previous polling budget.
 Commit `7d80f5f` observes the same browser for at most 45 seconds, tolerates partial
 port files and retains bounded startup diagnostics. Four synthetic child-process
 tests and all 81 existing Chrome form cases pass locally; no browser sandbox flags
-or form assertions were weakened. Complete CI validation remains pending.
+or form assertions were weakened. The ring commit's
+[push workflow](https://github.com/the-luap/openuem-console/actions/runs/34428494432)
+passed. Both complete workflows for subsequent cohort commit `d6fb091` pass with
+the startup correction included; see the cohort validation below.
 
 Set `OPENUEM_WINDOWS_RING_BROWSER_FIXTURE` to a private URL-file path to use the
 same opt-in loopback fixture for rings. Browser checks exercise invalid dependent
@@ -274,7 +294,10 @@ UUID sets, real route permissions, previews without writes, retained invalid
 drafts, two-device atomic admission, rollback after a late missing target or audit
 failure, exact retries after ring changes, changed-target conflicts, historical
 removal, sibling-site isolation and authority lost after review. Vet and both
-Linux/Windows builds pass. Full CI for this extension is pending.
+Linux/Windows builds pass. Both complete workflows pass for cohort commit
+`d6fb091`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34429700762),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34429703551)).
 
 The opt-in `OPENUEM_WINDOWS_ASSIGNMENT_BROWSER_FIXTURE` uses the same loopback
 fixture lifecycle. Browser acceptance rejects stale apply intent, preserves two
@@ -300,4 +323,5 @@ Both complete workflows pass for test correction `55ffd76`
 and history/cancellation commit `9f33aae`
 ([push](https://github.com/the-luap/openuem-console/actions/runs/34425352621),
 [pull request](https://github.com/the-luap/openuem-console/actions/runs/34425355677)).
-The subsequent policy-creation form extension still awaits its own complete CI.
+The subsequent policy, ring and cohort validation is recorded above. Schedule
+console validation is recorded in the [schedule guide](native-windows-update-schedules.md#verification).

@@ -127,6 +127,8 @@ now includes [typed policy forms, run history and confirmed cancellation](native
 It also includes [versioned ring creation, editing and history](native-windows-update-console.md#versioned-update-rings).
 [Explicit cohort assignment and history](native-windows-update-console.md#assign-an-exact-revision-to-devices)
 now cover confirmed apply and historical source removal for selected devices.
-The roadmap still requires raw command/result and scheduling workflows, broader CSP
+[Scheduled cohorts](native-windows-update-schedules.md#schedule-from-the-console)
+add UTC timing review, future-plan creation, protected state/history and confirmed
+pending cancellation. The roadmap still requires raw command/result workflows, broader CSP
 policies, certificate renewal and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.

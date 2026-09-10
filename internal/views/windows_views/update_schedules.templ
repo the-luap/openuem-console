@@ -1,0 +1,125 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"time"
+)
+
+templ UpdateSchedules(c echo.Context, info *partials.CommonInfo, rows []UpdateScheduleRow, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: "Update schedules"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows update schedules</h1>@ringNavigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Each plan retains its reviewed ring revision, devices and UTC activation window. Create a schedule from a ring's revision history. Activation creates device runs; their subsequent delivery and Windows restart timing are separate.</p>
+					<div class="overflow-x-auto" role="region" aria-label="Windows update schedules table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Update schedules in this site</caption><thead><tr><th scope="col">Ring / schedule</th><th scope="col">Action / devices</th><th scope="col">Status</th><th scope="col">Activation window (UTC)</th></tr></thead>
+							<tbody>
+								for _,row:=range rows {
+									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules/"+row.Schedule.ID)) }>{ row.Name } · Revision { fmt.Sprint(row.Schedule.RingRevision) }</a><div class="text-sm">{ row.Schedule.ID }</div></td><td>{ updateMode(row.Schedule.Mode) }<div>{ fmt.Sprint(len(row.Schedule.Targets)) } devices</div></td><td>{ scheduleState(row.Schedule.Phase) }</td><td><div>From { scheduleTimestamp(row.Schedule.NotBefore) }</div><div>Until { scheduleTimestamp(row.Schedule.ExpiresAt) }</div></td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(rows)==0 {
+						<p class="my-4 uk-text-muted">No update schedules in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-schedules?offset=%d", max(0, offset-25)))) }>Previous schedules</a>
+						}
+						if more && offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-schedules?offset=%d", min(100000, offset+25)))) }>More schedules</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UpdateSchedule(c echo.Context, info *partials.CommonInfo, schedule windows.UpdateSchedule, ring windows.UpdateRingRevision, targets []UpdateScheduleTarget) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update schedules", Url: partials.GetNavigationUrl(info, "/windows/update-schedules")}, {Title: "Schedule history"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows update schedule</h1>@ringNavigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ scheduleState(schedule.Phase) }</h2>
+					if schedule.Reason!="" {
+						<p class="my-3">{ scheduleReason(schedule.Reason) }</p>
+					}
+					<dl class="uk-description-list"><dt>Schedule ID</dt><dd>{ schedule.ID }</dd><dt>Action</dt><dd>{ updateMode(schedule.Mode) }</dd><dt>Activate no earlier than</dt><dd>{ scheduleTimestamp(schedule.NotBefore) }</dd><dt>Activation window closes</dt><dd>{ scheduleTimestamp(schedule.ExpiresAt) }</dd><dt>Per-device admission lifetime after activation</dt><dd>{ fmt.Sprint(int64(schedule.Lifetime/time.Second)) } seconds</dd><dt>Created</dt><dd>{ scheduleTimestamp(schedule.CreatedAt) }</dd><dt>Created by</dt><dd>{ schedule.CreatedBy }</dd><dt>State revision</dt><dd>{ fmt.Sprint(schedule.Revision) }</dd><dt>Last state update</dt><dd>{ scheduleTimestamp(schedule.UpdatedAt) }</dd><dt>Activation attempts</dt><dd>{ fmt.Sprint(schedule.Attempts) }</dd></dl>
+					if canCancelSchedule(schedule) {
+						<dl class="uk-description-list"><dt>Next attempt no earlier than</dt><dd>{ scheduleTimestamp(schedule.NextAttemptAt) }</dd></dl>
+						<p>The worker rechecks the original creator, ring and devices before creating all device runs together. Queue capacity is not reserved. Waiting plans may retry only within their activation window.</p>
+					}
+					if schedule.CompletedAt!=nil {
+						<dl class="uk-description-list"><dt>Plan reached its terminal state</dt><dd>{ scheduleTimestamp(*schedule.CompletedAt) }</dd></dl>
+					}
+					if schedule.RolloutID!="" {
+						<a class="uk-button uk-button-primary my-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rollouts/"+schedule.RolloutID)) }>Open activated device runs</a>
+					}
+					<p class="my-3">The activation window controls when the server creates device runs. It is not an installation or restart maintenance window and does not cut off later delivery. Queue admission and verified policy values do not prove patch installation or reboot.</p>
+					if canCancelSchedule(schedule) {
+						<details class="mt-4">
+							<summary>Cancel future activation</summary>
+							<p>This stops a plan that has not activated. If activation wins before confirmation, cancellation fails and its device runs keep their own cancellation and sent/uncertain outcome boundaries.</p>
+							<form class="grid gap-3 mt-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/update-schedules/"+schedule.ID+"/cancel") }>
+								@mdm_views.CSRF(info)
+								<input type="hidden" name="expected_revision" value={ fmt.Sprint(schedule.Revision) }/>
+								<label><input type="checkbox" name="confirm_cancel" value="yes" required/> Cancel future activation of this reviewed schedule.</label><button class="uk-button uk-button-danger" type="submit">Confirm schedule cancellation</button>
+							</form>
+						</details>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					@assignmentSource(info, ring)
+					<p class="my-3">These are the originally reviewed settings. Later ring edits do not replace this plan's source. Removal uses the selected configuration nodes; other sources' effective values may remain.</p>
+					@ringPolicyValues(ring.Policy)
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Originally selected devices</h2>
+					<p>UUIDs identify the reviewed selection. Names and identity status describe current records available in this site and do not prove device contact or applied policy.</p>
+					<div class="overflow-x-auto" role="region" aria-label="Scheduled Windows devices" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Every original target in this schedule</caption><thead><tr><th scope="col">Native device ID</th><th scope="col">Current name</th><th scope="col">Identity record</th></tr></thead>
+							<tbody>
+								for _,target:=range targets {
+									<tr>
+										if target.Device!=nil {
+											<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+target.ID)) }>{ target.ID }</a></td>
+											<td>{ target.Device.Name }</td>
+											<td>{ DeviceStatus(*target.Device) }</td>
+										} else {
+											<td>{ target.ID }</td>
+											<td>Unavailable in this site</td>
+											<td>Original target retained</td>
+										}
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}

@@ -11,8 +11,10 @@ site-scoped ring lists, immutable history and validated create/edit previews wit
 confirmed revision saves, explicit device assignment previews and atomic confirmed
 apply/removal admission. Cohort history links each original device run to its
 protected evidence.
-The [scheduled activation backend](native-windows-update-schedules.md) now handles
-reviewed future cohorts. The [optional Windows listener](native-windows-operations.md)
+The [scheduled activation flow](native-windows-update-schedules.md) handles
+reviewed future cohorts with UTC console previews, confirmed plan creation,
+protected history and cancellation before activation. The
+[optional Windows listener](native-windows-operations.md)
 now starts and stops that worker. Dynamic groups,
 pilot-to-broad promotion gates, automatic reconciliation and end-user restart
 communication remain implementation work.

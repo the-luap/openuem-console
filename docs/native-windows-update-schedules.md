@@ -1,15 +1,73 @@
 # Scheduled native Windows update ring activation
 
-The backend can now schedule an exact [ring revision and device cohort](native-windows-update-rings.md)
+The console and backend can schedule an exact [ring revision and device cohort](native-windows-update-rings.md)
 for later activation. It stores the reviewed source, targets, creator permission
 revision and timing before creating any device commands. A bounded worker
 activates due plans through the same atomic cohort assignment used for immediate
 rollouts. Concurrent workers and process restarts cannot activate one plan twice.
 
 The [optional Windows listener](native-windows-operations.md) now starts the
-worker at server startup and cancels it during shutdown. Console forms, dynamic
-group selection and pilot promotion gates remain implementation work. This is scheduled policy
+worker at server startup and cancels it during shutdown. Reviewed console forms,
+protected history and pending-plan cancellation are available. Dynamic group
+selection and pilot promotion gates remain implementation work. This is scheduled policy
 assignment, not evidence of patch installation or an automatic patch rollout gate.
+
+## Schedule from the console
+
+Open ring history in a concrete site and choose **Schedule this revision** on the
+current enabled revision, or **Schedule source removal** on a historical revision.
+Enter 1–100 distinct native Windows UUIDs, one per line, and choose an activation
+date/time in **UTC**, a window of 1–10,080 whole minutes and a per-device admission
+lifetime of 1–168 whole hours. The browser's localized date display does not
+convert the entered time from its local timezone. The preview displays both UTC
+window boundaries, including date rollover, and every selected device.
+
+The preview uses the same scoped, audited source/device checks as immediate
+assignment. It preserves invalid drafts and shows each current certificate's
+expiry, with an advisory when it expires before activation. This describes the
+current identity record; it does not reserve future enrollment or queue capacity.
+The worker and device transport retain their independent checks.
+
+**Edit selected devices** preserves the selected source, targets, timing and
+request UUID. **Confirm and save schedule** requires explicit confirmation and
+saves only the plan. No device run or command is created by preview, editing or
+future-plan creation. Final admission calls the existing transactional store
+directly, preserving exact-request replay even after a ring change or the original
+activation window. Static form parsing therefore checks timing syntax independently
+of the current clock; new-work timing checks remain in preview and store admission.
+Changing an already committed request's intent produces a conflict.
+
+**Update schedules** displays 25 plans per page, including terminal history, with
+bounded offsets. Details show the original source revision and target UUIDs,
+UTC timestamps, admission lifetime, creator, state revision, attempts and reason.
+Current names and identity metadata are read only in the original site; an
+unavailable current device does not erase the original target or expose another
+site's records. Activated plans link to their original cohort and device runs.
+Backend timestamps retain subsecond precision in history.
+
+**Cancel future activation** appears only for scheduled or waiting plans. It
+requires explicit confirmation of the displayed state revision. A concurrent
+state change or activation returns a conflict; cancellation cannot recall an
+activated cohort. Successful cancellation preserves the immutable intent and
+terminal history, removes the cancellation form and cannot be undone by replaying
+the original create request.
+
+These routes require `ManageUpdates` in the selected site without a prefix,
+or under `/tenant/:tenant` and `/tenant/:tenant/site/:site`:
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /windows/update-rings/:ring/schedule?revision=N&mode=apply` | Draft a reviewed schedule; mode may also be `remove` |
+| `POST /windows/update-rings/:ring/schedule/preview` | Validate/review timing and all devices, or return to editing |
+| `POST /windows/update-rings/:ring/schedule/create` | Confirm and save immutable future intent |
+| `GET /windows/update-schedules` | Audited site history |
+| `GET /windows/update-schedules/:schedule` | Protected original intent and current plan state |
+| `POST /windows/update-schedules/:schedule/cancel` | Cancel pending activation with the reviewed state revision |
+
+The existing 8 KiB body / 24-field ceiling, unique field allowlists, body-only
+CSRF and no-query POST boundary apply. Reads fail closed if required auditing
+fails, and creation/cancellation audit failures roll back the entire operation.
+Names are escaped and storage errors do not reveal protected intent.
 
 ## Timing and operator controls
 
@@ -124,3 +182,30 @@ The tests use only the [reserved PostgreSQL fixture](native-windows-mdm.md#scope
 and synthetic loopback device identities. Test-only time adjustment reseals owned
 fixture data to exercise deadlines without waiting through production windows;
 no host policy, certificate or actual managed device is changed.
+
+Console parser and PostgreSQL route tests cover canonical UTC/minute syntax,
+date rollover and time bounds, retained invalid drafts, complete target review,
+future creation without queue writes, exact replay, changed intent, historical
+removal, stale source conflicts, live permission replacement, sibling-site
+isolation, confirmation/CSRF, cancellation revision races and full audit rollback.
+An actual worker pass produces an activated plan and linked cohort; a separate
+authority change produces protected blocked history. Pagination retains canceled
+plans. View tests cover all six states, original targets with unavailable current
+records, escaped names, subsecond UTC times and non-whole-hour backend lifetimes.
+
+The full handler/race suite passes in **9.028 seconds**; Windows/shared view suites
+pass in **2.543/1.987 seconds**. Vet and Linux/Windows builds pass. The final live
+browser-fixture run, including the certificate-expiry advisory and manual browser
+wait, passes in **303.907 seconds**, with views passing in **2.652/2.122 seconds**.
+Set `OPENUEM_WINDOWS_SCHEDULE_BROWSER_FIXTURE` to a private URL-file path and
+`OPENUEM_DESKTOP_BROWSER_HTTP=1` for the owned synthetic loopback fixture. Creating
+the URL file's `.stop` sibling releases the fixture and cleans its schema.
+
+Browser acceptance covers duplicate-target correction, edit preservation,
+confirmed two-device historical removal scheduled across UTC midnight, saved
+history and actual pending cancellation through cookie/Origin CSRF. The canceled
+history remains readable without another cancellation form. History remains
+contained at 390/768/1440 pixels; the 768-pixel form was visually inspected.
+The browser reported no warnings or errors. These tests do not contact managed
+devices or install host policy. Full CI for the schedule-console extension is
+pending; prior backend and cohort-console CI evidence does not replace that check.
