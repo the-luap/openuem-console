@@ -31,7 +31,7 @@ import (
 const maxClaimBody = 16 << 10
 
 // PublicHandler exposes only read-only installation metadata, approved packages
-// and endpoint key-proof claims. It contains no console authentication or routes.
+// and endpoint key-proof claims/renewals. It contains no console authentication or routes.
 type PublicHandler struct {
 	store                       *Store
 	catalog                     *Catalog
@@ -147,7 +147,8 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Encoding") != "" || (route.Kind != "claim" && (r.ContentLength != 0 || len(r.TransferEncoding) != 0)) {
+	proofRequest := route.Kind == "claim" || route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm"
+	if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Encoding") != "" || (!proofRequest && (r.ContentLength != 0 || len(r.TransferEncoding) != 0)) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
@@ -156,7 +157,7 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slots, timeout := h.metadata, 20*time.Second
-	if route.Kind == "claim" {
+	if proofRequest {
 		slots = h.claims
 	} else if route.Kind == "download" {
 		slots, timeout = h.downloads, protocol.DownloadTimeout
@@ -207,7 +208,14 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "an application/json request is required", http.StatusUnsupportedMediaType)
 		return
 	}
-	if r.ContentLength > maxClaimBody {
+	bodyLimit := int64(maxClaimBody)
+	if route.Kind == "renewal-prepare" {
+		bodyLimit = enrollment.MaxRenewalRequestBytes
+	}
+	if route.Kind == "renewal-confirm" {
+		bodyLimit = enrollment.MaxRenewalConfirmationBytes
+	}
+	if r.ContentLength > bodyLimit {
 		http.Error(w, "request is too large", http.StatusRequestEntityTooLarge)
 		return
 	}
@@ -215,7 +223,7 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxClaimBody))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, bodyLimit))
 	defer clear(body)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
@@ -230,6 +238,10 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// this timer armed could reset a valid claim while it waits for its DB lock.
 	if err = http.NewResponseController(w).SetReadDeadline(time.Time{}); err != nil {
 		http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm" {
+		h.identityRenewal(w, r, route, body)
 		return
 	}
 	request, err := decodeClaim(body)
@@ -326,6 +338,10 @@ func (r contextReadSeeker) Read(p []byte) (int, error) {
 }
 
 func publicJSON(w http.ResponseWriter, r *http.Request, value any) {
+	publicJSONStatus(w, r, http.StatusOK, value)
+}
+
+func publicJSONStatus(w http.ResponseWriter, r *http.Request, status int, value any) {
 	data, err := json.Marshal(value)
 	if err != nil {
 		http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
@@ -333,6 +349,7 @@ func publicJSON(w http.ResponseWriter, r *http.Request, value any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
 		_, _ = w.Write(data)
 	}

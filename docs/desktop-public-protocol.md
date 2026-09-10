@@ -3,8 +3,9 @@
 The console can run a separate, private HTTPS listener for individual Windows/Mac
 enrollment and approved installer downloads. The gateway exposes its exact routes
 on the canonical public HTTPS origin. No console routes are registered on this
-listener. It serves independently signed bootstrap configuration as well as the
-claim protocol. The [console invitation form](desktop-console-invitations.md) now
+listener. It serves independently signed bootstrap configuration, the claim
+protocol and [existing identity renewal](desktop-identity-renewal.md).
+The [console invitation form](desktop-console-invitations.md) now
 provides an administrator-assisted public installation page and limited token-file
 download. The agent provides separate administrator
 [Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md) and
@@ -95,6 +96,8 @@ payload digest, not a package hash.
 | `GET` or `HEAD /enroll/desktop/bootstrap-keys` | Schema-1 key document containing the configured origin and current configuration signing public key with its SHA-256 key ID |
 | `GET` or `HEAD /enroll/desktop/<token>/configuration` | Signed configuration attachment binding the origin, organization/site, invitation, target, expiry and exact approved release envelope |
 | `POST /enroll/desktop/<token>/claim` | Validate both endpoint key proofs, claim the bound invitation and return the assigned individual identity and public certificates |
+| `POST /enroll/desktop/identities/<device-uuid>/renewal/prepare` | Verify the current identity and candidate key proofs; retain exact candidate issuance without changing current credentials |
+| `POST /enroll/desktop/identities/<device-uuid>/renewal/confirm` | Verify both candidate keys and atomically activate the retained generation for the same device; recover a committed confirmation on exact retry |
 | `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows` or `macos`, architecture is `amd64` or `arm64` |
 
 The base invitation URL now serves the public installation page. Page, invitation
@@ -122,6 +125,15 @@ invitations without an approved release binding cannot use this endpoint.
 Release acceptance/withdrawal serializes with issuance: an already authorized
 claim may finish, while subsequent claims use the new committed release state.
 Release withdrawal does not revoke identities previously issued successfully.
+
+Renewal uses no invitation and does not depend on a currently approved release.
+It requires the existing independently authorized device identity, exact origin
+and all signed key proofs; a forwarded certificate alone grants no renewal rights.
+The 32 KiB preparation and 8 KiB confirmation bodies have strict versioned JSON.
+HTTP 409 returns a bounded version-1 `code` of `not_due`, `pending` or
+`recovery_pending`; denial uses a fixed 404 and operational failure a fixed 503.
+See the [renewal lifecycle and client contract](desktop-identity-renewal.md) before
+using the shared HTTPS methods. They do not persist or install endpoint keys.
 
 The configuration signature uses a dedicated domain and key, distinct from the
 release signature. Clients must authorize the expected origin independently before
@@ -167,10 +179,10 @@ to Fetch Metadata restrictions is a `GET`/`HEAD` top-level `navigate`/`document`
 request to the read-only installation page from `same-site` or `cross-site`, so an
 invitation in webmail can open normally. Foreign Origin headers, embedded frames,
 cross-origin fetches and cross-site configuration/token/package/claim requests are
-still rejected. Claims require JSON
-and both key proofs and do not use browser cookies or HTTP authorization headers.
+still rejected. Claims and renewals require JSON and their complete key proofs;
+they do not use browser cookies or HTTP authorization headers.
 
-The listener admits at most 4 claims, 8 package downloads and 32 metadata,
+The listener admits at most 4 claims/renewals combined, 8 package downloads and 32 metadata,
 configuration, key-document, page or invitation-file requests at once.
 It applies a global 100 requests/second, burst-200 limiter and per-source
 2 requests/second, burst-30 limit, with at most 4096 source buckets. IPv6 sources
@@ -179,7 +191,7 @@ and must contain one address. Otherwise the actual TCP source determines the lim
 Idle buckets can be reclaimed after five minutes. Admission failures return 429
 with `Retry-After: 5`. These initial limits are fixed in the implementation.
 
-Headers are bounded to 32 KiB. Claims have a 10-second body read deadline and a
+Headers are bounded to 32 KiB. Claims and renewals have a 10-second body read deadline and a
 20-second request context; the body deadline is cleared once its bounded input is
 complete, so HTTP/2 does not reset a valid claim during a database wait. Metadata
 and the bootstrap/page/invitation routes also have a 20-second context. Ordinary server
@@ -202,7 +214,8 @@ After all invitation uses are consumed, the page explains the computer limit and
 retains administrator configuration/token downloads for same-key recovery. It does
 not reveal any issued device ID or inventory. Revoked, expired or superseded links
 do not expose active organization details or token files. Temporary database/service
-failures return a generic 503 page. Native claims remain the only issuance operation.
+failures return a generic 503 page. Native claims create initial device identities;
+renewal preserves the existing device ID and scope.
 
 Real PostgreSQL/TLS tests cover repeated GET/HEAD scans, unchanged invitation usage,
 no device issuance, exact token-file bytes, capacity/revocation, CSP/rendering limits,

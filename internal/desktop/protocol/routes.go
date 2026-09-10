@@ -13,7 +13,7 @@ import (
 const DownloadTimeout = 15 * time.Minute
 
 type Route struct {
-	Kind, Token, Digest, Platform, Architecture string
+	Kind, Token, Digest, Platform, Architecture, DeviceID string
 }
 
 // Parse never normalizes a path or accepts query parameters. The gateway and
@@ -27,6 +27,9 @@ func Parse(r *http.Request) (Route, bool) {
 		return Route{}, false
 	}
 	read := r.Method == http.MethodGet || r.Method == http.MethodHead
+	if len(p) == 7 && p[3] == "identities" && enrollment.ValidDeviceID(p[4]) && p[5] == "renewal" && (p[6] == "prepare" || p[6] == "confirm") && r.Method == http.MethodPost {
+		return Route{Kind: "renewal-" + p[6], DeviceID: p[4]}, true
+	}
 	if len(p) == 4 && p[3] == "bootstrap-keys" && read {
 		return Route{Kind: "bootstrap-keys"}, true
 	}

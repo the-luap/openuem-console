@@ -1,18 +1,71 @@
 # Individual desktop identity renewal
 
 The console pins shared registry commit
-[`e0d6829`](https://github.com/the-luap/openuem-nats/commit/e0d68290a50e74b4caefd2b64afadbcd9fa0433d),
+[`06ec5c5`](https://github.com/the-luap/openuem-nats/commit/06ec5c578a4f8682a223fb42bbea10b4febe0a94),
 which implements persistent renewal preparation and candidate confirmation while
 preserving device ID and organization/site. Its
-[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/e0d68290a50e74b4caefd2b64afadbcd9fa0433d/enrollment/identity-renewal.md)
+[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/06ec5c578a4f8682a223fb42bbea10b4febe0a94/enrollment/identity-renewal.md)
 defines proof domains, expiry bounds, permanent key ownership and retry behavior.
-The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34469009791)
+The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34471335722)
 passes native Windows checks and Linux/PostgreSQL/race/fuzz tests.
 
 This dependency and the console integration below are implementation components.
-Automatic endpoint renewal is not enabled yet. Authenticated HTTPS/gateway routes,
-rate limits, protected candidate/activation journals, scheduling, broker runtime
-reconnect and agent/worker/service release integration remain necessary.
+Automatic endpoint renewal is not enabled yet. The HTTPS client, console routes
+and pinned gateway transport are implemented. Protected candidate/activation
+journals, scheduling, broker runtime reconnect and agent/worker/service release
+integration remain necessary.
+
+## HTTPS and gateway transport
+
+The existing [desktop listener](desktop-public-protocol.md) and gateway expose only
+these two canonical POST routes for renewal:
+
+- `/enroll/desktop/identities/<device-uuid>/renewal/prepare`
+- `/enroll/desktop/identities/<device-uuid>/renewal/confirm`
+
+Each JSON body must bind the exact path device and configured public origin.
+Preparation verifies both current private keys and the candidate broker key;
+confirmation verifies both candidate private keys against the retained issuance.
+Public certificate headers, browser cookies and the gateway certificate cannot
+substitute for these proofs. Confirmation remains reachable with candidate proofs
+after activation retired the original certificate and its commit reply was lost.
+The private listener still requires its configured gateway pin on the TLS transport.
+
+Renewal neither consumes an invitation nor requires an approved installer release.
+Tests start with a revoked original invitation and an empty catalog. Listener
+startup still requires its configured release directory and trusted release keys;
+an unavailable repository is a startup error, as documented for that listener.
+
+Requests are limited to 32 KiB for preparation and 8 KiB for confirmation, with
+strict versioned JSON, a 10-second body deadline and a 20-second handler context.
+The registry adds its own 15-second transaction bound. Claims and renewals share
+four concurrent proof-processing slots and the existing bounded global/source
+rate limits. Shutdown cancels and joins waiting requests before storage closes.
+The completed-body deadline is cleared before database work, including on HTTP/2.
+Methods, query parameters and encoded/extra path aliases are rejected by the shared
+gateway/listener allowlist; administrator network restrictions remain in force.
+
+Successful responses contain only the public prepared or confirmed renewal DTO.
+HTTP 409 returns exactly `{"version":1,"code":"not_due"}`, `pending` or
+`recovery_pending` in the same shape. Denied or unknown identities return a fixed
+404; operational/audit failures return a fixed 503; admission returns 429 with
+`Retry-After`. Responses are not cached, offer no CORS permission and do not expose
+proofs, database diagnostics or private keys. Existing browser origin restrictions
+apply to both routes.
+
+The shared `HTTPClient.PrepareIdentityRenewal` and `ConfirmIdentityRenewal` methods
+require the independently authorized origin and trusted local source/target. They
+validate proofs before network I/O and validate the exact returned candidate,
+device, scope and times afterward. Responses are bounded to 96 KiB and 2 KiB.
+The client uses verified HTTPS without redirects, environment proxies, cookies or
+automatic retries; known conflicts become fixed local typed errors.
+
+Before sending, an endpoint must durably retain candidate keys and the request ID.
+It must retain verified issuance and its confirmation decision before confirmation.
+A timeout, cancellation or error response can follow a committed activation;
+never discard the candidate or restore old credentials solely on that result or
+preparation expiry. Retain the exact target and retry with a fresh candidate proof.
+These transport methods do not install credentials or supply that protected journal.
 
 ## Registry lifecycle
 
@@ -93,8 +146,33 @@ The final focused console integration passes in **5.008 seconds**. The complete
 Apple race suite passes in **262.823 seconds**; desktop in **19.407 seconds**, its
 authorization service in **3.857 seconds**, command service in **3.933 seconds**
 and protocol in **1.305 seconds**. Affected handler checks pass in **1.981 seconds**.
-Vet, module consistency and complete Linux/Windows builds pass. Console CI for
-this integration must be checked independently of the shared-library run above.
+Vet, module consistency and complete Linux/Windows builds pass. The
+[console PR CI for `1634d39`](https://github.com/the-luap/openuem-console/actions/runs/34470176352)
+and its [push CI](https://github.com/the-luap/openuem-console/actions/runs/34470172473)
+also pass for this FileVault integration.
+
+The subsequent HTTPS integration passes its focused race suite in **8.088 seconds**
+and route checks in **1.322 seconds**. A real SDK client traverses both direct HTTPS
+and the pinned HTTP/2 gateway into PostgreSQL. It recovers a lost commit response
+after client reconstruction and concurrent fresh-proof retries, preserving one
+identity, one invitation use and one activation audit. Old certificate access then
+fails while the candidate succeeds. Tests also cover each missing/corrupt key
+proof, scope movement, revocation, all three typed conflicts, browser/body limits,
+forged forwarding headers, direct unpinned TLS rejection and exact route isolation.
+Four concurrent preparations or confirmations wait on an observed database lock;
+the fifth receives 429, and shutdown joins all four without issuance, activation,
+key reservations or audit changes. Audit failure rolls back both operations before
+any success response. A synthetic Mac retains a delivered encrypted read-only
+recovery task until its signed completion, then renews through the gateway without
+losing the receipt. Shared response fuzzing passes **459,737 executions**.
+
+The complete transport regression passes with `-race -count=1`: desktop in
+**28.950 seconds**, authorization service in **7.027 seconds**, command service in
+**3.589 seconds**, protocol in **1.176 seconds** and gateway in **3.154 seconds**.
+Affected-package Vet, unchanged `go mod tidy -diff` and full Linux/Windows builds
+also pass. Handler capability checks pass in **1.737 seconds**; the real console
+router/PostgreSQL test, including desktop permissions, passes in **12.097 seconds**.
+These local results do not substitute for the subsequent console CI run.
 
 These tests use disposable PostgreSQL schemas and synthetic keys/certificates.
 They do not install an agent, execute FileVault on a physical volume, contact a

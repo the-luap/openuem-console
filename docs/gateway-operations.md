@@ -47,6 +47,9 @@ The current public allowlist contains only:
   explicit private agent backend is configured
 - `GET` and `HEAD /enroll/desktop/<canonical token>/metadata`, and
   `POST /enroll/desktop/<canonical token>/claim`, when `--desktop-url` is configured
+- `POST /enroll/desktop/identities/<canonical device UUID>/renewal/prepare` and
+  `/enroll/desktop/identities/<canonical device UUID>/renewal/confirm`, when
+  `--desktop-url` is configured; [renewal requires the complete signed key proofs](desktop-identity-renewal.md)
 - `GET` and `HEAD /enroll/desktop/bootstrap-keys` and
   `/enroll/desktop/<canonical token>/configuration`, when `--desktop-url` is configured
 - `GET` and `HEAD /enroll/desktop/releases/<release digest>/<platform>/<architecture>`

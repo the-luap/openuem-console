@@ -30,7 +30,7 @@ type Config struct {
 	// AgentURL enables the exact native-agent WebSocket route to private NATS.
 	AgentURL             string
 	AgentConnectionLimit int
-	// DesktopURL enables only the public installer metadata, claim and download routes.
+	// DesktopURL enables only public installer metadata, key-proof claim/renewal and download routes.
 	DesktopURL string
 	// WindowsURL enables only the four exact native Windows protocol endpoints.
 	WindowsURL    string
