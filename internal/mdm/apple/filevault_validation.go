@@ -207,6 +207,13 @@ func (s *Store) requestFileVaultValidation(ctx context.Context, scope Scope, dev
 			return tx.Commit()
 		}
 	}
+	if err = s.queueFileVaultValidation(ctx, tx, d, key, actor, r, cert, entity, nil); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) queueFileVaultValidation(ctx context.Context, tx *sql.Tx, d *Device, key, actor string, r *enrollment.RecoveryRecipient, cert *x509.Certificate, entity string, history *fileVaultHistoricalRotation) error {
 	now := time.Now()
 	expires := now.Add(15 * time.Minute).Truncate(time.Second)
 	for _, limit := range []time.Time{cert.NotAfter, d.CertificateExpiresAt} {
@@ -218,6 +225,10 @@ func (s *Store) requestFileVaultValidation(ctx context.Context, scope Scope, dev
 		return ErrFileVault
 	}
 	c := enrollment.RecoveryContext{Version: enrollment.RecoveryVersion, Identity: r.Identity, TaskID: uuid.NewString(), NativeID: d.ID, KeyID: key, RecipientID: r.ID, ExpiresAt: expires.Unix()}
+	keyDigest, err := s.fileVaultCurrentKeyDigest(ctx, tx, d, key)
+	if err != nil {
+		return err
+	}
 	plain, err := s.openFileVaultKey(ctx, tx, d, key)
 	if err != nil {
 		return err
@@ -251,7 +262,25 @@ func (s *Store) requestFileVaultValidation(ctx context.Context, scope Scope, dev
 		}
 		err = registryAccess.QueueRotationValidation(ctx, tx, rotation.Context, *envelope, nonceHash)
 	} else {
-		err = registryAccess.QueueRecoveryTask(ctx, tx, *envelope, nonceHash)
+		if history == nil && s.agentRegistry != nil && historicalRotationSchemaReady(ctx, tx) {
+			history, err = loadFileVaultHistoricalRotation(ctx, tx, d, r, entity, "")
+			if err != nil {
+				return err
+			}
+		}
+		if history != nil {
+			if history.nonKey() {
+				if err = s.acknowledgeFileVaultHistoricalNonKey(ctx, tx, d, history, actor, r, cert); err != nil {
+					return err
+				}
+				history = nil
+			} else {
+				err = s.agentRegistry.QueueHistoricalRotationCheckInTransaction(ctx, tx, registry.Scope{TenantID: d.TenantID, SiteID: d.SiteID}, r.Identity.AgentID, registry.HistoricalRotationCheck{RotationID: history.id, ReceiptHash: digest(history.wire), Task: *envelope, NonceHash: nonceHash, KeyDigest: keyDigest}, actor)
+			}
+		}
+		if history == nil {
+			err = registryAccess.QueueRecoveryTask(ctx, tx, *envelope, nonceHash)
+		}
 	}
 	if err != nil {
 		return ErrFileVault
@@ -263,7 +292,13 @@ func (s *Store) requestFileVaultValidation(ctx context.Context, scope Scope, dev
 	if err = audit(ctx, tx, d.TenantID, actor, "apple.filevault.validation.request", c.TaskID); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if history != nil {
+		_, err = tx.ExecContext(ctx, `UPDATE mdm_apple_filevault_rotations SET history_status='checking' WHERE id=$1`, history.id)
+		if err == nil {
+			err = fileVaultHistoryAuthorityCurrent(ctx, tx, d, r, cert)
+		}
+	}
+	return err
 }
 
 func (s *Store) finishFileVaultValidation(ctx context.Context, tx *sql.Tx, e fileVaultExpectation, status string, at time.Time) error {
@@ -281,6 +316,9 @@ func (s *Store) finishFileVaultValidation(ctx context.Context, tx *sql.Tx, e fil
 		outcome = "cancelled"
 	} else if status == "unavailable" || status == "unsupported" {
 		outcome = "deferred"
+	}
+	if err := s.finishFileVaultHistoricalValidation(ctx, tx, e, status); err != nil {
+		return err
 	}
 	return auditOutcome(ctx, tx, e.Context.Identity.TenantID, "filevault-validation-service", "apple.filevault.validation."+status, e.Context.TaskID, outcome)
 }
@@ -355,6 +393,30 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 	if err != nil || !bytes.Equal(canonical, result) || receipt.Context != *c || subtle.ConstantTimeCompare([]byte(hex.EncodeToString(hash[:])), []byte(e.NonceHash)) != 1 || enrollment.VerifyRecoveryResult(receipt, cert, *completed) != nil {
 		return finish("rejected")
 	}
+	var historicalCheck bool
+	if historicalRotationSchemaReady(ctx, tx) {
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_agent_rotation_recovery_checks WHERE id=$1)`, c.TaskID).Scan(&historicalCheck); err != nil {
+			return err
+		}
+	}
+	if historicalCheck && receipt.Outcome == "valid" {
+		if e.RotationID != "" {
+			return finish("rejected")
+		}
+		keyDigest, err := s.fileVaultCurrentKeyDigest(ctx, tx, d, c.KeyID)
+		if err != nil {
+			return err
+		}
+		if s.agentRegistry == nil {
+			return ErrFileVault
+		}
+		if err = s.agentRegistry.AcknowledgeHistoricalRotationCheckInTransaction(ctx, tx, registry.Scope{TenantID: d.TenantID, SiteID: d.SiteID}, c.Identity.AgentID, c.TaskID, keyDigest, e.Actor); err != nil {
+			if errors.Is(err, registry.ErrDenied) || errors.Is(err, registry.ErrUnavailable) {
+				return finish("rejected")
+			}
+			return err
+		}
+	}
 	var resolvedRotation *fileVaultRotationExpectation
 	if receipt.Outcome == "valid" {
 		if e.RotationID != "" {
@@ -386,6 +448,11 @@ func (s *Store) reconcileFileVaultValidation(ctx context.Context, tx *sql.Tx, d 
 	}
 	if err := s.finishFileVaultValidation(ctx, tx, e, receipt.Outcome, *completed); err != nil {
 		return err
+	}
+	if historicalCheck && receipt.Outcome == "valid" {
+		// The native and identity locks remain held, but an audit can finish
+		// after certificate expiry. Recheck time before committing the release.
+		return fileVaultHistoryAuthorityCurrent(ctx, tx, d, r, cert)
 	}
 	if resolvedRotation != nil {
 		var original []byte

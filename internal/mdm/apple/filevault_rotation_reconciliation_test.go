@@ -198,7 +198,7 @@ func TestFileVaultRotationRequiresRegistryReconciliationMigration(t *testing.T) 
 	reportFileVaultRotation(t, f, task, "rotated", []byte("1111-2222-3333-4444-5555-6666"))
 	// Only the disposable fixture removes this table to reproduce an older
 	// registry during an upgrade. Existing return keys must remain recoverable.
-	if _, err := f.s.db.Exec(`DROP TABLE uem_agent_rotation_reconciliations; DELETE FROM uem_agent_migrations WHERE name='migrations/009_rotation_reconciliations.sql'`); err != nil {
+	if _, err := f.s.db.Exec(`DROP TABLE uem_agent_rotation_reconciliations; DROP TABLE uem_agent_rotation_recovery_checks; DELETE FROM uem_agent_migrations WHERE name IN ('migrations/009_rotation_reconciliations.sql','migrations/011_historical_rotation_checks.sql')`); err != nil {
 		t.Fatal(err)
 	}
 	if rotationSchemaReady(t.Context(), f.s.db) {

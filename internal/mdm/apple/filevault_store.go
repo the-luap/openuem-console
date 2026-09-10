@@ -17,20 +17,22 @@ import (
 // FileVault contains lifecycle metadata only. Neither CMS envelopes nor
 // decrypted keys are part of device inventory, command history or this model.
 type FileVault struct {
-	Rotation        *FileVaultRotation   `json:"rotation,omitempty"`
-	RotationReady   bool                 `json:"rotation_ready"`
-	Validation      *FileVaultValidation `json:"validation,omitempty"`
-	ValidationReady bool                 `json:"validation_ready"`
-	DeviceID        string               `json:"device_id"`
-	Desired         string               `json:"desired"`
-	Phase           string               `json:"phase"`
-	Error           string               `json:"error"`
-	RecoveryError   string               `json:"recovery_error"`
-	KeyID           string               `json:"key_id,omitempty"`
-	EscrowedAt      *time.Time           `json:"escrowed_at"`
-	ObservedAt      *time.Time           `json:"observed_at"`
-	VerifiedAt      *time.Time           `json:"verified_at"`
-	UpdatedAt       time.Time            `json:"updated_at"`
+	HistoricalRotationsPending       int                  `json:"historical_rotations_pending"`
+	HistoricalRotationsNeedAttention bool                 `json:"historical_rotations_need_attention"`
+	Rotation                         *FileVaultRotation   `json:"rotation,omitempty"`
+	RotationReady                    bool                 `json:"rotation_ready"`
+	Validation                       *FileVaultValidation `json:"validation,omitempty"`
+	ValidationReady                  bool                 `json:"validation_ready"`
+	DeviceID                         string               `json:"device_id"`
+	Desired                          string               `json:"desired"`
+	Phase                            string               `json:"phase"`
+	Error                            string               `json:"error"`
+	RecoveryError                    string               `json:"recovery_error"`
+	KeyID                            string               `json:"key_id,omitempty"`
+	EscrowedAt                       *time.Time           `json:"escrowed_at"`
+	ObservedAt                       *time.Time           `json:"observed_at"`
+	VerifiedAt                       *time.Time           `json:"verified_at"`
+	UpdatedAt                        time.Time            `json:"updated_at"`
 }
 
 type FileVaultKeyHistory struct {
@@ -82,6 +84,9 @@ func (s *Store) FileVault(ctx context.Context, scope Scope, id string) (*FileVau
 	}
 	if err == nil {
 		err = s.fileVaultRotationMetadata(ctx, d, v)
+	}
+	if err == nil {
+		err = s.fileVaultHistoryMetadata(ctx, d, v)
 	}
 	return v, err
 }

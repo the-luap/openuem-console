@@ -246,8 +246,50 @@ Registry migration 009 is required for rotation readiness. A partial upgrade
 cannot silently finish key processing without acknowledgement storage; the
 pending return key remains available until the registry is upgraded. Existing
 completed rows predating this feature are not guessed to be safely processed or
-automatically acknowledged. A separately verified historical reconciliation path
-is still required before those attempts can release automatic renewal.
+automatically acknowledged. Registry migration 011 and Apple migration 036 add a
+separate verified historical reconciliation path, including rows whose original
+return private key was already erased.
+
+The maintenance worker claims at most 25 historical rows per sweep, preserves
+existing pending validations and rotations, and defers another scheduling attempt
+for an hour. It verifies the current canonical Mac association and decrypts the
+current key while holding its row lock. A fresh encrypted read-only challenge is
+bound in an immutable registry admission to that exact old signed receipt, current
+key ciphertext digest, current certificate, recipient, task ID and nonce hash.
+Old receipt signatures use the current certificate or an authenticated retained
+source certificate; merely issued candidate certificates are not authority.
+
+Only that dedicated task's timely signed `valid` response can release the old
+rotation. Key verification, console completion/audit and registry acknowledgement
+commit together; authority is checked again after the console audit. Changed key
+ciphertext, unsuccessful or unbound checks, damaged evidence, identity/association
+changes and audit failures cannot release renewal. Failed completed checks defer
+automatic retry for 24 hours; authorized administrators can request another check
+through the existing validation action. The page exposes pending history and a
+fixed attention message without recovery secrets.
+
+This proves current volume recoverability; it does not reconstruct an erased old
+returned key. Old receipts, ordinals, final states and key history remain intact.
+Verified non-mutating rotation outcomes have a separate acknowledgement path that
+does not require a current key. Unresolved mutations cannot use either historical
+path. New version 2 acknowledgements retain their exact admission/proof references;
+renewal revalidates those records so a partial database restore cannot waive the
+prerequisites. The ledger retains at most 256 historical checks per agent, counting
+unsuccessful attempts, and never deletes evidence to reclaim capacity.
+
+Historical recovery tests cover the erased-return-key case through actual registry
+confirmation, concurrent maintenance replicas, ordinary pending validations,
+invalid/unsupported/unavailable outcomes, changed ciphertext, console-audit
+rollback, expiry during admission/completion/non-key audit, authenticated retired
+source certificates, immutable capacity and partial-restore corruption. The full
+local registry race suite passes in **48.744 seconds**; the expanded historical
+subset passes in **5.824 seconds**, with the missing-admission restore case also
+passing. The complete Apple/desktop/view race suites pass in
+**273.287/30.850/2.067 seconds**. The final historical console subset against the
+pinned published library passes in **17.110 seconds**, and the updated management
+views pass in **1.940 seconds**. Vet, module consistency and complete Linux/Windows
+builds pass. These are synthetic PostgreSQL and signed-protocol checks, not
+physical FileVault execution.
 
 After handoff, original receipts, ordinals and encrypted recovery keys remain.
 The agent must register a fresh recipient epoch against its new certificate while
@@ -324,5 +366,5 @@ builds pass. Shared resolution proof/response fuzzing and CI also pass. Console
 These tests use disposable PostgreSQL schemas and synthetic keys/certificates.
 They do not install an agent, execute FileVault on a physical volume, contact a
 provider, deploy a service or demonstrate a signed production release. Physical
-Windows/macOS renewal/restart acceptance, historical reconciliation, CA/master-key
+Windows/macOS renewal/restart acceptance, CA/master-key
 rotation and the complete PKI-01 work package remain open.

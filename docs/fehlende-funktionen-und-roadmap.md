@@ -518,8 +518,10 @@ Desktop PKI-01 implementation evidence is tracked in
 activation, authoritative cancellation, protected native decisions and retained
 FileVault history are implemented and tested. The installed individual-agent
 service now adds automatic scheduling, joined handoff/reconnect, startup recovery
-and native process ownership. Production release integration, historical server
-reconciliation and physical-device acceptance remain open.
+and native process ownership. Historical server reconciliation now binds a fresh
+signed current-key check to each old completed rotation, including erased return
+keys, and preserves all earlier evidence. Production release integration and
+physical-device acceptance remain open.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

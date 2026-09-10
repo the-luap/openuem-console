@@ -99,6 +99,11 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	filevault.Commands = []apple.Command{{ID: "e0000000-0000-4000-8000-000000000002", FileVault: true, Status: "failed", RequestType: "InstallProfile"}}
 	filevaultFailure := filevault
 	filevaultFailure.FileVault = &apple.FileVault{DeviceID: mac.ID, Desired: "enabled", Phase: "failed", Error: "escrow_profile_missing"}
+	filevaultHistory := filevault
+	filevaultHistoryValue := *filevault.FileVault
+	filevaultHistoryValue.HistoricalRotationsPending = 1
+	filevaultHistoryValue.HistoricalRotationsNeedAttention = true
+	filevaultHistory.FileVault = &filevaultHistoryValue
 	validationDetail := func(status string) Detail {
 		d := filevault
 		v := *filevault.FileVault
@@ -353,6 +358,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-filevault-rotation-resolved", DeviceDetails(c, info, rotationDetail("resolved")), []string{"uncertain attempt is resolved", "Rotate current recovery key"}},
 		{"mac-filevault-rotation-reader", DeviceDetails(c, &reader, rotationDetail("rotated")), []string{"New recovery key stored and validated"}},
 		{"mac-filevault", DeviceDetails(c, info, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume", "Retrieve recovery key", "Disk encryption remains enabled", "Validate current recovery key"}},
+		{"mac-filevault-history", DeviceDetails(c, info, filevaultHistory), []string{"Older recovery key rotations still require reconciliation", "does not recover a missing historical key", "The historical check could not complete", "Validate current recovery key"}},
 		{"mac-filevault-validation-queued", DeviceDetails(c, info, validationDetail("queued")), []string{"Waiting for the Mac to validate the current key"}},
 		{"mac-filevault-validation-valid", DeviceDetails(c, info, validationDetail("valid")), []string{"Validated on", "Validate current recovery key"}},
 		{"mac-filevault-validation-invalid", DeviceDetails(c, info, validationDetail("invalid")), []string{"does not unlock its volume", "Validate current recovery key"}},

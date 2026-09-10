@@ -175,7 +175,8 @@ the certificate before returned-key processing finishes. A completed worker row
 alone is insufficient. Audit failure rolls back both acknowledgement and key
 processing; verified uncertainty resolution uses the same boundary. Registry
 migration 009 is required for rotation readiness. Older completed attempts receive
-no automatic acknowledgement; their historical reconciliation remains separate work.
+no automatic acknowledgement. They require the dedicated signed current-key
+reconciliation described below, which preserves the original evidence.
 
 ## Recovery access
 
@@ -204,6 +205,25 @@ administrator forget action yet. Backups must preserve both the database and
 the configured encryption master key. Loss of that key prevents decryption.
 
 ## Protocol evidence and validation
+
+Older completed rotations without a trusted processing acknowledgement can block
+desktop identity renewal. The console now schedules a separate read-only check of
+the current retained key, bound to the exact old signed receipt in an immutable
+encrypted registry admission. Its signed valid result, final state and audit must
+commit together. Existing ordinary validations are preserved and cannot substitute
+for the dedicated historical proof. Current-key changes, unsuccessful checks,
+expired authority, altered records and audit failures keep renewal blocked.
+
+The page reports pending historical reconciliation and failed checks. Maintenance
+uses batches of at most 25 rows with an hour between scheduling attempts and a
+24-hour delay after a failed completed check. The existing authorized validation
+action can retry sooner. The registry retains at most 256 such checks per agent;
+it does not prune attempts or bypass the limit. Verified non-mutating old receipts
+can be acknowledged without requesting a key. All old receipts, final rotation
+states and keys remain. This establishes current recoverability, including after
+an old return private key was erased; it cannot recreate a lost historical key.
+See [desktop identity renewal](desktop-identity-renewal.md) for migration and restore
+requirements.
 
 The implementation follows Apple's pinned
 [recovery escrow payload](https://github.com/apple/device-management/blob/67045e2fa06f528b196c01edee6a8bf88b844beb/mdm/profiles/com.apple.security.FDERecoveryKeyEscrow.yaml),

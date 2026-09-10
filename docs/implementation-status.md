@@ -89,10 +89,17 @@ the table's package summaries do not remove any detail from the roadmap.
   original installation anchors and verifies historical FileVault receipts after
   source expiry. Local full native macOS protected-store/runtime/command/service
   race checks, Vet, module consistency and Linux/Windows/macOS builds pass; its
-  [new CI](https://github.com/the-luap/openuem-agent/actions/runs/34476393712) is pending.
-  Automatic endpoint renewal, authoritative cancellation, historical reconciliation,
-  runtime/release integration and physical acceptance
-  remain open.
+  [journal CI](https://github.com/the-luap/openuem-agent/actions/runs/34476393712) passes.
+  Subsequent work adds authoritative cancellation, automatic installed-service
+  scheduling, joined handoff/reconnect, native process ownership and stoppable
+  startup recovery; agent `cdffd2c` passes
+  [all-platform CI](https://github.com/the-luap/openuem-agent/actions/runs/34486258522).
+  Historical server reconciliation now admits fresh signed current-key checks
+  bound to exact old rotation receipts, including erased return keys. The console
+  preserves pending validations, retries with bounded backoff and commits key
+  verification, acknowledgement and audit together. Missing/changed proof, key,
+  authority or restore evidence cannot release renewal. Production release
+  integration, CA/master-key rotation and physical acceptance remain open.
 - [Encrypted database backup and recovery](encrypted-backup-restore.md) adds a
   standalone CLI with separate age recipients for database and recovery keys,
   protected streaming/staging, authenticated pair binding and confirmed empty

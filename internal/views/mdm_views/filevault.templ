@@ -39,6 +39,12 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 				<dd>{ FileVaultRotationState(detail.FileVault) }</dd>
 			</dl>
 			if detail.FileVault!=nil {
+				if detail.FileVault.HistoricalRotationsPending>0 {
+					<p role="status" class="uk-alert uk-alert-warning">Older recovery key rotations still require reconciliation before the linked agent can renew its identity. OpenUEM checks the current stored key without changing disk encryption. This confirms current recoverability; it does not recover a missing historical key.</p>
+					if detail.FileVault.HistoricalRotationsNeedAttention {
+						<p role="status">The historical check could not complete. Confirm that the linked agent is online, its hardware report is current and the latest recovery key is stored, then validate the current recovery key again.</p>
+					}
+				}
 				if detail.FileVault.Error!="" {
 					<p role="status" class="uk-alert uk-alert-warning">{ FileVaultHelp(detail.FileVault.Error) }</p>
 				}
