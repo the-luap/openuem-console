@@ -77,6 +77,7 @@ templ CSPObservation(c echo.Context, info *partials.CommonInfo, device windows.D
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">Operation evidence at this point</h2>
 					<p>Status 202 is asynchronous acceptance; 516 reports failed rollback. Partial Get values are withheld. Empty values and absent results remain distinct. Device acknowledgments do not establish effective policy or compliance.</p>
+					@cspExportForm(info, command, observation.MessageID)
 					@cspOutcomes(observation.Outcomes)
 				</div>
 			</section>

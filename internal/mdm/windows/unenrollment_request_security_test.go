@@ -255,6 +255,9 @@ func unenrollmentRequestTestExpiry(t *testing.T, f syncMLStoreFixture, id string
 	}
 	c.ExpiresAt = expiry.UTC().Truncate(time.Microsecond)
 	c.CreatedAt = c.ExpiresAt.Add(-time.Hour)
+	if c.result == nil {
+		c.UpdatedAt = c.CreatedAt
+	}
 	c.request, err = f.store.secrets.sealBounded(request, cspPurpose("request", c), maxCSPProtectedBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +280,7 @@ func unenrollmentRequestTestExpiry(t *testing.T, f syncMLStoreFixture, id string
 	if _, err = tx.Exec(`ALTER TABLE mdm_windows_csp_commands ALTER CONSTRAINT mdm_windows_csp_unenrollment_request DEFERRABLE INITIALLY DEFERRED; ALTER TABLE mdm_windows_csp_commands DISABLE TRIGGER mdm_windows_csp_command_identity; ALTER TABLE mdm_windows_unenrollment_requests DISABLE TRIGGER mdm_windows_unenrollment_request_history`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(`UPDATE mdm_windows_csp_commands SET created_at=$2,expires_at=$3,encrypted_request=$4,encrypted_result=$5 WHERE id=$1`, c.ID, c.CreatedAt, c.ExpiresAt, c.request, c.result); err != nil {
+	if _, err = tx.Exec(`UPDATE mdm_windows_csp_commands SET created_at=$2,expires_at=$3,encrypted_request=$4,encrypted_result=$5,updated_at=$6 WHERE id=$1`, c.ID, c.CreatedAt, c.ExpiresAt, c.request, c.result, c.UpdatedAt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(`UPDATE mdm_windows_unenrollment_requests SET created_at=$2,expires_at=$3,encrypted_intent=$4 WHERE id=$1`, c.ID, c.CreatedAt, c.ExpiresAt, encrypted); err != nil {

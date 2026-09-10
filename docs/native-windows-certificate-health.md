@@ -71,8 +71,9 @@ A real database lock wait exercises a concurrent authenticated confirmation.
 Final console integration and Windows handler tests pass under the race detector
 in **12.418 seconds**, Windows views in **4.530 seconds** and gateway tests in
 **1.775 seconds**. Vet and Linux/Windows builds pass. Gateway tests verify that
-the health paths remain administrative routes. Full CI for this extension is
-pending.
+the health paths remain administrative routes. Both complete workflows pass for health commit `615f465`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34449014616),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34449018594)).
 
 An owned synthetic browser fixture passes 18 page checks at 390, 768 and 1440
 pixels, covering valid, due, soon-expiring, expired, retired and empty states.

@@ -91,6 +91,7 @@ func TestCSPObservationHistoryPreservesPartialAndCompletedSnapshots(t *testing.T
 	if before := read(3); before.Command.Phase != "acknowledged" || before.Observations[0].Outcome != "" || before.Observations[0].Outcomes[0].Data != nil {
 		t.Fatal("current command rewrote earlier partial evidence")
 	}
+	testCSPExportSnapshots(t, f, queued.ID)
 	for _, value := range []any{complete, *history} {
 		data, err := json.Marshal(value)
 		if err != nil || string(data) != "{}" || strings.Contains(fmt.Sprintf("%v %+v %#v", value, value, value), "abcd") {
@@ -128,6 +129,9 @@ func TestCSPObservationHistoryPreservesPartialAndCompletedSnapshots(t *testing.T
 	}
 	if _, err := f.store.db.Exec(`CREATE FUNCTION fail_observation_read_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic observation audit failure'; END $$; CREATE TRIGGER fail_observation_read_audit BEFORE INSERT ON mdm_windows_csp_audit FOR EACH ROW EXECUTE FUNCTION fail_observation_read_audit()`); err != nil {
 		t.Fatal(err)
+	}
+	if result, err := f.store.ExportCSPCommand(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID, history.Command.Revision, 0); err == nil || result != nil {
+		t.Fatal("unaudited export escaped")
 	}
 	for _, message := range []int{0, 4} {
 		value, err := f.store.readCSPObservations(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID, message, 0, 1)
@@ -223,6 +227,9 @@ func cspTestObservationCorruption(t *testing.T, f syncMLStoreFixture, commandID 
 			change(ciphertext, boundDigest, stamp)
 			defer change(encrypted, digest, receivedAt)
 			for _, message := range []int{0, 4} {
+				if result, err := f.store.ExportCSPCommand(ctx, "admin", f.identity.Scope, f.identity.DeviceID, commandID, c.Revision, message); err == nil || result != nil {
+					t.Fatal("corrupted export escaped", name)
+				}
 				value, err := f.store.readCSPObservations(ctx, "admin", f.identity.Scope, f.identity.DeviceID, commandID, message, 0, 11)
 				if err == nil || value != nil {
 					t.Fatal("substituted snapshot escaped", name)

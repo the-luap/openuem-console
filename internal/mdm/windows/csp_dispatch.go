@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
@@ -25,7 +26,9 @@ func (v cspStoredResult) GoString() string { return v.String() }
 
 func (s *Store) openCSPResult(c *cspStoredCommand) (*cspStoredResult, error) {
 	if c.result == nil {
-		if c.DeliveredSessionID != "" {
+		// Only untouched initial intent can lack a result envelope. Any later
+		// metadata requires its authenticated revision and lifecycle proof.
+		if c.Phase != "queued" || c.Revision != 1 || !c.UpdatedAt.Equal(c.CreatedAt) || c.DeliveredSessionID != "" || c.DeliveredMessage != 0 || c.DeliveredAt != nil || c.CompletedAt != nil {
 			return nil, ErrAuthoritySecret
 		}
 		return &cspStoredResult{Version: 1}, nil
@@ -336,11 +339,17 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 		if err != nil {
 			return nil, err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&c.UpdatedAt); err != nil {
+		if _, err := s.openCSPResult(c); err != nil {
+			return nil, err
+		}
+		// Preserve stored metadata until its existing proof has been checked.
+		// Eligibility and repeated blocking still read the previous revision.
+		var now time.Time
+		if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
 			return nil, err
 		}
 		cause := ""
-		if !c.ExpiresAt.After(c.UpdatedAt) {
+		if !c.ExpiresAt.After(now) {
 			cause = "expired"
 		} else if err := s.authorizeCSPCreator(ctx, tx, c); errors.Is(err, access.ErrDenied) {
 			cause = "authority_lost"
@@ -348,6 +357,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 			return nil, err
 		}
 		if cause != "" {
+			c.UpdatedAt = now
 			c.Revision++
 			c.Phase = "expired"
 			if cause == "authority_lost" {
@@ -365,6 +375,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 		if reason, err := s.cspCommandEligibility(ctx, tx, c); err != nil {
 			return nil, err
 		} else if reason != "" {
+			c.UpdatedAt = now
 			c.Revision++
 			c.Phase = "canceled"
 			c.CompletedAt = &c.UpdatedAt
@@ -396,6 +407,7 @@ func (s *Store) dispatchCSP(ctx context.Context, tx *sql.Tx, identity Management
 		state.LastResponse = sent
 		session.Phase = "active"
 		*response = candidate
+		c.UpdatedAt = now
 		c.Revision++
 		c.Phase = "sent"
 		c.DeliveredSessionID = session.ID

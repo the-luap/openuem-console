@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
 func cspState(state string) string {
@@ -57,4 +58,12 @@ func cspRequestRows(command windows.SyncMLCommand) []cspRequestRow {
 	}
 	visit(command, "1")
 	return rows
+}
+
+func cspExportURL(info *partials.CommonInfo, command windows.CSPCommand, message int) string {
+	path := "/windows/" + command.DeviceID + "/commands/" + command.ID
+	if message != 0 {
+		path += "/observations/" + fmt.Sprint(message)
+	}
+	return partials.GetNavigationUrl(info, path+"/export")
 }

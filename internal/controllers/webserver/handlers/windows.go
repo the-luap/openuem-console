@@ -39,7 +39,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon", "/windows/:id/commands/preview", "/windows/:id/commands/create":
+		case "/windows/:id/commands/:command/export", "/windows/:id/commands/:command/observations/:message/export", "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon", "/windows/:id/commands/preview", "/windows/:id/commands/create":
 			return access.ManageWindowsCSP, true
 		case "/windows/setup", "/windows/:id/renewals/:renewal/cancel":
 			return access.ManageCertificates, true
@@ -92,6 +92,8 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/:id/commands/preview", h.WindowsPreviewCSPCommand)
 		g.POST("/windows/:id/commands/create", h.WindowsCreateCSPCommand)
 		g.GET("/windows/:id/commands/:command", h.WindowsCSPCommand)
+		g.POST("/windows/:id/commands/:command/export", h.WindowsExportCSPCommand)
+		g.POST("/windows/:id/commands/:command/observations/:message/export", h.WindowsExportCSPCommand)
 		g.GET("/windows/:id/commands/:command/observations", h.WindowsCSPObservations)
 		g.GET("/windows/:id/commands/:command/observations/:message", h.WindowsCSPObservation)
 		g.POST("/windows/:id/commands/:command/cancel", h.WindowsCancelCSPCommand)

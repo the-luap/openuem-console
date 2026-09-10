@@ -59,7 +59,7 @@ func TestWindowsCSPViewsPreserveUntrustedValuesAndOutcomeBoundaries(t *testing.T
 					t.Fatal("untrusted or partial payload escaped")
 				}
 			}
-			for _, want := range []string{cspState(phase), "Operation 1.2.1", "&lt;script&gt;intent&lt;/script&gt;", "wire-parent", "Incomplete result; partial value withheld.", "No complete result received.", "No status received", "Text value · 0 bytes", "Empty value", "516", "202", "2026-09-10 12:13:14.123456 UTC"} {
+			for _, want := range []string{cspState(phase), "Operation 1.2.1", "&lt;script&gt;intent&lt;/script&gt;", "wire-parent", "Incomplete result; partial value withheld.", "No complete result received.", "No status received", "Text value · 0 bytes", "Empty value", "516", "202", "2026-09-10 12:13:14.123456 UTC", "Download command evidence (JSON)", "The download contains unencrypted configuration", "/tenant/1/site/11/windows/" + device.ID + "/commands/" + command.ID + "/export"} {
 				if !strings.Contains(html, want) {
 					t.Fatal("CSP meaning lost", want)
 				}
@@ -84,7 +84,7 @@ func TestWindowsCSPViewsPreserveUntrustedValuesAndOutcomeBoundaries(t *testing.T
 					t.Fatal("historical view exposed content, action or later state", value)
 				}
 			}
-			for _, want := range []string{"Evidence incomplete", "&lt;script&gt;stop&lt;/script&gt;", "Incomplete result; partial value withheld.", "Empty value", "No complete result received.", "2026-09-10 12:13:14.123456 UTC", "516"} {
+			for _, want := range []string{"Evidence incomplete", "&lt;script&gt;stop&lt;/script&gt;", "Incomplete result; partial value withheld.", "Empty value", "No complete result received.", "2026-09-10 12:13:14.123456 UTC", "516", "Download this observation (JSON)", "/observations/3/export"} {
 				if !strings.Contains(html, want) {
 					t.Fatal("historical evidence distinction lost", want)
 				}

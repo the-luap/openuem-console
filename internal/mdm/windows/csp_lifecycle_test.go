@@ -128,6 +128,29 @@ func TestCSPDeferredUserAndSizeLimits(t *testing.T) {
 			if detail.Command.Phase != "blocked" || detail.Reason != reason || detail.Command.DeliveredAt != nil {
 				t.Fatal("queue did not retain a precise eligibility reason")
 			}
+			// A new session with the same limit preserves the authenticated
+			// blocked revision, instead of rewriting or losing its proof.
+			record, _ := f.state(t)
+			secrets := *f.secrets
+			secrets.ClientNonce = record.Nonces.ClientNonce
+			repeated := syncMLTestInitial(f.identity, f.options, &secrets)
+			repeated.Header.SessionID = "2"
+			if reason == "user_context" {
+				repeated.Commands[0].Items[0].Data.Text = "others"
+			}
+			first, err = f.process(syncMLTestWire(t, repeated))
+			if err != nil {
+				t.Fatal(err)
+			}
+			next := syncMLTestReply(syncMLTestParsed(t, first))
+			next.Header.Meta = request.Header.Meta
+			if _, err := f.process(syncMLTestWire(t, next)); err != nil {
+				t.Fatal("repeated blocking lost authenticated state", err)
+			}
+			again := cspTestRead(t, f, queued.ID)
+			if again.Command.Revision != detail.Command.Revision || !again.Command.UpdatedAt.Equal(detail.Command.UpdatedAt) || again.Reason != reason {
+				t.Fatal("unchanged blocking rewrote lifecycle proof")
+			}
 			response = cspTestNextSession(t, f)
 			if len(syncMLTestParsed(t, response).Commands) != 2 || cspTestRead(t, f, queued.ID).Command.Phase != "sent" {
 				t.Fatal("eligible next session did not release the queued command")

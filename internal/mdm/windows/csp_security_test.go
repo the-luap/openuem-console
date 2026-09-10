@@ -33,6 +33,9 @@ func cspTestExpiry(t *testing.T, f syncMLStoreFixture, id string, expiry time.Ti
 	}
 	c.ExpiresAt = expiry.UTC().Truncate(time.Microsecond)
 	c.CreatedAt = c.ExpiresAt.Add(-time.Hour)
+	if c.result == nil {
+		c.UpdatedAt = c.CreatedAt
+	}
 	c.request, err = f.store.secrets.sealBounded(request, cspPurpose("request", c), maxCSPProtectedBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +54,7 @@ func cspTestExpiry(t *testing.T, f syncMLStoreFixture, id string, expiry time.Ti
 	if _, err := tx.Exec(`ALTER TABLE mdm_windows_csp_commands DISABLE TRIGGER mdm_windows_csp_command_identity`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(`UPDATE mdm_windows_csp_commands SET created_at=$2,expires_at=$3,encrypted_request=$4,encrypted_result=$5 WHERE id=$1`, c.ID, c.CreatedAt, c.ExpiresAt, c.request, c.result); err != nil {
+	if _, err := tx.Exec(`UPDATE mdm_windows_csp_commands SET created_at=$2,expires_at=$3,encrypted_request=$4,encrypted_result=$5,updated_at=$6 WHERE id=$1`, c.ID, c.CreatedAt, c.ExpiresAt, c.request, c.result, c.UpdatedAt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(`ALTER TABLE mdm_windows_csp_commands ENABLE TRIGGER mdm_windows_csp_command_identity`); err != nil {
@@ -225,7 +228,7 @@ func TestCSPMigrationPreservesExistingSessions(t *testing.T) {
 	unenrollmentTestRemoveRequestMigration(t, f.store)
 	updateTestRemoveRingMigration(t, f.store)
 	renewalTestRemoveMigration(t, f.store)
-	if _, err := f.store.db.Exec(`DROP TABLE mdm_windows_update_audit,mdm_windows_csp_observations,mdm_windows_csp_audit,mdm_windows_csp_commands,mdm_windows_update_runs; DROP FUNCTION mdm_windows_keep_csp_command(); ALTER TABLE mdm_windows_syncml_packets DROP CONSTRAINT mdm_windows_syncml_packet_scope_message; DELETE FROM mdm_windows_migrations WHERE name IN ('migrations/005_csp_commands.sql','migrations/006_update_runs.sql','migrations/007_update_verification_batches.sql')`); err != nil {
+	if _, err := f.store.db.Exec(`DROP TABLE mdm_windows_update_audit,mdm_windows_csp_observations,mdm_windows_csp_audit,mdm_windows_csp_commands,mdm_windows_update_runs; DROP FUNCTION mdm_windows_keep_csp_command(); ALTER TABLE mdm_windows_syncml_packets DROP CONSTRAINT mdm_windows_syncml_packet_scope_message; DELETE FROM mdm_windows_migrations WHERE name IN ('migrations/016_csp_exports.sql','migrations/005_csp_commands.sql','migrations/006_update_runs.sql','migrations/007_update_verification_batches.sql')`); err != nil {
 		t.Fatal(err)
 	}
 	for n := 0; n < 2; n++ {
@@ -262,6 +265,9 @@ func TestCSPCorruptedResultRejectsDeliveryAndMetadataReads(t *testing.T) {
 		}
 		if value, err := f.store.CSPCommandDetails(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID); !errors.Is(err, ErrAuthoritySecret) || value != nil {
 			t.Fatal("corrupted command exposed protected details", err)
+		}
+		if value, err := f.store.ExportCSPCommand(ctx, "admin", f.identity.Scope, f.identity.DeviceID, queued.ID, queued.Revision, 0); !errors.Is(err, ErrAuthoritySecret) || value != nil {
+			t.Fatal("corrupted current result exported", err)
 		}
 		for _, data := range [][]byte{request, syncMLTestWire(t, cspTestReply(syncMLTestParsed(t, delivery)))} {
 			if result, err := f.process(data); !errors.Is(err, ErrAuthoritySecret) || result != nil {

@@ -21,6 +21,7 @@ func exerciseWindowsCSPObservations(t *testing.T, h *Handler, ctx context.Contex
 		deviceID, deliver := windowsCSPConsolePeer(t, h, ctx, scope)
 		completed := deliver(windows.CSPCommandSpec{Kind: "Get", URI: "./DevDetail/SwV"}, "chunks")
 		base := fmt.Sprintf("/tenant/%d/site/%d/windows/%s/commands/%s", scope.TenantID, scope.SiteID, deviceID, completed.Command.ID)
+		exerciseWindowsCSPExports(t, h, ctx, scope, completed.Command, request)
 		path := base + "/observations"
 		for _, actor := range []string{"organization-admin", "apple-console-admin"} {
 			w := request(actor, "GET", path, nil)

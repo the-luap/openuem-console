@@ -169,6 +169,7 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 					<h2 class="uk-card-title">Correlated device evidence</h2>
 					<p>Status 202 is asynchronous acceptance; 516 reports failed rollback. Neither establishes successful completion. Partial Get values are withheld until the complete object is received. Empty values and absent results remain distinct.</p>
 					<a class="uk-button uk-button-default my-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+detail.Command.ID+"/observations")) }>Observation history</a>
+					@cspExportForm(info, detail.Command, 0)
 					@cspOutcomes(detail.Outcomes)
 				</div>
 			</section>
@@ -216,4 +217,26 @@ templ cspOutcomes(outcomes []windows.CSPOperationOutcome) {
 			}
 		</section>
 	}
+}
+
+templ cspExportForm(info *partials.CommonInfo, command windows.CSPCommand, message int) {
+	<div class="my-3">
+		<form method="post" action={ cspExportURL(info, command, message) }>
+			@mdm_views.CSRF(info)
+			<input type="hidden" name="expected_revision" value={ fmt.Sprint(command.Revision) }/>
+			<button class="uk-button uk-button-default" type="submit">
+				if message == 0 {
+					Download command evidence (JSON)
+				} else {
+					Download this observation (JSON)
+				}
+			</button>
+		</form>
+		if message == 0 {
+			<p>Includes the original request, current result and all stored observations. For large histories, download individual observations from the history page.</p>
+		} else {
+			<p>Includes the original request, current result and this historical observation, each recorded separately.</p>
+		}
+		<p>The download contains unencrypted configuration and complete result values, which may include secrets. Keep it in an access-controlled location. Partial values remain withheld.</p>
+	</div>
 }

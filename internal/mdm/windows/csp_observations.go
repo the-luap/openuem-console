@@ -109,40 +109,14 @@ func (s *Store) readCSPObservations(ctx context.Context, actor string, scope acc
 	defer rows.Close()
 	history := &CSPObservationHistory{Command: c.CSPCommand, Observations: []CSPObservation{}}
 	for rows.Next() {
-		var observation CSPObservation
-		var digest, encrypted, packetDigest []byte
-		if err := rows.Scan(&observation.SessionID, &observation.MessageID, &observation.ReceivedAt, &digest, &encrypted, &packetDigest); err != nil {
-			return nil, err
-		}
-		if observation.SessionID != c.DeliveredSessionID || observation.MessageID <= c.DeliveredMessage || observation.MessageID > maxSyncMLSessionMessages || c.DeliveredAt == nil || observation.ReceivedAt.Before(*c.DeliveredAt) || len(digest) != 32 || !bytes.Equal(digest, packetDigest) {
-			return nil, ErrAuthoritySecret
-		}
-		plain, err := s.secrets.openBounded(encrypted, cspObservationPurpose(c, observation.SessionID, strconv.Itoa(observation.MessageID), digest, observation.ReceivedAt), maxCSPProtectedBytes)
+		observation, err := s.openCSPObservation(c, command, current, rows)
 		if err != nil {
 			return nil, err
 		}
-		var state cspSessionCommand
-		err = decodeSyncMLProtectedJSON(plain, &state)
-		clear(plain)
-		if err != nil || state.validate() != nil || state.CommandID != c.ID || state.UnenrollmentRequestID != c.UnenrollmentRequestID || state.MessageID != strconv.Itoa(c.DeliveredMessage) || state.ObservedMessageID != strconv.Itoa(observation.MessageID) || len(state.StopReason) > 128 {
-			return nil, ErrAuthoritySecret
+		if messageID == 0 {
+			observation.Outcomes = nil
 		}
-		if err := bindCSPDispatch(&syncMLSession{ID: observation.SessionID}, command, &state); err != nil {
-			return nil, err
-		}
-		if current.Exchange == nil || len(current.Exchange.Operations) != len(state.Operations) {
-			return nil, ErrAuthoritySecret
-		}
-		for n, operation := range state.Operations {
-			if operation.WireID != current.Exchange.Operations[n].WireID {
-				return nil, ErrAuthoritySecret
-			}
-		}
-		observation.Outcome, observation.StopReason = cspOutcome(&state), state.StopReason
-		if messageID != 0 {
-			observation.Outcomes = cspOperationOutcomes(&state)
-		}
-		history.Observations = append(history.Observations, observation)
+		history.Observations = append(history.Observations, *observation)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -160,4 +134,41 @@ func (s *Store) readCSPObservations(ctx context.Context, actor string, scope acc
 		return nil, err
 	}
 	return history, nil
+}
+
+// openCSPObservation is shared by console reads and exports. It authenticates
+// packet provenance and the dispatched operation tree before exposing values.
+func (s *Store) openCSPObservation(c *cspStoredCommand, command SyncMLCommand, current *cspStoredResult, row cspScanner) (*CSPObservation, error) {
+	var observation CSPObservation
+	var digest, encrypted, packetDigest []byte
+	if err := row.Scan(&observation.SessionID, &observation.MessageID, &observation.ReceivedAt, &digest, &encrypted, &packetDigest); err != nil {
+		return nil, err
+	}
+	if observation.SessionID != c.DeliveredSessionID || observation.MessageID <= c.DeliveredMessage || observation.MessageID > maxSyncMLSessionMessages || c.DeliveredAt == nil || observation.ReceivedAt.Before(*c.DeliveredAt) || len(digest) != 32 || !bytes.Equal(digest, packetDigest) {
+		return nil, ErrAuthoritySecret
+	}
+	plain, err := s.secrets.openBounded(encrypted, cspObservationPurpose(c, observation.SessionID, strconv.Itoa(observation.MessageID), digest, observation.ReceivedAt), maxCSPProtectedBytes)
+	if err != nil {
+		return nil, err
+	}
+	var state cspSessionCommand
+	err = decodeSyncMLProtectedJSON(plain, &state)
+	clear(plain)
+	if err != nil || state.validate() != nil || state.CommandID != c.ID || state.UnenrollmentRequestID != c.UnenrollmentRequestID || state.MessageID != strconv.Itoa(c.DeliveredMessage) || state.ObservedMessageID != strconv.Itoa(observation.MessageID) || len(state.StopReason) > 128 {
+		return nil, ErrAuthoritySecret
+	}
+	if err := bindCSPDispatch(&syncMLSession{ID: observation.SessionID}, command, &state); err != nil {
+		return nil, err
+	}
+	if current.Exchange == nil || len(current.Exchange.Operations) != len(state.Operations) {
+		return nil, ErrAuthoritySecret
+	}
+	for n, operation := range state.Operations {
+		if operation.WireID != current.Exchange.Operations[n].WireID {
+			return nil, ErrAuthoritySecret
+		}
+	}
+	observation.Outcome, observation.StopReason = cspOutcome(&state), state.StopReason
+	observation.Outcomes = cspOperationOutcomes(&state)
+	return &observation, nil
 }

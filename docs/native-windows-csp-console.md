@@ -296,6 +296,8 @@ in the browser console. The complete fixture/handler race run passes in
 **127.374 seconds**, including manual inspection; Windows/shared view suites pass
 in **3.166/1.883 seconds**. Full CI for the observation extension is pending.
 
-Retention/export, broader typed policies and physical Windows acceptance remain
+[Audited JSON downloads](native-windows-csp-export.md) now expose whole-command
+evidence and individual historical observations through revision-bound native
+forms. Retention, broader typed policies and physical Windows acceptance remain
 implementation work.
 The full WIN-02 roadmap also retains lifecycle, integration and deployment work.

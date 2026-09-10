@@ -81,7 +81,7 @@ func TestGatewayWindowsExactRoutesAreOptionalAndSeparateFromConsole(t *testing.T
 					}
 				}
 			}
-			for _, path := range []string{"/windows/certificate-reminders", "/tenant/1/windows/certificate-reminders", "/tenant/1/site/1/windows/certificate-reminders", "/windows/certificate-health", "/tenant/1/windows/certificate-health", "/tenant/1/site/1/windows/certificate-health", "/windows", "/tenant/1/site/1/windows", "/windows/device/disconnections", "/tenant/1/windows/device/disconnections/create", "/tenant/1/site/1/windows/device/disconnections/request/release", "/EnrollmentServer/%44iscovery.svc", "/mdm/windows//syncml"} {
+			for _, path := range []string{"/windows/device/commands/command/export", "/tenant/1/windows/device/commands/command/export", "/tenant/1/site/1/windows/device/commands/command/observations/3/export", "/windows/certificate-reminders", "/tenant/1/windows/certificate-reminders", "/tenant/1/site/1/windows/certificate-reminders", "/windows/certificate-health", "/tenant/1/windows/certificate-health", "/tenant/1/site/1/windows/certificate-health", "/windows", "/tenant/1/site/1/windows", "/windows/device/disconnections", "/tenant/1/windows/device/disconnections/create", "/tenant/1/site/1/windows/device/disconnections/request/release", "/EnrollmentServer/%44iscovery.svc", "/mdm/windows//syncml"} {
 				for _, method := range []string{"GET", "POST"} {
 					r, _ := http.NewRequest(method, front.URL+path, nil)
 					response, err := front.Client().Do(r)

@@ -155,7 +155,8 @@ The console shows the original request and latest correlated result, with a
 separate [observation history](native-windows-csp-console.md#review-the-observation-history)
 for immutable earlier snapshots. List and single-message reads authenticate the
 existing encrypted history, preserve partial/completed distinctions and require
-current scoped authority plus audit. Administrative retention/export remains work.
+current scoped authority plus audit. [Audited JSON exports](native-windows-csp-export.md) now preserve original intent,
+current results and all or selected historical snapshots. Retention remains work.
 
 ## Verification and remaining work
 
