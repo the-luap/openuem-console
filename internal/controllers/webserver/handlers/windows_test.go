@@ -16,7 +16,7 @@ func TestWindowsConsoleRoutesHaveExplicitCapabilities(t *testing.T) {
 	h := &Handler{}
 	e := echo.New()
 	h.RegisterWindows(e)
-	want := map[string]access.Capability{"GET /windows": access.ReadDevices, "GET /windows/:id": access.ReadDevices, "POST /windows/setup": access.ManageCertificates, "POST /windows/invitations": access.EnrollDevices, "POST /windows/invitations/:id/revoke": access.EnrollDevices, "POST /windows/:id/revoke": access.RevokeDevices}
+	want := map[string]access.Capability{"GET /windows": access.ReadDevices, "GET /windows/:id": access.ReadDevices, "POST /windows/setup": access.ManageCertificates, "POST /windows/invitations": access.EnrollDevices, "POST /windows/invitations/:id/revoke": access.EnrollDevices, "POST /windows/:id/revoke": access.RevokeDevices, "GET /windows/:id/updates": access.ManageUpdates, "GET /windows/:id/updates/:run": access.ManageUpdates, "POST /windows/:id/updates/:run/cancel": access.ManageUpdates}
 	count := 0
 	for _, r := range e.Routes() {
 		if r.Method == echo.RouteNotFound {

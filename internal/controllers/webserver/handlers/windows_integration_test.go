@@ -115,7 +115,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 		if w.Code != 200 || !strings.Contains(w.Body.String(), "owin1.") || !strings.Contains(w.Body.String(), "https://uem.example.test") {
 			t.Fatal("credential creation form failed", w.Code)
 		}
-		if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Location") != "" || w.Header().Get("Referrer-Policy") != "no-referrer" {
+		if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Location") != "" || w.Header().Get("Referrer-Policy") != "strict-origin" {
 			t.Fatal("enrollment password response can be cached or redirected")
 		}
 		created, err := store.EnrollmentInvitations(ctx, admin, scope, 0, 25)
@@ -170,6 +170,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 	if err != nil {
 		t.Fatal(err)
 	}
+	exerciseWindowsUpdateConsole(t, h, ctx, scope, deviceID, request, artifact)
 	t.Run("Windows device views and revocation are scoped", func(t *testing.T) {
 		for _, path := range []string{base + "/devices?platform=windows", orgBase + "/devices?platform=windows", base + "/devices?q=synthetic"} {
 			w := request("organization-admin", "GET", path, nil)

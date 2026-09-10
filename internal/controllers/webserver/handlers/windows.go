@@ -23,6 +23,9 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	if method == http.MethodGet && (route == "/windows" || route == "/windows/:id") {
 		return access.ReadDevices, true
 	}
+	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run") {
+		return access.ManageUpdates, true
+	}
 	if method == http.MethodPost {
 		switch route {
 		case "/windows/setup":
@@ -31,6 +34,8 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/windows/:id/revoke":
 			return access.RevokeDevices, true
+		case "/windows/:id/updates/:run/cancel":
+			return access.ManageUpdates, true
 		}
 	}
 	return "", false
@@ -45,6 +50,9 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/invitations", h.WindowsInvitation)
 		g.POST("/windows/invitations/:id/revoke", h.WindowsRevokeInvitation)
 		g.POST("/windows/:id/revoke", h.WindowsRevokeDevice)
+		g.GET("/windows/:id/updates", h.WindowsUpdateRuns)
+		g.GET("/windows/:id/updates/:run", h.WindowsUpdateRun)
+		g.POST("/windows/:id/updates/:run/cancel", h.WindowsCancelUpdateRun)
 	}
 }
 
@@ -54,7 +62,7 @@ func (h *Handler) WindowsCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		defer cancel()
 		c.SetRequest(c.Request().WithContext(ctx))
 		c.Response().Header().Set("Cache-Control", "no-store")
-		c.Response().Header().Set("Referrer-Policy", "no-referrer")
+		c.Response().Header().Set("Referrer-Policy", "strict-origin")
 		if c.Request().Method == http.MethodPost {
 			r := c.Request()
 			media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -149,6 +157,10 @@ func windowsFailure(err error) error {
 		return echo.NewHTTPError(404, "Windows resource not found")
 	case errors.Is(err, windows.ErrAuthorityExists):
 		return echo.NewHTTPError(409, "The organization already has a Windows enrollment authority")
+	case errors.Is(err, windows.ErrCSPAlreadySent):
+		return echo.NewHTTPError(409, "This run has no cancelable undelivered steps, or a step is already sent or uncertain")
+	case errors.Is(err, windows.ErrUpdatePolicy):
+		return echo.NewHTTPError(400, "Invalid Windows update request")
 	case errors.Is(err, windows.ErrConsoleInput), errors.Is(err, windows.ErrInvitation), errors.Is(err, windows.ErrAuthority):
 		return echo.NewHTTPError(400, "Invalid Windows enrollment settings")
 	default:
@@ -164,6 +176,9 @@ func (h *Handler) windowsReady() error {
 }
 
 func windowsOffset(c echo.Context, name string) (int, error) {
+	if len(c.QueryParams()[name]) > 1 {
+		return 0, echo.NewHTTPError(400, "Invalid Windows page")
+	}
 	raw := c.QueryParam(name)
 	if raw == "" {
 		return 0, nil

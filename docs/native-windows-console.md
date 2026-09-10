@@ -23,8 +23,10 @@ shows its independent, random enrollment password once, the configured public
 server origin and manual Windows enrollment instructions. It also immediately
 includes the new invitation in the list. A subsequent GET shows metadata only;
 neither the URL, session nor a password retrieval endpoint contains the secret.
-Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
-Lost credentials require revoking the unused invitation and creating another.
+Responses use `Cache-Control: no-store` and `Referrer-Policy: strict-origin`.
+The origin-only referrer policy preserves the same-origin Origin header used by
+the CSRF check for ordinary browser form submissions. Lost credentials require
+revoking the unused invitation and creating another.
 
 Use Windows **Settings → Accounts → Access work or school → Enroll only in
 device management**, following the
@@ -117,7 +119,8 @@ handler suite passes in 7.950 seconds and shared view tests in 2.147 seconds.
 Vet and both Linux/Windows builds pass. Full CI for the console change is pending.
 
 The fixtures create only isolated synthetic database state and loopback services.
-No host certificate, policy, account or device is changed. The full roadmap still
-requires command/result and update/ring/schedule console workflows, broader CSP
+No host certificate, policy, account or device is changed. Native Windows management
+now includes [update run history and confirmed cancellation](native-windows-update-console.md).
+The roadmap still requires raw command/result and policy/ring/schedule creation workflows, broader CSP
 policies, certificate renewal and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.

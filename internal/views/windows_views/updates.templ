@@ -1,0 +1,154 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ updateNavigation(info *partials.CommonInfo, device windows.DeviceMetadata) {
+	<div class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>Device identity</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates")) }>Update policy runs</a>
+	</div>
+}
+
+templ UpdateRuns(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, runs []*windows.UpdateRunDetail, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows update policy runs</h1>
+				<p>{ device.Name }</p>@updateNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Each run keeps its reviewed settings and historical device evidence. Verified policy values do not prove that a patch was downloaded, installed or followed by a reboot.</p>
+					<div role="region" aria-label="Windows update policy runs table" tabindex="0" class="overflow-x-auto">
+						<table class="uk-table uk-table-divider">
+							<thead><tr><th scope="col">Policy run</th><th scope="col">Action</th><th scope="col">Evidence status</th><th scope="col">Created</th></tr></thead>
+							<tbody>
+								for _, run := range runs {
+									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+run.Run.ID)) }>{ run.Name }</a><div>{ run.Run.ID }</div></td><td>{ updateMode(run.Run.Mode) }</td><td>{ updateState(run.Phase) }</td><td>{ timestamp(run.Run.CreatedAt) }</td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(runs)==0 {
+						<p class="my-4 uk-text-muted">No update policy runs in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/updates?offset=%d", device.ID, max(0, offset-25)))) }>Previous runs</a>
+						}
+						if more && offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/updates?offset=%d", device.ID, min(100000, offset+25)))) }>More runs</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UpdateRun(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, detail windows.UpdateRunDetail) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}, {Title: "Update policy run"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">{ detail.Name }</h1>
+				<p>{ device.Name } · Windows update policy run</p>@updateNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ updateState(detail.Phase) }</h2>
+					<p class="my-3">These are historical policy observations. They do not prove patch download, installation or reboot, and do not continuously check the device's current state.</p>
+					if detail.Reason!="" {
+						<p>Reported reason: { updateState(detail.Reason) }</p>
+					}
+					<dl class="uk-description-list"><dt>Run ID</dt><dd>{ detail.Run.ID }</dd><dt>Action</dt><dd>{ updateMode(detail.Run.Mode) }</dd><dt>Created</dt><dd>{ timestamp(detail.Run.CreatedAt) }</dd><dt>Admission expires</dt><dd>{ timestamp(detail.Run.ExpiresAt) }</dd><dt>Created by</dt><dd>{ detail.Run.CreatedBy }</dd></dl>
+					if detail.Run.RingID!="" {
+						<dl class="uk-description-list"><dt>Source ring / revision</dt><dd>{ detail.Run.RingID } · { fmt.Sprint(detail.Run.RingRevision) }</dd><dt>Cohort rollout</dt><dd>{ detail.Run.RolloutID }</dd></dl>
+					}
+					if canCancelUpdate(detail.Steps) {
+						<details class="mt-4">
+							<summary>Cancel remaining undelivered steps</summary>
+							<p>Already applied settings remain. Cancellation cannot stop a sent or uncertain step and does not remove policy from Windows.</p>
+							<form class="grid gap-3 mt-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+detail.Run.ID+"/cancel") }>
+								@mdm_views.CSRF(info)
+								<label><input type="checkbox" name="confirm_cancel" value="yes" required/> Cancel the remaining steps that have not been sent.</label><button type="submit" class="uk-button uk-button-danger">Confirm cancellation</button>
+							</form>
+						</details>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Reviewed settings</h2>
+					<p><a class="underline" target="_blank" rel="noreferrer noopener" href="https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update">Microsoft update policy definitions</a></p>
+					if detail.Run.Mode=="remove" {
+						<p>These identify the original settings selected for removal. An effective value from another source may remain after this source is removed.</p>
+					}
+					<dl class="uk-description-list">
+						for _, row := range updatePolicyRows(detail.Policy) {
+							<dt>{ row.Label }</dt>
+							<dd>{ row.Value }</dd>
+						}
+					</dl>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Platform evidence</h2>
+					if detail.Platform.Version=="" {
+						<p>No complete platform evidence has been received for this run.</p>
+					} else {
+						<dl class="uk-description-list"><dt>Reported Windows version / edition</dt><dd>{ detail.Platform.Version } · { detail.Platform.Edition }</dd><dt>Architecture</dt><dd>{ detail.Platform.Architecture }</dd><dt>Release</dt><dd>{ detail.Platform.Release }</dd><dt>Catalog date</dt><dd>{ detail.Platform.CatalogDate }</dd><dt>Servicing support</dt><dd>{ platformEvidenceLabel(detail.Platform.SupportState) }</dd><dt>Support ends</dt><dd>{ detail.Platform.SupportEndsOn }</dd><dt>Extended Security Updates</dt><dd>{ platformEvidenceLabel(detail.Platform.ExtendedSecurityUpdates) }</dd></dl>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Delivery steps</h2>
+					<p>Acknowledgment confirms a command response. Policy verification requires the separate read-back steps.</p>
+					<div role="region" aria-label="Windows update delivery steps table" tabindex="0" class="overflow-x-auto">
+						<table class="uk-table uk-table-divider">
+							<thead><tr><th scope="col">Step</th><th scope="col">Status</th><th scope="col">Sent</th><th scope="col">Completed</th></tr></thead>
+							<tbody>
+								for index, step := range detail.Steps {
+									<tr><td>{ updateStep(index) }</td><td>{ updateState(step.Phase) }</td><td>{ optionalTimestamp(step.DeliveredAt) }</td><td>{ optionalTimestamp(step.CompletedAt) }</td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Policy read-back</h2>
+					<p>Receipt times belong to each read batch. Partial batches do not constitute a complete or simultaneous policy snapshot. Missing values and a numeric zero are distinct.</p>
+					if len(detail.Outcomes)==0 {
+						<p class="my-3">No setting observations are available yet.</p>
+					} else {
+						<div role="region" aria-label="Windows update setting evidence table" tabindex="0" class="overflow-x-auto">
+							<table class="uk-table uk-table-divider">
+								<thead><tr><th scope="col">Setting</th><th scope="col">Reviewed value</th><th scope="col">Configured / status</th><th scope="col">Effective / status</th><th scope="col">Evidence</th><th scope="col">Received</th></tr></thead>
+								<tbody>
+									for _, row := range detail.Outcomes {
+										<tr><td>{ row.Name }</td><td>{ fmt.Sprint(row.Expected) }</td><td>{ observedInteger(row.Configured) }<div>{ fmt.Sprintf("Status %d", row.ConfigStatus) }</div></td><td>{ observedInteger(row.Effective) }<div>{ fmt.Sprintf("Status %d", row.EffectiveStatus) }</div></td><td>{ updateState(row.State) }</td><td>{ optionalTimestamp(row.EvidenceReceivedAt) }</td></tr>
+									}
+								</tbody>
+							</table>
+						</div>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

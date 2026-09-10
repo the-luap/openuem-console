@@ -9,8 +9,11 @@ and cancellation of undelivered remaining steps.
 
 This is update-policy management. A verified run confirms the values returned by
 the device's policy CSP. It does not prove update download, installation, restart,
-patch compliance, licensing or physical device acceptance. Production routes,
-console forms and scheduled group rollout remain separate implementation work.
+patch compliance, licensing or physical device acceptance. The
+[listener](native-windows-operations.md) registers device protocol routes;
+[run history and cancellation](native-windows-update-console.md) now have console
+routes. [Scheduled cohorts](native-windows-update-schedules.md) are implemented;
+policy/ring/schedule creation forms remain separate work.
 [Versioned update rings and explicit cohorts](native-windows-update-rings.md) now
 reuse these device runs with protected source provenance.
 
