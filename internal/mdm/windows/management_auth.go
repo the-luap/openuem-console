@@ -84,8 +84,17 @@ func managementPeerCertificateWithIdentity(r *http.Request, options EnrollmentOp
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
-	u, _ := enrollmentEndpoint(options.ManagementURL)
-	if r == nil || r.Method != http.MethodPost || r.URL == nil || r.URL.RawPath != "" || r.URL.Path != u.Path || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.URL.User != nil || r.URL.Opaque != "" || (r.URL.Scheme != "" && r.URL.Scheme != "https") || (r.URL.Host != "" && r.URL.Host != r.Host) || !sameEnrollmentEndpoint("https://"+r.Host+u.Path, options.ManagementURL) {
+	return windowsPeerCertificate(r, options.ManagementURL, identity)
+}
+
+// Bind transport proof to the endpoint handling this request, without changing
+// the immutable management configuration used for database authorization.
+func windowsPeerCertificate(r *http.Request, endpoint string, identity clientidentity.Policy) (*x509.Certificate, error) {
+	u, err := enrollmentEndpoint(endpoint)
+	if err != nil {
+		return nil, ErrManagementIdentity
+	}
+	if r == nil || r.Method != http.MethodPost || r.URL == nil || r.URL.RawPath != "" || r.URL.Path != u.Path || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.URL.User != nil || r.URL.Opaque != "" || (r.URL.Scheme != "" && r.URL.Scheme != "https") || (r.URL.Host != "" && r.URL.Host != r.Host) || !sameEnrollmentEndpoint("https://"+r.Host+u.Path, endpoint) {
 		return nil, ErrManagementIdentity
 	}
 	state := r.TLS

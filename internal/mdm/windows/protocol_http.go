@@ -67,7 +67,7 @@ func NewProtocolHandler(store *Store, options ProtocolOptions, identity clientid
 	if err != nil {
 		return nil, err
 	}
-	wstep, err := NewWSTEPHandler(store, origin+protocol.EnrollmentPath, enrollment)
+	wstep, err := newWSTEPHandlerWithIdentity(store, origin+protocol.EnrollmentPath, enrollment, identity)
 	if err != nil {
 		return nil, err
 	}

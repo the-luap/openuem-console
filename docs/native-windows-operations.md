@@ -53,13 +53,15 @@ preserves the public HTTP Host. No Windows option makes console pages public.
 
 Queries (including an empty `?`), encoded aliases, suffixes, extra segments and
 other methods are excluded from public routing. Discovery advertises initial
-OnPremise enrollment version 3. Federated/Entra, certificate renewal and
-Autopilot flows are not advertised by this listener.
+OnPremise enrollment version 3. Certificate-authenticated
+[Renew](native-windows-renewal.md) uses the existing enrollment endpoint and
+preserves the initial enrollment/SyncML state. Federated/Entra, account-password
+renewal and Autopilot flows are not advertised; automatic ROBO remains disabled.
 
 ## Transport and resource boundaries
 
 Direct TLS mode requests a client certificate but allows anonymous discovery,
-policy and initial enrollment. SyncML requires the enrolled leaf and its private
+policy and initial enrollment. Certificate renewal and SyncML require the enrolled leaf and its private
 key proof, then rechecks issuer, fingerprint, live scope, revocation and the
 enrollment configuration within the existing session transaction.
 

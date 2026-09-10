@@ -26,7 +26,9 @@ var ErrRenewalConflict = errors.New("native Windows certificate renewal conflict
 
 type CertificateRenewalRequest struct {
 	MessageID string
-	CMSDER    []byte `json:"-" xml:"-" yaml:"-"`
+	CMSDER    []byte     `json:"-" xml:"-" yaml:"-"`
+	CreatedAt *time.Time `json:"-" xml:"-" yaml:"-"`
+	ExpiresAt *time.Time `json:"-" xml:"-" yaml:"-"`
 }
 
 func (CertificateRenewalRequest) String() string     { return "[protected Windows renewal request]" }
@@ -394,6 +396,25 @@ func checkCertificateRenewalWindow(ctx context.Context, tx *sql.Tx, device *mana
 	return nil
 }
 
+// A WS-Security timestamp is an optional freshness constraint, never identity
+// or a replacement for CMS proof. Recheck it after database/audit waits.
+func checkRenewalRequestTime(ctx context.Context, tx *sql.Tx, request CertificateRenewalRequest) error {
+	if request.CreatedAt == nil && request.ExpiresAt == nil {
+		return nil
+	}
+	if request.CreatedAt == nil || request.ExpiresAt == nil || !request.ExpiresAt.After(*request.CreatedAt) || request.ExpiresAt.Sub(*request.CreatedAt) > 10*time.Minute {
+		return ErrCertificateRenewal
+	}
+	var now time.Time
+	if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
+		return err
+	}
+	if request.CreatedAt.After(now.Add(5*time.Minute)) || !request.ExpiresAt.After(now) {
+		return ErrCertificateRenewal
+	}
+	return nil
+}
+
 // RenewWindowsCertificate issues one pending replacement from an authenticated
 // current device certificate. The transport must supply the actual peer leaf;
 // scope and identity are derived again under database locks. Issuance does not
@@ -414,6 +435,9 @@ func (s *Store) RenewWindowsCertificate(ctx context.Context, certificate *x509.C
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock_shared(684627902)`); err != nil {
+		return nil, err
+	}
+	if err := checkRenewalRequestTime(ctx, tx, request); err != nil {
 		return nil, err
 	}
 	device, err := s.authorizeManagementDeviceExclusive(ctx, tx, certificate, options)
@@ -455,6 +479,9 @@ func (s *Store) RenewWindowsCertificate(ctx context.Context, certificate *x509.C
 			return nil, err
 		}
 		if err := checkCertificateRenewalWindow(ctx, tx, device, a.metadata); err != nil {
+			return nil, err
+		}
+		if err := checkRenewalRequestTime(ctx, tx, request); err != nil {
 			return nil, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -505,6 +532,9 @@ func (s *Store) RenewWindowsCertificate(ctx context.Context, certificate *x509.C
 		return nil, err
 	}
 	if err := checkCertificateRenewalWindow(ctx, tx, device, a.metadata); err != nil {
+		return nil, err
+	}
+	if err := checkRenewalRequestTime(ctx, tx, request); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

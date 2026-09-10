@@ -13,7 +13,7 @@ ring/schedule workflows provide operator controls.
 The [CSP command extension](native-windows-csp.md) adds administrative queues and
 correlated results. The [typed update extension](native-windows-updates.md) adds
 platform preflight and separate effective-policy read-back. Broader policies,
-automatic ring promotion, registered certificate renewal and unenrollment remain
+automatic ring promotion, complete renewal operations and unenrollment remain
 open. WIN-02 remains in progress.
 
 ## HTTP and authorization

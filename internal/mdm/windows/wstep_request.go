@@ -50,6 +50,14 @@ func (WSTEPRequest) GoString() string { return "[protected Windows enrollment re
 // Renewal (PKCS#7), federated tokens and certificate-authenticated enrollment
 // must use their own verification flows, never fall through to initial issuance.
 func ParseWSTEPRequest(data []byte, expectedURL string) (*WSTEPRequest, error) {
+	message, err := parseWSTEPMessage(data, expectedURL)
+	if err != nil {
+		return nil, err
+	}
+	return parseWSTEPInitial(message)
+}
+
+func parseWSTEPMessage(data []byte, expectedURL string) (*soapMessage, error) {
 	message, err := parseSOAP(data, MaxWSTEPBytes, xml.Name{Space: securityNS, Local: "Security"})
 	if err != nil {
 		return nil, err
@@ -60,6 +68,25 @@ func ParseWSTEPRequest(data []byte, expectedURL string) (*WSTEPRequest, error) {
 	if !sameEnrollmentEndpoint(message.To, expectedURL) {
 		return nil, ErrEndpoint
 	}
+	return message, nil
+}
+
+func wstepRequestType(message *soapMessage) (string, error) {
+	if !message.Body.is(trustNS, "RequestSecurityToken") || !message.Body.container() || len(message.Body.Attrs) != 0 {
+		return "", ErrWSTEP
+	}
+	requestType, err := message.Body.one(trustNS, "RequestType")
+	if err != nil {
+		return "", ErrWSTEP
+	}
+	value, err := requestType.plainText(256)
+	if err != nil || (value != trustNS+"/Issue" && value != trustNS+"/Renew") {
+		return "", ErrWSTEP
+	}
+	return value, nil
+}
+
+func parseWSTEPInitial(message *soapMessage) (*WSTEPRequest, error) {
 	body := message.Body
 	if !body.is(trustNS, "RequestSecurityToken") || !body.container() || len(body.Attrs) != 0 || len(body.Children) != 4 {
 		return nil, ErrWSTEP
@@ -109,7 +136,27 @@ func ParseWSTEPRequest(data []byte, expectedURL string) (*WSTEPRequest, error) {
 		return nil, ErrCSR
 	}
 	context, err := body.one(contextNS, "AdditionalContext")
-	if err != nil || !context.container() || len(context.Attrs) != 0 || len(context.Children) > maxEnrollmentContextItems {
+	if err != nil {
+		return nil, ErrWSTEP
+	}
+	items, err := parseWSTEPContext(context)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateEnrollmentContext(items); err != nil {
+		return nil, err
+	}
+	credential, err := parseUsernameCredential(message.Header)
+	if err != nil {
+		return nil, err
+	}
+	// Parsing limits the DER envelope; expensive public-key verification happens
+	// only after invitation authorization in the issuing transaction.
+	return &WSTEPRequest{MessageID: message.MessageID, Credential: credential, CSRDER: der, Context: items}, nil
+}
+
+func parseWSTEPContext(context *xmlElement) ([]EnrollmentContextItem, error) {
+	if !context.container() || len(context.Attrs) != 0 || len(context.Children) > maxEnrollmentContextItems {
 		return nil, ErrWSTEP
 	}
 	items := make([]EnrollmentContextItem, 0, len(context.Children))
@@ -127,16 +174,7 @@ func ParseWSTEPRequest(data []byte, expectedURL string) (*WSTEPRequest, error) {
 		}
 		items = append(items, EnrollmentContextItem{Name: child.Attrs[0].Value, Value: text})
 	}
-	if err := validateEnrollmentContext(items); err != nil {
-		return nil, err
-	}
-	credential, err := parseUsernameCredential(message.Header)
-	if err != nil {
-		return nil, err
-	}
-	// Parsing limits the DER envelope; expensive public-key verification happens
-	// only after invitation authorization in the issuing transaction.
-	return &WSTEPRequest{MessageID: message.MessageID, Credential: credential, CSRDER: der, Context: items}, nil
+	return items, nil
 }
 
 func enrollmentContextValue(items []EnrollmentContextItem, name string) string {
@@ -149,7 +187,11 @@ func enrollmentContextValue(items []EnrollmentContextItem, name string) string {
 }
 
 func validateEnrollmentContext(items []EnrollmentContextItem) error {
-	if len(items) == 0 || len(items) > maxEnrollmentContextItems {
+	return validateEnrollmentContextShape(items, true)
+}
+
+func validateEnrollmentContextShape(items []EnrollmentContextItem, initial bool) error {
+	if (initial && len(items) == 0) || len(items) > maxEnrollmentContextItems {
 		return ErrWSTEP
 	}
 	seen := map[string]int{}
@@ -202,9 +244,11 @@ func validateEnrollmentContext(items []EnrollmentContextItem) error {
 			}
 		}
 	}
-	for _, required := range []string{"OSEdition", "OSVersion", "ApplicationVersion", "DeviceName", "DeviceID", "DeviceType", "EnrollmentType"} {
-		if seen[required] != 1 {
-			return ErrWSTEP
+	if initial {
+		for _, required := range []string{"OSEdition", "OSVersion", "ApplicationVersion", "DeviceName", "DeviceID", "DeviceType", "EnrollmentType"} {
+			if seen[required] != 1 {
+				return ErrWSTEP
+			}
 		}
 	}
 	return nil

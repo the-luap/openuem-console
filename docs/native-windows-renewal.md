@@ -1,10 +1,12 @@
 # Native Windows certificate renewal
 
-Cryptographic verification and the persistent issuance/handoff service are
-implemented. The registered WSTEP endpoint still accepts initial Issue requests
-only and rejects Renew; renewal SOAP admission and its operator interface remain
-implementation work. No automatic renewal setting is enabled. Calling the pure
-proof verifier does not issue a certificate or modify a device.
+Cryptographic verification, persistent issuance/handoff and certificate-authenticated
+SOAP renewal are implemented. The registered WSTEP endpoint distinguishes initial
+Issue from Renew and requires the actual device TLS certificate for renewal,
+directly or through the pinned gateway. Account/federated renewal, operator
+lifecycle screens and scheduling remain implementation work. No automatic renewal
+setting is enabled. Calling the pure proof verifier does not issue a certificate
+or modify a device.
 
 ## Protocol requirements
 
@@ -159,22 +161,81 @@ certificate store, device enrollment or physical client is involved.
 The complete Windows PostgreSQL/race suite for this persistence extension passes
 in **99.851 seconds**, with the protocol package in **1.407 seconds**. Scoped
 Windows handler and view regressions pass in **2.094/2.525 seconds**. Vet and
-Linux/Windows builds pass. Full CI for this extension is pending. The registered
-SOAP renewal endpoint and physical Windows acceptance remain unverified.
+Linux/Windows builds pass. Full CI for this persistence extension is pending.
+The following extension adds SOAP admission; physical Windows acceptance remains
+unverified.
+
+## Certificate-authenticated SOAP admission
+
+`ParseWSTEPRenewalRequest` decodes the separate Renew operation at the configured
+enrollment URL. The shared SOAP envelope validator checks namespaces, destination,
+action, request identifier and required headers before selecting exactly one
+operation. Initial Issue keeps its existing UsernameToken/PKCS#10 requirements;
+an invalid Renew never falls back to initial enrollment.
+
+Renew requires the device enrollment TokenType and a WS-Security BinarySecurityToken
+with `ValueType` equal to the security namespace plus `#PKCS7`. Its canonical
+Base64 contains up to 64 KiB of CMS. SOAP remains bounded to 128 KiB. The optional
+AdditionalContext uses the existing 64-item/16-KiB aggregate hint validation
+without requiring initial-enrollment identity fields. Hints are discarded and
+cannot select the device, tenant, site or issuer.
+
+The Security header can be absent or contain an optional Timestamp and an
+optional UsernameToken with an empty password, matching Microsoft's published
+certificate-authenticated shape. An account name is only a bounded hint. A
+nonempty password, federated token, unknown security child, duplicate identifier
+or ambiguous field is rejected. This is not corporate account authentication;
+initial one-time enrollment credentials do not become reusable renewal passwords.
+
+If supplied, Created and Expires must be UTC RFC 3339 timestamps, ordered within
+ten minutes of each other. The store checks them against database time before
+issuance/replay and again after audit waits: Expires must remain in the future
+and Created permits at most five minutes of clock skew. These unsigned timestamp
+fields constrain freshness; they do not establish identity or replace CMS proof.
+Resigned/retried requests can supply fresh timestamps without issuing another key.
+
+The HTTP handler resolves the actual TLS/RFC 9440 leaf at the enrollment endpoint
+without changing the immutable management URL used for store authorization.
+Direct mode ignores certificate headers. Gateway mode requires the configured
+gateway TLS pin and its canonical forwarded client certificate. The production
+handler supplies the same gateway policy to both WSTEP and SyncML. Responses and
+fixed English faults have explicit Content-Length and no-store headers. Faults
+omit supplied credentials, certificate bytes and SQL details; only a validated
+request identifier can appear as RelatesTo. No redirect, cookie or chunked
+response is emitted.
+
+Tests exercise initial HTTP enrollment, CMS renewal, service-instance restart and
+exact retry, new-key SyncML confirmation and retired-key denial on resumed TLS.
+They run through both a direct loopback TLS listener and the actual gateway with
+its separate pinned backend TLS connection. Forged identity headers, mixed
+Issue/Renew credentials, wrong destinations and unsupported password requests do
+not issue certificates. Separate database tests expire timestamps while issuance
+or replay waits on the audit table and verify complete rollback. Parser tests
+cover namespace/field ambiguity, UTC intervals, context and CMS bounds, privacy
+and disjoint initial/renewal grammars. CI includes a bounded renewal SOAP fuzz
+target.
+
+The focused PostgreSQL/race tests pass in **9.579 seconds**. The full Windows
+PostgreSQL/race suite passes in **107.712 seconds**, with protocol in **1.430
+seconds**. Separate client-identity/gateway regressions pass in **1.333/3.037
+seconds**. SOAP parser fuzzing passes **298,640 executions** in **30.813 seconds**.
+Vet and Linux/Windows builds pass. Full CI for this SOAP extension is pending;
+synthetic TLS/protocol evidence does not establish physical Windows acceptance.
 
 ## Remaining lifecycle work
 
 The full renewal path must preserve device identity, pending commands, settings
 and history. It requires:
 
-- Renewal SOAP parsing and authenticated direct/gateway certificate admission,
-  with the automatic and account-authenticated flows handled explicitly.
+- Configured account-authenticated renewal, including its distinct request
+  content encoding and expired-certificate recovery rules, and any required
+  additional CMS/CMC compatibility.
 - Renewal scheduling configuration and an operator interface for protected
   lifecycle history/cancellation and expiry reporting.
-- End-to-end renewal SOAP/TLS admission tests and actual supported Windows
-  client/PKI acceptance, including the documented Microsoft PKI constraint.
+- Actual supported Windows client/PKI acceptance, including the documented
+  Microsoft PKI constraint before enabling automatic ROBO configuration.
 
 The existing enrollment record and bootstrap ciphertext are immutable. An
 implementation must not update their certificate reference or erase them to make
 a replacement authenticate. The persistent service preserves this requirement;
-registered renewal and unenrollment remain open in WIN-02.
+complete renewal operations and unenrollment remain open in WIN-02.

@@ -20,8 +20,9 @@ operation with one WS-Security UsernameToken, a PKCS#10 BinarySecurityToken and
 AdditionalContext. The configured HTTPS destination and SOAP action must match.
 The [renewal service](native-windows-renewal.md) checks old/new-key continuity and
 persists replacement issuance, SyncML confirmation and protected history while
-preserving the immutable initial enrollment. Registered renewal SOAP admission
-is still incomplete.
+preserving the immutable initial enrollment. The registered WSTEP handler now
+routes certificate-authenticated Renew to that separate service; account/federated
+renewal and automatic scheduling remain open.
 Renewal/PKCS#7, federated tokens and certificate-authenticated enrollment are
 separate flows and cannot become initial password enrollment. The
 [OnPremise definition](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/09c69d4c-5315-4226-be5e-4cea54058317)
