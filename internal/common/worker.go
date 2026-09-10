@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	openuem "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/authserver"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver"
@@ -13,6 +14,7 @@ import (
 )
 
 type Worker struct {
+	IndividualAgentService            *openuem.ServiceConnection
 	Model                             *models.Model
 	Logger                            *utils.OpenUEMLogger
 	DBConnectJob                      gocron.Job
@@ -88,13 +90,10 @@ func (w *Worker) StartWorker() {
 }
 
 func (w *Worker) StopWorker() {
-	w.Model.Close()
-	if err := w.TaskScheduler.Shutdown(); err != nil {
-		log.Printf("[ERROR]: could not stop the task scheduler, reason: %s", err.Error())
-	}
-
-	if w.SessionManager != nil {
-		w.SessionManager.Close()
+	if w.TaskScheduler != nil {
+		if err := w.TaskScheduler.Shutdown(); err != nil {
+			log.Printf("[ERROR]: could not stop the task scheduler, reason: %s", err.Error())
+		}
 	}
 
 	if w.WebServer != nil {
@@ -109,6 +108,12 @@ func (w *Worker) StopWorker() {
 		}
 	}
 
+	if w.SessionManager != nil {
+		w.SessionManager.Close()
+	}
+	if w.Model != nil {
+		w.Model.Close()
+	}
 	if w.Logger != nil {
 		w.Logger.Close()
 	}

@@ -75,7 +75,9 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 		}
 
-		w.StartConsoleService()
+		if err := w.StartConsoleService(); err != nil {
+			return err
+		}
 
 		// Start a job to check latest OpenUEM releases
 		channel, err := w.Model.GetDefaultUpdateChannel()
@@ -166,7 +168,10 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 				}
 
-				w.StartConsoleService()
+				if err := w.StartConsoleService(); err != nil {
+					log.Print("[ERROR]: console startup failed")
+					return
+				}
 
 				// Start a job to check latest OpenUEM releases
 				channel, err := w.Model.GetDefaultUpdateChannel()
@@ -196,13 +201,13 @@ func (w *Worker) StartDBConnectJob() error {
 	return nil
 }
 
-func (w *Worker) StartConsoleService() {
+func (w *Worker) StartConsoleService() error {
 	publicOrigin := ""
 	if configured := os.Getenv("OPENUEM_PUBLIC_ORIGIN"); configured != "" {
 		origin, err := gateway.ParseOrigin(configured)
 		if err != nil {
 			log.Printf("[ERROR]: invalid OPENUEM_PUBLIC_ORIGIN: %v", err)
-			return
+			return err
 		}
 		publicOrigin = origin.String()
 	}
@@ -235,6 +240,12 @@ func (w *Worker) StartConsoleService() {
 
 	// HTTPS web server
 	w.WebServer = webserver.New(w.Model, w.NATSServers, w.SessionManager, w.TaskScheduler, w.JWTKey, w.ConsoleCertPath, w.ConsolePrivateKeyPath, w.SFTPPrivateKeyPath, w.CACertPath, serverName, consolePort, authPort, w.DownloadDir, w.Domain, w.OrgName, w.OrgProvince, w.OrgLocality, w.OrgAddress, w.Country, w.ReverseProxyAuthPort, w.ReverseProxyServer, w.ServerReleasesFolder, w.CommonSoftwareDBFolder, w.Version, w.EncryptionMasterKey, w.ReenableCertAuth, w.ReenablePasswdAuth, w.ResetOpenUEMUser, w.AuthLogger)
+	w.WebServer.Handler.IndividualAgentService = w.IndividualAgentService
+	if err := w.WebServer.Handler.StartNATSConnectJob(); err != nil {
+		_ = w.WebServer.Close()
+		w.SessionManager.Close()
+		return err
+	}
 	w.WebServer.Handler.PublicOrigin = publicOrigin
 	go func() {
 		if err := w.WebServer.Serve(":"+consolePort, w.ConsoleCertPath, w.ConsolePrivateKeyPath); err != http.ErrServerClosed {
@@ -253,6 +264,7 @@ func (w *Worker) StartConsoleService() {
 		}
 	}()
 	log.Println("[INFO]: auth server is running")
+	return nil
 }
 
 func (w *Worker) EncryptSensitiveFields() error {

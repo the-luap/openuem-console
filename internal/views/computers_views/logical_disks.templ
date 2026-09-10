@@ -20,6 +20,9 @@ templ LogicalDisks(c echo.Context, p partials.PaginationAndSort, agent *ent.Agen
 					@partials.ConfirmDeleteAgent(c, i18n.T(ctx, "agents.confirm_delete"), string(templ.URL(partials.GetNavigationUrl(commonInfo, "/computers"))), string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s", agent.ID)))))
 				}
 				<div id="error" class="hidden"></div>
+				if commonInfo.EndpointInboundDisabled {
+					<p role="note">Direct file transfer, device logs and remote access are disabled in this deployment.</p>
+				}
 				<div class="uk-width-1-2@m uk-card uk-card-default">
 					<div class="uk-card-header">
 						<div class="flex items-center gap-2">
@@ -55,7 +58,7 @@ templ LogicalDisks(c echo.Context, p partials.PaginationAndSort, agent *ent.Agen
 									<th>{ i18n.T(ctx, "inventory.logical_disk.remaining_space") }</th>
 									<th>{ i18n.T(ctx, "inventory.logical_disk.total_size") }</th>
 									<th>{ i18n.T(ctx, "inventory.logical_disk.bitlocker") }</th>
-									if  agent.SftpPort != "" {
+									if !commonInfo.EndpointInboundDisabled && agent.SftpPort != "" {
 										<th>{ i18n.T(ctx, "inventory.file_browser.title") }</th>
 									}
 								</tr>
@@ -82,7 +85,7 @@ templ LogicalDisks(c echo.Context, p partials.PaginationAndSort, agent *ent.Agen
 									<td class="!align-middle">
 										@partials.BitlockerStatus(disk.BitlockerStatus)
 									</td>
-									if agent.SftpPort != "" && agent.SftpService && (!commonInfo.DetectRemoteAgents || (commonInfo.DetectRemoteAgents && !agent.IsRemote)) {
+									if !commonInfo.EndpointInboundDisabled && agent.SftpPort != "" && agent.SftpService && (!commonInfo.DetectRemoteAgents || (commonInfo.DetectRemoteAgents && !agent.IsRemote)) {
 										<td class="!align-middle">
 											<form>
 												if agent.Os == "windows" {
@@ -104,7 +107,7 @@ templ LogicalDisks(c echo.Context, p partials.PaginationAndSort, agent *ent.Agen
 												</button>
 											</form>
 										</td>
-									} else {
+									} else if !commonInfo.EndpointInboundDisabled {
 										<td class="!align-middle">
 											<span uk-tooltip={ fmt.Sprintf("title: %s", i18n.T(ctx, "agents.sftp_not_available")) }>
 												<uk-icon icon="folder-x" custom-class="h-5 w-5 text-red-700 fill-red-500" hx-history="false" uk-cloak></uk-icon>

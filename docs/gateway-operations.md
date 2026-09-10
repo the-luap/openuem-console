@@ -190,6 +190,10 @@ individual broker authorization and scoped subjects separately as described in
 are removed for this route; they cannot replace end-to-end NKey possession proof.
 Do not point this route at the upstream shared-agent broker configuration.
 
+The [console's individual broker mode](individual-console-broker.md) uses its own
+private NKey connection. It leaves stream and consumer management to the separate
+provisioner and disables direct endpoint file/log/remote access in this deployment.
+
 HTTP deadlines do not limit an upgraded stream. The broker must enforce its short
 authentication timeout and expiring authorization grants, while agents use protocol
 pings, private reply inboxes and reconnect only through the configured public path.

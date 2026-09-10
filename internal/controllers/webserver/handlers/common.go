@@ -29,14 +29,15 @@ func (h *Handler) GetCommonInfo(c echo.Context) (*partials.CommonInfo, error) {
 	}
 
 	info := partials.CommonInfo{
-		Principal:      principal,
-		SM:             h.SessionManager,
-		CurrentVersion: h.Version,
-		Translator:     views.GetTranslatorForDates(c),
-		IsAdmin:        strings.Contains(c.Path(), "/admin"),
-		IsProfile:      strings.Contains(c.Path(), "/profiles"),
-		IsTask:         strings.Contains(c.Path(), "/tasks"),
-		CSRFToken:      csrfToken,
+		EndpointInboundDisabled: h.IndividualAgentService != nil,
+		Principal:               principal,
+		SM:                      h.SessionManager,
+		CurrentVersion:          h.Version,
+		Translator:              views.GetTranslatorForDates(c),
+		IsAdmin:                 strings.Contains(c.Path(), "/admin"),
+		IsProfile:               strings.Contains(c.Path(), "/profiles"),
+		IsTask:                  strings.Contains(c.Path(), "/tasks"),
+		CSRFToken:               csrfToken,
 	}
 
 	if strings.Contains(c.Request().URL.String(), "computers") && !strings.HasSuffix(c.Request().URL.String(), "computers") {

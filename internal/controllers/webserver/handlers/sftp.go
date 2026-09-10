@@ -37,6 +37,9 @@ type CheckedItemsForm struct {
 }
 
 func (h *Handler) BrowseLogicalDisk(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -124,6 +127,9 @@ func (h *Handler) BrowseLogicalDisk(c echo.Context) error {
 }
 
 func (h *Handler) NewFolder(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err
@@ -177,6 +183,9 @@ func (h *Handler) NewFolder(c echo.Context) error {
 }
 
 func (h *Handler) DeleteItem(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -254,6 +263,9 @@ func (h *Handler) DeleteItem(c echo.Context) error {
 }
 
 func (h *Handler) RenameItem(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -340,6 +352,9 @@ func (h *Handler) RenameItem(c echo.Context) error {
 }
 
 func (h *Handler) DeleteMany(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -419,6 +434,9 @@ func (h *Handler) DeleteMany(c echo.Context) error {
 }
 
 func (h *Handler) UploadFile(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -526,6 +544,9 @@ func (h *Handler) UploadFile(c echo.Context) error {
 }
 
 func (h *Handler) DownloadFile(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err
@@ -597,6 +618,9 @@ func (h *Handler) DownloadFile(c echo.Context) error {
 }
 
 func (h *Handler) DownloadFolderAsZIP(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err
@@ -672,6 +696,9 @@ func (h *Handler) DownloadFolderAsZIP(c echo.Context) error {
 }
 
 func (h *Handler) DownloadManyAsZIP(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err

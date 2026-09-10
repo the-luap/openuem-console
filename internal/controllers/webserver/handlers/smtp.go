@@ -56,7 +56,7 @@ func (h *Handler) SMTPSettings(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 		}
 
-		if err := h.NATSConnection.Publish("notification.reload_settings", nil); err != nil {
+		if err := h.PublishBroker("notification.reload_settings", nil); err != nil {
 			return RenderError(c, partials.ErrorMessage(err.Error(), false))
 		}
 

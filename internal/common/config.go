@@ -5,12 +5,17 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
 	"github.com/open-uem/utils"
 	"gopkg.in/ini.v1"
 )
 
 func (w *Worker) GenerateConsoleConfig() error {
 	var err error
+	w.IndividualAgentService, err = consolebroker.FromEnvironment()
+	if err != nil {
+		return err
+	}
 
 	w.DBUrl, err = utils.CreatePostgresDatabaseURL()
 	if err != nil {
@@ -61,16 +66,19 @@ func (w *Worker) GenerateConsoleConfig() error {
 		return err
 	}
 
-	key, err = cfg.Section("Certificates").GetKey("SFTPKey")
-	if err != nil {
-		return err
-	}
+	w.SFTPPrivateKeyPath = ""
+	if w.IndividualAgentService == nil {
+		key, err = cfg.Section("Certificates").GetKey("SFTPKey")
+		if err != nil {
+			return err
+		}
 
-	w.SFTPPrivateKeyPath = key.String()
-	_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
-	if err != nil {
-		log.Println("[ERROR]: could not read SFTP private key")
-		return err
+		w.SFTPPrivateKeyPath = key.String()
+		_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
+		if err != nil {
+			log.Println("[ERROR]: could not read SFTP private key")
+			return err
+		}
 	}
 
 	w.JWTKey, err = utils.GetJWTKey()
@@ -102,11 +110,15 @@ func (w *Worker) GenerateConsoleConfig() error {
 	}
 	w.Domain = key.String()
 
-	key, err = cfg.Section("NATS").GetKey("NATSServers")
-	if err != nil {
-		return err
+	if w.IndividualAgentService != nil {
+		w.NATSServers = w.IndividualAgentService.Servers
+	} else {
+		key, err = cfg.Section("NATS").GetKey("NATSServers")
+		if err != nil {
+			return err
+		}
+		w.NATSServers = key.String()
 	}
-	w.NATSServers = key.String()
 
 	key, err = cfg.Section("Certificates").GetKey("OrgName")
 	if err != nil {

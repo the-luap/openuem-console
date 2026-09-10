@@ -3,6 +3,7 @@ package webserver
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -75,6 +76,15 @@ func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts goc
 }
 
 func (w *WebServer) Serve(address, certFile, certKey string) error {
+	if w.Handler.IndividualAgentService != nil && w.Handler.IndividualBroker == nil {
+		return errors.New("individual console broker must be connected before serving")
+	}
+	var brokerFailure <-chan struct{}
+	if w.Handler.IndividualBroker != nil {
+		defer w.Handler.IndividualBroker.Close()
+		brokerFailure = w.Handler.IndividualBroker.Failure()
+	}
+
 	permissions, err := access.NewStore(w.Handler.Model.DB)
 	if err != nil {
 		return err
@@ -125,10 +135,14 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	}
 
 	identity.ConfigureTLS(w.Server.TLSConfig)
-	return w.Server.ListenAndServeTLS(certFile, certKey)
+	return serveWithBroker(w.Server, brokerFailure, func() error { return w.Server.ListenAndServeTLS(certFile, certKey) })
 }
 
 func (w *WebServer) Close() error {
+	if w.Handler != nil && w.Handler.IndividualBroker != nil {
+		defer w.Handler.IndividualBroker.Close()
+	}
+
 	w.stopWindows()
 	w.stopAuditRetention()
 	w.stopAppleReminders()

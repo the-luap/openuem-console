@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Individual console broker startup](individual-console-broker.md) connects the
+  CLI and installed Linux/Windows service through a separate console NKey before
+  listener startup, with explicit private TLS origins, no legacy fallback and no
+  stream/consumer/election management. Broker command retention, restart and
+  permission rejection pass the stock generated-config race fixture in 6.956
+  seconds. Native handler and joined HTTP lifecycle checks pass; an isolated
+  Linux arm64 process verifies the actual CLI flags without legacy broker/SFTP
+  inputs, and full Linux/Windows builds pass. Complete affected PostgreSQL/race
+  suites pass (handlers 13.324 seconds, webserver 1.895 seconds), as does Vet.
+  Direct file/log/remote operations
+  are denied and their UI actions hidden; unsupported legacy service subjects
+  return synchronous errors. Separate internal notification/certificate/catalog
+  integration, complete reference composition and physical acceptance remain.
 - [Private backend PKI initialization](https://github.com/the-luap/openuem-cert-manager/blob/272d58538f2854efd65cbba81c3bbf469ee3e595/docs/private-pki.md)
   adds a protected CA and distinct console, broker and gateway identities, retained
   original key/certificate records, configuration binding, exclusive initialization,

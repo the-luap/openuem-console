@@ -274,7 +274,7 @@ func (h *Handler) SendCertificateRequestToNATS(c echo.Context, user *openuem_ent
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
 
-	if err := h.NATSConnection.Publish("certificates.user", data); err != nil {
+	if err := h.PublishBroker("certificates.user", data); err != nil {
 		return err
 	}
 	return nil
@@ -364,7 +364,7 @@ func (h *Handler) RenewUserCertificate(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	if err := h.NATSConnection.Publish("certificates.user", data); err != nil {
+	if err := h.PublishBroker("certificates.user", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
 
@@ -468,7 +468,7 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
 
-	if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+	if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 		return err
 	}
 
@@ -513,7 +513,7 @@ func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.U
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
 
-	if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+	if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 		return err
 	}
 

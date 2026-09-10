@@ -644,7 +644,7 @@ func (h *Handler) ForgotPasswordEmail(c echo.Context) error {
 			return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 		}
 
-		if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+		if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 			return err
 		}
 

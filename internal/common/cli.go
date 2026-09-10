@@ -1,12 +1,19 @@
 package common
 
 import (
+	"errors"
+
+	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
 	"github.com/open-uem/utils"
 	"github.com/urfave/cli/v2"
 )
 
 func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	var err error
+	w.IndividualAgentService, err = consolebroker.FromEnvironment()
+	if err != nil {
+		return err
+	}
 
 	w.DBUrl = cCtx.String("dburl")
 
@@ -28,13 +35,22 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 		return err
 	}
 
-	w.SFTPPrivateKeyPath = cCtx.String("sftpkey")
-	_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
-	if err != nil {
-		return err
-	}
+	w.SFTPPrivateKeyPath = ""
+	if w.IndividualAgentService != nil {
+		w.NATSServers = w.IndividualAgentService.Servers
+	} else {
+		w.SFTPPrivateKeyPath = cCtx.String("sftpkey")
+		_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
+		if err != nil {
+			return err
+		}
 
-	w.NATSServers = cCtx.String("nats-servers")
+		w.NATSServers = cCtx.String("nats-servers")
+
+		if w.NATSServers == "" {
+			return errors.New("legacy console requires NATS servers")
+		}
+	}
 
 	w.JWTKey = cCtx.String("jwt-key")
 

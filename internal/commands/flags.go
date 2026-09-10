@@ -29,10 +29,9 @@ func StartConsoleFlags() []cli.Flag {
 			EnvVars: []string{"SFTP_KEY_FILENAME"},
 		},
 		&cli.StringFlag{
-			Name:     "nats-servers",
-			Usage:    "comma-separated list of NATS servers urls e.g (tls://localhost:4433)",
-			EnvVars:  []string{"NATS_SERVERS"},
-			Required: true,
+			Name:    "nats-servers",
+			Usage:   "legacy NATS server URLs; individual mode uses OPENUEM_AGENT_BROKER_URLS",
+			EnvVars: []string{"NATS_SERVERS"},
 		},
 		&cli.StringFlag{
 			Name:     "dburl",

@@ -21,25 +21,26 @@ type Breadcrumb struct {
 }
 
 type CommonInfo struct {
-	Principal          access.Principal
-	SM                 *sessions.SessionManager
-	CurrentVersion     string
-	LatestVersion      string
-	Tenants            []*ent.Tenant
-	Sites              []*ent.Site
-	TenantID           string
-	SiteID             string
-	DetectRemoteAgents bool
-	Translator         locales.Translator
-	IsAdmin            bool
-	ActionTenantID     string
-	IsComputer         bool
-	IsProfile          bool
-	IsTask             bool
-	ProfileSiteID      string
-	CSRFToken          string
-	IsDocker           bool
-	IsTurnstileEnabled bool
+	EndpointInboundDisabled bool
+	Principal               access.Principal
+	SM                      *sessions.SessionManager
+	CurrentVersion          string
+	LatestVersion           string
+	Tenants                 []*ent.Tenant
+	Sites                   []*ent.Site
+	TenantID                string
+	SiteID                  string
+	DetectRemoteAgents      bool
+	Translator              locales.Translator
+	IsAdmin                 bool
+	ActionTenantID          string
+	IsComputer              bool
+	IsProfile               bool
+	IsTask                  bool
+	ProfileSiteID           string
+	CSRFToken               string
+	IsDocker                bool
+	IsTurnstileEnabled      bool
 }
 
 func (info *CommonInfo) Can(capability access.Capability) bool {

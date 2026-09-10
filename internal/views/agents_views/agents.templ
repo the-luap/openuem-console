@@ -556,7 +556,7 @@ templ AddActionsButton(agent *ent.Agent, index int, sftpDisabled bool, commonInf
 					</a>
 				</li>
 			}
-			if !sftpDisabled && agent.AgentStatus == "Enabled" {
+			if !commonInfo.EndpointInboundDisabled && !sftpDisabled && agent.AgentStatus == "Enabled" {
 				<li>
 					<a
 						hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/agents/%s/logs", agent.ID)))) }

@@ -1,0 +1,32 @@
+name: Individual console broker
+
+on:
+  push:
+    branches: [feature/native-ios-management]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  console-broker:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: Generate console templates
+        run: go tool templ generate
+      - name: Native console configuration, broker and route gates
+        run: go test -count=1 -timeout=4m -run '^Test(Individual|Environment|GeneratedBroker)' ./internal/common ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Linux race and lifecycle checks
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|Environment|GeneratedBroker)' ./internal/common ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Vet affected startup paths
+        run: go vet ./internal/common ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
