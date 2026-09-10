@@ -7,8 +7,9 @@ services](native-windows-mdm.md). The optional
 [listener and gateway](native-windows-operations.md) now connect these services
 to authenticated SyncML, CSP commands/results and scheduled update policies.
 The [enrollment/device console](native-windows-console.md) now provides CA setup,
-one-time credentials and scoped access revocation. WIN-02 remains in progress:
-command/update console workflows, renewal/unenrollment, broader policy
+one-time credentials and scoped access revocation. Command creation/evidence and
+typed update, ring, cohort and schedule consoles are also implemented. WIN-02
+remains in progress: retention/export, renewal/unenrollment, broader typed policy
 workflows and physical Windows acceptance are still open. Issuing a
 certificate does not mark a device as successfully managed.
 
@@ -17,6 +18,8 @@ certificate does not mark a device as successfully managed.
 `ParseWSTEPRequest` implements the initial MS-MDE2 `RequestSecurityToken` Issue
 operation with one WS-Security UsernameToken, a PKCS#10 BinarySecurityToken and
 AdditionalContext. The configured HTTPS destination and SOAP action must match.
+The [CMS renewal proof verifier](native-windows-renewal.md) now checks old/new-key
+continuity; the registered renewal lifecycle is still incomplete.
 Renewal/PKCS#7, federated tokens and certificate-authenticated enrollment are
 separate flows and cannot become initial password enrollment. The
 [OnPremise definition](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/09c69d4c-5315-4226-be5e-4cea54058317)

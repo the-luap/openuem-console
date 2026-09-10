@@ -63,6 +63,8 @@ jobs:
         run: go test -run '^$' -fuzz=FuzzWSTEPRequest -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows enrollment CSR proof and parser fuzzing
         run: go test -run '^$' -fuzz=FuzzEnrollmentCSR -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows CMS renewal proof fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsRenewalProof$' -fuzztime=15s -fuzzminimizetime=1s -parallel=2 ./internal/mdm/windows
       - name: Bounded Windows SyncML digest fuzzing
         run: go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Bounded Windows SyncML XML codec fuzzing

@@ -267,7 +267,9 @@ contained at 390/768/1440 pixels; the edited 768-pixel form passes visual inspec
 The complete browser-fixture handler/race run passes in **80.036 seconds**, with
 views passing in **3.045/1.883 seconds**. Its earlier duplicate-field rejection
 returns the expected HTTP 400; the final page has no console warnings/errors.
-Complete CI for the creation extension is pending.
+Both complete workflows pass for creation commit `4dd95d7`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34434259923),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34434262839)).
 
 Observation-history tests cover partial/completed snapshots, restart and exact
 packet replay, ascending pagination, empty histories, current versus historical
