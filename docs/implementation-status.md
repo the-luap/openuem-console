@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [release admission command](agent-release-operations.md) now accepts
+  `--dburl-file` and `OPENUEM_AGENT_DATABASE_URL_FILE` through the shared protected
+  credential reader. Raw/file conflicts, missing or damaged files and argument
+  errors fail without revealing input values; offline signed-manifest inspection
+  does not load database credentials. Actual isolated PostgreSQL admission, show
+  and withdrawal pass using only the protected connection file, preserving the
+  approved catalog checkpoint and audit path. CLI/offline/privacy race tests,
+  native and Windows vet, and Windows cross-build pass. Native Windows command
+  checks and the PostgreSQL race workflow include these paths. Signed package
+  distribution and complete release-pipeline integration remain open.
+- The [2d89af1 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34543092044)
+  passes Linux amd64, Linux arm64 and Windows, including actual first-password
+  mount retirement before the fresh and retained-maintenance reference sequences.
 - The reference setup now obtains independent administrator trust from the actual
   retained PKI initializer at
   [`633bc7b`](https://github.com/the-luap/openuem-cert-manager/commit/633bc7bb0dc34c1240a72a9df25c74ad19451885).

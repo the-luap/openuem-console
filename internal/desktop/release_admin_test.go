@@ -47,11 +47,16 @@ func TestReleaseAdministrationCommandUsesPersistedCatalogAndRedactedOutput(t *te
 	query := databaseURL.Query()
 	query.Set("search_path", schema)
 	databaseURL.RawQuery = query.Encode()
-	config := ReleaseAdminConfig{Action: "accept", DatabaseURL: databaseURL.String(), Directory: f.directory, TrustedKeysFile: keyPath, ManifestFile: manifestPath, Actor: "release-cli-test"}
+	connectionPath := filepath.Join(t.TempDir(), "database.url")
+	if err := keyfile.Create(connectionPath, []byte(databaseURL.String())); err != nil {
+		t.Fatal("cannot create protected release database configuration")
+	}
+	config := ReleaseAdminConfig{Action: "accept", DatabaseURLFile: connectionPath, Directory: f.directory, TrustedKeysFile: keyPath, ManifestFile: manifestPath, Actor: "release-cli-test"}
 	var output bytes.Buffer
 	inspect := config
 	inspect.Action = "inspect"
-	inspect.DatabaseURL = ""
+	inspect.DatabaseURL = "unusable-synthetic-database-input"
+	inspect.DatabaseURLFile = filepath.Join(t.TempDir(), "missing-database.url")
 	inspect.Directory = ""
 	inspect.Actor = ""
 	if err = RunReleaseAdmin(context.Background(), inspect, &output); err != nil || !strings.Contains(output.String(), `"status":"candidate"`) {
@@ -154,5 +159,22 @@ func TestReleaseCommandDoesNotExposeDatabaseParseErrors(t *testing.T) {
 	err := RunReleaseAdmin(context.Background(), ReleaseAdminConfig{Action: "show", DatabaseURL: "postgres://secret-marker@[%invalid"}, &output)
 	if err == nil || strings.Contains(err.Error(), "secret-marker") || output.Len() != 0 {
 		t.Fatal("database parse failure was not redacted")
+	}
+}
+
+func TestReleaseCommandRejectsConflictingAndDamagedDatabaseFiles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "database.url")
+	if err := keyfile.Create(path, []byte("postgres://secret-marker@[%invalid")); err != nil {
+		t.Fatal(err)
+	}
+	for _, config := range []ReleaseAdminConfig{
+		{Action: "show", DatabaseURLFile: path},
+		{Action: "show", DatabaseURLFile: filepath.Join(t.TempDir(), "missing.url")},
+		{Action: "show", DatabaseURL: "postgres://secret-marker@localhost/database", DatabaseURLFile: path},
+	} {
+		var output bytes.Buffer
+		if err := RunReleaseAdmin(t.Context(), config, &output); err == nil || strings.Contains(err.Error(), "secret-marker") || output.Len() != 0 {
+			t.Fatal("release database input was accepted or disclosed")
+		}
 	}
 }

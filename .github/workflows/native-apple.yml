@@ -20,6 +20,8 @@ jobs:
           cache: true
       - name: Native protected bootstrap key provisioning
         run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
+      - name: Native protected release database files and offline inspection
+        run: go test -count=1 -run 'TestRelease(Command|KeyLoader|CLI)' ./internal/desktop ./cmd/openuem-agent-releases
       - name: Native public TLS renewal and connection continuity
         run: go test -count=1 -run TestPublicTLS ./internal/gateway
       - name: Native encrypted recovery files and command boundaries
@@ -165,7 +167,7 @@ jobs:
       - name: Existing Windows deployment and SMTP settings models
         run: go test -count=1 -run 'TestDeploymentTestSuite|TestSMTPTestSuite' ./internal/models
       - name: Individual agent authorization and command service lifecycles
-        run: go test -race -count=1 ./internal/desktop/...
+        run: go test -race -count=1 ./internal/desktop/... ./cmd/openuem-agent-releases
   build:
     runs-on: ubuntu-latest
     strategy:

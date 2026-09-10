@@ -16,11 +16,13 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/keyfile"
+	"github.com/open-uem/nats/enrollment/servicecredentials"
 )
 
 type ReleaseAdminConfig struct {
 	Action          string
 	DatabaseURL     string
+	DatabaseURLFile string
 	Directory       string
 	TrustedKeysFile string
 	ManifestFile    string
@@ -72,8 +74,8 @@ func LoadReleaseKeys(path string) ([]ed25519.PublicKey, error) {
 // requires console migrations and never creates schema or loads organization CA
 // keys. The command cannot assert native OS signing/notarization on its own.
 func RunReleaseAdmin(ctx context.Context, config ReleaseAdminConfig, output io.Writer) error {
-	if output == nil || (config.Action != "inspect" && config.DatabaseURL == "") {
-		return errors.New("configure the private agent database connection")
+	if output == nil {
+		return errors.New("release administration requires an output writer")
 	}
 	if config.Action != "inspect" && config.Action != "accept" && config.Action != "show" && config.Action != "withdraw" {
 		return errors.New("choose inspect, accept, show or withdraw")
@@ -104,7 +106,11 @@ func RunReleaseAdmin(ctx context.Context, config ReleaseAdminConfig, output io.W
 		}
 		return writeReleaseMetadata(output, "candidate", verified)
 	}
-	db, err := sql.Open("pgx", config.DatabaseURL)
+	connection, err := servicecredentials.DatabaseURL(config.DatabaseURL, config.DatabaseURLFile)
+	if err != nil || connection == "" {
+		return errors.New("configure one protected private agent database connection")
+	}
+	db, err := sql.Open("pgx", connection)
 	if err != nil {
 		return errors.New("installer release database is unavailable")
 	}

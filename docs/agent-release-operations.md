@@ -11,8 +11,20 @@ by itself. Native bootstrap and installer integration remain in progress.
 
 ## Trust and repository preparation
 
-Build the command with `go build ./cmd/openuem-agent-releases`. Use the console's
-private `OPENUEM_AGENT_DATABASE_URL` environment setting for database actions.
+Build the command with `go build ./cmd/openuem-agent-releases`. Select the console's
+protected database URL file with `--dburl-file /run/database.url` or
+`OPENUEM_AGENT_DATABASE_URL_FILE=/run/database.url` for database actions. This
+keeps the URL and password out of process arguments and environment metadata.
+Mount the file read-only for the intended service account. It uses the shared
+Unix ownership/mode and Windows ACL checks and requires a bounded network
+PostgreSQL URL. Parser and driver errors do not echo credentials.
+
+An explicit `--dburl-file` selects a file instead of the environment's file path.
+The legacy raw `OPENUEM_AGENT_DATABASE_URL` remains supported when no file is
+selected; raw and file inputs together are rejected. Missing or damaged files
+never fall back to the raw value. The `inspect` action loads neither database
+input, so offline manifest verification remains independent of server credentials.
+
 The console must first apply its additive `uem_desktop_*` migrations. This command
 does not run schema migrations or load the encryption master key or organization
 CA keys. Restrict it and its database credentials to trusted server administrators
