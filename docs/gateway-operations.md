@@ -1,10 +1,10 @@
 # Native HTTPS gateway
 
-The gateway implements Apple/administrator routing, an optional native-agent
-WSS route and bounded desktop enrollment/download routes for NET-01 and SEC-01.
+The gateway implements Apple/administrator routing, optional native-agent WSS and
+Windows MDM routes, and bounded desktop enrollment/download routes for NET-01 and SEC-01.
 It is not yet the complete one-port distribution:
-production installer integration,
-Windows MDM routes, automated certificate provisioning, rate limits and a complete
+production installer integration, automated certificate issuance, broader rate
+limits and a complete
 reference deployment remain open in [implementation status](implementation-status.md).
 
 ## Implemented trust boundary
@@ -47,8 +47,10 @@ The current public allowlist contains only:
   explicit private agent backend is configured
 - `GET` and `HEAD /enroll/desktop/<canonical token>/metadata`, and
   `POST /enroll/desktop/<canonical token>/claim`, when `--desktop-url` is configured
+- `GET` and `HEAD /enroll/desktop/<canonical token>` and its `/invitation` suffix
+  for the installation page and limited token file, when `--desktop-url` is configured
 - `POST /enroll/desktop/identities/<canonical device UUID>/renewal/prepare` and
-  `/enroll/desktop/identities/<canonical device UUID>/renewal/confirm`, when
+  the corresponding `/renewal/confirm` and `/renewal/resolve` paths, when
   `--desktop-url` is configured; [renewal requires the complete signed key proofs](desktop-identity-renewal.md)
 - `GET` and `HEAD /enroll/desktop/bootstrap-keys` and
   `/enroll/desktop/<canonical token>/configuration`, when `--desktop-url` is configured
@@ -64,7 +66,7 @@ private listener, pinned gateway identity and durable schedule worker.
 See [desktop protocol operations](desktop-public-protocol.md) for its independent
 private TLS listener, JSON proof, separate configuration/release signatures, read-only downloads,
 rate/concurrency limits and bounded transfer deadlines. Its invitation landing
-page and native bootstrap/installer integration remain open.
+page is implemented; finished native installer integration remains open.
 
 Everything else requires an explicitly configured administrator source network,
 including `/login`, `/auth`, `/admin`, `/tenant/...`, `/devices`, `/computers`,
@@ -181,7 +183,57 @@ authentication timeout and expiring authorization grants, while agents use proto
 pings, private reply inboxes and reconnect only through the configured public path.
 The gateway does not perform broker identity lookup or certificate renewal itself.
 
-## Rotation
+## Public TLS renewal
+
+The gateway checks `--tls-cert` and `--tls-key` once per minute and atomically
+selects a valid replacement for subsequent TLS handshakes. Set
+`--tls-reload-interval 30s` to change the interval; the accepted range is one second
+to one hour. An invalid initial pair prevents startup. An invalid later publication
+retains the loaded pair only within its original validity. Fixing the files is
+enough to recover on the next check; no process restart or signal is required.
+
+The complete PEM chain and exactly one unencrypted private key must parse and
+match. Files are bounded to 1 MiB for at most eight certificates and 64 KiB for the
+key. Trailing incomplete PEM, unrelated blocks, duplicate keys, mismatched keys,
+foreign hostnames, expired/not-yet-valid certificates and unsuitable purposes are
+rejected. The supplied chain's signatures, name/purpose constraints and validity
+are checked, including the issuer lifetime. This checks structural suitability
+against the supplied final certificate; it does not add that certificate to
+clients' trusted roots, contact a CA or perform revocation checking. Clients still
+verify the served chain using their own trust policy.
+
+The reload worker does file I/O outside handshakes. Each handshake retains one
+immutable certificate/configuration snapshot. A validity check when selecting each
+ClientHello configuration also covers resumed sessions; expiry cannot be bypassed by an old TLS
+ticket. HTTP/2, optional end-client certificates and existing NATS WSS streams are
+preserved. An established connection remains open under ordinary HTTP/broker
+lifecycle rules. A resumed client can retain its original session's certificate
+metadata; a new full handshake receives the replacement certificate. Public TLS
+renewal does not change individual device authorization or private gateway pins.
+
+Use administrator-controlled **local regular files** and protect their directories
+and private keys. The gateway only reads these files. An ACME publisher should
+write a complete new archive generation and atomically switch a directory/symlink
+to it; standard archive symlinks are supported. Mount the containing certificate
+directory read-only into the gateway, so a publisher's atomic replacement is
+visible. A bind mount of one old file can remain attached to that old file after
+replacement. If the gateway observes a partial directory switch or nonmatching
+pair, it retains the previous pair and retries. Do not update an active private
+key or certificate in place as an operational publication method.
+
+The worker logs fixed messages when validation fails, the failure reason changes,
+the files recover or a new pair becomes active. It does not log filenames, PEM,
+private keys or request URLs. Shutdown cancels and joins this worker. The Go
+[TLS configuration contract](https://pkg.go.dev/crypto/tls#Config)
+defines immutable per-client configurations and session-resumption behavior.
+
+This supplies the reload side of public TLS automation. A production DNS-01 ACME
+issuer, provider credentials, renewal scheduling/alerts and their reference
+deployment are still required; the gateway itself never opens port 80 or calls a
+DNS provider. Public certificate files are independent of the private backend
+identity and gateway client certificate described below.
+
+## Gateway client credential rotation
 
 To rotate the gateway credential with overlap, place both valid public leaf
 certificates in the backend bundle and restart all console replicas. Then switch
@@ -222,6 +274,15 @@ WebSocket test proves individual-key login and request/reply through frontend TL
 and gateway mutual TLS, rejection of direct backend access, malformed/native route
 boundaries, connection capacity, survival beyond ordinary HTTP deadlines and
 closure of existing streams on gateway shutdown.
+
+Public TLS tests additionally exercise complete and interrupted file publication,
+issuer constraints, lifetime/clock rollback, TLS session resumption, HTTP/2 and
+optional client-certificate continuity, concurrent reload/handshake snapshots,
+watcher recovery and joined shutdown. Unix fixtures switch real archive symlinks
+and reject local FIFOs. The real NATS test retains an authenticated individual-key
+request/reply stream through public certificate renewal and checks the replacement
+leaf on subsequent full TLS handshakes. Windows CI runs the portable public TLS
+suite natively. These tests create only isolated certificates and local listeners.
 
 These tests use synthetic device identities. They do not prove Safari's optional
 certificate-selection behavior, real APNs delivery, hardware management, an actual

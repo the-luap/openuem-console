@@ -66,12 +66,17 @@ func TestAgentChannelUsesPrivateMutualTLSAndSurvivesHTTPDeadlines(t *testing.T) 
 	frontend.Config.Handler = proxy
 	frontend.Config.ReadTimeout = time.Second
 	frontend.Config.WriteTimeout = time.Second
-	frontend.TLS = &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: tls.RequestClientCert}
+	publicFiles := newPublicTLSFixture(t)
+	publicFiles.publish(t, publicFiles.issue(t, nil))
+	publicTLS, err := NewPublicTLS(frontOrigin, publicFiles.certificatePath, publicFiles.keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frontend.TLS = publicTLS.Config()
 	frontend.StartTLS()
 	t.Cleanup(frontend.Close)
 	t.Cleanup(func() { _ = proxy.Close() })
-	frontRoots := x509.NewCertPool()
-	frontRoots.AddCert(frontend.Certificate())
+	frontRoots := publicFiles.clientTLS().RootCAs
 	endpoint := strings.Replace(frontend.URL, "https://", "wss://", 1) + "/agent-channel"
 	options := []nats.Option{nats.Secure(&tls.Config{RootCAs: frontRoots}), nats.Nkey(devicePublic, deviceKey.Sign), nats.CustomInboxPrefix("uem.v1.agent.own.reply"), nats.NoReconnect(), nats.Timeout(time.Second)}
 	// The agent key alone cannot open the private backend, even with valid TLS
@@ -107,17 +112,29 @@ func TestAgentChannelUsesPrivateMutualTLSAndSurvivesHTTPDeadlines(t *testing.T) 
 		}
 	}
 	request()
+	// Public certificate renewal must preserve this authenticated NKey stream,
+	// while subsequent full TLS handshakes receive the newly published leaf.
+	replacement := publicFiles.issue(t, nil)
+	publicFiles.publish(t, replacement)
+	if changed, err := publicTLS.Reload(); err != nil || !changed {
+		t.Fatal("public TLS renewal failed", changed, err)
+	}
+	request()
 	if other, err := nats.Connect(endpoint, options...); err == nil {
 		other.Close()
 		t.Fatal("agent connection limit was not enforced")
 	}
+	publicClient := publicTLSClient(t, publicFiles.clientTLS(), true)
 	for _, path := range []string{"/agent-channel", "/agent-channel?token=secret", "/agent-channel/extra", "/login"} {
-		response, err := frontend.Client().Get(frontend.URL + path)
+		response, err := publicClient.Get(frontend.URL + path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		_, _ = io.Copy(io.Discard, response.Body)
 		response.Body.Close()
+		if !response.TLS.PeerCertificates[0].Equal(replacement.Leaf) {
+			t.Fatal("new TLS connection did not receive the renewed public certificate")
+		}
 		want := 400
 		if path == "/agent-channel/extra" || path == "/login" {
 			want = 403

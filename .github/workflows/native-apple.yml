@@ -20,6 +20,8 @@ jobs:
           cache: true
       - name: Native protected bootstrap key provisioning
         run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
+      - name: Native public TLS renewal and connection continuity
+        run: go test -count=1 -run TestPublicTLS ./internal/gateway
       - name: Native encrypted recovery files and command boundaries
         run: go test -count=1 ./internal/recovery ./cmd/openuem-recovery
       - name: Native protected vendor signing files

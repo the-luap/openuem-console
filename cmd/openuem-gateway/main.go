@@ -31,6 +31,7 @@ func run() error {
 	origin := flag.String("public-origin", "", "Canonical public HTTPS origin")
 	certPath := flag.String("tls-cert", "", "Public server certificate PEM file")
 	keyPath := flag.String("tls-key", "", "Public server private key PEM file")
+	reloadInterval := flag.Duration("tls-reload-interval", time.Minute, "Public TLS file reload interval (1s to 1h); existing connections remain open")
 	clientCertPath := flag.String("gateway-cert", "", "Gateway client certificate PEM file")
 	clientKeyPath := flag.String("gateway-key", "", "Gateway client private key PEM file")
 	caPath := flag.String("backend-ca", "", "Trusted backend server CA PEM bundle")
@@ -43,6 +44,13 @@ func run() error {
 	agentLimit := flag.Int("agent-connection-limit", 4096, "Maximum simultaneous agent upgrades and streams")
 	admin := flag.String("admin-networks", "", "Comma-separated administrator source CIDRs (for example VPN networks)")
 	flag.Parse()
+	if *reloadInterval < time.Second || *reloadInterval > time.Hour {
+		return errors.New("public TLS reload interval must be between one second and one hour")
+	}
+	publicTLS, err := gateway.NewPublicTLS(*origin, *certPath, *keyPath)
+	if err != nil {
+		return err
+	}
 	identity, err := tls.LoadX509KeyPair(*clientCertPath, *clientKeyPath)
 	if err != nil {
 		return fmt.Errorf("load gateway identity: %w", err)
@@ -75,14 +83,23 @@ func run() error {
 	defer handler.Close()
 	server := &http.Server{
 		Addr: *listen, Handler: handler,
-		// TLS proves possession; backends validate the end-client issuer and
-		// device/account binding. Anonymous enrollment remains possible.
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: tls.RequestClientCert},
+		TLSConfig:         publicTLS.Config(),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 60 * time.Second,
 		WriteTimeout: 60 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 << 10,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	reloadDone := make(chan struct{})
+	go func() {
+		defer close(reloadDone)
+		_ = publicTLS.Watch(ctx, *reloadInterval, func(err error) {
+			if err != nil {
+				log.Printf("public TLS reload rejected; retaining the previously loaded pair within its validity: %v", err)
+				return
+			}
+			log.Print("public TLS certificate files validated and active")
+		})
+	}()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -94,9 +111,10 @@ func run() error {
 			_ = server.Close()
 		}
 	}()
-	err = server.ListenAndServeTLS(*certPath, *keyPath)
+	err = server.ListenAndServeTLS("", "")
 	stop()
 	<-done
+	<-reloadDone
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

@@ -317,7 +317,9 @@ subset passes in **5.766 seconds**, and console resolution continuity in
 [library CI](https://github.com/the-luap/openuem-nats/actions/runs/34489951243)
 passes Linux/PostgreSQL/race/fuzz and native Windows checks. The corrected timestamp
 reader `2840163` also passes [all library CI jobs](https://github.com/the-luap/openuem-nats/actions/runs/34490994897);
-final console CI is tracked separately. All historical console
+Both final console `5522281` CI runs pass
+([push](https://github.com/the-luap/openuem-console/actions/runs/34491182565),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34491189411)). All historical console
 tests pass against the corrected published library in **18.115 seconds**.
 
 After handoff, original receipts, ordinals and encrypted recovery keys remain.
