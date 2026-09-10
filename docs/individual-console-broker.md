@@ -24,6 +24,9 @@ session encryption, JWT key, listener certificates and remaining CLI/INI setting
 are still required. The [protected administrator bootstrap](first-administrator-bootstrap.md)
 initializes the first account from a private provisioning file. The complete
 reference installation and automatic secret distribution remain separate work.
+The [installation secret provisioner](installation-secrets.md) generates durable
+runtime keys and the start password. Individual startup requires both runtime
+keys; mount them through `JWT_KEY_FILE` and `ENCRYPTION_MASTER_KEY_FILE`.
 
 If a private broker additionally requires a client TLS identity, configure both
 `OPENUEM_AGENT_BROKER_CLIENT_CERT_FILE` and

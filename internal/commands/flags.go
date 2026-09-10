@@ -40,10 +40,14 @@ func StartConsoleFlags() []cli.Flag {
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "jwt-key",
-			Usage:    "a string signed to use JWT tokens used in email address confirmation",
-			EnvVars:  []string{"JWT_KEY"},
-			Required: true,
+			Name:    "jwt-key",
+			Usage:   "a string signed to use JWT tokens used in email address confirmation",
+			EnvVars: []string{"JWT_KEY"},
+		},
+		&cli.StringFlag{
+			Name:    "jwt-key-file",
+			Usage:   "protected file containing the JWT signing key; mutually exclusive with jwt-key",
+			EnvVars: []string{"JWT_KEY_FILE"},
 		},
 		&cli.StringFlag{
 			Name:    "server-name",
@@ -127,6 +131,11 @@ func StartConsoleFlags() []cli.Flag {
 			Name:    "encryption-master-key",
 			Usage:   "master key used to encrypt sensitive fields in the database, need to be 32 bytes long (for example 32 ASCII characters)",
 			EnvVars: []string{"ENCRYPTION_MASTER_KEY"},
+		},
+		&cli.StringFlag{
+			Name:    "encryption-master-key-file",
+			Usage:   "protected file containing the actual 32-byte encryption key; mutually exclusive with encryption-master-key",
+			EnvVars: []string{"ENCRYPTION_MASTER_KEY_FILE"},
 		},
 	}
 }

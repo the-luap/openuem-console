@@ -24,9 +24,9 @@ jobs:
       - name: Generate console templates
         run: go tool templ generate
       - name: Native console configuration, broker and route gates
-        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Linux race and lifecycle checks
         if: runner.os == 'Linux'
-        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
       - name: Vet affected startup paths
-        run: go vet ./internal/common ./internal/setup/administrator ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./cmd/openuem-installation-secrets ./internal/commands ./internal/desktop/consolebroker ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views

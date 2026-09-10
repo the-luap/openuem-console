@@ -14,12 +14,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/openuem-console/internal/commands"
 	"github.com/open-uem/openuem-console/internal/common"
 	"github.com/urfave/cli/v2"
 )
 
 func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
+	for _, name := range []string{"JWT_KEY", "JWT_KEY_FILE", "ENCRYPTION_MASTER_KEY", "ENCRYPTION_MASTER_KEY_FILE"} {
+		t.Setenv(name, "")
+	}
 	t.Setenv("OPENUEM_INDIVIDUAL_AGENT_MODE", "true")
 	t.Setenv("OPENUEM_AGENT_BROKER_URLS", "tls://broker.internal:4222")
 	t.Setenv("OPENUEM_AGENT_CONSOLE_KEY_FILE", "/private/console.seed")
@@ -47,7 +51,14 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	run := func(args []string) error {
 		return (&cli.App{Writer: io.Discard, ErrWriter: io.Discard, Flags: commands.StartConsoleFlags(), Action: w.GenerateConsoleConfigFromCLI}).Run(args)
 	}
-	args := []string{"test", "--cacert", certFile, "--cert", certFile, "--key", keyFile, "--sftpkey", filepath.Join(directory, "missing-sftp.key"), "--dburl", "postgres://unused", "--jwt-key", "test-only", "--domain", "example.test", "--org-name", "Test"}
+	jwt, master := strings.Repeat("j", 43), strings.Repeat("m", 32)
+	jwtPath, masterPath := filepath.Join(directory, "jwt.key"), filepath.Join(directory, "master.key")
+	if keyfile.Create(jwtPath, []byte(jwt)) != nil || keyfile.Create(masterPath, []byte(master)) != nil {
+		t.Fatal("could not create protected fixture credentials")
+	}
+	args := []string{"test", "--cacert", certFile, "--cert", certFile, "--key", keyFile, "--sftpkey", filepath.Join(directory, "missing-sftp.key"), "--dburl", "postgres://unused", "--domain", "example.test", "--org-name", "Test"}
+	baseArgs := append([]string{}, args...)
+	args = append(args, "--jwt-key-file", jwtPath, "--encryption-master-key-file", masterPath)
 	if err := run(args); err != nil {
 		t.Fatal("individual CLI still needs legacy credentials", err)
 	}
@@ -57,6 +68,22 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	if w.ProtectedAdministrator == nil || w.ProtectedAdministrator.UserID != "first-admin" || w.ProtectedAdministrator.PasswordFile != "/private/first-password" {
 		t.Fatal("CLI lost protected administrator configuration")
 	}
+	if w.JWTKey != jwt || w.EncryptionMasterKey != master {
+		t.Fatal("CLI did not consume protected runtime credentials")
+	}
+	if err := run(append(append([]string{}, args...), "--jwt-key", "ambiguous")); err == nil {
+		t.Fatal("CLI allowed competing credential sources")
+	}
+	if err := run(append(append([]string{}, baseArgs...), "--jwt-key", "weak")); err == nil {
+		t.Fatal("individual CLI accepted weak or missing runtime credentials")
+	}
+	t.Setenv("JWT_KEY_FILE", jwtPath)
+	t.Setenv("ENCRYPTION_MASTER_KEY_FILE", masterPath)
+	if err := run(baseArgs); err != nil || w.JWTKey != jwt || w.EncryptionMasterKey != master {
+		t.Fatal("file environment configuration failed", err)
+	}
+	t.Setenv("JWT_KEY_FILE", "")
+	t.Setenv("ENCRYPTION_MASTER_KEY_FILE", "")
 	if err := run(append(append([]string{}, args...), "--reset-openuem-user")); err == nil {
 		t.Fatal("protected bootstrap allowed a password reset")
 	}

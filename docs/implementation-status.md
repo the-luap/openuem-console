@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Persistent installation secrets](installation-secrets.md) adds an offline
+  private provisioner with a durable source and completion manifest, independent
+  JWT/master/start-password values, exact resumable completed writes and no
+  credential output. The console CLI and installed services accept protected
+  JWT/encryption files, reject competing sources and require both keys in
+  individual mode. Race tests cover corruption, concurrency, interrupted writes,
+  privacy and the existing AES API (2.594 seconds); command tests pass in 1.323
+  seconds. The actual PostgreSQL/router administrator lifecycle now uses generated
+  credentials and passes in 4.793 seconds. Full Linux/Windows builds and affected
+  Vet checks pass. An isolated unprivileged Linux arm64 process verifies the
+  actual console flags, file environment inputs, installed credential selection
+  and rejected legacy fallback. Database/secret binding, database
+  credential provisioning, distribution, rotation and full reference composition
+  remain open.
 - [Protected first-administrator bootstrap](first-administrator-bootstrap.md)
   creates the initial account, grant, audit and retained completion binding in
   one transaction, from a bounded private file without password logging. CLI
@@ -75,8 +89,9 @@ the table's package summaries do not remove any detail from the roadmap.
   invitation records and retires session rows; reusing the current password is
   rejected. The local email fixture sends no mail. An isolated Linux arm64 process
   checks actual startup configuration and reset rejection. Full Linux/Windows
-  builds and affected Vet checks pass. Secret generation/distribution,
-  administrator PKI, the full setup wizard
+  builds and affected Vet checks pass. Native Linux amd64/arm64 and Windows
+  [configuration and protected-file CI passes](https://github.com/the-luap/openuem-console/actions/runs/34512524550).
+  Secret distribution, administrator PKI, the full setup wizard
   and reference composition remain open.
 - [Individual console broker startup](individual-console-broker.md) connects the
   CLI and installed Linux/Windows service through a separate console NKey before

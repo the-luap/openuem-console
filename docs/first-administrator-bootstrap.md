@@ -46,8 +46,10 @@ bootstrap before switching deployment modes. Setting
 the individual broker mode. Legacy mode without that setting retains its existing
 manual account initialization behavior.
 
-This component consumes a protected provisioning input. Automatic secret
-generation/distribution, the complete setup wizard, separate administrator PKI,
+This component consumes a protected provisioning input. The offline
+[installation secret provisioner](installation-secrets.md) now generates and
+retains that input together with the runtime signing/encryption keys. Secret
+distribution, the complete setup wizard, separate administrator PKI,
 container volume ownership and the full reference composition remain separate
 installation work. Existing JWT, encryption, listener, broker and database
 configuration is still required.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
 	"github.com/open-uem/openuem-console/internal/setup/administrator"
+	"github.com/open-uem/openuem-console/internal/setup/secrets"
 	"github.com/open-uem/utils"
 	"github.com/urfave/cli/v2"
 )
@@ -57,7 +58,11 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 		}
 	}
 
-	w.JWTKey = cCtx.String("jwt-key")
+	credentials, err := secrets.Load(secrets.Inputs{JWT: cCtx.String("jwt-key"), Master: cCtx.String("encryption-master-key"), JWTFile: cCtx.String("jwt-key-file"), MasterFile: cCtx.String("encryption-master-key-file"), Required: w.IndividualAgentService != nil})
+	if err != nil {
+		return err
+	}
+	w.JWTKey, w.EncryptionMasterKey = credentials.JWT, credentials.Master
 
 	w.ConsolePort = cCtx.String("console-port")
 	w.AuthPort = cCtx.String("auth-port")
@@ -74,7 +79,6 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	w.ReenablePasswdAuth = cCtx.Bool("re-enable-passwd-auth")
 	w.ResetOpenUEMUser = cCtx.Bool("reset-openuem-user")
 	w.Version = "0.12.0"
-	w.EncryptionMasterKey = cCtx.String("encryption-master-key")
 
 	return w.validateAdministratorReset()
 }

@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/setup/secrets"
 	"github.com/open-uem/utils"
 )
 
@@ -34,11 +37,29 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	if err := m.CreateDefaultTenantAndSite(); err != nil {
 		t.Fatal(err)
 	}
-	config := Config{UserID: "first-admin", PasswordFile: passwordFile(t, testPassword)}
+	initialPassword := testPassword
+	key, jwtKey := strings.Repeat("k", 32), strings.Repeat("j", 32)
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		path := filepath.Join(t.TempDir(), "provisioning")
+		if _, err := secrets.Initialize(ctx, path); err != nil {
+			t.Fatal(err)
+		}
+		credentials, err := secrets.Load(secrets.Inputs{JWTFile: filepath.Join(path, secrets.JWTFile), MasterFile: filepath.Join(path, secrets.MasterFile), Required: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key, jwtKey = credentials.Master, credentials.JWT
+		data, err := os.ReadFile(filepath.Join(path, secrets.PasswordFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialPassword = string(data)
+		clear(data)
+	}
+	config := Config{UserID: "first-admin", PasswordFile: passwordFile(t, initialPassword)}
 	if created, err := Initialize(ctx, m.DB, config); err != nil || !created {
 		t.Fatal("bootstrap failed", created, err)
 	}
-	key := strings.Repeat("k", 32)
 	sm := sessions.New(m.databaseURL, 30, key)
 	defer sm.Close()
 	permissions, _ := access.NewStore(m.DB)
@@ -69,13 +90,13 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 		if (len(expected) != 0 && rec.Code != expected[0]) || (len(expected) == 0 && rec.Code != http.StatusOK && !(path == "/login/userpass" && rec.Code == http.StatusFound)) {
 			t.Fatal("console password route failed", path, rec.Code)
 		}
-		if strings.Contains(rec.Body.String(), testPassword) {
+		if strings.Contains(rec.Body.String(), initialPassword) {
 			t.Fatal("console rendered its initial password")
 		}
 		return rec
 	}
 	request(http.MethodGet, "/login", nil)
-	rec := request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {testPassword}})
+	rec := request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {initialPassword}})
 	if !strings.Contains(rec.Body.String(), "confirm-password") || rec.Header().Get("Location") != "" {
 		t.Fatal("first login did not require password replacement")
 	}
@@ -86,7 +107,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	firstBrowser := cookies
 	cookies = map[string]*http.Cookie{}
 	request(http.MethodGet, "/login", nil)
-	request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {testPassword}})
+	request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {initialPassword}})
 	staleBrowser := cookies
 	cookies = firstBrowser
 	newPassword := "MyNew-Administrator_Password-987654321!"
@@ -98,7 +119,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	if match, err := argon2id.ComparePasswordAndHash(newPassword, u.Hash); err != nil || !match {
 		t.Fatal("replacement password was not persisted", err)
 	}
-	if match, err := argon2id.ComparePasswordAndHash(testPassword, u.Hash); err != nil || match {
+	if match, err := argon2id.ComparePasswordAndHash(initialPassword, u.Hash); err != nil || match {
 		t.Fatal("bootstrap password remained valid", err)
 	}
 	if err := os.Remove(config.PasswordFile); err != nil {
@@ -110,7 +131,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	cookies = staleBrowser
 	request(http.MethodPost, "/login/changepass", url.Values{"password": {"Stale-Session-Replacement-123456!"}, "confirm-password": {"Stale-Session-Replacement-123456!"}}, http.StatusForbidden)
 	cookies = firstBrowser
-	request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {testPassword}})
+	request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {initialPassword}})
 	rec = request(http.MethodPost, "/login/userpass", url.Values{"username": {config.UserID}, "password": {newPassword}})
 	if !strings.HasPrefix(rec.Header().Get("Location"), "https://uem.example.test/tenant/") || !strings.HasSuffix(rec.Header().Get("Location"), "/dashboard") {
 		t.Fatal("replacement password could not complete normal console login")
@@ -201,7 +222,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	// An authenticated invitation remains usable until one password is committed;
 	// scanning its GET link does not consume it. Bind the session to the exact
 	// encrypted invitation record and consume it with the password transaction.
-	h.JWTKey = strings.Repeat("j", 32)
+	h.JWTKey = jwtKey
 	if err := m.Client.User.Create().SetID("invited-admin").SetName("Invited administrator").SetPasswd(true).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

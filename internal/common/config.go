@@ -2,7 +2,6 @@ package common
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -87,10 +86,11 @@ func (w *Worker) GenerateConsoleConfig() error {
 		}
 	}
 
-	w.JWTKey, err = utils.GetJWTKey()
+	credentials, err := installedSecrets(w.IndividualAgentService != nil, utils.GetJWTKey)
 	if err != nil {
 		return err
 	}
+	w.JWTKey, w.EncryptionMasterKey = credentials.JWT, credentials.Master
 
 	key, err = cfg.Section("Console").GetKey("hostname")
 	if err != nil {
@@ -197,9 +197,6 @@ func (w *Worker) GenerateConsoleConfig() error {
 		return err
 	}
 	w.Version = key.String()
-	if w.IndividualAgentService != nil {
-		w.EncryptionMasterKey = os.Getenv("ENCRYPTION_MASTER_KEY")
-	}
 
 	return w.validateAdministratorReset()
 }
