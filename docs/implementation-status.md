@@ -70,6 +70,9 @@ the table's package summaries do not remove any detail from the roadmap.
   Linux arm64 process verifies the actual CLI flags without legacy broker/SFTP
   inputs, and full Linux/Windows builds pass. Complete affected PostgreSQL/race
   suites pass (handlers 13.324 seconds, webserver 1.895 seconds), as does Vet.
+  The native [Linux amd64/arm64 and Windows pipeline](https://github.com/the-luap/openuem-console/actions/runs/34508769503)
+  and matching [pull-request pipeline](https://github.com/the-luap/openuem-console/actions/runs/34508777009)
+  also pass on all three platforms.
   Direct file/log/remote operations
   are denied and their UI actions hidden; unsupported legacy service subjects
   return synchronous errors. Separate internal notification/certificate/catalog
