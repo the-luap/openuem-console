@@ -37,11 +37,12 @@ forwarded certificate header does not authenticate an individual agent to NATS.
 
 ## Process configuration
 
-Build with `go build ./cmd/openuem-agent-auth`. Supply the database connection URL
-through `OPENUEM_AGENT_DATABASE_URL` in the service's protected environment, rather
-than a command-line argument. Start the binary with protected service key files:
+Build with `go build ./cmd/openuem-agent-auth`. Set
+`OPENUEM_AGENT_DATABASE_URL_FILE` to its protected database URL file and mount
+that file read-only. Start the binary with protected service key files:
 
 ```sh
+OPENUEM_AGENT_DATABASE_URL_FILE=/run/openuem/database.url \
 openuem-agent-auth \
   --broker-urls tls://broker.internal:4222 \
   --broker-ca /run/openuem/broker-ca.pem \
@@ -57,6 +58,14 @@ or root and have no group/other permissions. On Windows, file ownership and ever
 effective allow ACE must be restricted to the service user, LocalSystem or local
 Administrators. Broad inherited permissions are rejected. Windows ACL checks are
 tested on a native Windows runner, in addition to Unix permission tests.
+
+The database file accepts a network PostgreSQL URL of at most 8192 printable
+non-space ASCII bytes, with an optional single LF/CRLF terminator. Its URL must
+select the deployment's verified TLS mode and CA. Missing, malformed, unprotected
+or symlinked files fail without credential output. The existing raw
+`OPENUEM_AGENT_DATABASE_URL` remains supported but cannot be combined with the
+file source; invalid files never select a raw or legacy fallback. This service
+does not receive the console's encryption master key.
 
 If the private broker requires client TLS certificates, also set
 `--broker-client-cert` and `--broker-client-key`. The TLS private key has the same
@@ -94,3 +103,10 @@ revocation, denied reconnection, readiness during broker loss, and graceful
 shutdown. The fixture requires `AGENT_ENROLLMENT_TEST_DATABASE_URL`; the console CI
 sets it and runs the test. These tests are synthetic endpoint evidence, not
 physical Windows/Mac or deployment/firewall acceptance.
+
+The lifecycle fixture uses a protected URL file. When
+`OPENUEM_AUTH_SERVICE_TEST_BINARY` names the compiled executable, it tests the
+actual process using only required file-based database configuration and sends
+SIGTERM at shutdown. The isolated PostgreSQL setup fixture also runs this process
+with generated database credentials and private server TLS, alongside command
+provisioning and the worker's own real-broker fixtures.

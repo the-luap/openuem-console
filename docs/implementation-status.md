@@ -61,6 +61,37 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Protected service credential files now cover the authorization service, command
+  provisioner and individual agent worker, using the shared reader at
+  [revision 87aa1bd](https://github.com/the-luap/openuem-nats/commit/87aa1bdf56ea7776f170c9d09de870b30be7d263).
+  Selected files have bounded contents, private Unix permissions or Windows ACLs,
+  read-only access and fixed redacted errors; competing raw/file sources are
+  rejected. The worker accepts the actual 32-byte task-field key and validates
+  all input before replacing configuration. The shared library's
+  [CI passes](https://github.com/the-luap/openuem-nats/actions/runs/34523652815).
+  [Worker revision 4f66293](https://github.com/the-luap/openuem-worker/commit/4f6629381090c91884bec08f90c77ea1288cf9d1)
+  passes Linux configuration tests, a full Windows build and affected Linux Vet
+  checks. Local console secret/authorization/command race tests pass
+  (2.947/3.674/3.817 seconds). An isolated native Linux arm64 PostgreSQL fixture
+  runs all three actual service executables using protected file inputs against
+  generated private TLS and the provisioned database (6.07 seconds). Existing
+  real-broker assertions cover authorization, revocation, command queues and
+  authenticated Windows/Mac worker requests, with successful SIGTERM shutdown.
+  Native console CI pins that worker and requires the combined process fixture;
+  worker CI also requires its executable fixture and native Windows input checks.
+  The worker's [complete CI run](https://github.com/the-luap/openuem-worker/actions/runs/34525215784)
+  passes. Full console Linux/Windows builds and affected Vet checks pass. The
+  rebuilt bootstrap distribution binary and all private services pass the full
+  isolated PostgreSQL interruption, drift, concurrency and recovery suite;
+  service processes take 6.05 seconds. The existing broker restart fixture now
+  observes disconnection and reconnection separately and requires a flush before
+  publishing, avoiding an old transport's stale connected status after shutdown.
+  The updated fixture passes ten native Linux arm64 repetitions and three race
+  repetitions on macOS, and compiles for Windows.
+  See the [authorization](agent-authorization-operations.md),
+  [command](agent-command-operations.md), and [setup container](setup-containers.md)
+  operations guides. Reference service images, mount ownership, complete topology
+  and administrator authority integration remain open.
 - [Separate setup container images](setup-containers.md) now distribute one
   command per unprivileged scratch image for installation secrets, database
   credentials and online database bootstrap. All three image filesystem,

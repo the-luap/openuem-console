@@ -26,10 +26,12 @@ import (
 	"github.com/open-uem/nats/enrollment"
 	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/nats/enrollment/servicecredentials"
 )
 
 type Config struct {
 	DatabaseURL           string
+	DatabaseURLFile       string
 	BrokerURLs            string
 	BrokerCAFile          string
 	ClientCertificateFile string
@@ -138,12 +140,16 @@ func Run(ctx context.Context, config Config, logger *slog.Logger) error {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	if config.DatabaseURL == "" || !privateBrokerURLs(config.BrokerURLs) {
+	if config.DatabaseURL == "" && config.DatabaseURLFile == "" || !privateBrokerURLs(config.BrokerURLs) {
 		return errors.New("database and credential-free private TLS broker URLs are required")
 	}
 	address, err := netip.ParseAddrPort(config.HealthAddress)
 	if err != nil || !address.Addr().IsLoopback() {
 		return errors.New("health listener must use a loopback IP address")
+	}
+	config.DatabaseURL, err = servicecredentials.DatabaseURL(config.DatabaseURL, config.DatabaseURLFile)
+	if err != nil {
+		return err
 	}
 	issuer, err := readKey(config.IssuerKeyFile, true)
 	if err != nil {

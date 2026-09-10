@@ -17,12 +17,14 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	openuem "github.com/open-uem/nats"
 	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/nats/enrollment/servicecredentials"
 )
 
 type Config struct {
-	DatabaseURL   string
-	Broker        openuem.ServiceConnection
-	HealthAddress string
+	DatabaseURL     string
+	DatabaseURLFile string
+	Broker          openuem.ServiceConnection
+	HealthAddress   string
 }
 
 func Run(ctx context.Context, config Config, logger *slog.Logger) (result error) {
@@ -38,8 +40,12 @@ func Run(ctx context.Context, config Config, logger *slog.Logger) (result error)
 	if err != nil || !address.Addr().IsLoopback() {
 		return errors.New("command service health listener must use a loopback IP address")
 	}
-	if config.DatabaseURL == "" || !openuem.ValidServiceURLs(config.Broker.Servers) {
+	if config.DatabaseURL == "" && config.DatabaseURLFile == "" || !openuem.ValidServiceURLs(config.Broker.Servers) {
 		return errors.New("command service requires a database URL and explicit private TLS broker origins")
+	}
+	config.DatabaseURL, err = servicecredentials.DatabaseURL(config.DatabaseURL, config.DatabaseURLFile)
+	if err != nil {
+		return err
 	}
 	db, err := sql.Open("pgx", config.DatabaseURL)
 	if err != nil {

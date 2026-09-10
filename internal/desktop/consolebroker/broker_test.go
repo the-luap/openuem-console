@@ -156,20 +156,32 @@ func TestGeneratedBrokerPermissionsAndReconnect(t *testing.T) {
 	if err != nil || info.State.Msgs != 1 {
 		t.Fatal("command was not retained", info, err)
 	}
+	// Observe both transitions: an immediate IsConnected check after server
+	// shutdown can still report the old transport before its reader sees EOF.
+	disconnected := console.Connection.StatusChanged(nats.RECONNECTING)
+	defer console.Connection.RemoveStatusListener(disconnected)
+	reconnected := console.Connection.StatusChanged(nats.CONNECTED)
+	defer console.Connection.RemoveStatusListener(reconnected)
 	broker.Shutdown()
 	broker.WaitForShutdown()
+	select {
+	case <-disconnected:
+	case <-time.After(5 * time.Second):
+		t.Fatal("console did not observe the broker outage")
+	}
 	select {
 	case <-console.Failure():
 		t.Fatal("temporary outage treated as terminal")
 	default:
 	}
 	broker = start()
-	deadline := time.Now().Add(8 * time.Second)
-	for !console.Connection.IsConnected() {
-		if time.Now().After(deadline) {
-			t.Fatal("console did not reconnect")
-		}
-		time.Sleep(20 * time.Millisecond)
+	select {
+	case <-reconnected:
+	case <-time.After(8 * time.Second):
+		t.Fatal("console did not reconnect")
+	}
+	if err = console.Connection.FlushWithContext(ctx); err != nil {
+		t.Fatal("reconnected transport did not acknowledge subscriptions", err)
 	}
 	if _, err = console.JetStream.Publish(ctx, "agent.report.test-device", []byte("after-restart")); err != nil {
 		t.Fatal(err)

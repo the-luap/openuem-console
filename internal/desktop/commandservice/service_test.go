@@ -172,10 +172,14 @@ func TestCommandServiceRunsGeneratedBrokerConfigAndDurableReconciliation(t *test
 		t.Fatal(err)
 	}
 	healthAddress := freeAddress()
+	databaseFile := filepath.Join(t.TempDir(), "database.url")
+	if keyfile.Create(databaseFile, []byte(dsn+"\r\n")) != nil {
+		t.Fatal("cannot create protected database URL")
+	}
 	serviceContext, stop := context.WithCancel(ctx)
 	result := make(chan error, 1)
 	go func() {
-		result <- Run(serviceContext, Config{DatabaseURL: dsn, HealthAddress: healthAddress, Broker: openuem.ServiceConnection{Servers: broker.ClientURL(), KeyFile: seedPath, CAFile: certPath}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		result <- runCommandFixture(serviceContext, Config{DatabaseURLFile: databaseFile, HealthAddress: healthAddress, Broker: openuem.ServiceConnection{Servers: broker.ClientURL(), KeyFile: seedPath, CAFile: certPath}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 	t.Cleanup(func() {
 		stop()

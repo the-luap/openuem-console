@@ -88,6 +88,17 @@ it with generated private TLS, read-only credential permissions, real database
 locking and process termination. The ordinary console model migrates the resulting
 database. CI also requires an explicit pass from the offline smoke fixture.
 
+The same isolated PostgreSQL suite starts the actual authorization and command
+service executables and the pinned individual worker at
+`4f6629381090c91884bec08f90c77ea1288cf9d1`. Each consumes a protected application
+database URL file; the worker also receives a protected task encryption key file.
+Their existing real TLS broker fixtures exercise authorization/revocation,
+durable command reconciliation and authenticated Windows/Mac worker requests,
+then require successful process shutdown after SIGTERM. The database uses the
+generated private PKI and provisioned application role. The service process
+fixture requires all six test/runtime binary paths and explicit pass markers;
+an incomplete or skipped child fixture cannot pass CI.
+
 These checks use only synthetic material. Complete reference composition,
 automatic service ownership preparation, signed release publication and full
 fresh-install/restore acceptance remain open in the

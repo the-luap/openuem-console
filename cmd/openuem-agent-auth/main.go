@@ -26,6 +26,7 @@ func main() {
 	flag.StringVar(&config.HealthAddress, "health-listen", "127.0.0.1:1326", "Loopback health listener")
 	flag.Parse()
 	config.DatabaseURL = os.Getenv("OPENUEM_AGENT_DATABASE_URL")
+	config.DatabaseURLFile = os.Getenv("OPENUEM_AGENT_DATABASE_URL_FILE")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := authservice.Run(ctx, config, slog.Default()); err != nil {

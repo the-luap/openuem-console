@@ -24,6 +24,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/nats/enrollment/registry"
 )
 
@@ -191,7 +192,11 @@ func TestRunAuthorizesAndDisconnectsDurableIdentityOverTLS(t *testing.T) {
 	}
 	address := listener.Addr().String()
 	listener.Close()
-	config := Config{DatabaseURL: dsn, BrokerURLs: broker.ClientURL(), BrokerCAFile: caPath, IssuerKeyFile: writeKey(t, signer), AuthKeyFile: writeKey(t, authKey), SystemKeyFile: writeKey(t, systemKey), DeviceAccount: "UEM_DEVICES", HealthAddress: address}
+	databaseFile := filepath.Join(t.TempDir(), "database.url")
+	if keyfile.Create(databaseFile, []byte(dsn+"\n")) != nil {
+		t.Fatal("cannot create protected database URL")
+	}
+	config := Config{DatabaseURLFile: databaseFile, BrokerURLs: broker.ClientURL(), BrokerCAFile: caPath, IssuerKeyFile: writeKey(t, signer), AuthKeyFile: writeKey(t, authKey), SystemKeyFile: writeKey(t, systemKey), DeviceAccount: "UEM_DEVICES", HealthAddress: address}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// A trusted name alone must not bypass TLS verification, even with valid NKeys.
 	untrusted := config
@@ -201,7 +206,7 @@ func TestRunAuthorizesAndDisconnectsDurableIdentityOverTLS(t *testing.T) {
 	}
 	serviceCtx, cancel := context.WithCancel(ctx)
 	result := make(chan error, 1)
-	go func() { result <- Run(serviceCtx, config, logger) }()
+	go func() { result <- runAuthorizationFixture(serviceCtx, config, logger) }()
 	t.Cleanup(func() {
 		cancel()
 		select {
