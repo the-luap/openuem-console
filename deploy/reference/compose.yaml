@@ -90,7 +90,7 @@ services:
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/encryption.key", target: /run/encryption.key}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/console-user.seed", target: /run/console.seed}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/console", target: /run/console-tls}
-      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/administrator-ca.pem", target: /run/administrator-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/administrator-ca.pem", target: /run/administrator-ca.pem}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/protocol/state/windows.key", target: /run/windows.key}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/protocol/state/desktop-bootstrap.key", target: /run/desktop-bootstrap.key}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/release-keys.pem", target: /run/release-keys.pem}

@@ -112,7 +112,7 @@ def mount(source, target, writable=False):
     return ["--mount", "type=bind,source=" + str(source) + ",destination=" + target + ("" if writable else ",readonly")]
 
 
-def layout(root, bootstrap=False):
+def layout(root, bootstrap=False, legacy_administrator=False):
     database = {"/run/database.url": "credentials/state/database.url", "/run/database-ca.pem": "pki/state/trust/backend-ca.pem",
                 "/run/backend-ca.pem": "pki/state/trust/backend-ca.pem"}
     files = {
@@ -126,7 +126,7 @@ def layout(root, bootstrap=False):
         "worker": {**database, "/run/worker.seed": "broker/state/worker-user.seed", "/run/encryption.key": "installation/state/encryption.key"},
         "console": {**database, "/run/jwt.key": "installation/state/jwt.key", "/run/encryption.key": "installation/state/encryption.key",
                     "/run/console.seed": "broker/state/console-user.seed",
-                    "/run/console-tls": "pki/state/console", "/run/administrator-ca.pem": "administrator-ca.pem",
+                    "/run/console-tls": "pki/state/console", "/run/administrator-ca.pem": "administrator-ca.pem" if legacy_administrator else "pki/state/trust/administrator-ca.pem",
                     "/run/windows.key": "protocol/state/windows.key", "/run/desktop-bootstrap.key": "protocol/state/desktop-bootstrap.key",
                     "/run/release-keys.pem": "release-keys.pem", "/run/releases": "releases", "/var/log/openuem-server": "console-logs"}}
     if bootstrap:
@@ -202,7 +202,8 @@ class Maintenance:
         if not re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", self.account):
             raise MaintenanceError("reference containers require an explicit non-root UID and GID")
         bootstrap = any(item.get("target") == "/run/initial-password" for item in self.definition["services"]["console"].get("volumes", []))
-        self.expected_mounts = layout(self.root, bootstrap)
+        legacy_administrator = any(item.get("target") == "/run/administrator-ca.pem" and pathlib.Path(item.get("source", "")).resolve() == self.root / "administrator-ca.pem" for item in self.definition["services"]["console"].get("volumes", []))
+        self.expected_mounts = layout(self.root, bootstrap, legacy_administrator)
         self.inspect()
         self.validate()
         self.current_broker = self.broker_plan()

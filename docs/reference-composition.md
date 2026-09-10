@@ -65,17 +65,25 @@ mounts contain the two exported keys; its journal stays outside the console.
 The Windows key uses `WINDOWS_MDM_MASTER_KEY_FILE`, preserving canonical Base64
 without placing the secret in container environment metadata.
 
-Additional inputs include public HTTPS files, independent administrator public
-trust, approved release public keys and the release repository. The fixture
-generates synthetic versions of these inputs. That driver is an acceptance
-fixture, not an ACME, administrator PKI or release provisioner.
+Fresh reference PKI also enables `--administrator-authority`. Its independent
+self-signed root has a separate retained key; only
+`pki/state/trust/administrator-ca.pem` reaches the console. The administrator CA
+key and its journal remain outside every runtime mount. This replaces the former
+synthetic administrator trust file in the reference fixture. Administrator client
+certificate issuance, account binding and deployed OCSP/status delivery remain
+separate work; the first administrator uses the protected password workflow.
+
+Additional inputs include public HTTPS files, approved release public keys and
+the release repository. The fixture still generates synthetic versions of these
+inputs. That driver is an acceptance fixture, not an ACME or release provisioner.
 
 Use the broker initializer revision pinned by the console workflow. The separate
 container test exposed an older initializer grant without `hardware`, `recovery`
 and `rotation`; the current worker correctly rejects that configuration. Revision
 `e7525ad161cc06323e8cc7573f1d6525379d88a7` includes the current subjects and an exact
 grant regression test. The workflow now pins its successor
-`b06bac13bd0e72f306a87ed119d2f7be66a66063`, which also supplies a
+`633bc7bb0dc34c1240a72a9df25c74ad19451885`, which also supplies the independent
+administrator root and a
 [reviewed broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/b06bac13bd0e72f306a87ed119d2f7be66a66063/docs/broker-upgrade.md).
 The reference runner invokes its read-only preview against freshly generated
 configuration and requires an exact unchanged result before starting services.
@@ -140,6 +148,8 @@ socket is added to a service image or runtime mount.
 The fixture checks:
 
 - Generated protected inputs and actual TLS database bootstrap.
+- Independent administrator public trust from the production PKI initializer,
+  with its CA key and provisioning journal excluded from runtime mounts.
 - First administrator login and mandatory password replacement through the
   gateway from one admitted client IP, with a separate client denied even when
   it forges the admitted source in forwarding headers.

@@ -61,8 +61,8 @@ func write(t *testing.T, path string, data []byte) {
 	}
 }
 
-// These public/admin certificates and signing keys are synthetic acceptance
-// inputs. They are not an administrator authority or public ACME provisioner.
+// Public HTTPS certificates and release signing keys remain synthetic acceptance
+// inputs. Administrator trust comes from the actual private PKI initializer.
 func TestReferencePrepare(t *testing.T) {
 	fixture(t)
 	makeCA := func(name string) (*x509.Certificate, *ecdsa.PrivateKey, []byte) {
@@ -97,8 +97,6 @@ func TestReferencePrepare(t *testing.T) {
 	write(t, "/state/public/server.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 	write(t, "/state/public/server.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private}))
 	write(t, "/state/public-ca.pem", caPEM)
-	_, _, adminCA := makeCA("Independent administrator fixture")
-	write(t, "/state/administrator-ca.pem", adminCA)
 	release, signing, _ := ed25519.GenerateKey(rand.Reader)
 	defer clear(signing)
 	encoded, _ := x509.MarshalPKIXPublicKey(release)

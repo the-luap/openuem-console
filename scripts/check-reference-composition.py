@@ -91,7 +91,7 @@ def main():
         command("private service PKI", *offline, *mount(root / "pki", "/work", False), args.pki_image,
                 "private-pki", "--directory", "/work/state", "--name", "reference-composition",
                 "--console-dns", "console.internal", "--broker-dns", "broker.internal",
-                "--database-dns", "database.internal")
+                "--database-dns", "database.internal", "--administrator-authority")
         command("broker setup", *offline, *mount(root / "broker", "/work", False), args.legacy_broker_image or args.pki_image,
                 "individual-broker", "--directory", "/work/state", "--name", "reference-composition",
                 "--listen", "0.0.0.0:4222", "--websocket-listen", "0.0.0.0:9222",
@@ -383,7 +383,7 @@ def main():
             "console": {**service_database, "/run/jwt.key": "installation/state/jwt.key",
                         "/run/encryption.key": "installation/state/encryption.key",
                         "/run/console.seed": "broker/state/console-user.seed", "/run/console-tls": "pki/state/console",
-                        "/run/administrator-ca.pem": "administrator-ca.pem", "/run/windows.key": "protocol/state/windows.key",
+                        "/run/administrator-ca.pem": "pki/state/trust/administrator-ca.pem", "/run/windows.key": "protocol/state/windows.key",
                         "/run/desktop-bootstrap.key": "protocol/state/desktop-bootstrap.key", "/run/release-keys.pem": "release-keys.pem",
                         "/run/releases": "releases", "/var/log/openuem-server": "console-logs"}}
         writable = {("database", "/var/lib/postgresql/data"), ("broker", "/var/lib/openuem/jetstream"),

@@ -61,6 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The reference setup now obtains independent administrator trust from the actual
+  retained PKI initializer at
+  [`633bc7b`](https://github.com/the-luap/openuem-cert-manager/commit/633bc7bb0dc34c1240a72a9df25c74ad19451885).
+  Its opt-in administrator root is self-signed with a distinct key, and exports
+  only public trust to the console. Both CA keys and provisioning journals stay
+  outside runtime mounts. Exact retries, interrupted export, committed loss,
+  incompatible mode changes and backend cross-signing rejection pass, including
+  actual TLS administrator admission/backend-identity denial and the distribution
+  smoke. The [native PKI workflow](https://github.com/the-luap/openuem-cert-manager/actions/runs/34543538601)
+  and [broker compatibility workflow](https://github.com/the-luap/openuem-cert-manager/actions/runs/34543538465)
+  pass. The console pins this revision and removes synthetic administrator-CA
+  generation from its reference probe. Fresh and retained broker-maintenance
+  acceptance pass locally on Linux arm64 with the generated trust, bootstrap mount
+  retirement, preserved login/device/command state and live WSS revocation.
+  Administrator client issuance, account binding, deployed certificate status,
+  enterprise CA import and rotation remain open; password login remains the
+  implemented first-account path. Current console integration CI remains required.
+- The [f8339b5 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34542668163)
+  passes Linux amd64, Linux arm64 and Windows, including both fresh and historical
+  broker-grant maintenance fixtures, interrupted CLI resume and retained commands.
 - The reference runtime now omits the initial administrator password. A separate
   [`compose.bootstrap.yaml`](../deploy/reference/compose.bootstrap.yaml) mounts it
   only for first-account creation. The actual container fixture completes the

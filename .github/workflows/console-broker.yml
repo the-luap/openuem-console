@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: the-luap/openuem-cert-manager
-          ref: b06bac13bd0e72f306a87ed119d2f7be66a66063
+          ref: 633bc7bb0dc34c1240a72a9df25c74ad19451885
           path: .database-pki-source
           persist-credentials: false
       - name: Check out the actual preceding broker initializer

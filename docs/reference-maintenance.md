@@ -23,7 +23,10 @@ overlay when applicable. An initialized project normally omits the
 `compose.bootstrap.yaml` overlay and initial-password mount. An older reference
 project that still has that exact protected console mount is also accepted; it
 must be reflected in the reviewed configuration. Maintenance does not remove it
-or recreate application containers. All service images, the pinned PKI upgrade image and
+or recreate application containers. It also accepts the preceding exact protected
+`administrator-ca.pem` trust location at the state root, as well as the current
+`pki/state/trust/administrator-ca.pem` export. It neither moves nor replaces trust.
+All service images, the pinned PKI upgrade image and
 the `reference-probe` target of `Dockerfile.setup` must already exist locally.
 The command resolves image references to immutable local image IDs. It does not
 pull images. The Python controller requires only the standard library and Docker
