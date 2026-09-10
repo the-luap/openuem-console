@@ -230,11 +230,12 @@ private keys or request URLs. Shutdown cancels and joins this worker. The Go
 [TLS configuration contract](https://pkg.go.dev/crypto/tls#Config)
 defines immutable per-client configurations and session-resumption behavior.
 
-This supplies the reload side of public TLS automation. A production DNS-01 ACME
-issuer, provider credentials, renewal scheduling/alerts and their reference
-deployment are still required; the gateway itself never opens port 80 or calls a
-DNS provider. Public certificate files are independent of the private backend
-identity and gateway client certificate described below.
+This supplies the reload side of public TLS automation. The separate
+[DNS-01 issuer](gateway-acme.md) provides issuance, periodic renewal and atomic
+publication. Live provider configuration, operational alert delivery and the
+complete reference deployment still require acceptance. The gateway itself never
+opens port 80 or calls a DNS provider. Public certificate files are independent
+of the private backend identity and gateway client certificate described below.
 
 ## Gateway client credential rotation
 

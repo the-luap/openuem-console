@@ -43,6 +43,8 @@ paths are paths inside the container.
 Public certificate renewal observes complete archive generations through the
 mounted directory. Keep its publisher separate and follow
 [atomic public TLS publication](gateway-operations.md#public-tls-renewal).
+The [separate DNS-01 issuer](gateway-acme.md) can obtain and renew these generations
+while keeping its account and DNS credentials outside the gateway mount.
 No writable root filesystem or Linux capability is required by the gateway.
 SIGTERM closes tracked streams, stops serving and joins the certificate watcher.
 
