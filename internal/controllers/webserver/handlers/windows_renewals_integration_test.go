@@ -55,6 +55,7 @@ func exerciseWindowsRenewals(t *testing.T, h *Handler, ctx context.Context, requ
 			t.Fatal("empty renewal history unavailable", empty.Code)
 		}
 		first := peer.renew(t, h, ctx, scope)
+		exerciseWindowsCertificateHealth(t, scope, sibling.ID, peer.deviceID, first, request, artifact)
 		path := list + "/" + first.ID
 		form := func() url.Values {
 			return url.Values{"expected_revision": {"1"}, "resolution": {"Reviewed <script>synthetic replacement</script>"}, "confirm_cancel": {"yes"}}

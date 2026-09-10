@@ -19,6 +19,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 				<h1 class="text-2xl font-semibold">Native Windows management</h1>
 				<p class="uk-text-muted mt-2">Enroll Windows through its built-in management client. Each device receives an individual identity in the selected organization and site.</p>
 				@mdm_views.Navigation(info)
+				if info.Can(access.ManageCertificates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-health")) }>Certificate health</a>
+				}
 				if info.Can(access.ManageUpdates) && info.SiteID!="0" && info.SiteID!="-1" && info.SiteID!="" {
 					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
 				}
@@ -169,6 +172,9 @@ templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetad
 				<h1 class="text-2xl font-semibold break-words">{ data.Name }</h1>
 				<p>Native Windows device identity</p>
 				@mdm_views.Navigation(info)
+				if info.Can(access.ManageCertificates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-health")) }>Certificate health</a>
+				}
 				if info.Can(access.ManageUpdates) && info.SiteID!="0" && info.SiteID!="-1" && info.SiteID!="" {
 					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
 				}

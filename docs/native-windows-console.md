@@ -149,3 +149,11 @@ report/certificate metadata in device details. Inventory retains a separate
 disconnection status, and interrupted command effects remain uncertain. Local
 cleanup is explicitly unverified; no remote unenrollment command is sent by this
 extension.
+
+## Certificate health
+
+**Certificate health** opens the organization/site expiry overview for certificate
+administrators, including all-sites selection. It separates current confirmed
+identities, pending replacements, access retirement and CA issuance limits.
+See [certificate health](native-windows-certificate-health.md) for filters,
+integrity checks and acceptance evidence.

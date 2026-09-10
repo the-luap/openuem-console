@@ -169,6 +169,16 @@ func (s *Store) decryptAuthority(a EnrollmentAuthority, encrypted []byte, now ti
 	if a.CreatedAt.After(now) || certificate.NotBefore.After(now) || !certificate.NotAfter.After(now.Add(time.Duration(a.ValiditySeconds)*time.Second+5*time.Minute)) {
 		return nil, ErrAuthorityUnavailable
 	}
+	return s.authenticateAuthority(a, encrypted)
+}
+
+// authenticateAuthority verifies stored issuer identity and policy without
+// authorizing issuance. Health reporting must remain possible after expiry.
+func (s *Store) authenticateAuthority(a EnrollmentAuthority, encrypted []byte) (*authoritySigner, error) {
+	certificate, err := parseAuthorityCertificate(a)
+	if err != nil {
+		return nil, err
+	}
 	plain, err := s.secrets.open(encrypted, authoritySecretPurpose(a))
 	if err != nil {
 		return nil, err

@@ -195,7 +195,9 @@ protocol in **1.426 seconds**. After the final queue-capacity correction, the
 focused lifecycle and affected update-queue regression tests pass in **17.055
 seconds**. Full console integration and focused Windows handler tests pass in
 **12.629 seconds**, and Windows views in **2.994 seconds**. Vet and Linux/Windows
-builds pass. Full CI for this request extension is pending. The dedicated console
+builds pass. Both workflows pass for request commit `45d5823`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34444483789),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34444486383)). The dedicated console
 workflow is described below; physical acceptance remains pending.
 
 ## Request and review in the console
@@ -254,5 +256,7 @@ reported acknowledged/uncertain/failed outcomes remain contained. Keyboard
 confirmation submits actual review and create/cancel forms; unchecked forms do
 not submit. Editing retains request identity, history paging works, long escaped
 reasons remain readable and command-owner links round-trip. The fixture and its
-isolated schema are removed afterward. Full CI for this console extension is
-pending; these checks do not enroll or disconnect a physical computer.
+isolated schema are removed afterward. Both workflows pass for console commit `cc40089`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34446401405),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34446404608));
+these checks do not enroll or disconnect a physical computer.

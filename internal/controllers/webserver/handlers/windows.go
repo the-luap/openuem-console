@@ -24,7 +24,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/windows/:id/disconnections", "/windows/:id/disconnections/new", "/windows/:id/disconnections/:request":
 			return access.RevokeDevices, true
-		case "/windows/:id/renewals", "/windows/:id/renewals/:renewal":
+		case "/windows/certificate-health", "/windows/:id/renewals", "/windows/:id/renewals/:renewal":
 			return access.ManageCertificates, true
 		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new", "/windows/:id/commands/:command/observations", "/windows/:id/commands/:command/observations/:message":
 			return access.ManageWindowsCSP, true
@@ -58,6 +58,7 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 		g := e.Group(prefix, h.IsAuthenticated, h.WindowsCSRF)
 		g.GET("/windows", h.WindowsEnrollment)
+		g.GET("/windows/certificate-health", h.WindowsCertificateHealth)
 		g.GET("/windows/update-rings", h.WindowsUpdateRings)
 		g.GET("/windows/update-rings/new", h.WindowsEditUpdateRing)
 		g.GET("/windows/update-rings/:ring", h.WindowsUpdateRingHistory)
@@ -195,7 +196,7 @@ func (h *Handler) windowsInfo(c echo.Context) (*partials.CommonInfo, access.Scop
 	if !ok || !p.Can(capability, needed) {
 		return nil, access.Scope{}, echo.NewHTTPError(403, "Permission denied for this organization or site")
 	}
-	if site == 0 && appleRoute(c.Path()) != "/windows" && appleRoute(c.Path()) != "/windows/setup" {
+	if site == 0 && appleRoute(c.Path()) != "/windows/certificate-health" && appleRoute(c.Path()) != "/windows" && appleRoute(c.Path()) != "/windows/setup" {
 		return nil, access.Scope{}, echo.NewHTTPError(400, "Select a concrete site")
 	}
 	return info, scope, nil

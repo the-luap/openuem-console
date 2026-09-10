@@ -4,7 +4,7 @@ Cryptographic verification, persistent issuance/handoff and certificate-authenti
 SOAP renewal are implemented. The registered WSTEP endpoint distinguishes initial
 Issue from Renew and requires the actual device TLS certificate for renewal,
 directly or through the pinned gateway. Scoped console history, certificate
-details and pending cancellation are also implemented. Account/federated renewal
+details, pending cancellation and an audited [certificate health overview](native-windows-certificate-health.md) are also implemented. Account/federated renewal
 and scheduling remain implementation work. No automatic renewal
 setting is enabled. Calling the pure proof verifier does not issue a certificate
 or modify a device.
@@ -292,7 +292,9 @@ and history. It requires:
 - Configured account-authenticated renewal, including its distinct request
   content encoding and expired-certificate recovery rules, and any required
   additional CMS/CMC compatibility.
-- Renewal scheduling configuration and broader expiry reporting.
+- Renewal scheduling configuration and deployment expiry notifications. The
+  [certificate health overview](native-windows-certificate-health.md) provides
+  scoped on-demand expiry warnings and separates pending replacements.
 - Actual supported Windows client/PKI acceptance, including the documented
   Microsoft PKI constraint before enabling automatic ROBO configuration.
 
