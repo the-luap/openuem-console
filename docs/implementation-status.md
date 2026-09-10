@@ -61,6 +61,31 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [console reference image](console-container.md) now retains CGO/SQLite
+  support with pinned Go and Distroless runtime inputs, a non-root account,
+  versioned static assets, public trust and explicit writable cache/auth-log
+  mounts. Its audit proves unchanged base files and exact application assets;
+  the offline runtime/SQLite smoke passes. The image-extracted
+  console process passes isolated PostgreSQL startup using generated installation
+  secrets, actual private PKI and broker initialization, pinned gateway TLS,
+  direct-backend rejection, first-password replacement and retained state across
+  SIGTERM restart. The fixture deliberately blocks the initial catalog connection
+  at an offline proxy on each start. Foreground startup now registers signals
+  before starting listeners and cancels release requests through its shutdown
+  context; the preceding version fails this process regression and the new
+  version passes. Request cancellation, the complete PostgreSQL suite (including
+  all three private services), Windows cross-build and Linux/Windows vet pass
+  locally. The fixture keeps a separate synthetic
+  administrator CA and does not claim certificate login/OCSP or physical-device
+  acceptance. Native CI now requires these image and process checks. Full
+  composition, persistent log operations and administrator authority integration
+  remain open.
+- The preceding private service distribution pipeline
+  [passes](https://github.com/the-luap/openuem-console/actions/runs/34526398961),
+  as does the worker's [image/process pipeline](https://github.com/the-luap/openuem-worker/actions/runs/34526227432).
+  [Native console CI for revision 7862a7e](https://github.com/the-luap/openuem-console/actions/runs/34527193093)
+  passes on Linux amd64, Linux arm64 and Windows, including the complete Linux
+  foreign-UID bind-mount denial, private database bootstrap and restart gates.
 - [Reference database ownership](reference-database-ownership.md) now has a
   container acceptance fixture using the host's non-root UID/GID for the actual
   installation, database credential, private PKI and bootstrap distribution

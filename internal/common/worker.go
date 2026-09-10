@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 )
 
 type Worker struct {
+	Context                           context.Context
 	ProtectedAdministrator            *administrator.Config
 	IndividualAgentService            *openuem.ServiceConnection
 	Model                             *models.Model

@@ -1,0 +1,38 @@
+FROM golang:1.26.8-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
+WORKDIR /src
+ENV GOTOOLCHAIN=local
+COPY go.mod go.sum main.go ./
+COPY internal ./internal
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go tool templ generate && \
+    CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o /out/openuem-console .
+
+FROM build AS test-build
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go test -mod=readonly -trimpath -buildvcs=false -c -o /out/console-runtime.test ./internal/setup/consolecheck
+
+FROM gcr.io/distroless/base-debian13:nonroot@sha256:d199d20fb09c898d8822ae5cbd5cf3c6d424e9b5e1fc2eb9a719a7752cd9d861 AS runtime
+COPY --from=build /out/openuem-console /openuem-console
+COPY assets /assets
+COPY LICENSE /licenses/openuem-console.LICENSE
+USER 65532:65532
+WORKDIR /tmp
+ENV OPENUEM_INDIVIDUAL_AGENT_MODE=true
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/openuem-console"]
+CMD ["--help"]
+
+# Only the smoke target contains the SQLite/runtime test executable.
+FROM runtime AS smoke
+COPY --from=test-build /out/console-runtime.test /console-runtime.test
+ENV OPENUEM_CONSOLE_CONTAINER_TEST=1
+ENTRYPOINT ["/console-runtime.test"]
+CMD ["-test.v", "-test.run=^TestConsoleContainerRuntime$", "-test.timeout=30s"]
+
+FROM runtime AS final

@@ -120,6 +120,10 @@ func startDatabaseFixture(t *testing.T) databaseFixture {
 }
 
 func startDatabaseFixtureWithTLS(t *testing.T, productionPKI bool) databaseFixture {
+	return startDatabaseFixtureForInstallation(t, productionPKI, strings.Repeat("1", 32))
+}
+
+func startDatabaseFixtureForInstallation(t *testing.T, productionPKI bool, installation string) databaseFixture {
 	t.Helper()
 	initdb, postgres := os.Getenv("OPENUEM_DATABASE_TEST_INITDB"), os.Getenv("OPENUEM_DATABASE_TEST_POSTGRES")
 	if initdb == "" || postgres == "" {
@@ -151,7 +155,7 @@ func startDatabaseFixtureWithTLS(t *testing.T, productionPKI bool) databaseFixtu
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	listener.Close()
-	config := secrets.DatabaseConfig{Version: 1, Installation: strings.Repeat("1", 32), Host: host, Port: port, Database: "openuem", User: "console", TrustFile: caFile}
+	config := secrets.DatabaseConfig{Version: 1, Installation: installation, Host: host, Port: port, Database: "openuem", User: "console", TrustFile: caFile}
 	credentialDirectory := filepath.Join(root, "credentials")
 	if _, err := secrets.InitializeDatabaseCredentials(ctx, credentialDirectory, config); err != nil {
 		t.Fatal("credential provisioning failed", err)

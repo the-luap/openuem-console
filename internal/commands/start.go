@@ -30,6 +30,11 @@ func startConsole(cCtx *cli.Context) error {
 	if err := worker.GenerateConsoleConfigFromCLI(cCtx); err != nil {
 		return err
 	}
+	// Capture shutdown before listeners or catalog checks can start. Outbound
+	// startup requests share this context so worker initialization can finish.
+	runtimeContext, stopSignals := signal.NotifyContext(cCtx.Context, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	defer stopSignals()
+	worker.Context = runtimeContext
 
 	// Get working directory
 	cwd, err := utils.GetWd()
@@ -77,13 +82,8 @@ func startConsole(cCtx *cli.Context) error {
 	worker.TaskScheduler.Start()
 	log.Println("[INFO]: task scheduler has been started")
 
-	// Start worker
 	worker.StartWorker()
-
-	// Keep the connection alive
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-done
+	<-runtimeContext.Done()
 
 	worker.StopWorker()
 
