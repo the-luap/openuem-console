@@ -20,6 +20,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
@@ -110,7 +111,15 @@ func TestWindowsStartupMigratesProtectedStoreAndResumesAfterRestart(t *testing.T
 	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}), 0600); err != nil {
 		t.Fatal(err)
 	}
-	w := &WebServer{Handler: &handlers.Handler{Model: &models.Model{DB: db}, Access: permissions, PublicOrigin: "https://uem.example.test"}}
+	auditStore, err := audit.NewStore(db, permissions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Shared audit starts before the optional Windows schema on a new install.
+	if err := auditStore.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	w := &WebServer{Handler: &handlers.Handler{Model: &models.Model{DB: db}, Access: permissions, Audit: auditStore, PublicOrigin: "https://uem.example.test"}}
 	if err := w.startWindows(certFile, keyFile, clientidentity.Policy{}); err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +137,14 @@ func TestWindowsStartupMigratesProtectedStoreAndResumesAfterRestart(t *testing.T
 	if invitation.CreatedBy != "admin" {
 		t.Fatal("invitation authority changed")
 	}
+	var guards int
+	if err := db.QueryRow(`SELECT count(*) FROM pg_trigger WHERE tgname='uem_audit_windows_history' AND tgenabled='O' AND tgfoid='uem_audit_guard_windows_history()'::regprocedure`).Scan(&guards); err != nil || guards != 12 {
+		t.Fatal("startup omitted optional Windows audit guards", guards, err)
+	}
+	page, err := auditStore.List(t.Context(), "admin", audit.Filter{Scope: access.Scope{TenantID: 1, SiteID: 11}, Source: "windows_enrollment", From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Minute)}, "")
+	if err != nil || len(page.Events) == 0 || page.Events[0].Resource != invitation.ID {
+		t.Fatal("startup audit source omitted enrollment metadata", err)
+	}
 	w.stopWindows()
 	if err := w.startWindows(certFile, keyFile, clientidentity.Policy{}); err != nil {
 		t.Fatal("idempotent restart failed", err)
@@ -136,6 +153,13 @@ func TestWindowsStartupMigratesProtectedStoreAndResumesAfterRestart(t *testing.T
 		t.Fatal("restart lost durable credential", err)
 	}
 	w.stopWindows()
+	// A failed optional source registration must not launch the native runtime.
+	if _, err := db.Exec(`ALTER FUNCTION uem_audit_guard_windows_history() RENAME TO unavailable_windows_audit_guard`); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.startWindows(certFile, keyFile, clientidentity.Policy{}); err == nil || w.windowsRuntime != nil {
+		t.Fatal("failed audit registration launched listener")
+	}
 	t.Setenv("WINDOWS_MDM_MASTER_KEY", "invalid synthetic key")
 	if err := w.startWindows(certFile, keyFile, clientidentity.Policy{}); err == nil || w.windowsRuntime != nil {
 		t.Fatal("invalid encryption configuration launched listener")

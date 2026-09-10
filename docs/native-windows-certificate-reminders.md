@@ -106,7 +106,9 @@ The complete Windows PostgreSQL/race suite passes in **161.199 seconds**, with
 the protocol package also passing. Final console/handler checks pass in
 **16.646 seconds**, views in **4.434 seconds**, runtime/SMTP integration in
 **1.962 seconds** and gateway checks in **1.948 seconds**. Vet and Linux/Windows
-builds pass. Full CI for this extension is pending.
+builds pass. Both full workflows for `98c9f9b` pass
+([push](https://github.com/the-luap/openuem-console/actions/runs/34452316965),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34452320064)).
 
 Browser checks cover mixed, empty and actual synthetic retry history at 390, 768
 and 1440 pixels. All nine views remain contained; keyboard expansion, paging links

@@ -97,7 +97,10 @@ payload or selected message number. All encoding and integrity checks finish
 before the transaction commits and attachment bytes become available. Errors,
 cancellation, capacity rejection and audit failure release no attachment and
 roll back the attempted export audit. The event proves preparation, not that a
-browser finished saving a file.
+browser finished saving a file. An explicitly confirmed [Windows audit retention
+policy](native-windows-audit.md) can later remove that original audit event; its
+source ID remains in the permanent deletion batch. This does not change the
+exported file or protected command/observation evidence.
 
 Responses use JSON with attachment disposition, a fixed UUID/revision-based
 filename, `no-store`, `nosniff`, a restrictive sandbox content policy, exact byte
@@ -122,7 +125,12 @@ the protocol package passing in **1.377 seconds**. The focused PostgreSQL/race
 regression checks pass in **12.166 seconds**.
 The final console route and Windows handler checks pass in **15.303 seconds**,
 Windows views in **4.429 seconds**, and private gateway route checks in **1.847 seconds**.
-Vet and complete Linux/Windows builds pass. Full CI for this extension is pending. The opt-in live console fixture
+Vet and complete Linux/Windows builds pass. The full PR workflow for `d3bec86`
+passes. Its push workflow exposed a timing-sensitive test size comparison: a new
+export timestamp can have fewer fractional digits than the previous timestamp.
+The transactional overflow test now accounts for variable audit metadata; exact
+buffer boundary checks remain. Twenty PostgreSQL/race repetitions pass in 12.077
+seconds. The next complete CI run remains pending. The opt-in live console fixture
 passes its complete handler/race run in **162.499 seconds**, including browser
 inspection. All tests use the isolated PostgreSQL service on loopback port 55440.
 
@@ -135,6 +143,7 @@ passes visual inspection. The final page reports no console warnings or errors.
 The fixture's initial navigation reports only its missing favicon. Its owned
 listener and database schema are cleaned up after the test.
 
-Retention/deletion, bulk cross-command exports, broader typed policies and
-physical Windows acceptance remain separate work. Existing append-only command,
-observation and audit history is not removed by this feature.
+Command/observation/packet retention, bulk cross-command exports, broader typed
+policies and physical Windows acceptance remain separate work. Shared Windows
+audit retention now has its own explicit organization opt-in; CSP evidence exports
+themselves do not delete history.

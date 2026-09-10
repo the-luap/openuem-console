@@ -83,6 +83,11 @@ func (s *Store) Migrate(ctx context.Context) error {
 		}
 		// Recheck optional sources at startup even if the audit migration already
 		// ran before that platform was configured. These are fixed source names.
+		if isWindowsSource(source.name) {
+			if err := installWindowsAuditGuard(ctx, tx, source); err != nil {
+				return err
+			}
+		}
 		if source.name != "release" && source.name != "activity" {
 			if _, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS `+source.table+`_timeline ON `+source.table+`(created_at DESC,id DESC)`); err != nil {
 				return err

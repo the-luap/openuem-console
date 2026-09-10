@@ -86,6 +86,9 @@ func (w *WebServer) startWindows(certFile, keyFile string, identity clientidenti
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	err = store.Migrate(ctx)
+	if err == nil && w.Handler.Audit != nil {
+		err = w.Handler.Audit.Migrate(ctx)
+	}
 	cancel()
 	if err != nil {
 		return errors.New("native Windows database initialization failed")

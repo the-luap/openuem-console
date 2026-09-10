@@ -10,19 +10,27 @@ import (
 
 // Each source exposes only identifiers and outcome metadata. Configuration,
 // command payloads, grant documents, credentials and arbitrary JSON stay out.
-var sourceQueries = []struct{ name, table, query string }{
+type auditSource struct{ name, table, query string }
+
+var sourceQueries = append([]auditSource{
 	{"apple", "mdm_apple_audit", `SELECT id,tenant_id,CASE WHEN details->>'site_id' ~ '^[0-9]{1,18}$' THEN (details->>'site_id')::bigint ELSE 0 END AS site_id,actor,action,resource_id AS resource,CASE WHEN details->>'result' IN ('success','failure','denied','deferred','cancelled') THEN details->>'result' ELSE 'recorded' END AS result,created_at FROM mdm_apple_audit`},
 	{"agent", "uem_agent_audit", `SELECT id,tenant_id,COALESCE(site_id,0) AS site_id,actor,action,resource_id::text AS resource,'recorded'::text AS result,created_at FROM uem_agent_audit`},
 	{"access", "uem_access_audit", `SELECT id,0::bigint AS tenant_id,0::bigint AS site_id,actor,action,subject AS resource,'recorded'::text AS result,created_at FROM uem_access_audit`},
 	{"release", "uem_desktop_release_audit", `SELECT id,0::bigint AS tenant_id,0::bigint AS site_id,actor,action,digest AS resource,'recorded'::text AS result,created_at FROM uem_desktop_release_audit`},
 	{"activity", "uem_audit_activity", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,result,created_at FROM uem_audit_activity`},
 	{"retention", "uem_audit_retention_history", `SELECT id,tenant_id,0::bigint AS site_id,actor,action,'organization:'||tenant_id::text AS resource,'success'::text AS result,created_at FROM uem_audit_retention_history`},
-}
+}, windowsSources...)
 
 func availableSources(ctx context.Context, tx *sql.Tx) ([]bool, error) {
-	var apple, agent, access, release, activity, retention bool
-	err := tx.QueryRowContext(ctx, `SELECT to_regclass('mdm_apple_audit') IS NOT NULL,to_regclass('uem_agent_audit') IS NOT NULL,to_regclass('uem_access_audit') IS NOT NULL,to_regclass('uem_desktop_release_audit') IS NOT NULL,to_regclass('uem_audit_activity') IS NOT NULL,to_regclass('uem_audit_retention_history') IS NOT NULL`).Scan(&apple, &agent, &access, &release, &activity, &retention)
-	return []bool{apple, agent, access, release, activity, retention}, err
+	available := make([]bool, len(sourceQueries))
+	parts := make([]string, len(sourceQueries))
+	values := make([]any, len(sourceQueries))
+	for i, source := range sourceQueries {
+		parts[i] = "to_regclass('" + source.table + "') IS NOT NULL"
+		values[i] = &available[i]
+	}
+	err := tx.QueryRowContext(ctx, "SELECT "+strings.Join(parts, ",")).Scan(values...)
+	return available, err
 }
 
 func selectEvents(ctx context.Context, tx *sql.Tx, f Filter, c cursor, limit int) ([]Event, []string, error) {

@@ -50,9 +50,10 @@ func (f Filter) Validate() error {
 }
 
 func validSource(source string) bool {
-	switch source {
-	case "apple", "agent", "access", "release", "activity", "retention":
-		return true
+	for _, candidate := range sourceQueries {
+		if source == candidate.name {
+			return true
+		}
 	}
 	return false
 }

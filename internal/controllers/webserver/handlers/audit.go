@@ -259,14 +259,17 @@ func (h *Handler) AuditRetentionPreview(c echo.Context) error {
 		return err
 	}
 	values := c.Request().PostForm
-	if err = auditValues(values, "csrf", "days"); err != nil {
+	if err = auditValues(values, "csrf", "days", "include_windows"); err != nil {
 		return auditFailure(err)
 	}
 	days, err := strconv.Atoi(values.Get("days"))
 	if err != nil {
 		return auditFailure(audit.ErrInvalid)
 	}
-	preview, err := h.Audit.PreviewRetention(c.Request().Context(), h.appleActor(c), scope, days)
+	if values.Has("include_windows") && values.Get("include_windows") != "yes" {
+		return auditFailure(audit.ErrInvalid)
+	}
+	preview, err := h.Audit.PreviewRetentionWithWindows(c.Request().Context(), h.appleActor(c), scope, days, values.Get("include_windows") == "yes")
 	if err != nil {
 		return auditFailure(err)
 	}

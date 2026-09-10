@@ -48,6 +48,7 @@ The tests verify encoded fields, not every spreadsheet application's behavior.
 | Release | `uem_desktop_release_audit` | Server-wide; approved desktop release metadata, result `recorded` |
 | Activity | `uem_audit_activity` | Audit page/export access in the requested scope |
 | Retention | `uem_audit_retention_history` | Committed policy changes and deletion receipts for the policy scope |
+| Windows | Twelve original Windows audit tables; [source mapping and deletion guards](native-windows-audit.md) | Original organization/site, result `recorded`; no credentials, command values or mail recipients |
 
 Absent optional platform tables are omitted; available sources are shown on the
 page. Organization/site searches exclude global access and release events.
@@ -80,6 +81,15 @@ policy with the checkbox and **Apply retention policy**. A finite policy enables
 permanent deletion of original audit rows. It does not delete devices, desired
 configuration, command state or deployment state.
 
+Windows audit events have a separate **Include Windows audit events in this
+retention policy** selection on organization pages. It defaults to off, including
+for existing finite policies and pending previews migrated from earlier versions.
+Review and confirm the Windows inclusion change as well as the number of days.
+The selection applies to all available Windows audit sources in that organization.
+Global and site policies cannot opt in. Clearing the selection preserves future
+Windows audit events while the organization's other sources continue to follow
+its day setting. Choosing zero retains every covered source indefinitely.
+
 Previews expire after ten minutes, are account/scope-bound and usable once. Only
 the latest preview for an account and scope remains valid. The database stores a
 hash of the confirmation token. Changed policy revisions, expired/used previews,
@@ -93,7 +103,12 @@ up to ten due policies and up to 1,000 old rows per source/policy. Policy row lo
 coordinate replicas. Full batches become due in a minute; otherwise in an hour.
 Each deletion batch commits with a receipt containing source, cutoff, policy
 revision and deleted count. Failed receipt writes roll back the deletion. Policy
-changes likewise commit with their before/after retention evidence.
+changes likewise commit with their before/after retention evidence, including the
+old/new Windows inclusion flag. Windows deletions additionally require an immutable
+batch of the exact event IDs, source table, organization, cutoff, policy revision
+and current transaction. Their row guards always reject updates and reject deletes
+without a matching live policy and receipt. These guards cover audit rows only;
+protected command, packet and observation evidence keeps its existing lifecycle.
 
 Retention history is excluded from automatic pruning and retained indefinitely.
 The policy page shows the latest 25 detailed records; the audit log exposes older
@@ -105,8 +120,12 @@ and retention procedures; this worker does not erase those copies.
 
 Startup initializes audit storage after access control and before serving the
 console. Migrations add tables and timeline indexes on available source tables,
-and recheck optional platform tables on later starts. The database account needs
-schema/index creation and source audit DELETE permissions in addition to normal
+and recheck optional platform tables on later starts. Native Windows startup also
+registers its audit tables after their own migrations and before launching its
+listener or maintenance worker. A registration failure prevents native startup.
+Only known Windows audit-row triggers are replaced by the scoped retention guard;
+other Windows history and integrity triggers stay installed. The database account needs
+schema/index/trigger creation and source audit DELETE permissions in addition to normal
 read/write access. Index creation occurs in the bounded startup transaction and
 can block writers; large existing installations should plan a maintenance window
 and validate index creation time. No production-scale benchmark is claimed.

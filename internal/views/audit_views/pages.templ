@@ -88,9 +88,9 @@ templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit
 						Source
 						<select class="uk-select" name="source">
 							<option value="">All available sources</option>
-							for _, source := range []string{"apple","agent","access","release","activity","retention"} {
+							for _, source := range audit.SourceNames() {
 								<option value={ source } selected?={ f.Source == source }>
-									{ strings.Title(source) }
+									{ audit.SourceLabel(source) }
 								</option>
 							}
 						</select>
@@ -118,7 +118,7 @@ templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit
 						{ fmt.Sprintf("%d events on this page · newest first", len(page.Events)) }
 					</p>
 					<p class="uk-text-muted">
-						{ "Available sources: "+strings.Join(page.Sources, ", ") }
+						{ "Available sources: "+sourceLabels(page.Sources) }
 					</p>
 				</div>
 				<form method="post" action={ templ.URL(BaseURL(f.Scope) + "/export") } class="audit-actions">
@@ -163,7 +163,7 @@ templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit
 							<div>
 								<dt>Source / event</dt>
 								<dd>
-									{ fmt.Sprintf("%s / %d", event.Source, event.ID) }
+									{ fmt.Sprintf("%s / %d", audit.SourceLabel(event.Source), event.ID) }
 								</dd>
 							</div>
 							<div>
@@ -219,12 +219,16 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 				if scope.TenantID == 0 {
 					<p>This policy covers server permission changes, desktop release events and server-wide audit access. Organization audit events have independent policies.</p>
 				} else {
-					<p>This policy covers this organization's Apple, agent and audit access events across all sites.</p>
+					<p>This policy covers this organization's Apple, agent and audit access events across all sites. Windows audit events are included only when explicitly selected.</p>
+					<p>{ windowsRetentionLabel(policy.WindowsEnabled) }</p>
 				}
 				<p>A finite policy permanently deletes original audit events as they age. Cleanup runs in batches while the console is running. Retention changes and deletion receipts are kept indefinitely. Backup and database recovery copies have separate retention.</p>
 				<form method="post" action={ templ.URL(BaseURL(scope) + "/retention/preview") } class="audit-actions">
 					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
-					<label>Days to retain<input class="uk-input" type="number" name="days" min="0" max="3650" step="1" value={ strconv.Itoa(policy.Days) } aria-describedby="retention-days-help" required/></label><button class="uk-button uk-button-primary" type="submit">Preview change</button>
+					if scope.TenantID > 0 {
+						<label class="audit-confirm"><input type="checkbox" name="include_windows" value="yes" checked?={ retentionWindowsSelection(policy, preview) }/> Include Windows audit events in this retention policy.</label>
+					}
+					<label>Days to retain<input class="uk-input" type="number" name="days" min="0" max="3650" step="1" value={ strconv.Itoa(retentionDaysSelection(policy, preview)) } aria-describedby="retention-days-help" required/></label><button class="uk-button uk-button-primary" type="submit">Preview change</button>
 				</form>
 				<p id="retention-days-help" class="uk-text-muted">Enter 0 to retain indefinitely, or 30–3,650 days. Previewing does not change the policy.</p>
 			</section>
@@ -234,6 +238,9 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 					<p>
 						{ policyLabel(preview.Policy.Days)+" → "+policyLabel(preview.Days) }
 					</p>
+					if scope.TenantID > 0 {
+						<p>{ windowsRetentionLabel(preview.Policy.WindowsEnabled)+" → "+windowsRetentionLabel(preview.WindowsEnabled) }</p>
+					}
 					if preview.Cutoff != nil {
 						<p>
 							{ "Events before "+dateTime(*preview.Cutoff)+" currently qualify for deletion:" }
@@ -242,11 +249,11 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 						<p>Automatic deletion will stop. Previously deleted events cannot be restored by this change.</p>
 					}
 					<dl class="audit-metadata">
-						for _, source := range []string{"apple","agent","access","release","activity"} {
+						for _, source := range audit.SourceNames() {
 							if count, ok := preview.Counts[source]; ok {
 								<div>
 									<dt>
-										{ strings.Title(source) }
+										{ audit.SourceLabel(source) }
 									</dt>
 									<dd>
 										{ strconv.FormatInt(count, 10)+" events" }
@@ -283,6 +290,12 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 						<p>
 							{ fmt.Sprintf("%s · Revision %d", policyLabel(event.Days), event.Revision) }
 						</p>
+						if scope.TenantID > 0 {
+							<p>{ windowsRetentionLabel(event.WindowsEnabled) }</p>
+							if event.PreviousWindowsEnabled != nil {
+								<p>{ "Previous Windows setting: "+windowsRetentionLabel(*event.PreviousWindowsEnabled) }</p>
+							}
+						}
 						if event.PreviousDays != nil {
 							<p>
 								{ "Previous policy: "+policyLabel(*event.PreviousDays) }
@@ -290,7 +303,7 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 						}
 						if event.Action == "retention.prune" {
 							<p>
-								{ fmt.Sprintf("Deleted %d %s events", event.Count, event.Source) }
+								{ fmt.Sprintf("Deleted %d %s events", event.Count, audit.SourceLabel(event.Source)) }
 							</p>
 						}
 						if event.Cutoff != nil {
@@ -303,4 +316,33 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 			</section>
 		</main>
 	}
+}
+
+func sourceLabels(sources []string) string {
+	labels := make([]string, len(sources))
+	for i, source := range sources {
+		labels[i] = audit.SourceLabel(source)
+	}
+	return strings.Join(labels, ", ")
+}
+
+func windowsRetentionLabel(enabled bool) string {
+	if enabled {
+		return "Windows audit events follow this policy"
+	}
+	return "Windows audit events are retained indefinitely"
+}
+
+func retentionWindowsSelection(policy audit.RetentionPolicy, preview *audit.RetentionPreview) bool {
+	if preview != nil {
+		return preview.WindowsEnabled
+	}
+	return policy.WindowsEnabled
+}
+
+func retentionDaysSelection(policy audit.RetentionPolicy, preview *audit.RetentionPreview) int {
+	if preview != nil {
+		return preview.Days
+	}
+	return policy.Days
 }

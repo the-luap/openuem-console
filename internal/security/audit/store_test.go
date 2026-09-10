@@ -22,6 +22,11 @@ import (
 
 func testStore(t *testing.T, allSources bool) *Store {
 	t.Helper()
+	return testStoreWithAuditMigration(t, allSources, true)
+}
+
+func testStoreWithAuditMigration(t *testing.T, allSources, migrateAudit bool) *Store {
+	t.Helper()
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for audit integration tests")
@@ -90,6 +95,9 @@ func testStore(t *testing.T, allSources bool) *Store {
 	s, err := NewStore(db, permissions)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !migrateAudit {
+		return s
 	}
 	if err = s.Migrate(t.Context()); err != nil {
 		t.Fatal(err)

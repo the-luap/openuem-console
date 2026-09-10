@@ -240,4 +240,5 @@ func exerciseAuditConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.Co
 			}
 		}
 	})
+	exerciseWindowsAuditConsole(t, h, ctx, tenant, site, request, artifact, field)
 }
