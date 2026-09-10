@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: the-luap/openuem-cert-manager
-          ref: e7525ad161cc06323e8cc7573f1d6525379d88a7
+          ref: b06bac13bd0e72f306a87ed119d2f7be66a66063
           path: .database-pki-source
           persist-credentials: false
       - name: Check out the pinned individual agent worker

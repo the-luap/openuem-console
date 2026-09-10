@@ -74,8 +74,17 @@ Use the broker initializer revision pinned by the console workflow. The separate
 container test exposed an older initializer grant without `hardware`, `recovery`
 and `rotation`; the current worker correctly rejects that configuration. Revision
 `e7525ad161cc06323e8cc7573f1d6525379d88a7` includes the current subjects and an exact
-grant regression test. Existing broker configuration upgrades still require a
-deliberate operation that retains their original service keys and storage.
+grant regression test. The workflow now pins its successor
+`b06bac13bd0e72f306a87ed119d2f7be66a66063`, which also supplies a
+[reviewed broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/b06bac13bd0e72f306a87ed119d2f7be66a66063/docs/broker-upgrade.md).
+The reference runner invokes its read-only preview against freshly generated
+configuration and requires an exact unchanged result before starting services.
+The separate upgrade distribution test runs the actual previous initializer and
+stock broker, retaining service keys, messages and a durable consumer across
+configuration publication and process restart. Complete reference maintenance
+orchestration remains separate work. Verify the configuration visible through a
+single-file bind against the upgrade's target hash and remount/recreate the
+broker if its container runtime still exposes the old file.
 
 Database, JetStream and authentication-log storage are persistent private bind
 mounts. The console's temporary cache/PID directory uses a private tmpfs. Every

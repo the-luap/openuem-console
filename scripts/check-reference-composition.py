@@ -6,6 +6,7 @@ probe containers and temporary state. It never reads an installed deployment.
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import pathlib
@@ -92,6 +93,13 @@ def main():
                 "--tls-cert", "/run/broker-tls/server.pem", "--tls-key", "/run/broker-tls/server.key",
                 "--gateway-ca", "/run/broker-tls/gateway-leaves.pem",
                 "--store-directory", "/var/lib/openuem/jetstream")
+        broker_digest = hashlib.sha256((root / "broker/state/broker.json").read_bytes()).hexdigest()
+        broker_plan = json.loads(command("current broker upgrade inspection", *offline,
+                                         *mount(root / "broker/state", "/broker"), args.pki_image,
+                                         "individual-broker-upgrade", "--directory", "/broker", "--check").stdout)
+        if broker_plan != {"version": 1, "before_sha256": broker_digest, "after_sha256": broker_digest,
+                           "change_required": False, "added_worker_requests": []}:
+            raise RuntimeError("fresh broker configuration unexpectedly requires a migration")
         protected(root / "pg_hba.conf", "local all all trust\nhostssl all all all scram-sha-256\nhostnossl all all all reject\n")
         probe_base = [*policy, "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=32m,uid=" + str(uid)
                       + ",gid=" + str(gid) + ",mode=0700", "--env", "OPENUEM_REFERENCE_FIXTURE=1",

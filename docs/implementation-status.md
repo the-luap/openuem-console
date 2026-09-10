@@ -61,6 +61,27 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The PKI component's [broker upgrade c3a5943](https://github.com/the-luap/openuem-cert-manager/commit/c3a5943431c4c6542cdfc38e9eb94405ff7cab49)
+  adds a read-only review plan and a hash-bound, resumable migration of the known
+  preceding worker grant. It retains all six service seeds, TLS/listener settings,
+  storage path and original configuration; private journal/staging files and an
+  OS directory lease protect publication. Tests cover completed-write interruption,
+  rollback/damage rejection, concurrency, cancellation and pre-publication changes.
+  The actual historical initializer, upgrade command and stock NATS process pass
+  isolated Linux arm64 acceptance: the old grant rejects hardware subscriptions,
+  the new grant accepts all three added subjects while rejecting a broader wildcard,
+  and the same persisted message and durable consumer survive a clean restart.
+  Further commands enter the retained consumer. Unit/CLI/race, private PKI, native
+  process, vet and Windows cross-build checks pass locally. The [c3a5943 broker workflow](https://github.com/the-luap/openuem-cert-manager/actions/runs/34538538635)
+  also passes Linux amd64/arm64 process upgrades and Linux/Windows setup checks.
+  Console CI pins the `b06bac1` documentation follow-up and the full reference
+  lifecycle passes with the new initializer and an unchanged preview of fresh state.
+  Production maintenance orchestration, complete restore and physical device
+  acceptance remain open.
+- The [aadf9c3 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34537016525)
+  passes on Linux amd64, Linux arm64 and Windows, including generated retained
+  protocol keys, input bind-alias rejection and the full separate reference
+  composition on both Linux runners.
 - The [protocol key provisioner](protocol-keys.md) now supplies retained,
   independent Windows authority encryption and desktop bootstrap signing keys.
   It verifies an existing complete installation without writing to that input,
