@@ -22,6 +22,8 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/windows/:id/disconnections", "/windows/:id/disconnections/new", "/windows/:id/disconnections/:request":
+			return access.RevokeDevices, true
 		case "/windows/:id/renewals", "/windows/:id/renewals/:renewal":
 			return access.ManageCertificates, true
 		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new", "/windows/:id/commands/:command/observations", "/windows/:id/commands/:command/observations/:message":
@@ -43,7 +45,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.ManageCertificates, true
 		case "/windows/invitations", "/windows/invitations/:id/revoke":
 			return access.EnrollDevices, true
-		case "/windows/:id/revoke":
+		case "/windows/:id/revoke", "/windows/:id/disconnections/preview", "/windows/:id/disconnections/create", "/windows/:id/disconnections/:request/cancel", "/windows/:id/disconnections/:request/release":
 			return access.RevokeDevices, true
 		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save", "/windows/update-rings/:ring/assign/preview", "/windows/update-rings/:ring/assign/create", "/windows/update-rings/:ring/schedule/preview", "/windows/update-rings/:ring/schedule/create", "/windows/update-schedules/:schedule/cancel":
 			return access.ManageUpdates, true
@@ -73,6 +75,13 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.GET("/windows/update-schedules/:schedule", h.WindowsUpdateSchedule)
 		g.POST("/windows/update-schedules/:schedule/cancel", h.WindowsCancelUpdateSchedule)
 		g.GET("/windows/:id", h.WindowsDevice)
+		g.GET("/windows/:id/disconnections", h.WindowsUnenrollmentRequests)
+		g.GET("/windows/:id/disconnections/new", h.WindowsNewUnenrollmentRequest)
+		g.GET("/windows/:id/disconnections/:request", h.WindowsUnenrollmentRequest)
+		g.POST("/windows/:id/disconnections/preview", h.WindowsPreviewUnenrollmentRequest)
+		g.POST("/windows/:id/disconnections/create", h.WindowsCreateUnenrollmentRequest)
+		g.POST("/windows/:id/disconnections/:request/cancel", h.WindowsCancelUnenrollmentRequest)
+		g.POST("/windows/:id/disconnections/:request/release", h.WindowsReleaseUnenrollmentRequest)
 		g.GET("/windows/:id/renewals", h.WindowsCertificateRenewals)
 		g.GET("/windows/:id/renewals/:renewal", h.WindowsCertificateRenewal)
 		g.POST("/windows/:id/renewals/:renewal/cancel", h.WindowsCancelCertificateRenewal)

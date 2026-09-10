@@ -44,7 +44,7 @@ templ CSPCommands(c echo.Context, info *partials.CommonInfo, device windows.Devi
 										<td>{ scheduleTimestamp(command.CreatedAt) }<div>{ scheduleTimestamp(command.ExpiresAt) }</div></td>
 										<td>
 											if command.UnenrollmentRequestID!="" {
-												<span>Disconnection request</span>
+												<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+command.UnenrollmentRequestID)) }>Disconnection request</a>
 											} else if command.UpdateRunID!="" {
 												<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+command.UpdateRunID)) }>Update policy run</a>
 												<div>{ updateStep(command.UpdateStep) }</div>
@@ -118,6 +118,7 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 					}
 					if detail.Command.UnenrollmentRequestID!="" {
 						<p class="uk-alert uk-alert-warning">This fixed disconnection request belongs to the device lifecycle. A command acknowledgment does not prove local cleanup. Cancellation and review require device revocation permission.</p>
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+detail.Command.UnenrollmentRequestID)) }>Open owning disconnection request</a>
 					}
 					if detail.Command.UpdateRunID!="" {
 						<p class="my-3">This is a step in an immutable update policy run. Review its combined evidence and cancel remaining undelivered work from that run.</p>

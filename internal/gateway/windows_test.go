@@ -81,22 +81,24 @@ func TestGatewayWindowsExactRoutesAreOptionalAndSeparateFromConsole(t *testing.T
 					}
 				}
 			}
-			for _, path := range []string{"/windows", "/tenant/1/site/1/windows", "/EnrollmentServer/%44iscovery.svc", "/mdm/windows//syncml"} {
-				r, _ := http.NewRequest("POST", front.URL+path, nil)
-				response, err := front.Client().Do(r)
-				if err != nil {
-					t.Fatal(err)
-				}
-				response.Body.Close()
-				want := 403
-				if internal {
-					want = 204
-				}
-				if strings.Contains(path, "%") || strings.Contains(path, "//") {
-					want = 400
-				}
-				if response.StatusCode != want {
-					t.Fatal("nonprotocol route became public")
+			for _, path := range []string{"/windows", "/tenant/1/site/1/windows", "/windows/device/disconnections", "/tenant/1/windows/device/disconnections/create", "/tenant/1/site/1/windows/device/disconnections/request/release", "/EnrollmentServer/%44iscovery.svc", "/mdm/windows//syncml"} {
+				for _, method := range []string{"GET", "POST"} {
+					r, _ := http.NewRequest(method, front.URL+path, nil)
+					response, err := front.Client().Do(r)
+					if err != nil {
+						t.Fatal(err)
+					}
+					response.Body.Close()
+					want := 403
+					if internal {
+						want = 204
+					}
+					if strings.Contains(path, "%") || strings.Contains(path, "//") {
+						want = 400
+					}
+					if response.StatusCode != want {
+						t.Fatal("nonprotocol route became public")
+					}
 				}
 			}
 			config.WindowsURL = "http://private.example.test"

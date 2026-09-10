@@ -175,6 +175,9 @@ templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetad
 				if info.Can(access.ManageWindowsCSP) {
 					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/commands")) }>Windows CSP commands</a>
 				}
+				if info.Can(access.RevokeDevices) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/disconnections")) }>Windows disconnections</a>
+				}
 				if info.Can(access.ManageCertificates) {
 					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/renewals")) }>Certificate renewals</a>
 				}

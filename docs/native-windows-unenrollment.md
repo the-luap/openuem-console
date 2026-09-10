@@ -4,8 +4,10 @@ The SyncML endpoint now accepts authenticated Windows disconnection notification
 retires the native identity's server access, preserves interrupted work and shows
 the report in device details and inventory. A typed store workflow now queues
 server-requested disconnection and records explicit review when the notification
-is missing. Its dedicated console forms and physical Windows cleanup acceptance
-remain implementation work; the existing custom CSP editor cannot create it.
+is missing. Its scoped console provides preview, confirmed admission, protected
+history,
+cancellation and explicit review. Physical Windows cleanup acceptance remains
+open; the existing custom CSP editor cannot create this lifecycle operation.
 
 ## Protocol meaning
 
@@ -117,13 +119,13 @@ Vet and Linux/Windows builds pass. Browser checks on an owned loopback fixture a
 390, 768 and 1440 pixels verify contained layout, escaped names, clear report
 semantics, absence of another revocation form and navigation to the retained
 uncertain command. The fixture and its isolated schema are removed afterward.
-Full CI for this extension is pending.
+Both complete workflows pass for notification commit `102e542`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34442544141),
+[PR](https://github.com/the-luap/openuem-console/actions/runs/34442546245)).
 
 These fixtures create no host enrollment, profile, certificate-store entry or
-physical device command. Real Windows disconnection behavior, local cleanup,
-dedicated disconnection console actions and end-to-end recovery acceptance remain
-open in WIN-02.
-
+physical device command. Real Windows disconnection behavior, local cleanup and
+end-to-end physical recovery acceptance remain open in WIN-02.
 
 ## Server-requested disconnection and explicit review
 
@@ -194,4 +196,63 @@ focused lifecycle and affected update-queue regression tests pass in **17.055
 seconds**. Full console integration and focused Windows handler tests pass in
 **12.629 seconds**, and Windows views in **2.994 seconds**. Vet and Linux/Windows
 builds pass. Full CI for this request extension is pending. The dedicated console
-workflow and physical acceptance remain pending.
+workflow is described below; physical acceptance remains pending.
+
+## Request and review in the console
+
+Open a native Windows device at a concrete organization/site and choose **Windows
+disconnections**. These routes, history reads, draft actions, cancellation and
+review require fresh `devices.revoke` permission. Device readers and operators
+do not acquire that permission through navigation or the ordinary CSP endpoints.
+The public device gateway does not publish these administrator routes.
+
+The history view pages ten requests at a time. **Request disconnection** opens a
+reason and delivery-window form; an existing unresolved request redirects to its
+current details. The console accepts 1–168 whole hours. **Preview disconnection**
+shows the selected native identity, reason, delivery window and impact before any
+command is queued. Editing preserves the request identifier. The final checkbox
+and **Confirm disconnection request** submit only that fixed lifecycle intent.
+Provider IDs, CSP paths and management URLs are never browser-controlled fields.
+
+A request detail separates current device access, any authenticated device report,
+command delivery/outcome and an administrative review. A report explicitly does
+not attribute which person or request caused disconnection and does not verify
+local cleanup. Received `200`, `202`, failure or absent operation statuses retain
+their original meaning after a later report or review. Command evidence links to
+the protected CSP history; that page links back to its immutable lifecycle owner
+and offers no custom cancellation or abandonment form for it.
+
+**Confirm request cancellation** applies only before delivery. For a delivered
+request without retired device access, **Record review and release hold** requires
+an investigation reason, the displayed command revision and explicit acceptance
+that Windows may still disconnect. It releases the command hold without undoing
+or resending the operation. Existing server-access revocation remains linked as
+a separate action. A later disconnection report preserves the review and command
+history while retiring access. Retired devices expose history without a new
+request or release form; queued work can still be explicitly canceled.
+
+All mutations use bounded form bodies, exact field names, body CSRF, canonical
+request/revision values and current scoped authorization. Unknown/duplicate
+fields, query parameters on actions/details, invalid lifetimes, missing
+confirmation and stale revisions fail. Failed audited reads disclose no protected
+request details. An exact admitted form retry returns its existing identity even
+after access retirement; changed intent conflicts. Reasons and device-reported
+values are escaped, and generic draft formatting omits protected content.
+
+Full PostgreSQL console integration and focused Windows handler tests pass under
+the race detector in **13.174 seconds**; Windows view tests pass in **3.395 seconds**.
+Coverage includes grants removed after preview, foreign organization/sibling-site
+access, malformed/ambiguous forms, CSRF, paging, admission retries, audit rollback,
+actual synthetic SyncML absent/200/202/500 outcomes, and reports arriving after
+administrative review. Final focused view checks pass in **2.022 seconds**;
+public/private Windows gateway route tests pass in **1.785 seconds** and include
+the new disconnection paths. Vet and Linux/Windows builds pass.
+
+An owned loopback browser fixture passes 27 responsive page checks at 390, 768
+and 1440 pixels: draft, preview, queued cancellation, sent/reviewed history and
+reported acknowledged/uncertain/failed outcomes remain contained. Keyboard
+confirmation submits actual review and create/cancel forms; unchecked forms do
+not submit. Editing retains request identity, history paging works, long escaped
+reasons remain readable and command-owner links round-trip. The fixture and its
+isolated schema are removed afterward. Full CI for this console extension is
+pending; these checks do not enroll or disconnect a physical computer.

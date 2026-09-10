@@ -31,6 +31,21 @@ func windowsCSPConsolePeer(t *testing.T, h *Handler, ctx context.Context, scope 
 
 func windowsConsoleProtocolPeer(t *testing.T, h *Handler, ctx context.Context, scope access.Scope) (string, func(windows.CSPCommandSpec, string) *windows.CSPCommandDetail, func()) {
 	t.Helper()
+	id, exchange, disconnect := windowsConsoleQueuedPeer(t, h, ctx, scope)
+	return id, func(spec windows.CSPCommandSpec, status string) *windows.CSPCommandDetail {
+		t.Helper()
+		command, err := h.Windows.EnqueueCSPCommand(ctx, "organization-admin", scope, id, uuid.NewString(), spec, time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return exchange(command.ID, status)
+	}, disconnect
+}
+
+// windowsConsoleQueuedPeer delivers an already queued command, including fixed
+// lifecycle requests admitted by the actual console form under test.
+func windowsConsoleQueuedPeer(t *testing.T, h *Handler, ctx context.Context, scope access.Scope) (string, func(string, string) *windows.CSPCommandDetail, func()) {
+	t.Helper()
 	invitation, credential, err := h.Windows.CreateEnrollmentInvitation(ctx, "organization-admin", scope, "csp-console-peer@example.test", time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -136,12 +151,10 @@ func windowsConsoleProtocolPeer(t *testing.T, h *Handler, ctx context.Context, s
 		}
 		return parsed
 	}
-	deliver := func(spec windows.CSPCommandSpec, status string) *windows.CSPCommandDetail {
+	sessionNumber := 0
+	deliver := func(commandID, status string) *windows.CSPCommandDetail {
 		t.Helper()
-		queued, err := h.Windows.EnqueueCSPCommand(ctx, "organization-admin", scope, deviceID, uuid.NewString(), spec, time.Hour)
-		if err != nil {
-			t.Fatal(err)
-		}
+		sessionNumber++
 		rawNonce, err := base64.StdEncoding.DecodeString(nonce)
 		if err != nil {
 			t.Fatal(err)
@@ -149,7 +162,7 @@ func windowsConsoleProtocolPeer(t *testing.T, h *Handler, ctx context.Context, s
 		inner := md5.Sum([]byte(deviceID + ":" + secret))
 		outer := md5.Sum(append([]byte(base64.StdEncoding.EncodeToString(inner[:])+":"), rawNonce...))
 		maximum := uint64(5000)
-		initial := &windows.SyncMLMessage{Header: windows.SyncMLHeader{SessionID: "1", MessageID: "1", Source: windows.SyncMLLocation{URI: "urn:uuid:synthetic-csp-console-peer", Name: deviceID}, Target: windows.SyncMLLocation{URI: h.WindowsOptions.ManagementURL}, Credential: &windows.SyncMLCredential{Digest: base64.StdEncoding.EncodeToString(outer[:])}, Meta: &windows.SyncMLMeta{MaxMessageSize: &maximum}}, Final: true}
+		initial := &windows.SyncMLMessage{Header: windows.SyncMLHeader{SessionID: strconv.Itoa(sessionNumber), MessageID: "1", Source: windows.SyncMLLocation{URI: "urn:uuid:synthetic-csp-console-peer", Name: deviceID}, Target: windows.SyncMLLocation{URI: h.WindowsOptions.ManagementURL}, Credential: &windows.SyncMLCredential{Digest: base64.StdEncoding.EncodeToString(outer[:])}, Meta: &windows.SyncMLMeta{MaxMessageSize: &maximum}}, Final: true}
 		initial.Commands = []windows.SyncMLCommand{{Kind: "Alert", ID: "1", Data: &windows.SyncMLData{Text: "1224"}, Items: []windows.SyncMLItem{{Meta: &windows.SyncMLMeta{Type: "com.microsoft/MDM/LoginStatus"}, Data: &windows.SyncMLData{Text: "user"}}}}}
 		info := windows.SyncMLCommand{Kind: "Replace", ID: "2"}
 		for i, uri := range []string{"./DevInfo/DevId", "./DevInfo/Man", "./DevInfo/Mod", "./DevInfo/DmV", "./DevInfo/Lang"} {
@@ -209,7 +222,7 @@ func windowsConsoleProtocolPeer(t *testing.T, h *Handler, ctx context.Context, s
 		} else if status != "" {
 			process(reply(delivery, status))
 		}
-		detail, err := h.Windows.CSPCommandDetails(ctx, "organization-admin", scope, deviceID, queued.ID)
+		detail, err := h.Windows.CSPCommandDetails(ctx, "organization-admin", scope, deviceID, commandID)
 		if err != nil {
 			t.Fatal(err)
 		}
