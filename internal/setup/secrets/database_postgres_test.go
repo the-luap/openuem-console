@@ -35,12 +35,93 @@ import (
 // Run only inside an explicitly configured disposable PostgreSQL image. The
 // cluster, TLS authority and both database roles are synthetic and loopback-only.
 func TestInstallationSecretsDatabasePostgres(t *testing.T) {
+	f := startDatabaseFixture(t)
+	ctx, config, credentialDirectory, connection, administratorPassword := f.ctx, f.config, f.directory, f.connection, f.administratorPassword
+	state := filepath.Join(f.root, "bootstrap")
+	if _, err := secrets.BootstrapDatabase(ctx, credentialDirectory, state, config); err != nil {
+		entries, _ := os.ReadDir(state)
+		for _, entry := range entries {
+			t.Log("retained bootstrap phase", entry.Name())
+		}
+		var rolePresent, rowPresent bool
+		_ = f.admin.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='console'),EXISTS(SELECT 1 FROM openuem_bootstrap.installations)`).Scan(&rolePresent, &rowPresent)
+		t.Log("retained role and control row", rolePresent, rowPresent)
+		t.Fatal("automatic database bootstrap failed", err)
+	}
+	t.Setenv("ENV", "test")
+	model, err := models.New(connection, "pgx", "example.test")
+	if err != nil {
+		t.Fatal("console schema migration failed using the generated database credential")
+	}
+	defer model.Close()
+	var user, database string
+	var privileged bool
+	if err := model.DB.QueryRowContext(ctx, `SELECT current_user,current_database(),rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname=current_user`).Scan(&user, &database, &privileged); err != nil || user != "console" || database != "openuem" || privileged {
+		t.Fatal("console did not use the unprivileged application role")
+	}
+	if _, err := model.DB.ExecContext(ctx, `CREATE ROLE forbidden_fixture_role`); err == nil {
+		t.Fatal("application role can create cluster identities")
+	}
+	var tlsActive bool
+	if err := model.DB.QueryRowContext(ctx, `SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()`).Scan(&tlsActive); err != nil || !tlsActive {
+		t.Fatal("application did not authenticate over TLS")
+	}
+	if err := model.CreateInitialSettings(); err != nil {
+		t.Fatal("normal console initialization failed under application ownership")
+	}
+	if _, err := secrets.InitializeDatabaseCredentials(ctx, credentialDirectory, config); err != nil {
+		t.Fatal("credential restart failed", err)
+	}
+	if err := model.DB.PingContext(ctx); err != nil {
+		t.Fatal("idempotent provisioning broke the existing database connection")
+	}
+	if _, err := secrets.BootstrapDatabase(ctx, credentialDirectory, state, config); err != nil {
+		t.Fatal("bound database restart failed", err)
+	}
+	checkRejected := func(value *url.URL) error {
+		t.Helper()
+		db, err := sql.Open("pgx", value.String())
+		if err != nil {
+			t.Fatal("cannot configure negative fixture")
+		}
+		defer db.Close()
+		attempt, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		err = db.PingContext(attempt)
+		if err == nil {
+			t.Fatal("invalid database credentials or TLS identity were accepted")
+		}
+		return err
+	}
+	wrongPassword, _ := url.Parse(connection)
+	wrongPassword.User = url.UserPassword(config.User, administratorPassword)
+	var authentication *pgconn.PgError
+	if err := checkRejected(wrongPassword); !errors.As(err, &authentication) || authentication.Code != "28P01" {
+		t.Fatal("separate administrator password did not fail application authentication")
+	}
+	wrongHost, _ := url.Parse(connection)
+	wrongHost.Host = net.JoinHostPort("localhost", strconv.Itoa(config.Port))
+	var hostnameError x509.HostnameError
+	if err := checkRejected(wrongHost); !errors.As(err, &hostnameError) {
+		t.Fatal("verify-full did not reject the wrong server name")
+	}
+}
+
+type databaseFixture struct {
+	ctx                                                context.Context
+	root, directory, connection, administratorPassword string
+	config                                             secrets.DatabaseConfig
+	admin                                              *sql.DB
+}
+
+func startDatabaseFixture(t *testing.T) databaseFixture {
+	t.Helper()
 	initdb, postgres := os.Getenv("OPENUEM_DATABASE_TEST_INITDB"), os.Getenv("OPENUEM_DATABASE_TEST_POSTGRES")
 	if initdb == "" || postgres == "" {
 		t.Skip("requires the disposable PostgreSQL credential container")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
-	defer cancel()
+	t.Cleanup(cancel)
 	root := t.TempDir()
 	caFile, certificateFile, keyFile := databaseTLS(t, root)
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
@@ -71,7 +152,7 @@ func TestInstallationSecretsDatabasePostgres(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() { done <- server.Wait() }()
-	defer func() {
+	t.Cleanup(func() {
 		_ = syscall.Kill(-server.Process.Pid, syscall.SIGINT)
 		select {
 		case <-done:
@@ -79,7 +160,7 @@ func TestInstallationSecretsDatabasePostgres(t *testing.T) {
 			_ = syscall.Kill(-server.Process.Pid, syscall.SIGKILL)
 			<-done
 		}
-	}()
+	})
 	read := func(name string) string {
 		t.Helper()
 		data, err := os.ReadFile(filepath.Join(credentialDirectory, name))
@@ -90,7 +171,6 @@ func TestInstallationSecretsDatabasePostgres(t *testing.T) {
 		return string(data)
 	}
 	administratorPassword := read(secrets.DatabaseAdministratorPasswordFile)
-	applicationPassword := read(secrets.DatabasePasswordFile)
 	connection, err := secrets.DatabaseURL("", filepath.Join(credentialDirectory, secrets.DatabaseURLFile))
 	if err != nil {
 		t.Fatal("generated application connection is invalid", err)
@@ -102,7 +182,7 @@ func TestInstallationSecretsDatabasePostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot configure the fixture administrator connection")
 	}
-	defer admin.Close()
+	t.Cleanup(func() { admin.Close() })
 	for admin.PingContext(ctx) != nil {
 		select {
 		case <-ctx.Done():
@@ -110,68 +190,7 @@ func TestInstallationSecretsDatabasePostgres(t *testing.T) {
 		case <-time.After(25 * time.Millisecond):
 		}
 	}
-	// The fixture creates a normal application role, then uses the unmodified
-	// generated URL through the real console model and schema migration path.
-	if _, err := admin.ExecContext(ctx, `CREATE ROLE console LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '`+applicationPassword+`'`); err != nil {
-		t.Fatal("cannot create the fixture application role")
-	}
-	if _, err := admin.ExecContext(ctx, `CREATE DATABASE openuem OWNER console`); err != nil {
-		t.Fatal("cannot create the fixture application database")
-	}
-	t.Setenv("ENV", "test")
-	model, err := models.New(connection, "pgx", "example.test")
-	if err != nil {
-		t.Fatal("console schema migration failed using the generated database credential")
-	}
-	defer model.Close()
-	var user, database string
-	var privileged bool
-	if err := model.DB.QueryRowContext(ctx, `SELECT current_user,current_database(),rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname=current_user`).Scan(&user, &database, &privileged); err != nil || user != "console" || database != "openuem" || privileged {
-		t.Fatal("console did not use the unprivileged application role")
-	}
-	if _, err := model.DB.ExecContext(ctx, `CREATE ROLE forbidden_fixture_role`); err == nil {
-		t.Fatal("application role can create cluster identities")
-	}
-	var tlsActive bool
-	if err := model.DB.QueryRowContext(ctx, `SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()`).Scan(&tlsActive); err != nil || !tlsActive {
-		t.Fatal("application did not authenticate over TLS")
-	}
-	if err := model.CreateInitialSettings(); err != nil {
-		t.Fatal("normal console initialization failed under application ownership")
-	}
-	if _, err := secrets.InitializeDatabaseCredentials(ctx, credentialDirectory, config); err != nil {
-		t.Fatal("credential restart failed", err)
-	}
-	if err := model.DB.PingContext(ctx); err != nil {
-		t.Fatal("idempotent provisioning broke the existing database connection")
-	}
-	checkRejected := func(value *url.URL) error {
-		t.Helper()
-		db, err := sql.Open("pgx", value.String())
-		if err != nil {
-			t.Fatal("cannot configure negative fixture")
-		}
-		defer db.Close()
-		attempt, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		err = db.PingContext(attempt)
-		if err == nil {
-			t.Fatal("invalid database credentials or TLS identity were accepted")
-		}
-		return err
-	}
-	wrongPassword, _ := url.Parse(connection)
-	wrongPassword.User = url.UserPassword(config.User, administratorPassword)
-	var authentication *pgconn.PgError
-	if err := checkRejected(wrongPassword); !errors.As(err, &authentication) || authentication.Code != "28P01" {
-		t.Fatal("separate administrator password did not fail application authentication")
-	}
-	wrongHost, _ := url.Parse(connection)
-	wrongHost.Host = net.JoinHostPort("localhost", strconv.Itoa(port))
-	var hostnameError x509.HostnameError
-	if err := checkRejected(wrongHost); !errors.As(err, &hostnameError) {
-		t.Fatal("verify-full did not reject the wrong server name")
-	}
+	return databaseFixture{ctx: ctx, root: root, directory: credentialDirectory, connection: connection, administratorPassword: administratorPassword, config: config, admin: admin}
 }
 
 func databaseTLS(t *testing.T, directory string) (string, string, string) {

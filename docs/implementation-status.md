@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Resumable database bootstrap](database-bootstrap.md) now creates the production
+  application role and database from completed protected credentials. A private
+  journal and PostgreSQL control table bind the cluster and original object OIDs;
+  the pending role cannot log in and the staged database cannot accept connections.
+  Final name, private database grants, login, connections and SQL readiness commit
+  together. Isolated native Linux arm64 PostgreSQL tests pass for nine durable
+  interruption points, finalization rollback, suppressed binding writes, concurrency,
+  cancellation, missing/corrupt inputs, changed roles/databases/catalogs, cluster
+  binding and phase reconstruction. The compiled command passes actual startup,
+  restart, output privacy and blocked-query SIGTERM checks (0.38 seconds), and the
+  real console model migrates/initializes the resulting database over verified TLS
+  (0.32 seconds). Affected secret and command race suites pass (3.232, 1.363 and
+  1.327 seconds); full Linux/Windows builds and affected Vet checks pass.
+  Native CI now includes the command and full PostgreSQL suite.
+  Server TLS provisioning, service mounts, full reference installation and
+  restore/migration acceptance remain open.
 - [Persistent database credentials](database-credentials.md) generates independent
   bootstrap/application passwords and a verify-full URL with explicit CA trust,
   bound to the installation and immutable deployment metadata. The offline command
@@ -72,8 +88,11 @@ the table's package summaries do not remove any detail from the roadmap.
   rejected role creation, password separation and hostname validation (0.90 seconds).
   The existing generated-secret administrator/router lifecycle also passes
   (11.847 seconds), as do full Linux/Windows builds and affected Vet checks.
-  Production role/database creation, server TLS provisioning, service mounts and
-  full reference installation/restore acceptance remain open.
+  The original fixture's manual role/database setup is now replaced by the
+  production bootstrap above. Server TLS provisioning, service mounts and full
+  reference installation/restore acceptance remain open. The
+  [credential configuration pipeline](https://github.com/the-luap/openuem-console/actions/runs/34517852043)
+  passes on native Linux amd64/arm64 and Windows.
 - [Persistent installation secrets](installation-secrets.md) adds an offline
   private provisioner with a durable source and completion manifest, independent
   JWT/master/start-password values, exact resumable completed writes and no

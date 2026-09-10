@@ -47,7 +47,7 @@ It contains:
 | `credentials.json` | Durable source of both credentials and the exact metadata | Provisioning/recovery only |
 | `manifest.json` | Completion marker binding file digests and installation | Provisioning/recovery only |
 
-The CA path is interpreted inside the application container. Its CA must verify
+The CA path is interpreted inside the application and bootstrap containers. Its CA must verify
 the PostgreSQL server certificate, whose identity must match the configured host.
 The generator never offers a verification-disabled connection mode. It does not
 create the database server certificate or install a CA into host trust.
@@ -81,7 +81,9 @@ output privacy. The main installation provisioner uses the same checked director
 and exclusive-write implementation and retains its existing recovery tests.
 
 An isolated native Linux PostgreSQL 17 fixture creates a new cluster with the
-generated administrator password, TLS server identity and application role. The
+generated administrator password and TLS server identity. The production
+[database bootstrap command](database-bootstrap.md) creates the application role
+and database using those completed credential files. The
 actual console model creates its schema and initial settings using the generated
 URL as the application owner. The fixture proves encrypted transport, rejects
 the administrator password for the application role, denies role creation and
@@ -89,6 +91,7 @@ rejects a mismatched TLS server name. It has no external network, host ports,
 host trust installation or existing database access. CI runs it on amd64/arm64;
 configuration parsing and protected file loading also run natively on Windows.
 
-Database account creation in that fixture is test setup. Automatic, resumable
-production role/database creation, server certificate provisioning, service
-mount ownership and full fresh-stack/restore acceptance remain open.
+Automatic, resumable production role/database creation has its own protected
+journal and PostgreSQL interruption, rollback, drift and process lifecycle tests.
+Server certificate provisioning, service mount ownership and full
+fresh-stack/restore acceptance remain open.

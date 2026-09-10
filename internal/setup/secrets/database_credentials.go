@@ -165,35 +165,55 @@ func initializeDatabaseCredentials(ctx context.Context, directory string, config
 			return Result{}, err
 		}
 	}
-	encoded, err := d.read("credentials.json", 4096)
+	state, err := loadDatabaseJournal(d, config)
 	if err != nil {
 		return Result{}, err
+	}
+	if err := completeDatabaseFiles(d, state, true); err != nil {
+		return Result{}, err
+	}
+	return Result{Installation: config.Installation}, nil
+}
+
+func loadDatabaseJournal(d *provisioningDirectory, config DatabaseConfig) (databaseJournal, error) {
+	encoded, err := d.read("credentials.json", 4096)
+	if err != nil {
+		return databaseJournal{}, err
 	}
 	defer clear(encoded)
 	var state databaseJournal
 	if json.Unmarshal(encoded, &state) != nil || state.Config != config || !validDatabasePassword(state.Password) || !validDatabasePassword(state.AdministratorPassword) || state.Password == state.AdministratorPassword {
-		return Result{}, ErrState
+		return databaseJournal{}, ErrState
 	}
 	canonical, err := json.Marshal(state)
 	defer clear(canonical)
 	if err != nil || !bytes.Equal(canonical, encoded) {
-		return Result{}, ErrState
+		return databaseJournal{}, ErrState
 	}
-	connection := url.URL{Scheme: "postgres", Host: net.JoinHostPort(config.Host, strconv.Itoa(config.Port)), Path: "/" + config.Database, User: url.UserPassword(config.User, state.Password)}
+	return state, nil
+}
+
+func databaseConnection(config DatabaseConfig, user, password, database string) string {
+	connection := url.URL{Scheme: "postgres", Host: net.JoinHostPort(config.Host, strconv.Itoa(config.Port)), Path: "/" + database, User: url.UserPassword(user, password)}
 	query := url.Values{"sslmode": {"verify-full"}, "sslrootcert": {config.TrustFile}}
 	connection.RawQuery = query.Encode()
-	values := []string{state.Password, state.AdministratorPassword, connection.String()}
+	return connection.String()
+}
+
+func completeDatabaseFiles(d *provisioningDirectory, state databaseJournal, create bool) error {
+	config := state.Config
+	values := []string{state.Password, state.AdministratorPassword, databaseConnection(config, config.User, state.Password, config.Database)}
 	marker := manifest{Version: 1, Installation: config.Installation, Files: map[string]string{}}
 	for index, name := range databaseArtifacts {
 		value := []byte(values[index])
 		if !d.present[name] {
-			if d.present["manifest.json"] {
+			if !create || d.present["manifest.json"] {
 				clear(value)
-				return Result{}, ErrState
+				return ErrState
 			}
 			if err := d.write(name, value); err != nil {
 				clear(value)
-				return Result{}, err
+				return err
 			}
 		}
 		actual, err := d.read(name, 8192)
@@ -202,26 +222,28 @@ func initializeDatabaseCredentials(ctx context.Context, directory string, config
 		digest := sha256.Sum256(value)
 		clear(value)
 		if err != nil || !equal {
-			return Result{}, ErrState
+			return ErrState
 		}
 		marker.Files[name] = hex.EncodeToString(digest[:])
 	}
 	data, err := json.Marshal(marker)
 	if err != nil {
-		return Result{}, ErrState
+		return ErrState
 	}
 	if d.present["manifest.json"] {
 		actual, err := d.read("manifest.json", 2048)
 		if err != nil || !bytes.Equal(data, actual) {
-			return Result{}, ErrState
+			return ErrState
 		}
+	} else if !create {
+		return ErrState
 	} else if err := d.write("manifest.json", data); err != nil {
-		return Result{}, err
+		return err
 	}
 	if err := d.check(); err != nil {
-		return Result{}, err
+		return err
 	}
-	return Result{Installation: config.Installation}, nil
+	return nil
 }
 
 func validDatabasePassword(value string) bool {
