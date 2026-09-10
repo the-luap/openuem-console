@@ -90,6 +90,10 @@ and Docker-created mount/metadata paths. The
 [container workflow](../.github/workflows/gateway-container.yml) builds and runs
 both architectures, requires the explicit test pass line and checks runtime user,
 declared port and absence of test/source/credential files.
+At `79d415d`, all native amd64 and arm64 jobs pass in both
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34497033584)
+and [pull-request CI](https://github.com/the-luap/openuem-console/actions/runs/34497040423),
+including the required process-test execution and runtime filesystem checks.
 
 The broader gateway race suite independently tests real NATS request/reply through
 public TLS renewal, per-handshake expiry including session resumption, atomic
