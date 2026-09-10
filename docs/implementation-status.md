@@ -72,7 +72,15 @@ the table's package summaries do not remove any detail from the roadmap.
   credentials and passes in 4.793 seconds. Full Linux/Windows builds and affected
   Vet checks pass. An isolated unprivileged Linux arm64 process verifies the
   actual console flags, file environment inputs, installed credential selection
-  and rejected legacy fallback. Database/secret binding, database
+  and rejected legacy fallback. Native Linux amd64/arm64 and Windows
+  [secret provisioning/loading CI passes](https://github.com/the-luap/openuem-console/actions/runs/34513814100).
+  Explicit installation identifiers now bind independent HMAC proofs to a fresh
+  database before account creation. Existing bindings cannot be bypassed by
+  clearing configuration or selecting legacy mode. Exact restarts, conflicting
+  initializers, marker rollback/loss and occupied registries pass PostgreSQL/race
+  tests with the full administrator lifecycle (32.530 seconds). An actual Linux
+  arm64 worker against disposable PostgreSQL also rejects a mode/reset downgrade
+  (2.59 seconds). Legacy binding migration, database
   credential provisioning, distribution, rotation and full reference composition
   remain open.
 - [Protected first-administrator bootstrap](first-administrator-bootstrap.md)

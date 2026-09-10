@@ -21,13 +21,14 @@ func TestInstallationSecretsInstalledService(t *testing.T) {
 	for _, name := range []string{"JWT_KEY", "JWT_KEY_FILE", "ENCRYPTION_MASTER_KEY", "ENCRYPTION_MASTER_KEY_FILE"} {
 		t.Setenv(name, "")
 	}
+	t.Setenv("OPENUEM_INSTALLATION_ID", strings.Repeat("1", 32))
 	t.Setenv("JWT_KEY_FILE", jwtPath)
 	t.Setenv("ENCRYPTION_MASTER_KEY_FILE", masterPath)
 	called := false
 	unavailable := errors.New("synthetic unavailable legacy credential store")
 	legacy := func() (string, error) { called = true; return "", unavailable }
 	credentials, err := installedSecrets(true, legacy)
-	if err != nil || called || credentials.JWT != jwt || credentials.Master != master {
+	if err != nil || called || credentials.JWT != jwt || credentials.Master != master || credentials.Installation != strings.Repeat("1", 32) {
 		t.Fatal("installed service did not use mounted credentials", err)
 	}
 	t.Setenv("JWT_KEY", "ambiguous")
@@ -44,6 +45,7 @@ func TestInstallationSecretsInstalledService(t *testing.T) {
 		t.Fatal("legacy credential failure ignored", err)
 	}
 	t.Setenv("ENCRYPTION_MASTER_KEY_FILE", "")
+	t.Setenv("OPENUEM_INSTALLATION_ID", "")
 	credentials, err = installedSecrets(false, func() (string, error) { return "legacy-jwt", nil })
 	if err != nil || credentials.JWT != "legacy-jwt" || credentials.Master != "" {
 		t.Fatal("legacy configuration changed", err)

@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"os"
 
 	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
 	"github.com/open-uem/openuem-console/internal/setup/administrator"
@@ -16,7 +17,7 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil)
+	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil || os.Getenv("OPENUEM_INSTALLATION_ID") != "")
 	if err != nil {
 		return err
 	}
@@ -58,11 +59,12 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 		}
 	}
 
-	credentials, err := secrets.Load(secrets.Inputs{JWT: cCtx.String("jwt-key"), Master: cCtx.String("encryption-master-key"), JWTFile: cCtx.String("jwt-key-file"), MasterFile: cCtx.String("encryption-master-key-file"), Required: w.IndividualAgentService != nil})
+	credentials, err := secrets.Load(secrets.Inputs{Installation: os.Getenv("OPENUEM_INSTALLATION_ID"), JWT: cCtx.String("jwt-key"), Master: cCtx.String("encryption-master-key"), JWTFile: cCtx.String("jwt-key-file"), MasterFile: cCtx.String("encryption-master-key-file"), Required: w.IndividualAgentService != nil})
 	if err != nil {
 		return err
 	}
 	w.JWTKey, w.EncryptionMasterKey = credentials.JWT, credentials.Master
+	w.InstallationID = credentials.Installation
 
 	w.ConsolePort = cCtx.String("console-port")
 	w.AuthPort = cCtx.String("auth-port")

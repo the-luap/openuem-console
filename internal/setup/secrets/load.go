@@ -4,6 +4,7 @@ package secrets
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 
@@ -14,13 +15,15 @@ var ErrConfiguration = errors.New("installation secrets require valid, unambiguo
 var ErrState = errors.New("installation secret state is incomplete, changed or not private; existing material was retained")
 
 type Inputs struct {
+	Installation        string
 	JWT, Master         string
 	JWTFile, MasterFile string
 	Required            bool
 }
 
 type Runtime struct {
-	JWT, Master string
+	Installation string
+	JWT, Master  string
 }
 
 // Load permits exactly one source for each credential. File errors never fall
@@ -29,7 +32,10 @@ type Runtime struct {
 // single LF or CRLF terminator. The master key is the actual 32-byte AES input,
 // not a hex/base64 encoding which consumers would need to decode.
 func Load(input Inputs) (Runtime, error) {
-	var result Runtime
+	result := Runtime{Installation: input.Installation}
+	if input.Installation != "" && !validInstallation(input.Installation) {
+		return Runtime{}, ErrConfiguration
+	}
 	var err error
 	result.JWT, err = resolve(input.JWT, input.JWTFile, 32, 128)
 	if err != nil {
@@ -39,10 +45,19 @@ func Load(input Inputs) (Runtime, error) {
 	if err != nil {
 		return Runtime{}, err
 	}
-	if result.JWT == "" || input.Required && (len(result.JWT) < 32 || len(result.JWT) > 1024 || len(result.Master) != 32) {
+	if result.JWT == "" || (input.Required || input.Installation != "") && !validRuntime(result) {
 		return Runtime{}, ErrConfiguration
 	}
 	return result, nil
+}
+
+func validInstallation(value string) bool {
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 16 && hex.EncodeToString(decoded) == value
+}
+
+func validRuntime(value Runtime) bool {
+	return len(value.JWT) >= 32 && len(value.JWT) <= 1024 && len(value.Master) == 32
 }
 
 func resolve(raw, path string, minimum, maximum int) (string, error) {

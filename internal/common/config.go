@@ -2,6 +2,7 @@ package common
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -17,7 +18,7 @@ func (w *Worker) GenerateConsoleConfig() error {
 	if err != nil {
 		return err
 	}
-	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil)
+	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil || os.Getenv("OPENUEM_INSTALLATION_ID") != "")
 	if err != nil {
 		return err
 	}
@@ -91,6 +92,7 @@ func (w *Worker) GenerateConsoleConfig() error {
 		return err
 	}
 	w.JWTKey, w.EncryptionMasterKey = credentials.JWT, credentials.Master
+	w.InstallationID = credentials.Installation
 
 	key, err = cfg.Section("Console").GetKey("hostname")
 	if err != nil {

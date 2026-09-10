@@ -24,6 +24,7 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	for _, name := range []string{"JWT_KEY", "JWT_KEY_FILE", "ENCRYPTION_MASTER_KEY", "ENCRYPTION_MASTER_KEY_FILE"} {
 		t.Setenv(name, "")
 	}
+	t.Setenv("OPENUEM_INSTALLATION_ID", strings.Repeat("1", 32))
 	t.Setenv("OPENUEM_INDIVIDUAL_AGENT_MODE", "true")
 	t.Setenv("OPENUEM_AGENT_BROKER_URLS", "tls://broker.internal:4222")
 	t.Setenv("OPENUEM_AGENT_CONSOLE_KEY_FILE", "/private/console.seed")
@@ -68,7 +69,7 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 	if w.ProtectedAdministrator == nil || w.ProtectedAdministrator.UserID != "first-admin" || w.ProtectedAdministrator.PasswordFile != "/private/first-password" {
 		t.Fatal("CLI lost protected administrator configuration")
 	}
-	if w.JWTKey != jwt || w.EncryptionMasterKey != master {
+	if w.JWTKey != jwt || w.EncryptionMasterKey != master || w.InstallationID != strings.Repeat("1", 32) {
 		t.Fatal("CLI did not consume protected runtime credentials")
 	}
 	if err := run(append(append([]string{}, args...), "--jwt-key", "ambiguous")); err == nil {
@@ -88,6 +89,7 @@ func TestIndividualConsoleCLIWithoutLegacySFTPOrBroker(t *testing.T) {
 		t.Fatal("protected bootstrap allowed a password reset")
 	}
 	t.Setenv("OPENUEM_BOOTSTRAP_PASSWORD_FILE", "")
+	t.Setenv("OPENUEM_INSTALLATION_ID", "")
 	t.Setenv("OPENUEM_INDIVIDUAL_AGENT_MODE", "false")
 	if err := run(args); err == nil {
 		t.Fatal("legacy mode no longer requires SFTP key")

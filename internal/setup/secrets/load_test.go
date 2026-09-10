@@ -33,6 +33,9 @@ func TestInstallationSecretsLoad(t *testing.T) {
 	}
 	for _, input := range []Inputs{
 		{}, {JWT: "short", Master: master, Required: true}, {JWT: jwt, Required: true},
+		{JWT: jwt, Master: master, Installation: "invalid"},
+		{JWT: jwt, Master: master, Installation: strings.Repeat("A", 32)},
+		{JWT: jwt, Installation: strings.Repeat("a", 32)},
 		{JWT: jwt, Master: strings.Repeat("m", 64), Required: true},
 		{JWT: jwt, JWTFile: privateFile(t, jwt)},
 		{JWT: jwt, Master: master, MasterFile: privateFile(t, master)},
@@ -45,6 +48,9 @@ func TestInstallationSecretsLoad(t *testing.T) {
 		if strings.Contains(err.Error(), jwt) || strings.Contains(err.Error(), master) {
 			t.Fatal("credential leaked in error")
 		}
+	}
+	if value, err := Load(Inputs{Installation: strings.Repeat("a", 32), JWT: jwt, Master: master}); err != nil || value.Installation != strings.Repeat("a", 32) {
+		t.Fatal("installation binding identity was not retained", err)
 	}
 }
 

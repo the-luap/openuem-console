@@ -46,6 +46,11 @@ OPENUEM_BOOTSTRAP_PASSWORD_FILE=/run/openuem-secrets/initial-password
 OPENUEM_BOOTSTRAP_ADMIN=openuem
 ```
 
+For a fresh installation, also set `OPENUEM_INSTALLATION_ID` to the exact
+32-character lowercase hexadecimal identifier printed by provisioning. This
+enables permanent database binding before the first account is created. The
+identifier is public metadata; preserve it with the provisioning source.
+
 These settings complement the remaining database, TLS, broker and console
 configuration. Do not set raw `JWT_KEY` / `ENCRYPTION_MASTER_KEY` values alongside
 their file alternatives: conflicting inputs are rejected. A missing or invalid
@@ -84,10 +89,32 @@ marker can only republish the exact credentials retained in a valid source.
 Back up the provisioning source with the installation's protected recovery
 material. Do not run this initializer against a new empty directory as a recovery
 procedure for an existing database: it would create a different installation.
-Restore the original secrets and database together. Automatic database/secret
-binding, rotation, database credential provisioning, service-specific volume
+Restore the original secrets, installation identifier and database together.
+Rotation, database credential provisioning, service-specific volume
 ownership and complete reference composition remain separate work. This command
 does not claim a completed fresh-stack or disaster-recovery acceptance test.
+
+## Database binding
+
+With `OPENUEM_INSTALLATION_ID` selected, startup records independent HMAC proofs
+for the JWT and encryption keys in a fresh account registry. The database stores
+the public identifier and proofs, without storing either key. A separate permanent
+completion marker commits in the same transaction. Account/grant bootstrap and
+competing secret bindings share a transaction-level advisory lock; ordinary
+registrations are also serialized while checking that the registry is empty.
+
+Every subsequent worker startup checks the retained binding before initializing
+accounts, encrypting database fields or starting listeners. A different/missing
+identifier, changed key or missing binding/marker stops startup. Clearing the
+environment setting or selecting legacy mode cannot bypass an existing binding.
+Account deletion and a missing initial-password mount cannot reset it.
+
+Existing unbound installations retain their startup behavior while the identifier
+is unset. They cannot silently opt in after accounts or access history exist; an
+explicit migration that verifies their existing credentials remains separate
+work. The check does not overwrite old keys or authorize rotation. Losing both
+the database and its retained records still requires restoring the original
+installation, rather than initializing a new empty directory.
 
 ## Validation
 
@@ -98,3 +125,7 @@ check output privacy and recovery after an output failure. Installed-service
 tests prove that mounted credentials work with an unavailable legacy credential
 store. The real PostgreSQL/router administrator test uses generated secrets for
 first login, password replacement, session encryption and signed invitations.
+Database tests cover exact restarts, conflicting initializers, changed/missing
+keys, marker rollback and loss, occupied registries and retained account history.
+An actual worker test verifies that switching to legacy mode and requesting an
+account reset cannot bypass a bound database.

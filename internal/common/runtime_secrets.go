@@ -17,5 +17,5 @@ func installedSecrets(required bool, legacyJWT func() (string, error)) (secrets.
 			return secrets.Runtime{}, err
 		}
 	}
-	return secrets.Load(secrets.Inputs{JWT: jwt, Master: os.Getenv("ENCRYPTION_MASTER_KEY"), JWTFile: os.Getenv("JWT_KEY_FILE"), MasterFile: os.Getenv("ENCRYPTION_MASTER_KEY_FILE"), Required: required})
+	return secrets.Load(secrets.Inputs{Installation: os.Getenv("OPENUEM_INSTALLATION_ID"), JWT: jwt, Master: os.Getenv("ENCRYPTION_MASTER_KEY"), JWTFile: os.Getenv("JWT_KEY_FILE"), MasterFile: os.Getenv("ENCRYPTION_MASTER_KEY_FILE"), Required: required})
 }

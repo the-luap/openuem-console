@@ -39,12 +39,15 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	}
 	initialPassword := testPassword
 	key, jwtKey := strings.Repeat("k", 32), strings.Repeat("j", 32)
+	installation := strings.Repeat("1", 32)
 	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		path := filepath.Join(t.TempDir(), "provisioning")
-		if _, err := secrets.Initialize(ctx, path); err != nil {
+		provisioned, err := secrets.Initialize(ctx, path)
+		if err != nil {
 			t.Fatal(err)
 		}
-		credentials, err := secrets.Load(secrets.Inputs{JWTFile: filepath.Join(path, secrets.JWTFile), MasterFile: filepath.Join(path, secrets.MasterFile), Required: true})
+		installation = provisioned.Installation
+		credentials, err := secrets.Load(secrets.Inputs{Installation: installation, JWTFile: filepath.Join(path, secrets.JWTFile), MasterFile: filepath.Join(path, secrets.MasterFile), Required: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,6 +58,10 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 		}
 		initialPassword = string(data)
 		clear(data)
+	}
+	credentials := secrets.Runtime{Installation: installation, JWT: jwtKey, Master: key}
+	if err := secrets.CheckBinding(ctx, m.DB, credentials); err != nil {
+		t.Fatal("generated credentials could not bind the fresh database", err)
 	}
 	config := Config{UserID: "first-admin", PasswordFile: passwordFile(t, initialPassword)}
 	if created, err := Initialize(ctx, m.DB, config); err != nil || !created {
@@ -124,6 +131,9 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	}
 	if err := os.Remove(config.PasswordFile); err != nil {
 		t.Fatal(err)
+	}
+	if err := secrets.CheckBinding(ctx, m.DB, credentials); err != nil {
+		t.Fatal("restart rejected the original generated credentials", err)
 	}
 	if created, err := Initialize(ctx, m.DB, config); err != nil || created {
 		t.Fatal("restart reset the first login", created, err)
