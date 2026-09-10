@@ -39,14 +39,19 @@ func CSRF() echo.MiddlewareFunc {
 				// CSRF credentials or appear in access logs as token-bearing URLs.
 				// Native console forms are small. Large package uploads use
 				// the HTMX header and retain the configured global upload limit.
-				request.Body = http.MaxBytesReader(c.Response(), request.Body, 4<<20)
+				limit := int64(4 << 20)
+				route := strings.TrimPrefix(strings.TrimPrefix(c.Path(), "/tenant/:tenant/site/:site"), "/tenant/:tenant")
+				if route == "/windows" || strings.HasPrefix(route, "/windows/") {
+					limit = 8192
+				}
+				request.Body = http.MaxBytesReader(c.Response(), request.Body, limit)
 				parseErr := request.ParseForm()
 				if parseErr == nil {
 					parseErr = request.ParseMultipartForm(4 << 20)
 				}
 				var tooLarge *http.MaxBytesError
 				if errors.As(parseErr, &tooLarge) {
-					return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form exceeds 4 MiB")
+					return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form is too large")
 				}
 				if parseErr != nil && !errors.Is(parseErr, http.ErrNotMultipart) {
 					return echo.NewHTTPError(http.StatusBadRequest, "Invalid form")

@@ -116,8 +116,10 @@ The real loopback TLS test now activates a schedule and verifies all 13 settings
 through the existing seven-step ring update exchange.
 
 The full PostgreSQL 17/race suite passes in **80.271 seconds**, at **83.6%**
-package statement coverage. Vet and formatting checks pass. Full CI for this
-scheduling extension is pending.
+package statement coverage. Vet and formatting checks pass. Both complete workflows
+pass for scheduling commit `8bb65fb`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34419443928),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34419447259)).
 The tests use only the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials)
 and synthetic loopback device identities. Test-only time adjustment reseals owned
 fixture data to exercise deadlines without waiting through production windows;

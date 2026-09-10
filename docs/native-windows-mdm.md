@@ -15,13 +15,14 @@ plus [scoped CSP command delivery and results](native-windows-csp.md) and
 [versioned rings](native-windows-update-rings.md) and
 [scheduled cohorts](native-windows-update-schedules.md). The optional
 [listener and gateway integration](native-windows-operations.md) registers the
-four device endpoints and schedule worker. Console forms remain implementation work.
+four device endpoints and schedule worker. The [enrollment/device console](native-windows-console.md)
+adds CA setup, one-time invitations, scoped inventory and device access revocation.
 
 Initial certificate issuance and bootstrap provisioning are implemented and
 tested synthetically. A real Windows management session and applied CSP are
 not yet demonstrated on hardware. Administrative command/result views,
 broader typed policies, automatic ring promotion, certificate renewal,
-unenrollment, console integration and physical Windows acceptance remain open.
+unenrollment, command/update console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
 
 ## Discovery behavior

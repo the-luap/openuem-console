@@ -181,7 +181,9 @@ go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=30s -parallel=2 ./
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 No test executes a command, installs a profile/certificate or changes host settings.
 The typed update extension adds selected update policies and verified read-back.
+The [enrollment/device console](native-windows-console.md) provides CA setup,
+one-time credentials, scoped inventory and native access revocation.
 Remaining WIN-02 work includes broader typed configuration policies, automatic
 ring promotion, outgoing large-object chunking, command/result console views,
-enrollment console forms, renewal/unenrollment, rotation/recovery,
+renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

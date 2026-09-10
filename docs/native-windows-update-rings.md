@@ -109,7 +109,9 @@ and formatting checks pass. `FuzzUpdateRingTargets` passes **213,552 executions*
 in a 30-second local run; it checks bounded parsing, stable target normalization, protected round-trip
 representation and distinct per-device request identities. CI includes that fuzz
 target, the Windows persistence/race suite and native Windows portable tests.
-Full CI for this ring extension is pending.
+Both complete workflows pass for ring commit `3c75b00`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34417747091),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34417751680)).
 
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 The tests enroll only synthetic identities in isolated schemas, exchange data

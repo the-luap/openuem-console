@@ -21,6 +21,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/mdm_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
+	"github.com/open-uem/openuem-console/internal/views/windows_views"
 )
 
 func (h *Handler) RegisterApple(e *echo.Echo) {
@@ -189,7 +190,9 @@ func appleRedirect(c echo.Context, info *partials.CommonInfo, path string) error
 }
 
 func renderApple(c echo.Context, component templ.Component) error {
-	c.Response().Header().Set("Referrer-Policy", "strict-origin")
+	if c.Response().Header().Get("Referrer-Policy") == "" {
+		c.Response().Header().Set("Referrer-Policy", "strict-origin")
+	}
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	c.Response().Header().Set("Cache-Control", "no-store")
 	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
@@ -219,6 +222,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 		return err
 	}
 	rows := []mdm_views.DeviceRow{}
+	nativeWindowsLimited := false
 	platform := c.QueryParam("platform")
 	if strings.HasSuffix(c.Path(), "/ios") && platform == "" {
 		platform = "apple"
@@ -288,6 +292,18 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: d.Platform(), OSVersion: d.OSVersion, Serial: d.SerialNumber, Model: d.Model, Status: d.Status, LastSeen: d.LastSeen, URL: partials.GetNavigationUrl(info, "/ios/"+d.ID)})
 		}
 	}
+	if h.Windows != nil && (platform == "" || platform == "windows") {
+		devices, err := h.Windows.Devices(c.Request().Context(), h.appleActor(c), access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, "", 0, 100)
+		if err != nil {
+			return windowsFailure(err)
+		}
+		nativeWindowsLimited = len(devices) == 100
+		for _, d := range devices {
+			// Native MDM and agent identities remain separate until a verified
+			// association exists. Enrollment hints cannot merge their authority.
+			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: "windows", OSVersion: d.OSVersion, Status: "Native MDM: " + windows_views.DeviceStatus(d), URL: fmt.Sprintf("/tenant/%d/site/%d/windows/%s", d.TenantID, d.SiteID, d.ID)})
+		}
+	}
 	filtered := rows[:0]
 	for _, r := range rows {
 		if search == "" || strings.Contains(strings.ToLower(r.Name+" "+r.Serial+" "+r.Model+" "+r.OSVersion), search) {
@@ -301,7 +317,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			return err
 		}
 	}
-	return renderApple(c, mdm_views.Devices(c, info, rows, platform, search, h.AppleSetupError))
+	return renderApple(c, mdm_views.Devices(c, info, rows, platform, search, h.AppleSetupError, nativeWindowsLimited))
 }
 
 func (h *Handler) AppleSettings(c echo.Context) error {

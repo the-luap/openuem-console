@@ -114,3 +114,21 @@ func TestCSRFLimitsNativeFormsBeforeTokenExtraction(t *testing.T) {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
 }
+
+func TestCSRFLimitsWindowsFormsBeforeTokenExtraction(t *testing.T) {
+	for _, route := range []string{"/windows/setup", "/tenant/:tenant/windows/invitations", "/tenant/:tenant/site/:site/windows/:id/revoke"} {
+		e := echo.New()
+		e.Use(CSRF())
+		e.POST(route, func(echo.Context) error { t.Fatal("oversized Windows form reached handler"); return nil })
+		path := strings.NewReplacer(":tenant", "1", ":site", "11", ":id", "device").Replace(route)
+		r := httptest.NewRequest("POST", "https://console.test"+path, strings.NewReader("csrf="+strings.Repeat("a", 32)+"&data="+strings.Repeat("x", 8192)))
+		r.ContentLength = -1
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.AddCookie(&http.Cookie{Name: "__Host-openuem-csrf", Value: strings.Repeat("a", 32)})
+		w := httptest.NewRecorder()
+		e.ServeHTTP(w, r)
+		if w.Code != 413 {
+			t.Fatal("Windows form body was parsed beyond its bound", w.Code)
+		}
+	}
+}

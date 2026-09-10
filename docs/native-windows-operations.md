@@ -5,8 +5,9 @@ an optional separate HTTPS listener. The gateway forwards only their exact
 public methods and paths. The same lifecycle starts and stops the durable update
 schedule worker. This is implementation and synthetic acceptance evidence;
 production deployment and physical Windows acceptance have not been performed.
-Enrollment credential/CA/device administration and update console forms remain
-implementation work. WIN-02 remains in progress.
+The [enrollment/device console](native-windows-console.md) now provides CA setup,
+one-time credentials, scoped inventory and device access revocation. Command/update
+console forms remain implementation work. WIN-02 remains in progress.
 
 ## Configuration
 
@@ -104,7 +105,10 @@ certificate headers, optional gateway routing, wrong hosts/methods/paths,
 concurrent admission, canceled requests, partial configuration, worker retry,
 concurrent shutdown and startup migrations with persisted-credential restart.
 The full local PostgreSQL 17/race suite, Vet and Linux/Windows builds pass.
-Full CI for this change is pending. No test installs a certificate or changes
+Both complete workflows pass for listener commit `85cac95`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34421236660),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34421239217)).
+No test installs a certificate or changes
 host settings.
 
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials)

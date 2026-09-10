@@ -201,7 +201,9 @@ package statement coverage. The extended typed policy fuzz target, including bot
 compiler versions and exact batch reassembly, passes **23,726 executions** in its
 30-second local run. Vet and formatting checks pass.
 CI includes the target, PostgreSQL/race tests, native Windows portable tests
-and both platform builds. Full CI for this update extension is pending.
+and both platform builds. Both complete workflows pass for batching commit `293f062`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34416153591),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34416160052)).
 
 ```sh
 go test -race -count=1 -timeout=3m ./internal/mdm/windows
@@ -210,7 +212,9 @@ go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=30s -parallel=2 ./interna
 
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 No fixture installs a policy/certificate, changes Windows settings or executes a
-host command. Remaining work includes dynamic groups, scheduled assignments and
-pilot promotion gates, outgoing chunking for large trees, console and production wiring,
+host command. [Scheduled assignments](native-windows-update-schedules.md) and
+[listener/worker registration](native-windows-operations.md) are now implemented.
+Remaining work includes dynamic groups, pilot promotion gates, outgoing chunking
+for large trees, update console workflows,
 continuous compliance and async reconciliation, actual update/restart evidence,
 renewal/unenrollment, provider integrations and physical Windows acceptance.

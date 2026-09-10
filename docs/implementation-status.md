@@ -48,7 +48,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
-| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle | Credential/CA/device and command/update console forms, broader typed policies, automatic ring promotion, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
+| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation | Command/update/ring/schedule console forms, broader typed policies, automatic ring promotion, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
@@ -200,8 +200,10 @@ the table's package summaries do not remove any detail from the roadmap.
   the activated plan. Deadline, cancellation-lock, concurrent worker, cap,
   corruption-isolation, restart and migration tests pass; the real TLS exchange
   now uses scheduled activation. The full PostgreSQL 17/race suite passes in
-  80.271 seconds at 83.6% package coverage; Vet and formatting pass. Full CI for
-  scheduling is pending.
+  80.271 seconds at 83.6% package coverage; Vet and formatting pass. Both complete
+  workflows pass for scheduling commit `8bb65fb`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34419443928),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34419447259)).
   Console wiring, dynamic groups and patch-based promotion
   gates remain open; activation timing does not control the Windows reboot time.
 - [Native Windows listener and gateway](native-windows-operations.md) register
@@ -215,8 +217,24 @@ the table's package summaries do not remove any detail from the roadmap.
   local PostgreSQL 17/race suite passes (Windows 88.587 seconds, 83.7% coverage;
   route classifier 100%; gateway 90.8%; shared identity 92.8%), including the
   existing server reminder lifecycle. Vet, formatting and Linux/Windows builds
-  pass. Full CI for this listener change is pending. Enrollment/device/update
-  console forms and physical Windows acceptance remain open.
+  pass. Both complete workflows pass for listener commit `85cac95`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34421236660),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34421239217)).
+  Enrollment/device console evidence follows below; command/update console
+  workflows and physical Windows acceptance remain open.
+- [Native Windows enrollment/device console](native-windows-console.md) adds
+  confirmed organization CA creation, one-time enrollment credentials, invitation
+  revocation, paged site inventory, device details and audited access revocation.
+  Shared inventory includes separate native identities with exact site links,
+  enrollment-only status and no invented last contact. Live transaction scope,
+  site moves, organization grants, audit rollback, concurrent revocation, replay
+  denial, bounded CSRF forms, escaped output and real session routes are tested.
+  Owned loopback browser flows cover CA creation, invitation creation, GET secret
+  absence and revocation at 390/768/1440 pixels. The full Windows PostgreSQL/race
+  suite passes in 84.932 seconds at 83.7% coverage; handler, shared view and router
+  tests, Vet and Linux/Windows builds pass. Full CI for the console change is
+  pending. Command/update/ring/schedule
+  console workflows and the remaining WIN-02 requirements stay open.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

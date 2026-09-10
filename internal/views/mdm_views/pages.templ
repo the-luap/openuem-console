@@ -27,6 +27,9 @@ templ Navigation(info *partials.CommonInfo) {
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>Automated Device Enrollment</a>
 		}
 		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/desktop/enrollment")) }>Desktop enrollment</a>
+		if info.Can(access.ReadDevices) {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a>
+		}
 	</div>
 }
 
@@ -34,7 +37,7 @@ templ CSRF(info *partials.CommonInfo) {
 	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
 }
 
-templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string) {
+templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string, nativeWindowsLimited bool) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}}, info)
@@ -55,6 +58,9 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 						<label>Platform<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>All platforms</option><option value="windows" selected?={ platform=="windows" }>Windows</option><option value="linux" selected?={ platform=="linux" }>Linux</option><option value="macos" selected?={ platform=="macos" }>macOS</option><option value="ios" selected?={ platform=="ios" }>iOS</option><option value="ipados" selected?={ platform=="ipados" }>iPadOS</option><option value="apple" selected?={ platform=="apple" }>All Apple MDM devices</option><option value="unknown" selected?={ platform=="unknown" }>Platform not yet identified</option></select></label>
 						<button type="submit" class="uk-button uk-button-primary">Filter</button>
 					</form>
+					if nativeWindowsLimited {
+						<p class="uk-text-muted mb-4">This view searches the 100 most recent native Windows enrollments in this scope. Open <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a> to browse and search the full inventory by site.</p>
+					}
 					<div class="overflow-x-auto">
 						<table class="uk-table uk-table-divider uk-table-hover">
 							<thead><tr><th>Device</th><th>Platform / OS</th><th>Model</th><th>Serial number</th><th>Management</th><th>Last contact</th></tr></thead>
@@ -79,7 +85,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 						</table>
 					</div>
 					if len(rows)==0 {
-						<p class="uk-text-muted my-6">No devices match this view. Enroll an Apple device or install and admit a desktop agent to get started.</p>
+						<p class="uk-text-muted my-6">No devices match this view. Enroll an Apple or Windows device, or install and admit a desktop agent to get started.</p>
 					}
 				</div>
 			</section>

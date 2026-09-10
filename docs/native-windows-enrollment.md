@@ -6,7 +6,9 @@ provisioning with exact retries. It builds on the [discovery, credential and CA
 services](native-windows-mdm.md). The optional
 [listener and gateway](native-windows-operations.md) now connect these services
 to authenticated SyncML, CSP commands/results and scheduled update policies.
-WIN-02 remains in progress: console forms, renewal/unenrollment, broader policy
+The [enrollment/device console](native-windows-console.md) now provides CA setup,
+one-time credentials and scoped access revocation. WIN-02 remains in progress:
+command/update console workflows, renewal/unenrollment, broader policy
 workflows and physical Windows acceptance are still open. Issuing a
 certificate does not mark a device as successfully managed.
 
@@ -54,8 +56,9 @@ or expiry before commit returns no response and rolls back all of those changes.
 
 The database keeps immutable scope/identity/certificate/result bindings through
 composite foreign keys and update/delete triggers. Device and certificate
-revocation timestamps can be set once. These storage transitions are not yet a
-console revocation operation or an on-device unenrollment command. Reported device
+revocation timestamps can be set once. The [console](native-windows-console.md)
+now revokes native device access while retaining history; this does not send an
+on-device unenrollment command. Reported device
 identifiers and names are retained as initial hints; they never merge or overwrite
 another managed identity.
 
