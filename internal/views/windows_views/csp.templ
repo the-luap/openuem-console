@@ -22,8 +22,13 @@ templ CSPCommands(c echo.Context, info *partials.CommonInfo, device windows.Devi
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}, {Title: "CSP commands"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Windows CSP commands</h1><p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
-</div>
+			<div>
+				<h1 class="text-2xl font-semibold">Windows CSP commands</h1>
+				<p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
+				if canConfigureUpdate(device) {
+					<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/new")) }>Create custom CSP command</a>
+				}
+			</div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<p>Protected command history includes custom operations and steps owned by typed update runs. Acknowledgments describe protocol evidence; they do not establish effective policy, compliance, installed patches or reboot.</p>
@@ -89,8 +94,10 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "CSP commands", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")}, {Title: "Command evidence"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Windows CSP command</h1><p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
-</div>
+			<div>
+				<h1 class="text-2xl font-semibold">Windows CSP command</h1>
+				<p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
+			</div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">{ cspState(detail.Command.Phase) }</h2>
@@ -148,20 +155,7 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">Original command intent</h2>
 					<p>Operation numbers preserve tree order and nesting. Request values are configuration intent, separate from device results below.</p>
-					for _, row := range cspRequestRows(detail.Request) {
-						<details class="my-3">
-							<summary>Operation { row.Position } · { row.Command.Kind }</summary>
-							for _, item := range row.Command.Items {
-								if item.Target!=nil {
-									<dl class="uk-description-list"><dt>Target node</dt><dd>{ item.Target.URI }</dd></dl>
-								}
-								if item.Meta!=nil {
-									<dl class="uk-description-list"><dt>Value format / MIME</dt><dd>{ item.Meta.Format } · { item.Meta.Type }</dd></dl>
-								}
-								@cspData(item.Data)
-							}
-						</details>
-					}
+					@cspIntent(detail.Request, false)
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
@@ -193,5 +187,22 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 				</div>
 			</section>
 		</main>
+	}
+}
+
+templ cspIntent(command windows.SyncMLCommand, expanded bool) {
+	for _, row := range cspRequestRows(command) {
+		<details class="my-3" open?={ expanded }>
+			<summary>Operation { row.Position } · { row.Command.Kind }</summary>
+			for _, item := range row.Command.Items {
+				if item.Target!=nil {
+					<dl class="uk-description-list"><dt>Target node</dt><dd>{ item.Target.URI }</dd></dl>
+				}
+				if item.Meta!=nil {
+					<dl class="uk-description-list"><dt>Value format / MIME</dt><dd>{ item.Meta.Format } · { item.Meta.Type }</dd></dl>
+				}
+				@cspData(item.Data)
+			}
+		</details>
 	}
 }

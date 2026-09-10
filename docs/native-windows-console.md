@@ -132,7 +132,8 @@ add UTC timing review, future-plan creation, protected state/history and confirm
 pending cancellation. [CSP command history and queue controls](native-windows-csp-console.md)
 add protected request/result reads, undelivered custom-command cancellation and
 explicit resolution of uncertain outcomes under the separate CSP administrator
-capability. The roadmap still requires command creation and observation timeline
+capability. Custom JSON command drafts now have shared-compiler previews, confirmed
+admission and idempotent retries. The roadmap still requires observation timeline
 forms, broader CSP
 policies, certificate renewal and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.

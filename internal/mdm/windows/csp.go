@@ -42,6 +42,31 @@ type CSPCommandSpec struct {
 func (CSPCommandSpec) String() string     { return "[protected Windows CSP command]" }
 func (v CSPCommandSpec) GoString() string { return v.String() }
 
+type CSPCommandPreview struct {
+	Command      SyncMLCommand `json:"-" xml:"-" yaml:"-"`
+	UserTarget   bool          `json:"-" xml:"-" yaml:"-"`
+	EncodedBytes int           `json:"-" xml:"-" yaml:"-"`
+}
+
+func (CSPCommandPreview) String() string     { return "[protected Windows CSP command preview]" }
+func (v CSPCommandPreview) GoString() string { return v.String() }
+
+// PreviewCSPCommand compiles and decodes the same canonical intent used by queue
+// admission. It performs no storage, authorization or device operations. A caller
+// must independently authorize access and revalidate final admission.
+func PreviewCSPCommand(spec CSPCommandSpec) (*CSPCommandPreview, error) {
+	payload, user, err := encodeCSPRequest(spec)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(payload)
+	command, _, err := decodeCSPRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	return &CSPCommandPreview{Command: command, UserTarget: user, EncodedBytes: len(payload)}, nil
+}
+
 func cspUnreserved(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("-._~", rune(c))
 }

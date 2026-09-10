@@ -10,8 +10,9 @@ preflight/configuration/read-back workflow on this service. The optional
 [listener/gateway integration](native-windows-operations.md) registers its device
 transport. The [CSP console](native-windows-csp-console.md) provides protected
 history/results, undelivered custom-command cancellation and explicit resolution
-of uncertain effects. Command creation forms and physical Windows acceptance
-remain open.
+of uncertain effects. Its bounded JSON editor now reviews complete custom trees
+through the shared compiler before confirmed admission. Physical Windows
+acceptance remains open.
 
 ## Administrative command boundary
 
@@ -188,7 +189,6 @@ The typed update extension adds selected update policies and verified read-back.
 The [enrollment/device console](native-windows-console.md) provides CA setup,
 one-time credentials, scoped inventory and native access revocation.
 Remaining WIN-02 work includes broader typed configuration policies, automatic
-ring promotion, outgoing large-object chunking, command creation and observation
-timeline forms,
+ring promotion, outgoing large-object chunking, observation timeline forms,
 renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

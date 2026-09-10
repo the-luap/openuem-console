@@ -37,6 +37,13 @@ func TestCSPCompilerCanonicalTargetsTypesAndGroups(t *testing.T) {
 		if err != nil || decodedUser != user || command.Kind != spec.Kind {
 			t.Fatal("protected CSP representation changed request", err)
 		}
+		preview, err := PreviewCSPCommand(spec)
+		if err != nil || preview.UserTarget != user || preview.EncodedBytes != len(encoded) || preview.Command.Kind != command.Kind {
+			t.Fatal("CSP preview differs from admitted compilation", err)
+		}
+		if value, err := json.Marshal(preview); err != nil || string(value) != "{}" || strings.Contains(fmt.Sprintf("%+v", preview), spec.URI) && spec.URI != "" {
+			t.Fatal("CSP preview exposed protected intent")
+		}
 		if user != strings.HasPrefix(spec.URI, "./User/") {
 			t.Fatal("incorrect user-target classification")
 		}

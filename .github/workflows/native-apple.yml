@@ -116,6 +116,8 @@ jobs:
           retention-days: 7
       - name: Scoped console routes and response privacy
         run: go test -race -count=1 ./internal/controllers/webserver/handlers
+      - name: Bounded custom Windows CSP editor JSON fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsCSPJSON$' -fuzztime=15s -parallel=2 ./internal/controllers/webserver/handlers
       - name: Protocol, persistence and TLS
         run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver
       - name: Gateway identity, route isolation, certificate login and CSRF

@@ -17,7 +17,9 @@ func windowsCSPFailure(err error) error {
 	case errors.Is(err, windows.ErrCSPCommand):
 		return echo.NewHTTPError(400, "Invalid Windows CSP command request")
 	case errors.Is(err, windows.ErrCSPConflict):
-		return echo.NewHTTPError(409, "The command revision changed. Review its current evidence before taking another action.")
+		return echo.NewHTTPError(409, "The request or command revision changed. Review the existing command; new intent requires a new request.")
+	case errors.Is(err, windows.ErrCSPQueueFull):
+		return echo.NewHTTPError(409, "This device's command queue is full. Review its outstanding work first.")
 	case errors.Is(err, windows.ErrCSPAlreadySent):
 		return echo.NewHTTPError(409, "This action is unavailable in the command's current state. Review its delivery and outcome.")
 	default:

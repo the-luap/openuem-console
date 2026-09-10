@@ -22,7 +22,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/windows/:id/commands", "/windows/:id/commands/:command":
+		case "/windows/:id/commands", "/windows/:id/commands/:command", "/windows/:id/commands/new":
 			return access.ManageWindowsCSP, true
 		case "/windows", "/windows/:id":
 			return access.ReadDevices, true
@@ -35,7 +35,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
-		case "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon":
+		case "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon", "/windows/:id/commands/preview", "/windows/:id/commands/create":
 			return access.ManageWindowsCSP, true
 		case "/windows/setup":
 			return access.ManageCertificates, true
@@ -72,6 +72,9 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/update-schedules/:schedule/cancel", h.WindowsCancelUpdateSchedule)
 		g.GET("/windows/:id", h.WindowsDevice)
 		g.GET("/windows/:id/commands", h.WindowsCSPCommands)
+		g.GET("/windows/:id/commands/new", h.WindowsNewCSPCommand)
+		g.POST("/windows/:id/commands/preview", h.WindowsPreviewCSPCommand)
+		g.POST("/windows/:id/commands/create", h.WindowsCreateCSPCommand)
 		g.GET("/windows/:id/commands/:command", h.WindowsCSPCommand)
 		g.POST("/windows/:id/commands/:command/cancel", h.WindowsCancelCSPCommand)
 		g.POST("/windows/:id/commands/:command/abandon", h.WindowsAbandonCSPCommand)
@@ -104,10 +107,11 @@ func (h *Handler) WindowsCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 			if r.URL.RawQuery != "" || r.URL.ForceQuery {
 				return echo.NewHTTPError(400, "Form actions do not accept query parameters")
 			}
-			if r.ContentLength > 8192 {
+			limit := windowsFormByteLimit(c.Path())
+			if r.ContentLength > limit {
 				return echo.NewHTTPError(413, "Windows form is too large")
 			}
-			r.Body = http.MaxBytesReader(c.Response(), r.Body, 8192)
+			r.Body = http.MaxBytesReader(c.Response(), r.Body, limit)
 			if err := r.ParseForm(); err != nil {
 				var oversized *http.MaxBytesError
 				if errors.As(err, &oversized) {
@@ -115,7 +119,7 @@ func (h *Handler) WindowsCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 				}
 				return echo.NewHTTPError(400, "Invalid Windows form")
 			}
-			if len(r.PostForm.Encode()) > 8192 || len(r.PostForm) > 24 {
+			if int64(len(r.PostForm.Encode())) > limit || len(r.PostForm) > 24 {
 				return echo.NewHTTPError(413, "Windows form is too large")
 			}
 			expected, _ := c.Get("csrf").(string)

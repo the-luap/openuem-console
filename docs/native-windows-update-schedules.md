@@ -207,5 +207,7 @@ history and actual pending cancellation through cookie/Origin CSRF. The canceled
 history remains readable without another cancellation form. History remains
 contained at 390/768/1440 pixels; the 768-pixel form was visually inspected.
 The browser reported no warnings or errors. These tests do not contact managed
-devices or install host policy. Full CI for the schedule-console extension is
-pending; prior backend and cohort-console CI evidence does not replace that check.
+devices or install host policy. Both complete workflows pass for schedule-console
+commit `3a0b0fa`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34431557669),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34431559785)).

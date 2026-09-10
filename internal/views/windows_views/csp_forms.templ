@@ -1,0 +1,93 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ CSPCommandForm(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft CSPCommandDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "CSP commands", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")}, {Title: "Create command"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Create custom CSP command</h1><p>{ device.Name } · { updateTargetScope(info,device) }</p>@cspNavigation(info, device)
+</div>
+			if draft.Error!="" {
+				<div class="uk-alert uk-alert-danger" role="alert">{ draft.Error }</div>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Custom CSP operations require knowledge of the target node and its supported Windows versions, editions and operations. They can change device configuration or retrieve protected values. Use typed update policies when their guided settings meet your need.</p>
+					<p class="my-3">Enter one JSON command tree below. The next step validates its structure and displays every operation and value for review. Nothing is queued until you explicitly confirm.</p>
+					<form class="grid gap-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/preview") }>
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="request_key" value={ draft.Form.Get("request_key") }/>
+						<label class="grid gap-2">Command tree (JSON)<textarea class="uk-textarea font-mono" name="command" rows="16" maxlength="262144" required spellcheck="false" autocomplete="off" autocapitalize="none">{ draft.Form.Get("command") }</textarea><span>Up to 256 KiB of JSON. The compiled request must fit 128 KiB, with at most 32 operations and four child levels below the root.</span></label>
+						<label class="grid gap-2">Admission lifetime (seconds)<input class="uk-input" type="number" name="seconds" min="60" max="604800" step="1" value={ draft.Form.Get("seconds") } required/><span>60–604800 seconds, from one minute through seven days. Starts on confirmation and bounds delivery admission; expiry does not undo device changes.</span></label>
+						<button class="uk-button uk-button-primary" type="submit">Review command and device</button>
+					</form>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Command fields</h2>
+					<dl class="uk-description-list"><dt>kind</dt><dd>Get, Add, Replace, Delete or Exec. Atomic and Sequence contain an ordered commands array.</dd><dt>uri</dt><dd>One canonical target per leaf, starting with ./Device/Vendor/MSFT/ or ./User/Vendor/MSFT/. DevInfo and DevDetail paths support Get only.</dd><dt>format</dt><dd>chr, int, bool, b64, xml, null or node, where the operation supports that value type. Omit for Get, Delete and Exec without data.</dd><dt>text</dt><dd>A JSON string holding the exact value, including integer or Boolean text. Use canonical integers, true/false or padded base64. An empty string is an explicit empty value; omitting text supplies no data.</dd><dt>xml</dt><dd>Self-contained XML markup as a JSON string, with format xml. Use text with format chr when the CSP expects a literal XML string. Do not supply text and xml together.</dd><dt>mime</dt><dd>Optional MIME type without parameters, where data is supported.</dd><dt>commands</dt><dd>A nonempty ordered array for Atomic or Sequence. Groups contain only kind and commands. Atomic cannot contain Get or nested Atomic; Sequence cannot directly contain Sequence.</dd></dl>
+					<p class="my-3">Field names are lowercase and unique. JSON null is not an omitted field. For a null value use format null with an empty text string; for an interior node use Add with format node and no data. Protected enrollment/transport roots, external targets, traversal and wildcard queries are rejected.</p>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ cspCommandDraftFields(draft CSPCommandDraft) {
+	for _,name:=range []string{"request_key","seconds","command"} {
+		<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+	}
+}
+
+templ CSPCommandPreview(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft CSPCommandDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "CSP commands", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")}, {Title: "Review command"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Review custom CSP command</h1><p>{ device.Name }</p>@cspNavigation(info, device)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Selected device and admission</h2>
+					<dl class="uk-description-list"><dt>Organization / site</dt><dd>{ updateTargetScope(info,device) }</dd><dt>Native device ID</dt><dd>{ device.ID }</dd><dt>Enrollment type</dt><dd>{ device.EnrollmentType }</dd><dt>Current certificate expires</dt><dd>{ scheduleTimestamp(device.CertificateExpiresAt) }</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("seconds") } seconds after confirmation</dd><dt>Compiled request size</dt><dd>{ fmt.Sprint(draft.Preview.EncodedBytes) } bytes</dd></dl>
+					if draft.Preview.UserTarget {
+						<p class="my-3">This command includes user targets. Delivery requires Full enrollment and an eligible enrolled-user session. The current identity record does not establish a current user session.</p>
+					}
+					<p class="my-3">The compiler validates transport structure and values. It does not establish that each CSP exists or supports these operations on this device. Confirm the intended effects and supported platform before admission.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Every reviewed operation</h2>
+					<p>Operation numbers preserve order and nesting. Values below are the compiled intent; XML is displayed as text.</p>
+					@cspIntent(draft.Preview.Command, true)
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>No command has been queued by this preview. Confirmation saves one immutable request for this exact device. The device must contact the server before eligible work can be delivered. Queue admission and acknowledgments do not establish effective policy or compliance.</p>
+					<form class="grid gap-3 mt-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/create") }>
+						@mdm_views.CSRF(info)
+						@cspCommandDraftFields(draft)
+						<label><input type="checkbox" name="confirm_command" value="yes" required/> Queue every reviewed operation and value for this exact device.</label><button class="uk-button uk-button-primary" type="submit">Confirm and queue command</button>
+					</form>
+					<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/preview") }>
+						@mdm_views.CSRF(info)
+						@cspCommandDraftFields(draft)
+						<button class="uk-button uk-button-default" type="submit" name="edit_command" value="yes">Edit command tree</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
