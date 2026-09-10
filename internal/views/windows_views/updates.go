@@ -75,6 +75,10 @@ func canCancelUpdate(steps []windows.CSPCommand) bool {
 	return pending
 }
 
+func canConfigureUpdate(device windows.DeviceMetadata) bool {
+	return device.RevokedAt == nil && device.CertificateRevokedAt == nil && device.CertificateExpiresAt.After(time.Now())
+}
+
 type policyDisplayRow struct{ Label, Value string }
 
 // Explicit zero and false remain visible; an unset setting is unmanaged.

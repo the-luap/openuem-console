@@ -171,6 +171,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 		t.Fatal(err)
 	}
 	exerciseWindowsUpdateConsole(t, h, ctx, scope, deviceID, request, artifact)
+	runConsoleBrowserFixture(t, h, ctx, os.Getenv("OPENUEM_WINDOWS_POLICY_BROWSER_FIXTURE"), base+"/windows/"+deviceID+"/updates/new")
 	t.Run("Windows device views and revocation are scoped", func(t *testing.T) {
 		for _, path := range []string{base + "/devices?platform=windows", orgBase + "/devices?platform=windows", base + "/devices?q=synthetic"} {
 			w := request("organization-admin", "GET", path, nil)
@@ -225,6 +226,14 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 		}
 		if d, err := store.Device(ctx, admin, scope, deviceID); err != nil || d.RevokedAt == nil {
 			t.Fatal("device revocation not persisted", err)
+		}
+		if w := request("scoped-operator", "GET", base+"/windows/"+deviceID+"/updates/new", nil); w.Code != 409 {
+			t.Fatal("revoked device admitted a new policy form", w.Code)
+		}
+		form := windowsPolicyTestForm()
+		form.Set("confirm_policy", "yes")
+		if w := request("scoped-operator", "POST", base+"/windows/"+deviceID+"/updates/create", form); w.Code != 409 {
+			t.Fatal("revoked device admitted new policy work", w.Code)
 		}
 		if w := request("scoped-viewer", "GET", base+"/devices?platform=windows", nil); w.Code != 200 || !strings.Contains(w.Body.String(), "Native MDM: Access revoked") {
 			t.Fatal("unified inventory lost revocation history", w.Code)

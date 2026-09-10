@@ -21,19 +21,26 @@ import (
 // private <path>.stop file closes the server and permits schema cleanup.
 func runDesktopBrowserFixture(t *testing.T, h *Handler, ctx context.Context) {
 	t.Helper()
-	path := os.Getenv("OPENUEM_DESKTOP_BROWSER_FIXTURE")
+	runConsoleBrowserFixture(t, h, ctx, os.Getenv("OPENUEM_DESKTOP_BROWSER_FIXTURE"), "")
+}
+
+func runConsoleBrowserFixture(t *testing.T, h *Handler, ctx context.Context, path, entry string) {
+	t.Helper()
 	if path == "" {
 		return
 	}
-	tenant, err := h.Model.Client.Tenant.Create().SetDescription("Browser acceptance organization").Save(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = h.Model.CloneGlobalSettings(tenant.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = h.Model.Client.Site.Create().SetDescription("Browser acceptance site").SetTenantID(tenant.ID).SetIsDefault(true).Save(ctx); err != nil {
-		t.Fatal(err)
+	if entry == "" {
+		tenant, err := h.Model.Client.Tenant.Create().SetDescription("Browser acceptance organization").Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = h.Model.CloneGlobalSettings(tenant.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = h.Model.Client.Site.Create().SetDescription("Browser acceptance site").SetTenantID(tenant.ID).SetIsDefault(true).Save(ctx); err != nil {
+			t.Fatal(err)
+		}
+		entry = "/tenant/" + strconv.Itoa(tenant.ID) + "/desktop/enrollment"
 	}
 	e := echo.New()
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -74,11 +81,11 @@ func runDesktopBrowserFixture(t *testing.T, h *Handler, ctx context.Context) {
 		h.PublicOrigin = previous
 	}()
 	url := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
-	if err = os.WriteFile(path, []byte(url+"/tenant/"+strconv.Itoa(tenant.ID)+"/desktop/enrollment"), 0600); err != nil {
+	if err = os.WriteFile(path, []byte(url+entry), 0600); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Remove(path); _ = os.Remove(path + ".stop") }()
-	t.Log("Desktop browser fixture is ready; its loopback URL is in the configured file")
+	t.Log("Console browser fixture is ready; its loopback URL is in the configured file")
 	deadline := time.NewTimer(8 * time.Minute)
 	defer deadline.Stop()
 	ticker := time.NewTicker(250 * time.Millisecond)
@@ -86,7 +93,7 @@ func runDesktopBrowserFixture(t *testing.T, h *Handler, ctx context.Context) {
 	for {
 		select {
 		case <-deadline.C:
-			t.Fatal("desktop browser fixture timed out; its isolated schema will be removed")
+			t.Fatal("console browser fixture timed out; its isolated schema will be removed")
 		case <-ticker.C:
 			if _, err := os.Stat(path + ".stop"); err == nil {
 				return

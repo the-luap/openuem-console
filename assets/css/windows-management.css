@@ -37,3 +37,16 @@
 .windows-management ol li + li {
   margin-top: .5rem;
 }
+
+.windows-policy-fields {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .windows-policy-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

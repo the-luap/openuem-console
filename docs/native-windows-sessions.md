@@ -7,7 +7,8 @@ authenticated exchange and an initial read-only `Get ./DevInfo/DevId` probe.
 The optional [listener/gateway integration](native-windows-operations.md)
 registers this service with direct or pinned gateway TLS. The
 [enrollment/device console](native-windows-console.md) adds scoped administration;
-command/update views remain open.
+[typed update forms/history](native-windows-update-console.md) support policy runs.
+Raw CSP and ring/schedule views remain open.
 The [CSP command extension](native-windows-csp.md) adds administrative queues and
 correlated results. The [typed update extension](native-windows-updates.md) adds
 platform preflight and separate effective-policy read-back. Broader policies,

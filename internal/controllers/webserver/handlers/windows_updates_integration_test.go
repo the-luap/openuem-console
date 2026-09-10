@@ -17,6 +17,7 @@ import (
 
 func exerciseWindowsUpdateConsole(t *testing.T, h *Handler, ctx context.Context, scope access.Scope, deviceID string, request func(string, string, string, url.Values) *httptest.ResponseRecorder, artifact func(string, *httptest.ResponseRecorder)) {
 	t.Helper()
+	exerciseWindowsUpdatePolicyForms(t, h, ctx, scope, deviceID, request, artifact)
 	t.Run("Windows update history requires live update permission and scoped cancellation", func(t *testing.T) {
 		zero := 0
 		policy := windows.UpdatePolicy{QualityDeferralDays: &zero}

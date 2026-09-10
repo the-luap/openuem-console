@@ -13,7 +13,9 @@ patch compliance, licensing or physical device acceptance. The
 [listener](native-windows-operations.md) registers device protocol routes;
 [run history and cancellation](native-windows-update-console.md) now have console
 routes. [Scheduled cohorts](native-windows-update-schedules.md) are implemented;
-policy/ring/schedule creation forms remain separate work.
+[Typed policy forms](native-windows-update-console.md) now preview and confirm
+per-device apply/removal intent. Ring/schedule administration forms remain
+separate work.
 [Versioned update rings and explicit cohorts](native-windows-update-rings.md) now
 reuse these device runs with protected source provenance.
 

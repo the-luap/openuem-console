@@ -116,11 +116,14 @@ and keyboard-focusable horizontal table scrolling without page overflow.
 The full local PostgreSQL 17/race suite passes in 84.932 seconds at 83.7%
 Windows package coverage, with router and shared CSRF tests passing. The full
 handler suite passes in 7.950 seconds and shared view tests in 2.147 seconds.
-Vet and both Linux/Windows builds pass. Full CI for the console change is pending.
+Vet and both Linux/Windows builds pass. Both complete workflows pass for the
+corrected console/history commit `9f33aae`
+([push](https://github.com/the-luap/openuem-console/actions/runs/34425352621),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34425355677)).
 
 The fixtures create only isolated synthetic database state and loopback services.
 No host certificate, policy, account or device is changed. Native Windows management
-now includes [update run history and confirmed cancellation](native-windows-update-console.md).
-The roadmap still requires raw command/result and policy/ring/schedule creation workflows, broader CSP
+now includes [typed policy forms, run history and confirmed cancellation](native-windows-update-console.md).
+The roadmap still requires raw command/result and ring/schedule administration workflows, broader CSP
 policies, certificate renewal and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.

@@ -23,7 +23,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	if method == http.MethodGet && (route == "/windows" || route == "/windows/:id") {
 		return access.ReadDevices, true
 	}
-	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run") {
+	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new") {
 		return access.ManageUpdates, true
 	}
 	if method == http.MethodPost {
@@ -34,7 +34,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/windows/:id/revoke":
 			return access.RevokeDevices, true
-		case "/windows/:id/updates/:run/cancel":
+		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create":
 			return access.ManageUpdates, true
 		}
 	}
@@ -51,6 +51,9 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/invitations/:id/revoke", h.WindowsRevokeInvitation)
 		g.POST("/windows/:id/revoke", h.WindowsRevokeDevice)
 		g.GET("/windows/:id/updates", h.WindowsUpdateRuns)
+		g.GET("/windows/:id/updates/new", h.WindowsNewUpdatePolicy)
+		g.POST("/windows/:id/updates/preview", h.WindowsPreviewUpdatePolicy)
+		g.POST("/windows/:id/updates/create", h.WindowsCreateUpdatePolicy)
 		g.GET("/windows/:id/updates/:run", h.WindowsUpdateRun)
 		g.POST("/windows/:id/updates/:run/cancel", h.WindowsCancelUpdateRun)
 	}
@@ -67,24 +70,24 @@ func (h *Handler) WindowsCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 			r := c.Request()
 			media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 			if err != nil || media != "application/x-www-form-urlencoded" || len(r.Header.Values("Content-Type")) != 1 || r.Header.Get("Content-Encoding") != "" {
-				return echo.NewHTTPError(415, "Use a native enrollment form")
+				return echo.NewHTTPError(415, "Use a native Windows form")
 			}
 			if r.URL.RawQuery != "" || r.URL.ForceQuery {
 				return echo.NewHTTPError(400, "Form actions do not accept query parameters")
 			}
 			if r.ContentLength > 8192 {
-				return echo.NewHTTPError(413, "Enrollment form is too large")
+				return echo.NewHTTPError(413, "Windows form is too large")
 			}
 			r.Body = http.MaxBytesReader(c.Response(), r.Body, 8192)
 			if err := r.ParseForm(); err != nil {
 				var oversized *http.MaxBytesError
 				if errors.As(err, &oversized) {
-					return echo.NewHTTPError(413, "Enrollment form is too large")
+					return echo.NewHTTPError(413, "Windows form is too large")
 				}
-				return echo.NewHTTPError(400, "Invalid enrollment form")
+				return echo.NewHTTPError(400, "Invalid Windows form")
 			}
-			if len(r.PostForm.Encode()) > 8192 || len(r.PostForm) > 12 {
-				return echo.NewHTTPError(413, "Enrollment form is too large")
+			if len(r.PostForm.Encode()) > 8192 || len(r.PostForm) > 24 {
+				return echo.NewHTTPError(413, "Windows form is too large")
 			}
 			expected, _ := c.Get("csrf").(string)
 			if expected == "" || len(r.PostForm["csrf"]) != 1 || subtle.ConstantTimeCompare([]byte(expected), []byte(r.PostForm.Get("csrf"))) != 1 {
@@ -103,7 +106,7 @@ func windowsForm(c echo.Context, names ...string) (url.Values, error) {
 	}
 	for name, values := range f {
 		if !allowed[name] || len(values) != 1 {
-			return nil, echo.NewHTTPError(400, "Unexpected or repeated enrollment form field")
+			return nil, echo.NewHTTPError(400, "Unexpected or repeated Windows form field")
 		}
 	}
 	return f, nil
@@ -159,6 +162,12 @@ func windowsFailure(err error) error {
 		return echo.NewHTTPError(409, "The organization already has a Windows enrollment authority")
 	case errors.Is(err, windows.ErrCSPAlreadySent):
 		return echo.NewHTTPError(409, "This run has no cancelable undelivered steps, or a step is already sent or uncertain")
+	case errors.Is(err, windows.ErrCSPConflict):
+		return echo.NewHTTPError(409, "This request was already used with different settings. Start a new policy run.")
+	case errors.Is(err, windows.ErrCSPQueueFull):
+		return echo.NewHTTPError(409, "This device has no room for another policy run. Review its outstanding work first.")
+	case errors.Is(err, windows.ErrManagementIdentity):
+		return echo.NewHTTPError(409, "The device identity is unavailable for new policy work")
 	case errors.Is(err, windows.ErrUpdatePolicy):
 		return echo.NewHTTPError(400, "Invalid Windows update request")
 	case errors.Is(err, windows.ErrConsoleInput), errors.Is(err, windows.ErrInvitation), errors.Is(err, windows.ErrAuthority):

@@ -6,8 +6,9 @@ public methods and paths. The same lifecycle starts and stops the durable update
 schedule worker. This is implementation and synthetic acceptance evidence;
 production deployment and physical Windows acceptance have not been performed.
 The [enrollment/device console](native-windows-console.md) now provides CA setup,
-one-time credentials, scoped inventory and device access revocation. Command/update
-console forms remain implementation work. WIN-02 remains in progress.
+one-time credentials, scoped inventory and device access revocation. [Typed update forms and history](native-windows-update-console.md) support
+per-device policy runs. Raw CSP and ring/schedule console forms remain
+implementation work. WIN-02 remains in progress.
 
 ## Configuration
 
