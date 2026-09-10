@@ -138,8 +138,9 @@ def main():
                 "--env-file", "/dev/null", "--file", str(repository / "deploy/reference/compose.yaml")]
         invocation = [*base, "--file", str(override)]
 
-        def compose(stage, *arguments, check=True, timeout=60):
-            return command(stage, *invocation, *arguments, environment=environment, check=check, timeout=timeout)
+        def compose(stage, *arguments, check=True, timeout=60, bootstrap=False):
+            files = ["--file", str(repository / "deploy/reference/compose.bootstrap.yaml")] if bootstrap else []
+            return command(stage, *invocation, *files, *arguments, environment=environment, check=check, timeout=timeout)
 
         expected_networks = {"database": {"data"}, "broker": {"messaging", "broker_backend"},
                              "console": {"data", "messaging", "console_backend", "egress"},
@@ -149,6 +150,11 @@ def main():
         assert set(rendered["services"]) == set(expected_networks)
         for name, service in rendered["services"].items():
             assert not service.get("ports") and set(service["networks"]) == expected_networks[name]
+            assert all(item["target"] != "/run/initial-password" for item in service.get("volumes", []))
+            assert "OPENUEM_BOOTSTRAP_PASSWORD_FILE" not in service.get("environment", {})
+        bootstrap = json.loads(compose("bootstrap overlay render", "config", "--format", "json", bootstrap=True).stdout)
+        first_password = [name for name, service in bootstrap["services"].items() for item in service.get("volumes", []) if item["target"] == "/run/initial-password"]
+        assert first_password == ["console"]
         published = json.loads(command("publication render", *base, "--file",
                                        str(repository / "deploy/reference/compose.publish.yaml"), "config", "--format", "json",
                                        environment=environment).stdout)
@@ -195,7 +201,7 @@ def main():
 
         compose("broker startup", "up", "--detach", "broker")
         broker_ready()
-        compose("console startup", "up", "--detach", "console")
+        compose("console startup", "up", "--detach", "console", bootstrap=True)
         compose("gateway startup", "up", "--detach", "gateway")
 
         def administrator(restart=False):
@@ -210,6 +216,24 @@ def main():
                 raise RuntimeError("administrator gateway login failed: " + "; ".join(failures[:3] + summary))
 
         administrator()
+        initial_console = compose("bootstrap console identity", "ps", "--quiet", "console").stdout.strip()
+        password_digest = hashlib.sha256((root / "installation/state/initial-password").read_bytes()).digest()
+        for role in ("gateway", "console"):
+            identity = compose("bootstrap shutdown identity", "ps", "--quiet", role).stdout.strip()
+            command("bootstrap service shutdown", "docker", "stop", "--time", "20", identity)
+            stopped = json.loads(command("bootstrap joined shutdown", "docker", "inspect", identity).stdout)[0]["State"]
+            if stopped["Running"] or stopped["ExitCode"] != 0:
+                raise RuntimeError("bootstrap service did not join successful shutdown")
+        compose("retired bootstrap mount", "up", "--detach", "--no-deps", "--force-recreate", "console")
+        steady_console = compose("initialized console identity", "ps", "--quiet", "console").stdout.strip()
+        steady = json.loads(command("initialized console boundary", "docker", "inspect", steady_console).stdout)[0]
+        if steady_console == initial_console or any(item["Destination"] == "/run/initial-password" for item in steady["Mounts"]) or any(item.startswith("OPENUEM_BOOTSTRAP_PASSWORD_FILE=") for item in steady["Config"].get("Env", [])):
+            raise RuntimeError("initialized console retained bootstrap password access")
+        if hashlib.sha256((root / "installation/state/initial-password").read_bytes()).digest() != password_digest:
+            raise RuntimeError("bootstrap retirement changed retained recovery material")
+        compose("initialized gateway startup", "start", "gateway")
+        administrator(True)
+        print("reference bootstrap: retained administrator login after removing the initial-password mount passed", flush=True)
         compose("private services startup", "up", "--detach", "authorization", "commands", "worker")
 
         def health():
@@ -357,7 +381,7 @@ def main():
             "worker": {**service_database, "/run/worker.seed": "broker/state/worker-user.seed",
                        "/run/encryption.key": "installation/state/encryption.key"},
             "console": {**service_database, "/run/jwt.key": "installation/state/jwt.key",
-                        "/run/encryption.key": "installation/state/encryption.key", "/run/initial-password": "installation/state/initial-password",
+                        "/run/encryption.key": "installation/state/encryption.key",
                         "/run/console.seed": "broker/state/console-user.seed", "/run/console-tls": "pki/state/console",
                         "/run/administrator-ca.pem": "administrator-ca.pem", "/run/windows.key": "protocol/state/windows.key",
                         "/run/desktop-bootstrap.key": "protocol/state/desktop-bootstrap.key", "/run/release-keys.pem": "release-keys.pem",

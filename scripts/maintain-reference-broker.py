@@ -112,7 +112,7 @@ def mount(source, target, writable=False):
     return ["--mount", "type=bind,source=" + str(source) + ",destination=" + target + ("" if writable else ",readonly")]
 
 
-def layout(root):
+def layout(root, bootstrap=False):
     database = {"/run/database.url": "credentials/state/database.url", "/run/database-ca.pem": "pki/state/trust/backend-ca.pem",
                 "/run/backend-ca.pem": "pki/state/trust/backend-ca.pem"}
     files = {
@@ -125,10 +125,12 @@ def layout(root):
         "commands": {**database, "/run/provisioner.seed": "broker/state/provisioner-user.seed"},
         "worker": {**database, "/run/worker.seed": "broker/state/worker-user.seed", "/run/encryption.key": "installation/state/encryption.key"},
         "console": {**database, "/run/jwt.key": "installation/state/jwt.key", "/run/encryption.key": "installation/state/encryption.key",
-                    "/run/initial-password": "installation/state/initial-password", "/run/console.seed": "broker/state/console-user.seed",
+                    "/run/console.seed": "broker/state/console-user.seed",
                     "/run/console-tls": "pki/state/console", "/run/administrator-ca.pem": "administrator-ca.pem",
                     "/run/windows.key": "protocol/state/windows.key", "/run/desktop-bootstrap.key": "protocol/state/desktop-bootstrap.key",
                     "/run/release-keys.pem": "release-keys.pem", "/run/releases": "releases", "/var/log/openuem-server": "console-logs"}}
+    if bootstrap:
+        files["console"]["/run/initial-password"] = "installation/state/initial-password"
     writable = {("database", "/var/lib/postgresql/data"), ("broker", "/var/lib/openuem/jetstream"), ("console", "/var/log/openuem-server")}
     return {role: {target: (root / source, (role, target) in writable) for target, source in values.items()} for role, values in files.items()}
 
@@ -199,7 +201,8 @@ class Maintenance:
         self.account = self.definition["services"]["broker"].get("user", "")
         if not re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", self.account):
             raise MaintenanceError("reference containers require an explicit non-root UID and GID")
-        self.expected_mounts = layout(self.root)
+        bootstrap = any(item.get("target") == "/run/initial-password" for item in self.definition["services"]["console"].get("volumes", []))
+        self.expected_mounts = layout(self.root, bootstrap)
         self.inspect()
         self.validate()
         self.current_broker = self.broker_plan()

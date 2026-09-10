@@ -1,0 +1,13 @@
+# Add only while creating the first administrator. Recreate the initialized
+# console without this overlay after completing the mandatory password change.
+# Retain the original provisioning state for recovery.
+services:
+  console:
+    environment:
+      OPENUEM_BOOTSTRAP_PASSWORD_FILE: /run/initial-password
+    volumes:
+      - type: bind
+        source: "${OPENUEM_REFERENCE_STATE:?}/installation/state/initial-password"
+        target: /run/initial-password
+        read_only: true
+        bind: {create_host_path: false}

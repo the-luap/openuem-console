@@ -19,7 +19,11 @@ rotation. It rejects custom broker policies rather than merging permissions.
 Use a non-root POSIX account with access to the existing Docker project and its
 private state. Supply the same absolute Compose files, project directory and
 explicit environment file used by that installation, including its publication
-overlay when applicable. All service images, the pinned PKI upgrade image and
+overlay when applicable. An initialized project normally omits the
+`compose.bootstrap.yaml` overlay and initial-password mount. An older reference
+project that still has that exact protected console mount is also accepted; it
+must be reflected in the reviewed configuration. Maintenance does not remove it
+or recreate application containers. All service images, the pinned PKI upgrade image and
 the `reference-probe` target of `Dockerfile.setup` must already exist locally.
 The command resolves image references to immutable local image IDs. It does not
 pull images. The Python controller requires only the standard library and Docker

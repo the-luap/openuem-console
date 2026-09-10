@@ -100,6 +100,35 @@ and listeners, then start the authorization, command and worker services. These
 services deliberately reject an uninitialized registry. The fixture performs
 these stages explicitly; the runtime manifest alone is not a setup wizard.
 
+The base manifest is the initialized runtime and has no initial-password mount.
+While creating the first administrator, also supply
+[`compose.bootstrap.yaml`](../deploy/reference/compose.bootstrap.yaml). It adds
+only the protected initial password to the console and selects its file setting.
+After the first login and mandatory password replacement, stop the gateway and
+console, wait for successful shutdown, then recreate only the console using the
+same inputs **without** the bootstrap overlay. Restart the gateway and verify
+login with the replacement password. Retain the original installation provisioning
+directory for recovery; retiring a runtime mount does not delete that source.
+
+For example, once database and broker startup have completed, the initial console
+stage of an existing, explicitly configured project can use:
+
+```sh
+docker compose --project-name openuem --project-directory /srv/openuem \
+  --env-file /srv/openuem/reference.env \
+  --file /opt/openuem/deploy/reference/compose.yaml \
+  --file /opt/openuem/deploy/reference/compose.publish.yaml \
+  --file /opt/openuem/deploy/reference/compose.bootstrap.yaml \
+  up --detach --no-deps console
+```
+
+Use the initialized file set, omitting the last `--file`, for the subsequent
+console recreation (`up --detach --no-deps --force-recreate console`) and future
+operations. Preserve any installation-specific overlays. A first start without
+bootstrap material cannot create an administrator; an already initialized
+console checks its retained binding and never reloads the initial password.
+See [first-administrator bootstrap](first-administrator-bootstrap.md).
+
 ## Acceptance fixture
 
 `scripts/check-reference-composition.py` creates a uniquely named temporary
@@ -114,6 +143,8 @@ The fixture checks:
 - First administrator login and mandatory password replacement through the
   gateway from one admitted client IP, with a separate client denied even when
   it forges the admitted source in forwarding headers.
+- Console recreation without the bootstrap password mount or environment setting,
+  preserving the original recovery file and successful replacement-password login.
 - Public Apple unknown-enrollment rejection, desktop bootstrap-key discovery and
   Windows discovery through their actual private HTTPS listeners.
 - A synthetic scoped identity, the real command provisioner's durable consumer

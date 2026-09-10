@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The reference runtime now omits the initial administrator password. A separate
+  [`compose.bootstrap.yaml`](../deploy/reference/compose.bootstrap.yaml) mounts it
+  only for first-account creation. The actual container fixture completes the
+  required password replacement, joins gateway/console shutdown, recreates the
+  console without the bootstrap mount or setting, and proves retained login while
+  preserving the original protected recovery file. Both fresh and historical-grant
+  maintenance sequences pass locally on Linux arm64, including subsequent restart,
+  pending-command retention and WSS revocation. The maintenance validator accepts
+  the initialized layout and the previous exact bootstrap mount layout. Full
+  guided installation and current-commit native CI remain required.
 - The [reference maintenance controller](reference-maintenance.md) now reviews
   and resumes the known retained broker worker-grant migration across the actual
   seven-service project. It binds the rendered Compose model, exact local images,

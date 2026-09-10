@@ -31,6 +31,13 @@ account survive restarts. A retained completion binding also prevents silently
 changing the configured first-account name. Restore the installation's database
 records as part of recovery; this mechanism is not an account-repair tool.
 
+The [reference composition](reference-composition.md) supplies that mount through
+the explicit `compose.bootstrap.yaml` overlay. Its initialized base definition
+omits both the mount and file environment setting. The separate-container fixture
+completes first login, shuts down and recreates the console without the overlay,
+then verifies the retained password through the gateway and preserves the original
+protected provisioning file.
+
 The console rejects `--reset-openuem-user` / `resetopenuemuser` while protected
 bootstrap is selected. The CLI and installed Linux/Windows services load the
 configuration before normal startup, and both immediate and delayed database

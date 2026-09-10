@@ -70,7 +70,6 @@ services:
       OPENUEM_TRUSTED_GATEWAY_CERTIFICATES: /run/console-tls/gateway-leaves.pem
       OPENUEM_INSTALLATION_ID: ${OPENUEM_INSTALLATION_ID:?}
       OPENUEM_BOOTSTRAP_ADMIN: ${OPENUEM_BOOTSTRAP_ADMIN:?}
-      OPENUEM_BOOTSTRAP_PASSWORD_FILE: /run/initial-password
       JWT_KEY_FILE: /run/jwt.key
       ENCRYPTION_MASTER_KEY_FILE: /run/encryption.key
       DATABASE_URL_FILE: /run/database.url
@@ -89,7 +88,6 @@ services:
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/backend-ca.pem}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/jwt.key", target: /run/jwt.key}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/encryption.key", target: /run/encryption.key}
-      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/initial-password", target: /run/initial-password}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/console-user.seed", target: /run/console.seed}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/console", target: /run/console-tls}
       - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/administrator-ca.pem", target: /run/administrator-ca.pem}
