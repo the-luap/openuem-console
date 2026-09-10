@@ -248,6 +248,9 @@ func (s *Store) enqueueUpdatePolicyTx(ctx context.Context, tx *sql.Tx, actor str
 	if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&run.CreatedAt); err != nil {
 		return nil, err
 	}
+	if source != nil && run.CreatedAt.Before(source.CreatedAt) {
+		return nil, ErrCSPDeadline
+	}
 	run.ExpiresAt = run.CreatedAt.Add(validFor)
 	run.encrypted, err = s.secrets.sealBounded(encoded, updateRunPurpose(run), 8192)
 	if err != nil {

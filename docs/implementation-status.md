@@ -174,7 +174,9 @@ the table's package summaries do not remove any detail from the roadmap.
   idempotent retries. The full PostgreSQL 17/race suite passes in 69.105 seconds
   at 85.5% coverage; extended compiler fuzzing passes 23,726 executions. The real
   loopback TLS test verifies all seven steps. Vet and formatting pass; full CI
-  for this batching extension remains pending.
+  for batching commit `293f062` passes in both workflows
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34416153591),
+  [pull request](https://github.com/the-luap/openuem-console/actions/runs/34416160052)).
 - [Windows update ring revisions and explicit cohorts](native-windows-update-rings.md)
   add reusable scoped policies, optimistic revision checks, enabled/disabled
   revisions and immutable history. Atomic cohort assignments retain exact
@@ -186,6 +188,19 @@ the table's package summaries do not remove any detail from the roadmap.
   at 84.4% package coverage; Vet and formatting pass. Full CI is pending. Dynamic
   group selection, scheduling/promotion gates, console wiring and actual patch/restart
   acceptance remain open.
+- [Scheduled Windows ring activation](native-windows-update-schedules.md) stores
+  immutable source revisions, reviewed cohorts and absolute activation windows.
+  The bounded worker rechecks live creator/device/ring eligibility, activates
+  each plan once, persists queue backoff and retires invalid/expired intent.
+  Savepoint rollback removes all cohort work if admission or either final audit
+  exceeds its window. Protected source proof connects later device results to
+  the activated plan. Deadline, cancellation-lock, concurrent worker, cap,
+  corruption-isolation, restart and migration tests pass; the real TLS exchange
+  now uses scheduled activation. The full PostgreSQL 17/race suite passes in
+  80.271 seconds at 83.6% package coverage; Vet and formatting pass. Full CI for
+  scheduling is pending.
+  Production worker/console wiring, dynamic groups and patch-based promotion
+  gates remain open; activation timing does not control the Windows reboot time.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

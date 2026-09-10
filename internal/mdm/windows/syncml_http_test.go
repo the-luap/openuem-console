@@ -108,7 +108,15 @@ func TestSyncMLHTTPRealTLSCSPExchangeReplayAndRevocation(t *testing.T) {
 	queued := cspTestQueue(t, f, cspTestPolicy())
 	updatePolicy := updateTestFullPolicy()
 	ring := updateTestRing(t, f, updatePolicy)
-	rollout, err := s.AssignUpdateRing(t.Context(), "operator", f.identity.Scope, ring.RingID, ring.Revision, ring.RequestKey, []string{f.identity.DeviceID}, false, time.Hour)
+	schedule, err := s.ScheduleUpdateRing(t.Context(), "operator", f.identity.Scope, ring.RingID, ring.Revision, ring.RequestKey, []string{f.identity.DeviceID}, false, time.Now().UTC().Truncate(time.Microsecond), time.Hour, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if progress, err := s.ProcessDueUpdateSchedules(t.Context(), 1); err != nil || progress.Activated != 1 {
+		t.Fatal("TLS fixture schedule could not activate", err)
+	}
+	scheduled := updateTestScheduleRead(t, f, schedule.ID)
+	rollout, err := s.UpdateRolloutDetails(t.Context(), "operator", f.identity.Scope, scheduled.RolloutID)
 	if err != nil {
 		t.Fatal(err)
 	}

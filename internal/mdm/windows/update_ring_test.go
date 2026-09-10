@@ -17,6 +17,7 @@ import (
 
 func updateTestRemoveRingMigration(t *testing.T, s *Store) {
 	t.Helper()
+	updateTestRemoveScheduleMigration(t, s)
 	if _, err := s.db.Exec(`DROP TABLE mdm_windows_update_ring_audit; ALTER TABLE mdm_windows_update_runs DROP COLUMN ring_id,DROP COLUMN ring_revision,DROP COLUMN rollout_id; DROP TABLE mdm_windows_update_rollouts; ALTER TABLE mdm_windows_update_rings DROP CONSTRAINT mdm_windows_update_ring_head; DROP TABLE mdm_windows_update_ring_revisions,mdm_windows_update_rings; DROP FUNCTION mdm_windows_keep_update_ring(); DELETE FROM mdm_windows_migrations WHERE name='migrations/008_update_rings.sql'`); err != nil {
 		t.Fatal(err)
 	}

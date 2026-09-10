@@ -7,8 +7,10 @@ platform preflight, Atomic configuration and effective-value read-back. Changing
 a ring does not rewrite an admitted run or its evidence.
 
 These APIs do not yet have production console forms or registered HTTP routes.
-Dynamic groups, scheduled activation, pilot-to-broad promotion gates, automatic
-reconciliation and end-user restart communication remain implementation work.
+The [scheduled activation backend](native-windows-update-schedules.md) now handles
+reviewed future cohorts. Dynamic groups, production worker registration,
+pilot-to-broad promotion gates, automatic reconciliation and end-user restart
+communication remain implementation work.
 An explicit cohort supports manual pilot selection; it is not an automatic ring
 promotion system or proof that Windows patches were installed.
 

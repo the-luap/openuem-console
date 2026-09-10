@@ -16,6 +16,7 @@ import (
 )
 
 type UpdateRollout struct {
+	ScheduleID        string        `json:"-" xml:"-"`
 	ID                string        `json:"-" xml:"-"`
 	Scope             access.Scope  `json:"-" xml:"-"`
 	RequestKey        string        `json:"-" xml:"-"`
@@ -45,12 +46,12 @@ func (v UpdateRollout) GoString() string        { return v.String() }
 func (updateRolloutTargets) String() string     { return "[protected Windows update targets]" }
 func (v updateRolloutTargets) GoString() string { return v.String() }
 
-const updateRolloutColumns = `id,tenant_id,site_id,request_key,ring_id,ring_revision,created_by,created_by_revision,mode,lifetime_seconds,created_at,encrypted_targets`
+const updateRolloutColumns = `id,tenant_id,site_id,request_key,ring_id,ring_revision,created_by,created_by_revision,mode,lifetime_seconds,created_at,encrypted_targets,COALESCE(schedule_id::text,'')`
 
 func scanUpdateRollout(row cspScanner) (*updateStoredRollout, error) {
 	r := &updateStoredRollout{}
 	var seconds int64
-	err := row.Scan(&r.ID, &r.Scope.TenantID, &r.Scope.SiteID, &r.RequestKey, &r.RingID, &r.RingRevision, &r.CreatedBy, &r.CreatedByRevision, &r.Mode, &seconds, &r.CreatedAt, &r.encrypted)
+	err := row.Scan(&r.ID, &r.Scope.TenantID, &r.Scope.SiteID, &r.RequestKey, &r.RingID, &r.RingRevision, &r.CreatedBy, &r.CreatedByRevision, &r.Mode, &seconds, &r.CreatedAt, &r.encrypted, &r.ScheduleID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -79,7 +80,11 @@ func canonicalUpdateTargets(devices []string) ([]string, error) {
 }
 
 func updateRolloutPurpose(r *updateStoredRollout) string {
-	return fmt.Sprintf("openuem/windows/update-rollout/v1/%s/%d/%d/%s/%s/%d/%x/%d/%s/%d/%s", r.ID, r.Scope.TenantID, r.Scope.SiteID, r.RequestKey, r.RingID, r.RingRevision, sha256.Sum256([]byte(r.CreatedBy)), r.CreatedByRevision, r.Mode, int64(r.Lifetime/time.Second), r.CreatedAt.UTC().Format(time.RFC3339Nano))
+	purpose := fmt.Sprintf("openuem/windows/update-rollout/v1/%s/%d/%d/%s/%s/%d/%x/%d/%s/%d/%s", r.ID, r.Scope.TenantID, r.Scope.SiteID, r.RequestKey, r.RingID, r.RingRevision, sha256.Sum256([]byte(r.CreatedBy)), r.CreatedByRevision, r.Mode, int64(r.Lifetime/time.Second), r.CreatedAt.UTC().Format(time.RFC3339Nano))
+	if r.ScheduleID != "" {
+		purpose += "/schedule/" + r.ScheduleID
+	}
+	return purpose
 }
 
 func (s *Store) openUpdateRollout(r *updateStoredRollout) error {
@@ -124,6 +129,9 @@ func (s *Store) validateUpdateRunSource(ctx context.Context, tx *sql.Tx, run *up
 	if err := s.openUpdateRollout(source); err != nil {
 		return err
 	}
+	if err := s.validateUpdateRolloutSchedule(ctx, tx, source); err != nil {
+		return err
+	}
 	if !updateRunSourceMatches(run, source) || run.CreatedBy != source.CreatedBy || run.CreatedByRevision != source.CreatedByRevision || run.Mode != source.Mode || run.ExpiresAt.Sub(run.CreatedAt) != source.Lifetime || run.CreatedAt.Before(source.CreatedAt) || !slices.Contains(source.targets, run.DeviceID) || run.RequestKey != updateRolloutRequest(source.ID, run.DeviceID) {
 		return ErrAuthoritySecret
 	}
@@ -158,6 +166,23 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 	if s.secrets == nil {
 		return nil, ErrMasterKey
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rollout, err := s.assignUpdateRingTx(ctx, tx, actor, scope, ringID, ringRevision, requestKey, devices, remove, validFor, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rollout, nil
+}
+
+// The transaction owner may atomically activate a previously reviewed schedule.
+func (s *Store) assignUpdateRingTx(ctx context.Context, tx *sql.Tx, actor string, scope access.Scope, ringID string, ringRevision int64, requestKey string, devices []string, remove bool, validFor time.Duration, schedule *updateStoredSchedule) (*UpdateRollout, error) {
 	targets, err := canonicalUpdateTargets(devices)
 	if err != nil || !canonicalInvitationID(ringID) || !canonicalInvitationID(requestKey) || ringRevision < 1 || ringRevision > 1000000 || validFor < time.Minute || validFor > 7*24*time.Hour || validFor%time.Second != 0 {
 		return nil, ErrUpdateRing
@@ -166,11 +191,10 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 	if remove {
 		mode = "remove"
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
+	scheduleID := ""
+	if schedule != nil {
+		scheduleID = schedule.ID
 	}
-	defer tx.Rollback()
 	if err := s.authorizeUpdateRing(ctx, tx, actor, scope); err != nil {
 		return nil, err
 	}
@@ -188,7 +212,7 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 		if err := s.openUpdateRollout(previous); err != nil {
 			return nil, err
 		}
-		if previous.RingID != ringID || previous.RingRevision != ringRevision || previous.CreatedBy != actor || previous.CreatedByRevision != permissionRevision || previous.Mode != mode || previous.Lifetime != validFor || !slices.Equal(previous.targets, targets) {
+		if previous.ScheduleID != scheduleID || previous.RingID != ringID || previous.RingRevision != ringRevision || previous.CreatedBy != actor || previous.CreatedByRevision != permissionRevision || previous.Mode != mode || previous.Lifetime != validFor || !slices.Equal(previous.targets, targets) {
 			return nil, ErrUpdateRingConflict
 		}
 		if err := s.loadUpdateRolloutRuns(ctx, tx, actor, previous); err != nil {
@@ -199,9 +223,6 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 			return nil, err
 		}
 		if err := auditUpdateRing(ctx, tx, ring, actor, "rollout.replayed", previous.ID); err != nil {
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
 		return &previous.UpdateRollout, nil
@@ -222,9 +243,17 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 	if !remove && (current != ringRevision || !ring.Enabled) {
 		return nil, ErrUpdateRingConflict
 	}
-	rollout := &updateStoredRollout{UpdateRollout: UpdateRollout{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, RingID: ringID, RingRevision: ringRevision, CreatedBy: actor, CreatedByRevision: permissionRevision, Mode: mode, Lifetime: validFor, Runs: []UpdateRun{}}, targets: targets}
+	rollout := &updateStoredRollout{UpdateRollout: UpdateRollout{ID: uuid.NewString(), ScheduleID: scheduleID, Scope: scope, RequestKey: requestKey, RingID: ringID, RingRevision: ringRevision, CreatedBy: actor, CreatedByRevision: permissionRevision, Mode: mode, Lifetime: validFor, Runs: []UpdateRun{}}, targets: targets}
 	if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&rollout.CreatedAt); err != nil {
 		return nil, err
+	}
+	if schedule != nil {
+		if !rollout.CreatedAt.Before(schedule.ExpiresAt) {
+			return nil, errUpdateActivationExpired
+		}
+		if rollout.CreatedAt.Before(schedule.CreatedAt) || rollout.CreatedAt.Before(schedule.NotBefore) {
+			return nil, ErrCSPDeadline
+		}
 	}
 	plain, err := json.Marshal(updateRolloutTargets{Version: 1, Devices: targets})
 	if err != nil {
@@ -235,7 +264,7 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO mdm_windows_update_rollouts(id,tenant_id,site_id,request_key,ring_id,ring_revision,created_by,created_by_revision,mode,lifetime_seconds,created_at,encrypted_targets) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, rollout.ID, scope.TenantID, scope.SiteID, requestKey, ringID, ringRevision, actor, permissionRevision, mode, int64(validFor/time.Second), rollout.CreatedAt, rollout.encrypted); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO mdm_windows_update_rollouts(id,tenant_id,site_id,request_key,ring_id,ring_revision,created_by,created_by_revision,mode,lifetime_seconds,created_at,encrypted_targets,schedule_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,'')::uuid)`, rollout.ID, scope.TenantID, scope.SiteID, requestKey, ringID, ringRevision, actor, permissionRevision, mode, int64(validFor/time.Second), rollout.CreatedAt, rollout.encrypted, scheduleID); err != nil {
 		return nil, err
 	}
 	for _, device := range targets {
@@ -248,16 +277,28 @@ func (s *Store) AssignUpdateRing(ctx context.Context, actor string, scope access
 	if err := auditUpdateRing(ctx, tx, ring, actor, "rollout.created", rollout.ID); err != nil {
 		return nil, err
 	}
-	// The cohort audit can wait. Recheck every run's original deadline afterward.
-	for _, run := range rollout.Runs {
-		if err := checkUpdateRunDeadline(ctx, tx, &updateStoredRun{UpdateRun: run}); err != nil {
-			return nil, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
+	if err := checkUpdateRolloutDeadline(ctx, tx, &rollout.UpdateRollout); err != nil {
 		return nil, err
 	}
 	return &rollout.UpdateRollout, nil
+}
+
+// Use a single final database timestamp against the tightest cohort bounds.
+// A slow final audit must not admit an already expired earlier device run.
+func checkUpdateRolloutDeadline(ctx context.Context, tx *sql.Tx, rollout *UpdateRollout) error {
+	if len(rollout.Runs) == 0 {
+		return ErrAuthoritySecret
+	}
+	bounds := updateStoredRun{UpdateRun: rollout.Runs[0]}
+	for _, run := range rollout.Runs {
+		if run.CreatedAt.After(bounds.CreatedAt) {
+			bounds.CreatedAt = run.CreatedAt
+		}
+		if run.ExpiresAt.Before(bounds.ExpiresAt) {
+			bounds.ExpiresAt = run.ExpiresAt
+		}
+	}
+	return checkUpdateRunDeadline(ctx, tx, &bounds)
 }
 
 func (s *Store) loadUpdateRolloutRuns(ctx context.Context, tx *sql.Tx, actor string, rollout *updateStoredRollout) error {
