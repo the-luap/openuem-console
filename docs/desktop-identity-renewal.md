@@ -194,9 +194,9 @@ The subsequent stoppable-recovery correction `cdffd2c` passes the full affected
 native macOS race suite: agent **8.156 seconds**, lifecycle **1.182**, and Mac
 service **3.383**; Vet, all three platform builds and Windows SCM test compilation
 pass. Its [branch CI](https://github.com/the-luap/openuem-agent/actions/runs/34486258522)
-checks the actual Local System recovery/stop fixture and Windows file IDs captured
-from held handles before and after process exit; this run remains pending until
-its authoritative result is observed.
+also passes Linux, native macOS and native Windows, including the actual Local
+System recovery/stop fixture and Windows file IDs captured from held handles
+before and after process exit.
 
 ## Registry lifecycle
 
