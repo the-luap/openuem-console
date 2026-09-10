@@ -37,6 +37,8 @@ type ManagementDeviceIdentity struct {
 
 type managementDevice struct {
 	identity                         ManagementDeviceIdentity
+	stateIdentity                    ManagementDeviceIdentity
+	pendingRenewal                   *storedCertificateRenewal
 	certificate, root                *x509.Certificate
 	deviceCreated, issued, caCreated time.Time
 }
@@ -113,12 +115,21 @@ func managementPeerCertificateWithIdentity(r *http.Request, options EnrollmentOp
 // Acquire the live scope before device/certificate locks, then hold all of them
 // through the caller's transaction. Never derive scope from a subject or hint.
 func (s *Store) authorizeManagementDevice(ctx context.Context, tx *sql.Tx, certificate *x509.Certificate, options EnrollmentOptions) (*managementDevice, error) {
+	return s.authorizeManagementDeviceLock(ctx, tx, certificate, options, false)
+}
+
+func (s *Store) authorizeManagementDeviceExclusive(ctx context.Context, tx *sql.Tx, certificate *x509.Certificate, options EnrollmentOptions) (*managementDevice, error) {
+	return s.authorizeManagementDeviceLock(ctx, tx, certificate, options, true)
+}
+
+func (s *Store) authorizeManagementDeviceLock(ctx context.Context, tx *sql.Tx, certificate *x509.Certificate, options EnrollmentOptions, exclusive bool) (*managementDevice, error) {
 	if certificate == nil || len(certificate.Raw) == 0 || len(certificate.Raw) > MaxEnrollmentCSRBytes || options.validate() != nil {
 		return nil, ErrManagementIdentity
 	}
 	fingerprint := sha256.Sum256(certificate.Raw)
 	var scope access.Scope
-	err := tx.QueryRowContext(ctx, `SELECT tenant_id,site_id FROM mdm_windows_device_certificates WHERE fingerprint=$1`, fingerprint[:]).Scan(&scope.TenantID, &scope.SiteID)
+	var deviceID string
+	err := tx.QueryRowContext(ctx, `SELECT device_id,tenant_id,site_id FROM mdm_windows_device_certificates WHERE fingerprint=$1`, fingerprint[:]).Scan(&deviceID, &scope.TenantID, &scope.SiteID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrManagementIdentity
 	}
@@ -131,15 +142,29 @@ func (s *Store) authorizeManagementDevice(ctx context.Context, tx *sql.Tx, certi
 		}
 		return nil, err
 	}
+	// Take the device lock before certificate/history locks. Renewal admission,
+	// confirmation and cancellation must not upgrade competing shared locks.
+	lock := "FOR SHARE"
+	if exclusive {
+		lock = "FOR UPDATE"
+	}
+	var lockedID string
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM mdm_windows_devices WHERE id=$1 AND tenant_id=$2 AND site_id=$3 `+lock, deviceID, scope.TenantID, scope.SiteID).Scan(&lockedID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrManagementIdentity
+		}
+		return nil, err
+	}
 	device := &managementDevice{identity: ManagementDeviceIdentity{Scope: scope}}
 	i := &device.identity
 	var der, publicFingerprint, serial, configDigest []byte
-	err = tx.QueryRowContext(ctx, `SELECT d.id,c.id,c.authority_id,d.enrollment_type,c.certificate,c.public_key_fingerprint,c.serial,c.expires_at,d.created_at,c.issued_at,e.configuration_digest
+	var anchorID string
+	err = tx.QueryRowContext(ctx, `SELECT d.id,c.id,c.authority_id,d.enrollment_type,c.certificate,c.public_key_fingerprint,c.serial,c.expires_at,d.created_at,c.issued_at,e.configuration_digest,e.certificate_id
 		FROM mdm_windows_device_certificates c
 		JOIN mdm_windows_devices d ON d.id=c.device_id AND d.tenant_id=c.tenant_id AND d.site_id=c.site_id
-		JOIN mdm_windows_enrollments e ON e.device_id=d.id AND e.invitation_id=d.invitation_id AND e.certificate_id=c.id AND e.tenant_id=d.tenant_id AND e.site_id=d.site_id
+		JOIN mdm_windows_enrollments e ON e.device_id=d.id AND e.invitation_id=d.invitation_id AND e.tenant_id=d.tenant_id AND e.site_id=d.site_id
 		WHERE c.fingerprint=$1 AND c.tenant_id=$2 AND c.site_id=$3 AND c.revoked_at IS NULL AND d.revoked_at IS NULL
-		FOR SHARE OF c,d,e`, fingerprint[:], scope.TenantID, scope.SiteID).Scan(&i.DeviceID, &i.CertificateID, &i.AuthorityID, &i.EnrollmentType, &der, &publicFingerprint, &serial, &i.CertificateExpiry, &device.deviceCreated, &device.issued, &configDigest)
+		FOR SHARE OF c,e`, fingerprint[:], scope.TenantID, scope.SiteID).Scan(&i.DeviceID, &i.CertificateID, &i.AuthorityID, &i.EnrollmentType, &der, &publicFingerprint, &serial, &i.CertificateExpiry, &device.deviceCreated, &device.issued, &configDigest, &anchorID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrManagementIdentity
 	}
@@ -173,6 +198,46 @@ func (s *Store) authorizeManagementDevice(ctx context.Context, tx *sql.Tx, certi
 	}
 	if err := checkManagementDeviceTime(ctx, tx, device); err != nil {
 		return nil, err
+	}
+	var retired bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM mdm_windows_certificate_renewals WHERE source_certificate_id=$1 AND phase='confirmed')`, i.CertificateID).Scan(&retired); err != nil {
+		return nil, err
+	}
+	if retired {
+		return nil, ErrManagementIdentity
+	}
+	device.stateIdentity = device.identity
+	if i.CertificateID != anchorID {
+		renewal, err := scanCertificateRenewal(tx.QueryRowContext(ctx, `SELECT `+renewalColumns+` FROM mdm_windows_certificate_renewals WHERE renewed_certificate_id=$1 AND device_id=$2 AND tenant_id=$3 AND site_id=$4 FOR SHARE`, i.CertificateID, i.DeviceID, i.TenantID, i.SiteID))
+		if errors.Is(err, ErrNotFound) {
+			return nil, ErrManagementIdentity
+		}
+		if err != nil {
+			return nil, err
+		}
+		if renewal.Phase == "canceled" {
+			return nil, ErrManagementIdentity
+		}
+		if _, err := s.openCertificateRenewal(ctx, tx, renewal); err != nil {
+			return nil, err
+		}
+		if renewal.Phase == "pending" {
+			var sourceRevoked bool
+			if err := tx.QueryRowContext(ctx, `SELECT revoked_at IS NOT NULL FROM mdm_windows_device_certificates WHERE id=$1 FOR SHARE`, renewal.SourceCertificateID).Scan(&sourceRevoked); err != nil {
+				return nil, err
+			}
+			if sourceRevoked {
+				return nil, ErrManagementIdentity
+			}
+			device.pendingRenewal = renewal
+		}
+		anchor, _, err := s.renewalCertificate(ctx, tx, renewal, anchorID)
+		if err != nil {
+			return nil, err
+		}
+		// The anchor authenticates existing ciphertext and nonce/session identity;
+		// its dates and retirement never authorize the actual TLS connection.
+		device.stateIdentity = anchor.identity
 	}
 	return device, nil
 }

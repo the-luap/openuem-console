@@ -48,7 +48,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession | Physical-device identity renewal acceptance; desktop identity renewal; CA/master-key rotation, broader expiry health, encrypted backup/restore preserving enrollments |
 | OPS-01 | Console CI builds and gateway/service CLIs; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, fresh-install and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
-| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history; UTC schedule preview/confirmation, protected plan history and revision-checked pending cancellation; administrator-only CSP request/result history, undelivered custom-command cancellation and explicit uncertain-queue resolution; bounded custom JSON command editor with shared-compiler preview and confirmed idempotent admission; protected cumulative observation history with authenticated pagination and single-message detail; bounded CMS/PKCS#10 old/new-key renewal proof verification | CSP retention/export, broader typed policies, automatic ring promotion, renewal/unenrollment and physical Windows acceptance; separate Entra/Autopilot integration evidence |
+| WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history; UTC schedule preview/confirmation, protected plan history and revision-checked pending cancellation; administrator-only CSP request/result history, undelivered custom-command cancellation and explicit uncertain-queue resolution; bounded custom JSON command editor with shared-compiler preview and confirmed idempotent admission; protected cumulative observation history with authenticated pagination and single-message detail; bounded CMS/PKCS#10 old/new-key renewal proof verification; persistent scoped renewal issuance/retries, encrypted lifecycle history/cancellation, atomic SyncML replacement confirmation and immutable session anchor with TLS/database tests | CSP retention/export, broader typed policies, automatic ring promotion, renewal SOAP/operator integration and unenrollment, physical Windows acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
 | SW-01 | Upstream Windows/Homebrew foundation; immutable approved macOS PKG catalog, native install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation | Common platform adapters, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
@@ -369,7 +369,9 @@ the table's package summaries do not remove any detail from the roadmap.
   both directions, partial-value suppression and the final literal result at
   390/768/1440 pixels. The complete browser-fixture handler/race run passes in
   127.374 seconds, including manual inspection, with views in 3.166/1.883 seconds.
-  Vet and Linux/Windows builds pass. Full CI for this extension is pending.
+  Vet and Linux/Windows builds pass. Both full workflows pass for `9e47a6b`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34435262334),
+  [PR](https://github.com/the-luap/openuem-console/actions/runs/34435264197)).
   Retention/export, broader typed policies, lifecycle operations and physical
   Windows acceptance remain open; WIN-02 stays in progress.
 - [Windows certificate renewal proof](native-windows-renewal.md) adds bounded
@@ -382,10 +384,28 @@ the table's package summaries do not remove any detail from the roadmap.
   changing its certificate, device or encrypted bootstrap. Focused race tests pass
   in 2.715 seconds; the full Windows PostgreSQL/race suite passes in 87.008 seconds
   and protocol tests in 1.406 seconds. Fuzzing passes 118,432 executions in 31.414
-  seconds; CI now includes this target. Vet and both platform builds pass. Full CI
-  for this extension is pending. This is verification groundwork: registered WSTEP
-  still rejects Renew, and issuance/handoff, SyncML continuity, lifecycle history
-  and actual Windows/PKI acceptance remain open. WIN-02 stays in progress.
+  seconds; CI now includes this target. Vet and both platform builds pass. Both
+  complete workflows pass for `7d4e771`
+  ([push](https://github.com/the-luap/openuem-console/actions/runs/34436411706),
+  [PR](https://github.com/the-luap/openuem-console/actions/runs/34436413803)).
+  Registered WSTEP still rejects Renew. The following
+  persistence extension adds issuance/handoff, SyncML continuity and lifecycle
+  history; actual Windows/PKI acceptance remains open. WIN-02 stays in progress.
+- [Persistent Windows certificate renewal](native-windows-renewal.md) adds scoped
+  issuer-window admission, encrypted pending issuance, exact CSR retries,
+  authenticated replacement membership and audited cancellation/history.
+  A mutually authenticated SyncML packet using the new key commits confirmation
+  and source revocation with its protocol state. The immutable initial enrollment
+  remains the encryption anchor, preserving nonce/session/command history across
+  multiple key generations and original-certificate expiry. Unknown CSP outcomes
+  still block queued work. Device metadata switches to the confirmed certificate.
+  PostgreSQL/race tests cover restart, concurrent issuance, scope and permission
+  changes, audit rollback, immutable/protected history and migration preservation;
+  real loopback TLS verifies new-key confirmation and resumed old-key denial.
+  The complete Windows suite passes in 99.851 seconds, protocol in 1.407 seconds,
+  and scoped handler/views in 2.094/2.525 seconds. Vet and Linux/Windows builds
+  pass. Full CI for this extension is pending. Renewal SOAP admission, operator
+  lifecycle screens, scheduling and real Windows/PKI acceptance remain open.
 - [VPN target and DNS validation](apple-vpn-profiles.md) checks outer protocol
   configuration, DNS types and property versions, App-Layer connection UUIDs,
   transparent proxy Mac versions and fresh mobile supervision for Always On.

@@ -116,7 +116,12 @@ func (s *Store) EnrollmentAvailable(ctx context.Context, actor string, scope acc
 }
 
 const deviceMetadataColumns = `d.id,d.tenant_id,d.site_id,d.invitation_id,d.reported_device_id,d.device_name,d.enrollment_type,d.os_version,d.os_edition,d.created_at,d.revoked_at,c.expires_at,c.revoked_at,encode(c.fingerprint,'hex')`
-const deviceMetadataJoin = ` FROM mdm_windows_devices d JOIN mdm_windows_enrollments e ON e.device_id=d.id AND e.invitation_id=d.invitation_id AND e.tenant_id=d.tenant_id AND e.site_id=d.site_id JOIN mdm_windows_device_certificates c ON c.id=e.certificate_id AND c.device_id=d.id AND c.tenant_id=d.tenant_id AND c.site_id=d.site_id JOIN sites site ON site.id=d.site_id AND site.tenant_sites=d.tenant_id `
+const deviceMetadataJoin = ` FROM mdm_windows_devices d
+ JOIN mdm_windows_enrollments e ON e.device_id=d.id AND e.invitation_id=d.invitation_id AND e.tenant_id=d.tenant_id AND e.site_id=d.site_id
+ JOIN mdm_windows_device_certificates c ON c.device_id=d.id AND c.tenant_id=d.tenant_id AND c.site_id=d.site_id
+ AND (c.id=e.certificate_id OR EXISTS(SELECT 1 FROM mdm_windows_certificate_renewals r WHERE r.renewed_certificate_id=c.id AND r.device_id=d.id AND r.tenant_id=d.tenant_id AND r.site_id=d.site_id AND r.phase='confirmed'))
+ AND NOT EXISTS(SELECT 1 FROM mdm_windows_certificate_renewals r WHERE r.source_certificate_id=c.id AND r.phase='confirmed')
+ JOIN sites site ON site.id=d.site_id AND site.tenant_sites=d.tenant_id `
 
 func scanDeviceMetadata(row interface{ Scan(...any) error }) (*DeviceMetadata, error) {
 	var d DeviceMetadata

@@ -43,11 +43,11 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock_shared(684627902)`); err != nil {
 		return nil, err
 	}
-	device, err := s.authorizeManagementDevice(ctx, tx, certificate, options)
+	device, err := s.authorizeManagementDeviceExclusive(ctx, tx, certificate, options)
 	if err != nil {
 		return nil, err
 	}
-	identity := device.identity
+	identity := device.stateIdentity
 	secrets, err := s.syncMLBootstrap(ctx, tx, identity, options)
 	if err != nil {
 		return nil, err
@@ -94,6 +94,9 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 					return nil, ErrCSPAlreadySent
 				}
 			}
+			if err := s.confirmCertificateRenewal(ctx, tx, device, session, messageID, requestDigest[:]); err != nil {
+				return nil, err
+			}
 			if err := commitSyncML(ctx, tx, device, session); err != nil {
 				return nil, err
 			}
@@ -139,8 +142,8 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 			}
 		}
 		expires := now.Add(syncMLSessionLifetime)
-		if identity.CertificateExpiry.Before(expires) {
-			expires = identity.CertificateExpiry
+		if device.identity.CertificateExpiry.Before(expires) {
+			expires = device.identity.CertificateExpiry
 		}
 		if !expires.After(now) {
 			return nil, ErrManagementIdentity
@@ -207,6 +210,9 @@ func (s *Store) processSyncML(ctx context.Context, certificate *x509.Certificate
 		} else if reason != "" {
 			return nil, ErrCSPAlreadySent
 		}
+	}
+	if err := s.confirmCertificateRenewal(ctx, tx, device, session, messageID, requestDigest[:]); err != nil {
+		return nil, err
 	}
 	if err := commitSyncML(ctx, tx, device, session); err != nil {
 		return nil, err

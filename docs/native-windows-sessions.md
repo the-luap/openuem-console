@@ -8,12 +8,13 @@ The optional [listener/gateway integration](native-windows-operations.md)
 registers this service with direct or pinned gateway TLS. The
 [enrollment/device console](native-windows-console.md) adds scoped administration;
 [typed update forms/history](native-windows-update-console.md) support policy runs.
-Raw CSP and ring/schedule views remain open.
+The [custom CSP editor/history](native-windows-csp-console.md) and scoped
+ring/schedule workflows provide operator controls.
 The [CSP command extension](native-windows-csp.md) adds administrative queues and
 correlated results. The [typed update extension](native-windows-updates.md) adds
 platform preflight and separate effective-policy read-back. Broader policies,
-automatic ring promotion, certificate renewal and unenrollment remain open. WIN-02 remains
-in progress.
+automatic ring promotion, registered certificate renewal and unenrollment remain
+open. WIN-02 remains in progress.
 
 ## HTTP and authorization
 
@@ -39,6 +40,16 @@ required; wrong keys and unauthenticated ciphertext fail without response bytes.
 HTTP errors have empty, fixed-length bodies, without SQL details or supplied
 device data. Successful responses have an explicit content length and XML MIME
 type. All responses use `no-store`, `no-cache` and `nosniff` headers.
+
+The [persistent renewal service](native-windows-renewal.md) keeps the original
+enrollment certificate as the encryption and nonce/session identity anchor.
+Actual transport authorization uses the current or pending replacement
+certificate. A mutually authenticated packet using a pending replacement commits
+the handoff, source revocation, protocol state and audit together. Exact packet
+replay can confirm the new key without advancing session or command state. New
+sessions use the actual transport certificate's expiry; an expired initial anchor
+does not stop management under a valid replacement. Existing session deadlines
+and uncertain CSP outcomes retain their normal lifecycle.
 
 ## Exchange and credential transitions
 

@@ -1,10 +1,10 @@
 # Native Windows certificate renewal
 
-The cryptographic verification component is implemented. Certificate replacement,
-its persistent handoff and renewal HTTP admission remain implementation work.
-The registered WSTEP endpoint still accepts initial Issue requests only and rejects
-Renew. No automatic renewal setting is enabled, and verifying a proof does not
-issue a certificate or modify a device.
+Cryptographic verification and the persistent issuance/handoff service are
+implemented. The registered WSTEP endpoint still accepts initial Issue requests
+only and rejects Renew; renewal SOAP admission and its operator interface remain
+implementation work. No automatic renewal setting is enabled. Calling the pure
+proof verifier does not issue a certificate or modify a device.
 
 ## Protocol requirements
 
@@ -88,9 +88,79 @@ one second per input so its short run can exercise more mutations.
 
 The complete Windows PostgreSQL/race suite passes in **87.008 seconds**; the
 protocol package passes in **1.406 seconds**. Proof fuzzing passes **118,432
-executions** in **31.414 seconds**. Vet and Linux/Windows builds pass. Full CI for
-this verifier extension is pending. These checks do not establish renewal HTTP
-admission, certificate handoff or Windows client acceptance.
+executions** in **31.414 seconds**. Vet and Linux/Windows builds pass. The
+[push workflow](https://github.com/the-luap/openuem-console/actions/runs/34436411706)
+and [PR workflow](https://github.com/the-luap/openuem-console/actions/runs/34436413803)
+pass for verifier commit `7d4e771`. These verifier checks do not establish
+renewal HTTP admission, certificate handoff or Windows client acceptance.
+
+## Persistent issuance and handoff
+
+`Store.RenewWindowsCertificate` receives the actual transport leaf, the CMS proof
+and the existing enrollment configuration. It derives the device and exact
+organization/site from the stored certificate fingerprint, locks live scope and
+the device, and checks current certificate membership, dates, revocation,
+configuration and issuer renewal window. The issuing authority must remain the
+same. Requested subjects and SANs cannot alter the existing device identity.
+
+One pending replacement is allowed per device. The canonical CSR bytes identify
+an intent; changing the SOAP message identifier or signing the same CSR again
+reuses the stored certificate, provisioning and request identifier. A different
+CSR conflicts while the candidate is pending. Canceled intents cannot be revived.
+Retries require the source certificate to remain current, unrevoked and inside
+its renewal window. Once the new key confirms receipt, the retired key is denied
+for both renewal requests and SyncML, including exact retries and resumed TLS.
+
+Migration `011_certificate_renewal.sql` adds a scoped certificate history and an
+append-only audit. The encrypted record contains the accepted proof, minimal
+provisioning, configuration and cancellation note. AEAD binds its device, scope,
+source/replacement certificates, request/configuration digests, revision, phase
+and timestamps. A confirmed record additionally binds the exact stored SyncML
+session, message and request digest. History reads authenticate the record and
+its proof/certificate/provisioning relationship before returning metadata.
+
+The minimal provisioning document installs the replacement in `My/User` for
+`Full` enrollment or `My/System` for `Device` enrollment and identifies the
+existing `w7` provider. It does not replace bootstrap credentials, nonces, polling
+settings, issuer trust or provider identity.
+
+| State | Transport and lifecycle behavior |
+| --- | --- |
+| Pending | The original key remains current. The candidate can participate in SyncML authentication, but cannot renew itself. |
+| Confirmed | A mutually authenticated SyncML message using the candidate commits its packet, protocol state, confirmation and old-certificate revocation together. Exact packet replay can confirm without advancing nonce/session/command state. |
+| Canceled | A current scoped certificate administrator can cancel a pending revision with a protected reason. Only the candidate is revoked; the original key remains current. Confirmed handoffs cannot be canceled. |
+
+The immutable initial enrollment certificate remains the encryption/state anchor.
+Its certificate reference, bootstrap ciphertext, nonce identity, session history
+and command associations are not rewritten. Each operation separately checks the
+actual current TLS certificate. New sessions use that certificate's expiry,
+allowing continued management after the original anchor expires. Existing session
+deadlines retain their original values. Unknown CSP outcomes continue to block
+queued work until the existing explicit resolution workflow completes.
+
+`CertificateRenewals` and `CancelCertificateRenewal` require a current
+`certificates.manage` grant in the exact device scope. Reads are bounded and
+audited; revoked devices retain history. Generic serialization omits protected
+metadata and payloads. Device listings report the original certificate while a
+candidate is pending and the replacement's expiry/fingerprint after confirmation.
+Issuance, confirmation, cancellation and replay return no successful result when
+their audit or final validity checks fail.
+
+Persistence tests cover new-key and same-key issuance, restart/re-signing retries,
+eight concurrent requests, active-command handoff, uncertain/queued work,
+unauthenticated candidate messages, audit rollback, permission/revocation waits,
+scope/configuration/proof rejection, protected history and migration preservation.
+A short-lived synthetic anchor exercises two replacement generations and new
+sessions after the original certificate expires. An owned loopback TLS server
+checks real new-key presentation and denial of the retired key on resumed TLS.
+These tests use ephemeral keys and randomly named PostgreSQL schemas; no host
+certificate store, device enrollment or physical client is involved.
+
+The complete Windows PostgreSQL/race suite for this persistence extension passes
+in **99.851 seconds**, with the protocol package in **1.407 seconds**. Scoped
+Windows handler and view regressions pass in **2.094/2.525 seconds**. Vet and
+Linux/Windows builds pass. Full CI for this extension is pending. The registered
+SOAP renewal endpoint and physical Windows acceptance remain unverified.
 
 ## Remaining lifecycle work
 
@@ -99,17 +169,12 @@ and history. It requires:
 
 - Renewal SOAP parsing and authenticated direct/gateway certificate admission,
   with the automatic and account-authenticated flows handled explicitly.
-- Scoped issuance-window and current-certificate checks under transaction locks,
-  durable exact retries, immutable issuance/audit records and cancellation rules.
-- A certificate handoff that preserves the working identity until replacement
-  use is established and prevents repeated issuance or a stale-key rollback.
-- Continued SyncML credentials and nonce state across the handoff, including
-  active-session, pending-command and uncertain-outcome handling. Current state
-  encryption is bound to certificate identity and cannot simply be reassigned.
-- Minimal renewal provisioning, scheduling configuration, protected lifecycle
-  history and expiry reporting, together with TLS/database/restart/concurrency
-  tests and actual supported Windows client/PKI acceptance.
+- Renewal scheduling configuration and an operator interface for protected
+  lifecycle history/cancellation and expiry reporting.
+- End-to-end renewal SOAP/TLS admission tests and actual supported Windows
+  client/PKI acceptance, including the documented Microsoft PKI constraint.
 
 The existing enrollment record and bootstrap ciphertext are immutable. An
 implementation must not update their certificate reference or erase them to make
-a replacement authenticate. Renewal and unenrollment remain open in WIN-02.
+a replacement authenticate. The persistent service preserves this requirement;
+registered renewal and unenrollment remain open in WIN-02.

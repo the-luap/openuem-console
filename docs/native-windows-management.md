@@ -39,16 +39,25 @@ times after lock waits and immediately before commit. Device or certificate
 revocation denies access, including on a resumed TLS connection. Site reparenting
 does not transfer the device to another organization.
 
+[Persisted certificate renewal](native-windows-renewal.md) adds authenticated
+replacement membership. A pending candidate requires its encrypted renewal
+record and exact old/new-key proof. Only a mutually authenticated SyncML operation
+confirms the replacement and retires the source certificate. This public identity
+snapshot does not confirm a handoff. Retired keys remain denied on resumed TLS.
+The returned identity describes the actual transport certificate; session
+encryption retains the immutable initial enrollment certificate as its anchor.
+
 The enrollment invitation's expiry/revocation and its creator's later permissions
 do not revoke an already issued device identity. Those are invitation lifecycle
 events. Device/certificate revocation is the management authentication boundary.
 Authentication needs public CA state and does not decrypt a CA private key or
-bootstrap secret. It returns public identity only, with no account/device hints,
+bootstrap secret. Replacement membership also authenticates its encrypted renewal
+record using the master key. It returns public identity only, with no account/device hints,
 raw certificate, invitation credential or SyncML secret.
 
 The returned `ManagementDeviceIdentity` is a point-in-time result, not a reusable
 authorization token. Session/command operations must call the private
-`authorizeManagementDevice` inside their own transaction and call
+`authorizeManagementDeviceExclusive` inside their own transaction and call
 `checkManagementDeviceTime` after any session/audit waits before commit. The
 transaction holds scope and revocation locks throughout the operation. No public
 route currently exposes this diagnostic identity method.
