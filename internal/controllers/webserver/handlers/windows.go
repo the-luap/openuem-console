@@ -22,6 +22,8 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/windows/:id/commands", "/windows/:id/commands/:command":
+			return access.ManageWindowsCSP, true
 		case "/windows", "/windows/:id":
 			return access.ReadDevices, true
 		case "/windows/:id/updates", "/windows/:id/updates/:run", "/windows/:id/updates/new",
@@ -33,6 +35,8 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/windows/:id/commands/:command/cancel", "/windows/:id/commands/:command/abandon":
+			return access.ManageWindowsCSP, true
 		case "/windows/setup":
 			return access.ManageCertificates, true
 		case "/windows/invitations", "/windows/invitations/:id/revoke":
@@ -67,6 +71,10 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.GET("/windows/update-schedules/:schedule", h.WindowsUpdateSchedule)
 		g.POST("/windows/update-schedules/:schedule/cancel", h.WindowsCancelUpdateSchedule)
 		g.GET("/windows/:id", h.WindowsDevice)
+		g.GET("/windows/:id/commands", h.WindowsCSPCommands)
+		g.GET("/windows/:id/commands/:command", h.WindowsCSPCommand)
+		g.POST("/windows/:id/commands/:command/cancel", h.WindowsCancelCSPCommand)
+		g.POST("/windows/:id/commands/:command/abandon", h.WindowsAbandonCSPCommand)
 		g.POST("/windows/setup", h.WindowsAuthority)
 		g.POST("/windows/invitations", h.WindowsInvitation)
 		g.POST("/windows/invitations/:id/revoke", h.WindowsRevokeInvitation)

@@ -25,7 +25,7 @@
   min-width: 42rem;
 }
 
-.windows-management :is(h1, h2, h3, td, dd) {
+.windows-management :is(h1, h2, h3, td, dd, code) {
   overflow-wrap: anywhere;
 }
 
@@ -36,6 +36,18 @@
 
 .windows-management ol li + li {
   margin-top: .5rem;
+}
+
+.windows-management .windows-csp-value {
+  max-width: 100%;
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre;
+}
+
+.windows-management .windows-csp-observation {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 1rem;
 }
 
 .windows-policy-fields {

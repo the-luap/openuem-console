@@ -8,7 +8,10 @@ statuses and Get results. All local device exchanges use synthetic fixtures.
 The [typed update extension](native-windows-updates.md) adds an operator-authorized
 preflight/configuration/read-back workflow on this service. The optional
 [listener/gateway integration](native-windows-operations.md) registers its device
-transport. Console forms and physical Windows acceptance remain open.
+transport. The [CSP console](native-windows-csp-console.md) provides protected
+history/results, undelivered custom-command cancellation and explicit resolution
+of uncertain effects. Command creation forms and physical Windows acceptance
+remain open.
 
 ## Administrative command boundary
 
@@ -145,8 +148,9 @@ Failed audit, invalid evidence, cancellation and expiry roll back the transactio
 | Resolution note | 320 UTF-8 bytes, no surrounding whitespace or control characters |
 
 `CSPCommandDetails` provides an audited current request/result read. Results and
-original device errors are untrusted content; eventual views must escape them.
-Observation history is preserved in the database; a console history view and
+original device errors are untrusted content; console views escape them as text.
+The console shows the original request and latest correlated result. Observation
+history is preserved in the database; an observation-by-observation timeline and
 administrative retention/export lifecycle remain future work.
 
 ## Verification and remaining work
@@ -184,6 +188,7 @@ The typed update extension adds selected update policies and verified read-back.
 The [enrollment/device console](native-windows-console.md) provides CA setup,
 one-time credentials, scoped inventory and native access revocation.
 Remaining WIN-02 work includes broader typed configuration policies, automatic
-ring promotion, outgoing large-object chunking, command/result console views,
+ring promotion, outgoing large-object chunking, command creation and observation
+timeline forms,
 renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

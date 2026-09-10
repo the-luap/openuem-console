@@ -1,0 +1,197 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ cspNavigation(info *partials.CommonInfo, device windows.DeviceMetadata) {
+	<nav aria-label="Windows CSP commands" class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>Device identity</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")) }>CSP commands</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates")) }>Update policy runs</a>
+	</nav>
+}
+
+templ CSPCommands(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, commands []windows.CSPCommand, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}, {Title: "CSP commands"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Windows CSP commands</h1><p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Protected command history includes custom operations and steps owned by typed update runs. Acknowledgments describe protocol evidence; they do not establish effective policy, compliance, installed patches or reboot.</p>
+					<div role="region" aria-label="Windows CSP command history table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Commands for this native Windows device</caption>
+							<thead><tr><th scope="col">Command</th><th scope="col">State</th><th scope="col">Created / admission expires (UTC)</th><th scope="col">Owner</th></tr></thead>
+							<tbody>
+								for _, command := range commands {
+									<tr>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+command.ID)) }>{ command.ID }</a></td>
+										<td>{ cspState(command.Phase) }</td>
+										<td>{ scheduleTimestamp(command.CreatedAt) }<div>{ scheduleTimestamp(command.ExpiresAt) }</div></td>
+										<td>
+											if command.UpdateRunID!="" {
+												<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+command.UpdateRunID)) }>Update policy run</a>
+												<div>{ updateStep(command.UpdateStep) }</div>
+											} else {
+												Custom CSP request
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(commands)==0 {
+						<p class="my-4">No CSP commands in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands?offset=%d", device.ID, max(0, offset-25)))) }>Previous commands</a>
+						}
+						if more && offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands?offset=%d", device.ID, min(100000, offset+25)))) }>More commands</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+// All values, including XML, are rendered as escaped text. No markup is trusted.
+templ cspData(data *windows.SyncMLData) {
+	if data == nil {
+		<p>No value supplied</p>
+	} else if data.XML!="" {
+		<p>XML value · { fmt.Sprint(len(data.XML)) } bytes</p>
+		<pre class="windows-csp-value" tabindex="0" aria-label="XML value as text">{ data.XML }</pre>
+	} else {
+		<p>Text value · { fmt.Sprint(len(data.Text)) } bytes</p>
+		if data.Text=="" {
+			<p>Empty value</p>
+		} else {
+			<pre class="windows-csp-value" tabindex="0" aria-label="Text value">{ data.Text }</pre>
+		}
+	}
+}
+
+templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, detail windows.CSPCommandDetail) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "CSP commands", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")}, {Title: "Command evidence"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Windows CSP command</h1><p>{ device.Name } · { device.ID }</p>@cspNavigation(info, device)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ cspState(detail.Command.Phase) }</h2>
+					<p class="my-3">These are the saved request and latest correlated device observations. Group and child outcomes are separate. Acknowledgment does not prove effective configuration or current compliance; a failed group can leave other operations applied.</p>
+					if detail.Reason!="" {
+						<p>Recorded reason: <code>{ detail.Reason }</code></p>
+					}
+					<dl class="uk-description-list"><dt>Command ID</dt><dd>{ detail.Command.ID }</dd><dt>Request ID</dt><dd>{ detail.Command.RequestKey }</dd><dt>State revision</dt><dd>{ fmt.Sprint(detail.Command.Revision) }</dd><dt>Created by</dt><dd>{ detail.Command.CreatedBy }</dd><dt>Created</dt><dd>{ scheduleTimestamp(detail.Command.CreatedAt) }</dd><dt>Admission expires</dt><dd>{ scheduleTimestamp(detail.Command.ExpiresAt) }</dd><dt>Last state update</dt><dd>{ scheduleTimestamp(detail.Command.UpdatedAt) }</dd></dl>
+					if detail.Command.DeliveredAt!=nil {
+						<dl class="uk-description-list"><dt>Delivery committed</dt><dd>{ scheduleTimestamp(*detail.Command.DeliveredAt) }</dd><dt>Dispatch session / message</dt><dd>{ detail.Command.DeliveredSessionID } · { fmt.Sprint(detail.Command.DeliveredMessage) }</dd></dl>
+					} else {
+						<p>No delivery has been committed.</p>
+					}
+					if detail.Command.CompletedAt!=nil {
+						<dl class="uk-description-list"><dt>Terminal state recorded</dt><dd>{ scheduleTimestamp(*detail.Command.CompletedAt) }</dd></dl>
+					}
+					if detail.Command.UpdateRunID!="" {
+						<p class="my-3">This is a step in an immutable update policy run. Review its combined evidence and cancel remaining undelivered work from that run.</p>
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+detail.Command.UpdateRunID)) }>Open owning update policy run</a>
+					}
+					if canCancelCSP(detail.Command) {
+						<details class="mt-4">
+							<summary>Cancel undelivered command</summary>
+							<p>Cancellation retires this request before delivery. It does not remove settings already on Windows. A concurrent delivery or revision change prevents cancellation.</p>
+							<form class="grid gap-3 mt-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+detail.Command.ID+"/cancel") }>
+								@mdm_views.CSRF(info)
+								<input type="hidden" name="expected_revision" value={ fmt.Sprint(detail.Command.Revision) }/>
+								<label><input type="checkbox" name="confirm_cancel" value="yes" required/> Cancel this command only if it is still undelivered.</label><button class="uk-button uk-button-danger" type="submit">Confirm command cancellation</button>
+							</form>
+						</details>
+					}
+					if detail.Command.Phase=="sent" || detail.Command.Phase=="unknown" {
+						<p class="my-3">This command prevents the next queued command from being delivered while its outcome remains unresolved. No automatic resend is performed after uncertain effects.</p>
+					}
+					if detail.Command.Phase=="unknown" {
+						<details class="mt-4">
+							<summary>Record resolution and release queue</summary>
+							<p>The command may already have affected the device. Releasing it permits subsequent eligible work; it does not undo the operation, retry it or mark it successful. Record the evidence reviewed and the reason for accepting its unresolved effects.</p>
+							<form class="grid gap-3 mt-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+detail.Command.ID+"/abandon") }>
+								@mdm_views.CSRF(info)
+								<input type="hidden" name="expected_revision" value={ fmt.Sprint(detail.Command.Revision) }/>
+								<label class="grid gap-2">Resolution note<input class="uk-input" name="resolution" maxlength="320" required autocomplete="off"/><span>1–320 UTF-8 bytes on one line, without surrounding whitespace.</span></label>
+								<label><input type="checkbox" name="confirm_abandon" value="yes" required/> Accept the uncertain effects and release this command's queue barrier.</label><button class="uk-button uk-button-danger" type="submit">Confirm resolution and queue release</button>
+							</form>
+						</details>
+					}
+					if detail.Resolution!="" {
+						<h3 class="mt-4 font-semibold">Recorded resolution</h3>
+						<pre class="windows-csp-value" tabindex="0" aria-label="Recorded resolution">{ detail.Resolution }</pre>
+						<p>This note released the uncertain command. It does not establish a successful device outcome.</p>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Original command intent</h2>
+					<p>Operation numbers preserve tree order and nesting. Request values are configuration intent, separate from device results below.</p>
+					for _, row := range cspRequestRows(detail.Request) {
+						<details class="my-3">
+							<summary>Operation { row.Position } · { row.Command.Kind }</summary>
+							for _, item := range row.Command.Items {
+								if item.Target!=nil {
+									<dl class="uk-description-list"><dt>Target node</dt><dd>{ item.Target.URI }</dd></dl>
+								}
+								if item.Meta!=nil {
+									<dl class="uk-description-list"><dt>Value format / MIME</dt><dd>{ item.Meta.Format } · { item.Meta.Type }</dd></dl>
+								}
+								@cspData(item.Data)
+							}
+						</details>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Correlated device evidence</h2>
+					<p>Status 202 is asynchronous acceptance; 516 reports failed rollback. Neither establishes successful completion. Partial Get values are withheld until the complete object is received. Empty values and absent results remain distinct.</p>
+					if len(detail.Outcomes)==0 {
+						<p class="my-3">No operation evidence has been received.</p>
+					}
+					for _, outcome := range detail.Outcomes {
+						<section class="windows-csp-observation my-4">
+							<h3 class="font-semibold">{ outcome.Kind } · { outcome.CommandID }</h3>
+							<dl class="uk-description-list"><dt>Parent command</dt><dd>{ outcome.ParentID }</dd><dt>Target node</dt><dd>{ outcome.URI }</dd><dt>Device status</dt><dd>{ cspStatus(outcome.Status) }</dd></dl>
+							if outcome.OriginalError!="" {
+								<p>Original device error (diagnostic only)</p>
+								<pre class="windows-csp-value" tabindex="0" aria-label="Original device error">{ outcome.OriginalError }</pre>
+							}
+							if outcome.Kind=="Get" {
+								if outcome.Incomplete {
+									<p>Incomplete result; partial value withheld.</p>
+								} else if outcome.Data==nil {
+									<p>No complete result received.</p>
+								} else {
+									<dl class="uk-description-list"><dt>Reported format / MIME</dt><dd>{ outcome.Format } · { outcome.MIME }</dd></dl>@cspData(outcome.Data)
+								}
+							}
+						</section>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

@@ -174,6 +174,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 	exerciseWindowsAssignmentConsole(t, h, ctx, scope, deviceID, request, artifact)
 	exerciseWindowsScheduleConsole(t, h, ctx, scope, deviceID, request, artifact)
 	exerciseWindowsUpdateConsole(t, h, ctx, scope, deviceID, request, artifact)
+	exerciseWindowsCSPConsole(t, h, ctx, scope, request, artifact)
 	runConsoleBrowserFixture(t, h, ctx, os.Getenv("OPENUEM_WINDOWS_RING_BROWSER_FIXTURE"), base+"/windows/update-rings/new")
 	runConsoleBrowserFixture(t, h, ctx, os.Getenv("OPENUEM_WINDOWS_POLICY_BROWSER_FIXTURE"), base+"/windows/"+deviceID+"/updates/new")
 	t.Run("Windows device views and revocation are scoped", func(t *testing.T) {

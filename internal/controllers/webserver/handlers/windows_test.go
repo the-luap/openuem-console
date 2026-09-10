@@ -20,6 +20,9 @@ func TestWindowsConsoleRoutesHaveExplicitCapabilities(t *testing.T) {
 	for _, route := range []string{"GET /windows/update-rings", "GET /windows/update-rings/new", "GET /windows/update-rings/:ring", "GET /windows/update-rings/:ring/edit", "POST /windows/update-rings/preview", "POST /windows/update-rings/save", "GET /windows/update-rings/:ring/assign", "POST /windows/update-rings/:ring/assign/preview", "POST /windows/update-rings/:ring/assign/create", "GET /windows/update-rollouts/:rollout", "GET /windows/update-rings/:ring/schedule", "POST /windows/update-rings/:ring/schedule/preview", "POST /windows/update-rings/:ring/schedule/create", "GET /windows/update-schedules", "GET /windows/update-schedules/:schedule", "POST /windows/update-schedules/:schedule/cancel"} {
 		want[route] = access.ManageUpdates
 	}
+	for _, route := range []string{"GET /windows/:id/commands", "GET /windows/:id/commands/:command", "POST /windows/:id/commands/:command/cancel", "POST /windows/:id/commands/:command/abandon"} {
+		want[route] = access.ManageWindowsCSP
+	}
 	count := 0
 	for _, r := range e.Routes() {
 		if r.Method == echo.RouteNotFound {
