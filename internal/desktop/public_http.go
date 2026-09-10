@@ -147,7 +147,7 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	proofRequest := route.Kind == "claim" || route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm"
+	proofRequest := route.Kind == "claim" || route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm" || route.Kind == "renewal-resolve"
 	if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Encoding") != "" || (!proofRequest && (r.ContentLength != 0 || len(r.TransferEncoding) != 0)) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -215,6 +215,9 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if route.Kind == "renewal-confirm" {
 		bodyLimit = enrollment.MaxRenewalConfirmationBytes
 	}
+	if route.Kind == "renewal-resolve" {
+		bodyLimit = enrollment.MaxRenewalResolutionBytes
+	}
 	if r.ContentLength > bodyLimit {
 		http.Error(w, "request is too large", http.StatusRequestEntityTooLarge)
 		return
@@ -240,7 +243,7 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "service temporarily unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	if route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm" {
+	if route.Kind == "renewal-prepare" || route.Kind == "renewal-confirm" || route.Kind == "renewal-resolve" {
 		h.identityRenewal(w, r, route, body)
 		return
 	}

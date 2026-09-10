@@ -45,6 +45,7 @@ type renewalPublicFixture struct {
 	request            *enrollment.RenewalRequest
 	invitation         *registry.Invitation
 	loseConfirmation   atomic.Bool
+	loseResolution     atomic.Bool
 	backendRequests    atomic.Int64
 }
 
@@ -143,6 +144,18 @@ func newRenewalPublicTargetFixture(t *testing.T, throughGateway, due bool, platf
 		f.backendRequests.Add(1)
 		if throughGateway && (r.ProtoMajor != 2 || !policy.IsGateway(r) || r.Header.Get("X-Forwarded-For") != "127.0.0.1" || r.Header.Get("Client-Cert") != "" || r.Header.Get("X-SSL-Client-Cert") != "") {
 			t.Error("renewal gateway lost its pinned transport or retained forged identity headers")
+		}
+		if strings.HasSuffix(r.URL.Path, "/renewal/resolve") && f.loseResolution.Load() {
+			capture := &renewalCapture{ResponseWriter: w}
+			f.handler.ServeHTTP(capture, r)
+			if capture.status == 200 && f.loseResolution.Swap(false) {
+				w.Header().Del("Content-Length")
+				http.Error(w, "synthetic lost resolution acknowledgement", 503)
+				return
+			}
+			w.WriteHeader(capture.status)
+			w.Write(capture.body.Bytes())
+			return
 		}
 		if strings.HasSuffix(r.URL.Path, "/renewal/confirm") && f.loseConfirmation.Load() {
 			capture := &renewalCapture{ResponseWriter: w}
@@ -435,7 +448,7 @@ func (f *renewalPublicFixture) raw(t *testing.T, method, path string, body []byt
 func TestPublicIdentityRenewalGatewayRejectsAliasesAndUnpinnedBackend(t *testing.T) {
 	f := newRenewalPublicFixture(t, true, true)
 	body, _ := json.Marshal(f.request)
-	for _, operation := range []string{"prepare", "confirm"} {
+	for _, operation := range []string{"prepare", "confirm", "resolve"} {
 		path := enrollment.IdentityRenewalPath(f.source.DeviceID, operation)
 		for _, method := range []string{"GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"} {
 			response, _ := f.raw(t, method, path, nil, map[string]string{"X-Forwarded-For": "10.42.1.1"})
@@ -500,12 +513,12 @@ func TestPublicIdentityRenewalGatewayRejectsAliasesAndUnpinnedBackend(t *testing
 }
 
 func TestPublicIdentityRenewalConcurrencyIsBoundedAndShutdownCancelsDatabaseWaits(t *testing.T) {
-	for _, operation := range []string{"prepare", "confirm"} {
+	for _, operation := range []string{"prepare", "confirm", "resolve"} {
 		t.Run(operation, func(t *testing.T) {
 			f := newRenewalPublicFixture(t, false, true)
 			body, _ := json.Marshal(f.request)
 			preparations := 0
-			if operation == "confirm" {
+			if operation != "prepare" {
 				prepared, err := f.client.PrepareIdentityRenewal(t.Context(), *f.request, f.source)
 				if err != nil {
 					t.Fatal(err)
@@ -519,6 +532,13 @@ func TestPublicIdentityRenewalConcurrencyIsBoundedAndShutdownCancelsDatabaseWait
 					t.Fatal(err)
 				}
 				body, _ = json.Marshal(confirmation)
+				if operation == "resolve" {
+					resolution, err := enrollment.NewRenewalResolution(*target, f.candidate, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					body, _ = json.Marshal(resolution)
+				}
 				preparations = 1
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -603,15 +623,16 @@ func TestPublicIdentityRenewalConcurrencyIsBoundedAndShutdownCancelsDatabaseWait
 
 func (f *renewalPublicFixture) assertUnchanged(t *testing.T, preparations int) {
 	t.Helper()
-	var issued, confirmed, audits, reservations int
+	var issued, confirmed, cancelled, audits, reservations int
 	var hash string
 	err := f.store.db.QueryRow(`SELECT
 	 (SELECT count(*) FROM uem_agent_identity_renewals),
 	 (SELECT count(*) FROM uem_agent_identity_renewal_confirmations),
+	 (SELECT count(*) FROM uem_agent_identity_renewal_cancellations),
 	 (SELECT count(*) FROM uem_agent_audit WHERE action LIKE 'agent.identity.renew.%'),
 	 (SELECT count(*) FROM uem_agent_key_reservations),
-	 certificate_hash FROM uem_agent_identities WHERE id=$1`, f.source.DeviceID).Scan(&issued, &confirmed, &audits, &reservations, &hash)
-	if err != nil || issued != preparations || confirmed != 0 || audits != preparations || reservations != 2+2*preparations || hash != f.request.SourceCertificateHash {
+	 certificate_hash FROM uem_agent_identities WHERE id=$1`, f.source.DeviceID).Scan(&issued, &confirmed, &cancelled, &audits, &reservations, &hash)
+	if err != nil || issued != preparations || confirmed != 0 || cancelled != 0 || audits != preparations || reservations != 2+2*preparations || hash != f.request.SourceCertificateHash {
 		t.Fatal("failed renewal changed issuance, activation, audit or key ownership", issued, confirmed, audits, reservations, err)
 	}
 }
@@ -643,10 +664,17 @@ func TestPublicIdentityRenewalProofsPendingAndCurrentAuthorization(t *testing.T)
 	if _, err := f.client.PrepareIdentityRenewal(t.Context(), *other, f.source); !errors.Is(err, enrollment.ErrIdentityRenewalPending) {
 		t.Fatal("second request did not receive the pending conflict", err)
 	}
-	for _, operation := range []string{"prepare", "confirm"} {
+	for _, operation := range []string{"prepare", "confirm", "resolve"} {
 		body, _ := json.Marshal(f.request)
 		if operation == "confirm" {
 			body, _ = json.Marshal(confirmation)
+		}
+		if operation == "resolve" {
+			resolution, err := enrollment.NewRenewalResolution(*target, f.candidate, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ = json.Marshal(resolution)
 		}
 		var fields map[string]json.RawMessage
 		if err := json.Unmarshal(body, &fields); err != nil {
@@ -693,17 +721,28 @@ func TestPublicIdentityRenewalProofsPendingAndCurrentAuthorization(t *testing.T)
 }
 
 func TestPublicIdentityRenewalAuditFailureRollsBackBeforeResponse(t *testing.T) {
-	for _, operation := range []string{"prepare", "confirm"} {
+	for _, operation := range []string{"prepare", "confirm", "resolve"} {
 		t.Run(operation, func(t *testing.T) {
 			f := newRenewalPublicFixture(t, false, true)
 			body, _ := json.Marshal(f.request)
 			preparations := 0
-			if operation == "confirm" {
-				_, confirmation := f.prepareConfirmation(t)
+			if operation != "prepare" {
+				target, confirmation := f.prepareConfirmation(t)
 				body, _ = json.Marshal(confirmation)
+				if operation == "resolve" {
+					resolution, err := enrollment.NewRenewalResolution(*target, f.candidate, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					body, _ = json.Marshal(resolution)
+				}
 				preparations = 1
 			}
-			if _, err := f.store.db.Exec(`ALTER TABLE uem_agent_audit ADD CONSTRAINT renewal_fixture_audit_failure CHECK(action!='agent.identity.renew.` + operation + `')`); err != nil {
+			action := operation
+			if operation == "resolve" {
+				action = "cancel"
+			}
+			if _, err := f.store.db.Exec(`ALTER TABLE uem_agent_audit ADD CONSTRAINT renewal_fixture_audit_failure CHECK(action!='agent.identity.renew.` + action + `')`); err != nil {
 				t.Fatal(err)
 			}
 			path := enrollment.IdentityRenewalPath(f.source.DeviceID, operation)
@@ -726,81 +765,99 @@ func TestPublicIdentityRenewalAuditFailureRollsBackBeforeResponse(t *testing.T) 
 }
 
 func TestPublicIdentityRenewalPreservesDeliveredRecoveryUntilSignedCompletion(t *testing.T) {
-	f := newRenewalPublicTargetFixture(t, true, true, "macos")
-	target, confirmation := f.prepareConfirmation(t)
-	access, err := registry.NewAccessStore(f.store.db)
-	if err != nil {
-		t.Fatal(err)
-	}
-	identity, err := access.ActiveIdentity(t.Context(), f.source.DeviceID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cert, _ := x509.ParseCertificate(f.source.Certificate)
-	key, err := enrollment.NewRecoveryRecipientKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer key.Close()
-	reply, err := access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "challenge", PublicKey: key.PublicKey()})
-	if err != nil || reply.Registration == nil {
-		t.Fatal("fixture registration challenge failed", err)
-	}
-	signature, err := enrollment.SignRecoveryRegistration(*reply.Registration, cert, f.current.Certificate, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	reply, err = access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "register", Registration: reply.Registration, Signature: signature})
-	if err != nil || reply.Recipient == nil {
-		t.Fatal("fixture recovery registration failed", err)
-	}
-	recipient := reply.Recipient
-	context := enrollment.RecoveryContext{Version: 1, Identity: recipient.Identity, TaskID: uuid.NewString(), NativeID: uuid.NewString(), KeyID: uuid.NewString(), RecipientID: recipient.ID, ExpiresAt: time.Now().Add(5 * time.Minute).Unix()}
-	nonce := bytes.Repeat([]byte{8}, 32)
-	task, err := enrollment.EncryptRecoveryTask(*recipient, context, []byte("AAAA-BBBB-CCCC-DDDD-EEEE-FFFF"), nonce, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx, err := f.store.db.BeginTx(t.Context(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback()
-	if _, _, err := access.RecoveryRecipient(t.Context(), tx, identity.Scope, identity.ID); err != nil {
-		t.Fatal(err)
-	}
-	hash := sha256.Sum256(nonce)
-	if err := access.QueueRecoveryTask(t.Context(), tx, *task, hex.EncodeToString(hash[:])); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	reply, err = access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "poll", RecipientID: recipient.ID})
-	if err != nil || reply.Task == nil || reply.Task.Context != task.Context {
-		t.Fatal("fixture recovery task was not delivered", err)
-	}
-	if _, err := f.client.ConfirmIdentityRenewal(t.Context(), *confirmation, *target); !errors.Is(err, enrollment.ErrIdentityRenewalRecoveryPending) {
-		t.Fatal("delivered recovery did not return its typed renewal conflict", err)
-	}
-	f.assertUnchanged(t, 1)
-	secret, err := key.Open(*task, recipient.Identity, recipient.ID, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer secret.Close()
-	result, err := secret.Result("invalid", cert, f.current.Certificate, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "result", Result: result}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.client.ConfirmIdentityRenewal(t.Context(), *confirmation, *target); err != nil {
-		t.Fatal("completed signed recovery did not release activation", err)
-	}
-	var retained bool
-	if err := f.store.db.QueryRow(`SELECT status='completed' AND octet_length(result)>0 FROM uem_agent_recovery_tasks WHERE id=$1`, task.Context.TaskID).Scan(&retained); err != nil || !retained {
-		t.Fatal("activation discarded the completed recovery receipt", err)
+	for _, resolve := range []bool{false, true} {
+		t.Run(map[bool]string{false: "confirm after completion", true: "cancel before completion"}[resolve], func(t *testing.T) {
+			f := newRenewalPublicTargetFixture(t, true, true, "macos")
+			target, confirmation := f.prepareConfirmation(t)
+			access, err := registry.NewAccessStore(f.store.db)
+			if err != nil {
+				t.Fatal(err)
+			}
+			identity, err := access.ActiveIdentity(t.Context(), f.source.DeviceID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cert, _ := x509.ParseCertificate(f.source.Certificate)
+			key, err := enrollment.NewRecoveryRecipientKey()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer key.Close()
+			reply, err := access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "challenge", PublicKey: key.PublicKey()})
+			if err != nil || reply.Registration == nil {
+				t.Fatal("fixture registration challenge failed", err)
+			}
+			signature, err := enrollment.SignRecoveryRegistration(*reply.Registration, cert, f.current.Certificate, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			reply, err = access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "register", Registration: reply.Registration, Signature: signature})
+			if err != nil || reply.Recipient == nil {
+				t.Fatal("fixture recovery registration failed", err)
+			}
+			recipient := reply.Recipient
+			context := enrollment.RecoveryContext{Version: 1, Identity: recipient.Identity, TaskID: uuid.NewString(), NativeID: uuid.NewString(), KeyID: uuid.NewString(), RecipientID: recipient.ID, ExpiresAt: time.Now().Add(5 * time.Minute).Unix()}
+			nonce := bytes.Repeat([]byte{8}, 32)
+			task, err := enrollment.EncryptRecoveryTask(*recipient, context, []byte("AAAA-BBBB-CCCC-DDDD-EEEE-FFFF"), nonce, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx, err := f.store.db.BeginTx(t.Context(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+			if _, _, err := access.RecoveryRecipient(t.Context(), tx, identity.Scope, identity.ID); err != nil {
+				t.Fatal(err)
+			}
+			hash := sha256.Sum256(nonce)
+			if err := access.QueueRecoveryTask(t.Context(), tx, *task, hex.EncodeToString(hash[:])); err != nil {
+				t.Fatal(err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			reply, err = access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "poll", RecipientID: recipient.ID})
+			if err != nil || reply.Task == nil || reply.Task.Context != task.Context {
+				t.Fatal("fixture recovery task was not delivered", err)
+			}
+			if _, err := f.client.ConfirmIdentityRenewal(t.Context(), *confirmation, *target); !errors.Is(err, enrollment.ErrIdentityRenewalRecoveryPending) {
+				t.Fatal("delivered recovery did not return its typed renewal conflict", err)
+			}
+			f.assertUnchanged(t, 1)
+			if resolve {
+				resolution, err := enrollment.NewRenewalResolution(*target, f.candidate, time.Now())
+				if err != nil {
+					t.Fatal(err)
+				}
+				outcome, err := f.client.ResolveIdentityRenewal(t.Context(), *resolution, *target, f.source)
+				if err != nil || outcome.Outcome != "cancelled" {
+					t.Fatal("resolution did not recover original recovery authority", err)
+				}
+				var unchanged bool
+				if err := f.store.db.QueryRow(`SELECT t.status='pending' AND t.delivered_at IS NOT NULL AND r.id=$2 FROM uem_agent_recovery_tasks t JOIN uem_agent_recovery_recipients r ON r.device_id=t.device_id WHERE t.id=$1`, task.Context.TaskID, recipient.ID).Scan(&unchanged); err != nil || !unchanged {
+					t.Fatal("resolution retired delivered recovery or its recipient", err)
+				}
+			}
+			secret, err := key.Open(*task, recipient.Identity, recipient.ID, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer secret.Close()
+			result, err := secret.Result("invalid", cert, f.current.Certificate, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := access.HandleRecovery(t.Context(), *identity, enrollment.RecoveryRequest{Version: 1, AgentID: identity.ID, Action: "result", Result: result}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.client.ConfirmIdentityRenewal(t.Context(), *confirmation, *target); (resolve && !errors.Is(err, enrollment.ErrIdentityRenewalDenied)) || (!resolve && err != nil) {
+				t.Fatal("recovery completion changed the retained renewal decision", err)
+			}
+			var retained bool
+			if err := f.store.db.QueryRow(`SELECT status='completed' AND octet_length(result)>0 FROM uem_agent_recovery_tasks WHERE id=$1`, task.Context.TaskID).Scan(&retained); err != nil || !retained {
+				t.Fatal("activation discarded the completed recovery receipt", err)
+			}
+		})
 	}
 }

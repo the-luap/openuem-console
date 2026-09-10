@@ -98,6 +98,7 @@ payload digest, not a package hash.
 | `POST /enroll/desktop/<token>/claim` | Validate both endpoint key proofs, claim the bound invitation and return the assigned individual identity and public certificates |
 | `POST /enroll/desktop/identities/<device-uuid>/renewal/prepare` | Verify the current identity and candidate key proofs; retain exact candidate issuance without changing current credentials |
 | `POST /enroll/desktop/identities/<device-uuid>/renewal/confirm` | Verify both candidate keys and atomically activate the retained generation for the same device; recover a committed confirmation on exact retry |
+| `POST /enroll/desktop/identities/<device-uuid>/renewal/resolve` | Recover the exact current confirmed outcome or permanently cancel an unconfirmed candidate while its original identity is still current and authorized |
 | `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows` or `macos`, architecture is `amd64` or `arm64` |
 
 The base invitation URL now serves the public installation page. Page, invitation
@@ -129,7 +130,7 @@ Release withdrawal does not revoke identities previously issued successfully.
 Renewal uses no invitation and does not depend on a currently approved release.
 It requires the existing independently authorized device identity, exact origin
 and all signed key proofs; a forwarded certificate alone grants no renewal rights.
-The 32 KiB preparation and 8 KiB confirmation bodies have strict versioned JSON.
+The 32 KiB preparation and 8 KiB confirmation/resolution bodies have strict versioned JSON.
 HTTP 409 returns a bounded version-1 `code` of `not_due`, `pending` or
 `recovery_pending`; denial uses a fixed 404 and operational failure a fixed 503.
 See the [renewal lifecycle and client contract](desktop-identity-renewal.md) before

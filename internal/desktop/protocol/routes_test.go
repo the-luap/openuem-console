@@ -39,7 +39,7 @@ func TestBootstrapRoutesHaveExactReadOnlyMethodsAndPaths(t *testing.T) {
 
 func TestIdentityRenewalRoutesRequireExactDeviceOperationAndPOST(t *testing.T) {
 	id := "11111111-1111-4111-8111-111111111111"
-	for _, operation := range []string{"prepare", "confirm"} {
+	for _, operation := range []string{"prepare", "confirm", "resolve"} {
 		path := enrollment.IdentityRenewalPath(id, operation)
 		route, ok := Parse(httptest.NewRequest("POST", "https://uem.example.test"+path, nil))
 		if !ok || route.Kind != "renewal-"+operation || route.DeviceID != id || route.Token != "" {

@@ -32,6 +32,13 @@ func (h *PublicHandler) identityRenewal(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 		result, err = h.store.Registry.ConfirmIdentityRenewal(r.Context(), *request)
+	case "renewal-resolve":
+		request, decodeErr := enrollment.DecodeRenewalResolution(body)
+		if decodeErr != nil || request.DeviceID != route.DeviceID || request.Origin != h.origin {
+			http.Error(w, "invalid identity renewal request", http.StatusBadRequest)
+			return
+		}
+		result, err = h.store.Registry.ResolveIdentityRenewal(r.Context(), *request)
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 		return

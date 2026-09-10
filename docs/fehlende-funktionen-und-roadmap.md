@@ -513,6 +513,12 @@ remove P2 from the user's instruction to implement the entire plan.
 | API-01 | P2 | Public API, webhooks and GitOps | Same desired state expressible and verifiable through UI and versioned API |
 | SW-01 | P2 | Apple apps and self-service | Apps & Books/licenses and approved custom packages with status/update lifecycle; iOS apps remain lower priority |
 
+Desktop PKI-01 implementation evidence is tracked in
+[the identity renewal lifecycle](desktop-identity-renewal.md): persistent issuance,
+activation, authoritative cancellation, protected native decisions and retained
+FileVault history are implemented and tested. Automatic service handoff/reconnect,
+release integration and physical-device acceptance remain open.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.

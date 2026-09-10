@@ -1,32 +1,35 @@
 # Individual desktop identity renewal
 
 The console pins shared registry commit
-[`06ec5c5`](https://github.com/the-luap/openuem-nats/commit/06ec5c578a4f8682a223fb42bbea10b4febe0a94),
-which implements persistent renewal preparation and candidate confirmation while
+[`07a6ac8`](https://github.com/the-luap/openuem-nats/commit/07a6ac8e2a5e07f63778b2c1f4d75e72ca7e2fa3),
+which implements persistent preparation, confirmation and permanent cancellation while
 preserving device ID and organization/site. Its
-[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/06ec5c578a4f8682a223fb42bbea10b4febe0a94/enrollment/identity-renewal.md)
+[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/07a6ac8e2a5e07f63778b2c1f4d75e72ca7e2fa3/enrollment/identity-renewal.md)
 defines proof domains, expiry bounds, permanent key ownership and retry behavior.
-The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34471335722)
+The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34479270024)
 passes native Windows checks and Linux/PostgreSQL/race/fuzz tests.
 
 This dependency and the console integration below are implementation components.
 Automatic endpoint renewal is not enabled yet. The HTTPS client, console routes
 and pinned gateway transport are implemented, as are the agent's protected
 candidate/activation journals. Service scheduling, coordinated credential handoff,
-startup recovery, broker runtime reconnect, authoritative cancellation and
-agent/worker/service release integration remain necessary.
+startup recovery, broker runtime reconnect and agent/worker/service release
+integration remain necessary. Authoritative cancellation and its native journal
+are now implemented as explicit operations.
 
 ## HTTPS and gateway transport
 
 The existing [desktop listener](desktop-public-protocol.md) and gateway expose only
-these two canonical POST routes for renewal:
+these three canonical POST routes for renewal:
 
 - `/enroll/desktop/identities/<device-uuid>/renewal/prepare`
 - `/enroll/desktop/identities/<device-uuid>/renewal/confirm`
+- `/enroll/desktop/identities/<device-uuid>/renewal/resolve`
 
 Each JSON body must bind the exact path device and configured public origin.
 Preparation verifies both current private keys and the candidate broker key;
-confirmation verifies both candidate private keys against the retained issuance.
+confirmation and resolution verify both candidate private keys against retained
+issuance, using independent signature domains.
 Public certificate headers, browser cookies and the gateway certificate cannot
 substitute for these proofs. Confirmation remains reachable with candidate proofs
 after activation retired the original certificate and its commit reply was lost.
@@ -37,7 +40,7 @@ Tests start with a revoked original invitation and an empty catalog. Listener
 startup still requires its configured release directory and trusted release keys;
 an unavailable repository is a startup error, as documented for that listener.
 
-Requests are limited to 32 KiB for preparation and 8 KiB for confirmation, with
+Requests are limited to 32 KiB for preparation and 8 KiB for confirmation/resolution, with
 strict versioned JSON, a 10-second body deadline and a 20-second handler context.
 The registry adds its own 15-second transaction bound. Claims and renewals share
 four concurrent proof-processing slots and the existing bounded global/source
@@ -46,15 +49,16 @@ The completed-body deadline is cleared before database work, including on HTTP/2
 Methods, query parameters and encoded/extra path aliases are rejected by the shared
 gateway/listener allowlist; administrator network restrictions remain in force.
 
-Successful responses contain only the public prepared or confirmed renewal DTO.
+Successful responses contain only the public prepared, confirmed or resolved renewal DTO.
 HTTP 409 returns exactly `{"version":1,"code":"not_due"}`, `pending` or
 `recovery_pending` in the same shape. Denied or unknown identities return a fixed
 404; operational/audit failures return a fixed 503; admission returns 429 with
 `Retry-After`. Responses are not cached, offer no CORS permission and do not expose
 proofs, database diagnostics or private keys. Existing browser origin restrictions
-apply to both routes.
+apply to all three routes.
 
-The shared `HTTPClient.PrepareIdentityRenewal` and `ConfirmIdentityRenewal` methods
+The shared `HTTPClient.PrepareIdentityRenewal`, `ConfirmIdentityRenewal` and
+`ResolveIdentityRenewal` methods
 require the independently authorized origin and trusted local source/target. They
 validate proofs before network I/O and validate the exact returned candidate,
 device, scope and times afterward. Responses are bounded to 96 KiB and 2 KiB.
@@ -68,25 +72,54 @@ never discard the candidate or restore old credentials solely on that result or
 preparation expiry. Retain the exact target and retry with a fresh candidate proof.
 These transport methods do not install credentials or supply that protected journal.
 
+## Atomic resolution
+
+A candidate-key resolution request returns the original `confirmed` outcome if
+that exact generation is already current and authorized. Otherwise it permanently
+cancels the candidate while the original source remains current, valid and
+authorized. Cancellation works before or after preparation expiry, permitting
+retained recovery work to finish without waiting for an expired preparation.
+Neither expiry nor an unknown/error response grants permission to resume old keys.
+
+Migration 010 retains AES-GCM cancellation evidence with exact source/candidate
+hashes and an immutable original timestamp. It commits with audit before any reply.
+Retries after reconstruction recover the same outcome; a later generation,
+revocation or expired original source prevents old-credential recovery. A cancelled
+attempt cannot be re-prepared or confirmed, but a new signed request can follow.
+The device, broker sessions, recipient, tasks, receipts and key reservations remain.
+
+Database guards protect rolling upgrades too. They reject cancelled-certificate
+activation and contradictory confirmation/cancellation evidence. Cancellation
+publishes a new identity row version with identical field values; an older writer
+using READ COMMITTED, REPEATABLE READ or SERIALIZABLE cannot activate from a stale
+snapshot. No credential, scope, recovery or consumer transition is performed by
+that row-version change. Registry evidence is authenticated before retries or
+before ignoring cancelled history for the pending-preparation check.
+
 ## Protected endpoint journal
 
-Agent [`4b782a1`](https://github.com/the-luap/openuem-agent/commit/4b782a1b6ca3fab8ebf7e7c5c03c1236a859fe74)
-adds the [native renewal journal and caller contract](https://github.com/the-luap/openuem-agent/blob/4b782a1b6ca3fab8ebf7e7c5c03c1236a859fe74/docs/individual-identity-renewal.md).
+Agent [`e12bc24`](https://github.com/the-luap/openuem-agent/commit/e12bc24b6c3a19e6b52a05b297be13a07ddf9315)
+adds the [native renewal journal and caller contract](https://github.com/the-luap/openuem-agent/blob/e12bc24b6c3a19e6b52a05b297be13a07ddf9315/docs/individual-identity-renewal.md).
 The store preserves candidate keys and request ID before preparation, exact
 verified issuance afterward, one exclusive confirmation-or-abandonment decision,
-and verified activation before returning replacement credentials. Every record is
+and verified activation or authoritative resolution before returning selected credentials. Every record is
 bound to the original protected installation and exact ordinal/predecessor; all
 128 bounded attempt slots are checked for missing stages, gaps and later fragments.
 DPAPI and noninteractive Keychain use their existing immutable publication rules.
 
 An unresolved confirmation decision prevents `Load` from returning original
-credentials, including after cancellation, a lost server reply or original
+credentials, including after transport cancellation, a lost server reply or original
 certificate/preparation expiry. A fresh candidate proof can recover a committed
 result. Earlier confirmations cannot replace a later generation. Abandonment can
 win only before confirmation intent and cannot cancel a server reservation.
-A confirmation that never committed and has passed server expiry remains retained;
-an authoritative server cancellation/recovery contract is still needed to resolve
-that state without risking rollback or a later stale confirmation.
+`ResolveRenewal` requires an existing confirmation decision, stores the actual
+resolution proof/outcome in `renewal-resolved-v1-NNN`, then reloads and validates
+the selected identity. It never fabricates confirmation evidence. Both positive
+acknowledgements may coexist only with the same original confirmation time; the
+earliest local receipt preserves later generation ordering. A durable cancellation
+closes that attempt, but original keys remain unusable at or after their expiry.
+A missing final record retains quarantine. An older agent ignoring the new stage
+continues to fail closed on the retained confirmation decision.
 
 The original release/executable checkpoint, enrollment anchors, X25519 recipient
 key and FileVault attempt ordinals remain unchanged. Historical receipts are
@@ -97,7 +130,7 @@ durably selected identity and rejects stale journal handles or handoff uncertain
 The service must still stop and join existing credential/security users before
 confirmation and recreate its broker connection and server recipient epoch afterward.
 
-The final local native macOS race suite passes: protected store **30.632 seconds**,
+The original journal local native macOS race suite passes: protected store **30.632 seconds**,
 runtime **9.053**, bootstrap installation **1.555**, enrollment command **1.826**,
 activation **4.516**, lifecycle **1.292** and Mac service **3.456**. Tests include
 real SDK HTTP/2, both missing-response boundaries, native publication failures,
@@ -105,11 +138,17 @@ concurrent confirm/abandon decisions, source expiry, multiple generations,
 exhausted capacity and FileVault continuity. Vet, module consistency, Windows test
 compilation and Linux/Windows/native-macOS builds pass. The
 [agent journal CI](https://github.com/the-luap/openuem-agent/actions/runs/34476393712)
-was started and must be checked independently for native Windows execution.
+passes Linux, native macOS and native Windows checks for `4b782a1`. Resolution
+at `e12bc24` additionally passes the local native macOS store race suite in
+**44.678 seconds**, runtime in **9.933**, bootstrap installation in **1.558**,
+enrollment command in **1.814**, activation in **4.519**, lifecycle in **1.297**,
+Mac service entry point in **3.484** and service coordination in **2.913**. Vet,
+module consistency, Windows test compilation and all three platform builds pass.
+The new commit's native Windows CI must be checked independently.
 
 ## Registry lifecycle
 
-Desktop startup applies registry migrations 007–009 with its existing migrations.
+Desktop startup applies registry migrations 007–010 with its existing migrations.
 Preparation accepts current old-key proofs only within the 30-day renewal window,
 requires a real certificate extension and retains exact candidate issuance for
 up to 168 hours, bounded by source expiry. A fresh proof for the same request ID
@@ -123,7 +162,7 @@ certificate authentication fails after activation. Fresh broker keys reject new
 old-key connections; existing sessions have the established bounded lease and
 disconnect retry behavior. Same-key certificate renewal remains supported.
 
-Encrypted immutable issuance and confirmation records bind exact source/target
+Encrypted immutable issuance, confirmation and cancellation records bind exact source/target
 certificates, request/device IDs, scope and time. Retries after a lost commit reply
 or restart recover only the still-current confirmed generation and do not repeat
 disconnect effects. An older confirmation cannot restore a retired generation.
@@ -215,6 +254,17 @@ router/PostgreSQL test, including desktop permissions, passes in **12.097 second
 Console `3a49b79` also passes its
 [push CI](https://github.com/the-luap/openuem-console/actions/runs/34472852010) and
 [PR CI](https://github.com/the-luap/openuem-console/actions/runs/34472855743).
+
+The resolution integration passes its complete affected race suite: desktop
+**30.309 seconds**, protocol **1.298**, gateway **3.174**, authorization **3.736** and
+command service **3.788**. Tests reconstruct the real SDK and registry after lost
+confirmation/resolution replies through both direct HTTPS and the pinned gateway,
+recover concurrent exact outcomes, and reject late confirmation after cancellation.
+All three operations share the tested concurrency/shutdown, body, origin, route,
+proof and audit-rollback boundaries. A delivered encrypted read-only FileVault task
+can finish with the original certificate after authoritative cancellation; its
+recipient and signed receipt remain. Vet, tidy consistency and full Linux/Windows
+builds pass. Shared resolution proof/response fuzzing and CI also pass.
 
 These tests use disposable PostgreSQL schemas and synthetic keys/certificates.
 They do not install an agent, execute FileVault on a physical volume, contact a

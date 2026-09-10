@@ -27,7 +27,7 @@ func Parse(r *http.Request) (Route, bool) {
 		return Route{}, false
 	}
 	read := r.Method == http.MethodGet || r.Method == http.MethodHead
-	if len(p) == 7 && p[3] == "identities" && enrollment.ValidDeviceID(p[4]) && p[5] == "renewal" && (p[6] == "prepare" || p[6] == "confirm") && r.Method == http.MethodPost {
+	if len(p) == 7 && p[3] == "identities" && enrollment.ValidDeviceID(p[4]) && p[5] == "renewal" && (p[6] == "prepare" || p[6] == "confirm" || p[6] == "resolve") && r.Method == http.MethodPost {
 		return Route{Kind: "renewal-" + p[6], DeviceID: p[4]}, true
 	}
 	if len(p) == 4 && p[3] == "bootstrap-keys" && read {
