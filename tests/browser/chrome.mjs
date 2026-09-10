@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { waitForChromePort } from "./chrome-startup.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import {
@@ -187,36 +188,11 @@ export async function withChrome({ fixtureRoot, artifactRoot }, run) {
       ],
       { stdio: ["ignore", "ignore", "pipe"], detached: true },
     );
-    let startupError,
-      stderr = "";
-    chrome.stderr.on("data", (data) => {
-      stderr = (stderr + data.toString()).slice(-8192);
-    });
-    chrome.once("error", (error) => {
-      startupError = error;
-    });
     chromeExit = new Promise((resolve) => {
       chrome.once("exit", resolve);
       chrome.once("error", resolve);
     });
-    let port;
-    for (let i = 0; i < 150; i++) {
-      if (startupError) throw startupError;
-      if (chrome.exitCode !== null || chrome.signalCode !== null)
-        throw new Error("Chrome exited during startup: " + stderr);
-      try {
-        port = readFileSync(join(profile, "DevToolsActivePort"), "utf8").split(
-          "\n",
-        )[0];
-        break;
-      } catch {
-        await pause(100, undefined, { signal: abort.signal });
-      }
-    }
-    assert(
-      port && /^\d+$/.test(port),
-      "Chrome did not expose a debugging port",
-    );
+    const port = await waitForChromePort(chrome, profile, abort.signal, artifactRoot);
     const response = await fetch("http://127.0.0.1:" + port + "/json/list", {
       signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]),
     });

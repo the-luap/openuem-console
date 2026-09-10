@@ -98,6 +98,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Chrome startup lifecycle and diagnostics
+        run: node --test tests/browser/chrome-startup.test.mjs
       - name: Certificate and network forms in Chrome
         timeout-minutes: 5
         run: node tests/browser/run.mjs

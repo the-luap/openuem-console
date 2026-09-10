@@ -38,7 +38,9 @@ handler integration tests exercise persistence, authorization and actual routes.
 `BROWSER_TEST_ARTIFACTS` optionally selects the result directory. Otherwise the
 runner creates a temporary directory and prints its path. `results.json` records
 the browser/Node version, timestamps, each completed case and the overall result.
-A failure exits nonzero and attempts to save `failure.png`. The workflow preserves
+`chrome-startup.json` records the startup outcome, elapsed time, exit/signal and
+at most 8 KiB of browser stderr, including when Chrome never opens a debugging
+port. A failure exits nonzero and attempts to save `failure.png`. The workflow preserves
 results and screenshots as `apple-mdm-browser`, including on failure.
 
 ## Isolation and limits
@@ -47,7 +49,11 @@ The runner starts a loopback server on a free port, serves only the allowlisted
 synthetic pages and repository assets, and creates a temporary browser profile.
 Page requests outside that read-only origin are blocked and fail the run; form
 submissions are captured and prevented. Startup, protocol commands, navigation and
-the overall run have time limits. Cleanup terminates only the spawned browser
+the overall run have time limits. Startup observes the same owned process for at
+most 45 seconds and tolerates a temporarily empty or incomplete port file. It does
+not retry by spawning another browser. `node --test tests/browser/chrome-startup.test.mjs`
+checks delayed/partial port publication, early exit diagnostics, a live-process
+timeout and interruption using synthetic Node child processes. Cleanup terminates only the spawned browser
 process group and removes its temporary profile, including after test failures.
 The browser sandbox is not disabled.
 
