@@ -1,21 +1,21 @@
 # Individual desktop identity renewal
 
 The console pins shared registry commit
-[`07a6ac8`](https://github.com/the-luap/openuem-nats/commit/07a6ac8e2a5e07f63778b2c1f4d75e72ca7e2fa3),
+[`2840163`](https://github.com/the-luap/openuem-nats/commit/2840163f1271a5040288cfe4a178c6c804d4e274),
 which implements persistent preparation, confirmation and permanent cancellation while
 preserving device ID and organization/site. Its
-[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/07a6ac8e2a5e07f63778b2c1f4d75e72ca7e2fa3/enrollment/identity-renewal.md)
+[protocol and lifecycle documentation](https://github.com/the-luap/openuem-nats/blob/2840163f1271a5040288cfe4a178c6c804d4e274/enrollment/identity-renewal.md)
 defines proof domains, expiry bounds, permanent key ownership and retry behavior.
-The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34479270024)
+The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34490994897)
 passes native Windows checks and Linux/PostgreSQL/race/fuzz tests.
 
 The HTTPS client, console routes and pinned gateway transport are implemented,
 as are the agent's protected candidate, activation and authoritative-resolution
 journals. Agent
-[`cdffd2c`](https://github.com/the-luap/openuem-agent/commit/cdffd2cf6a38990fc4e5497187f9e4f910932511)
+[`f5fc83a`](https://github.com/the-luap/openuem-agent/commit/f5fc83ac654f21b5b4d55949f7b143c7d2d6e71c)
 now connects those components to the installed individual Windows/macOS service:
 automatic scheduling, joined credential handoff, startup recovery and complete
-broker/recipient reconstruction. The [agent lifecycle documentation](https://github.com/the-luap/openuem-agent/blob/cdffd2cf6a38990fc4e5497187f9e4f910932511/docs/individual-identity-renewal.md)
+broker/recipient reconstruction. The [agent lifecycle documentation](https://github.com/the-luap/openuem-agent/blob/12fac05417ce30e609c4e2534a5b5cccbf355c81/docs/individual-identity-renewal.md)
 describes the ownership and retry contract. Production signing, distribution and
 physical-device acceptance remain separate work; an old or unavailable server
 cannot authorize fallback during an uncertain handoff.
@@ -173,6 +173,22 @@ local initialization; [SCM cannot deliver normal stop controls in that state](ht
 The replacement loads independent protected keys and reconstructs all credential
 users. Source expiry never grants fallback.
 
+Windows activation also requires a fresh signed local readiness response from
+the exact live SCM process. Its private local-only named pipe checks native
+process/token authority and the protected device, scope, image, broker key and
+certificate deadline. `Running` during controller recovery cannot complete
+activation. The endpoint begins not ready, is marked ready after scheduler
+initialization, and joins all signing work before generation keys are released.
+See [Windows readiness](https://github.com/the-luap/openuem-agent/blob/f5fc83ac654f21b5b4d55949f7b143c7d2d6e71c/docs/windows-local-readiness.md).
+Agent `f5fc83a` passes [Linux/native Windows/native macOS CI](https://github.com/the-luap/openuem-agent/actions/runs/34493137911),
+including owned Local System/DPAPI activation and named-pipe fixtures. Portable
+and native macOS affected race checks pass locally (readiness **1.797 seconds**,
+activation **4.458**, Agent **10.633**, lifecycle **1.264**), as do Vet and full
+Linux/Windows builds. Signed installer and physical-device acceptance remain open.
+Follow-up `12fac05` also passes [all three platform jobs](https://github.com/the-luap/openuem-agent/actions/runs/34493655438);
+its Windows job explicitly requires successful execution of each native readiness
+and recovering-SCM test, so a skipped fixture cannot satisfy that check.
+
 Checks run immediately after startup and then hourly with jitter. Each request
 has a 20-second deadline; retries back off from one minute to one hour. Task and
 transport contexts end at the active leaf's expiry. Durable cancellation evidence
@@ -299,8 +315,9 @@ and key history survive the new challenge. The regression fails against library
 subset passes in **5.766 seconds**, and console resolution continuity in
 **2.822 seconds**. The `270602c`
 [library CI](https://github.com/the-luap/openuem-nats/actions/runs/34489951243)
-passes Linux/PostgreSQL/race/fuzz and native Windows checks; the timestamp follow-up
-and final console integration require their own CI results. All historical console
+passes Linux/PostgreSQL/race/fuzz and native Windows checks. The corrected timestamp
+reader `2840163` also passes [all library CI jobs](https://github.com/the-luap/openuem-nats/actions/runs/34490994897);
+final console CI is tracked separately. All historical console
 tests pass against the corrected published library in **18.115 seconds**.
 
 After handoff, original receipts, ordinals and encrypted recovery keys remain.
