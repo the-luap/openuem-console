@@ -9,13 +9,16 @@ defines proof domains, expiry bounds, permanent key ownership and retry behavior
 The [shared-library CI](https://github.com/the-luap/openuem-nats/actions/runs/34479270024)
 passes native Windows checks and Linux/PostgreSQL/race/fuzz tests.
 
-This dependency and the console integration below are implementation components.
-Automatic endpoint renewal is not enabled yet. The HTTPS client, console routes
-and pinned gateway transport are implemented, as are the agent's protected
-candidate/activation journals. Service scheduling, coordinated credential handoff,
-startup recovery, broker runtime reconnect and agent/worker/service release
-integration remain necessary. Authoritative cancellation and its native journal
-are now implemented as explicit operations.
+The HTTPS client, console routes and pinned gateway transport are implemented,
+as are the agent's protected candidate, activation and authoritative-resolution
+journals. Agent
+[`cdffd2c`](https://github.com/the-luap/openuem-agent/commit/cdffd2cf6a38990fc4e5497187f9e4f910932511)
+now connects those components to the installed individual Windows/macOS service:
+automatic scheduling, joined credential handoff, startup recovery and complete
+broker/recipient reconstruction. The [agent lifecycle documentation](https://github.com/the-luap/openuem-agent/blob/cdffd2cf6a38990fc4e5497187f9e4f910932511/docs/individual-identity-renewal.md)
+describes the ownership and retry contract. Production signing, distribution and
+physical-device acceptance remain separate work; an old or unavailable server
+cannot authorize fallback during an uncertain handoff.
 
 ## HTTPS and gateway transport
 
@@ -127,8 +130,9 @@ verified with their exact original certificate at its authenticated retirement
 time, while only the selected current certificate must remain unexpired. Historical
 reads cannot admit another mutation; new intent/result publication rechecks the
 durably selected identity and rejects stale journal handles or handoff uncertainty.
-The service must still stop and join existing credential/security users before
-confirmation and recreate its broker connection and server recipient epoch afterward.
+The service controller stops and joins existing credential/security users before
+confirmation, then constructs a fresh Agent with the selected identity, broker
+connection and server recipient registration.
 
 The original journal local native macOS race suite passes: protected store **30.632 seconds**,
 runtime **9.053**, bootstrap installation **1.555**, enrollment command **1.826**,
@@ -144,7 +148,55 @@ at `e12bc24` additionally passes the local native macOS store race suite in
 enrollment command in **1.814**, activation in **4.519**, lifecycle in **1.297**,
 Mac service entry point in **3.484** and service coordination in **2.913**. Vet,
 module consistency, Windows test compilation and all three platform builds pass.
-The new commit's native Windows CI must be checked independently.
+The resolution commit also passes
+[Linux, native macOS and Windows CI](https://github.com/the-luap/openuem-agent/actions/runs/34480704684).
+
+### Automatic service handoff
+
+The controller owns a private native process lease from initial local validation
+through recovery, all runtime generations and joined shutdown. Each Agent borrows
+that ownership. Windows holds an exclusive non-inheritable file handle and pins
+the protected directory; macOS uses a root-owned private flock. Protected native
+history exposes public installation/checkpoint metadata during quarantine, so the
+controller can verify platform, architecture and the enrolled executable before
+network recovery without releasing old keys. `Load` independently enforces current
+credential validity. Corrupt history or changed ownership/binding stops the Agent.
+
+Preparation preserves the active generation. A verified response triggers full
+joined shutdown, separate FileVault execution exclusion, confirmation and, after
+an error, authoritative resolution. Uncertain outcomes keep the Agent offline.
+Startup recovery finishes before Agent readiness. The common lifecycle separates
+an initialized recovery controller from its first usable Agent. Windows reports
+the controller `Running` and accepts SCM stop/shutdown while withholding Agent
+readiness and logging its offline state. It uses `StartPending` only for finite
+local initialization; [SCM cannot deliver normal stop controls in that state](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlserviceexw).
+The replacement loads independent protected keys and reconstructs all credential
+users. Source expiry never grants fallback.
+
+Checks run immediately after startup and then hourly with jitter. Each request
+has a 20-second deadline; retries back off from one minute to one hour. Task and
+transport contexts end at the active leaf's expiry. Durable cancellation evidence
+sets a restart-stable cooldown, normally seven days and shortened as the original
+certificate nears expiry. Prepared expiry or a seven-day-old candidate without
+confirmation may be explicitly abandoned while retaining all native records and
+server reservation guards. Confirmation intent is never abandoned. The existing
+128-attempt limit still applies.
+
+The local native macOS race suite passes with this controller: protected store
+**52.333 seconds**, agent **8.472**, service lifecycle **1.299**, Mac service
+**3.478**, FileVault security **39.286**, and the remaining bootstrap, activation,
+readiness, package, SFTP and hardware checks. Final controller changes pass a
+focused race run in **1.638 seconds**. Vet, module consistency, complete native
+macOS/Linux/Windows builds and Windows storage/controller/SCM test compilation
+pass. The original controller `bf48781` also passes
+[Linux, native macOS and Windows CI](https://github.com/the-luap/openuem-agent/actions/runs/34485183033).
+The subsequent stoppable-recovery correction `cdffd2c` passes the full affected
+native macOS race suite: agent **8.156 seconds**, lifecycle **1.182**, and Mac
+service **3.383**; Vet, all three platform builds and Windows SCM test compilation
+pass. Its [branch CI](https://github.com/the-luap/openuem-agent/actions/runs/34486258522)
+checks the actual Local System recovery/stop fixture and Windows file IDs captured
+from held handles before and after process exit; this run remains pending until
+its authoritative result is observed.
 
 ## Registry lifecycle
 
@@ -264,7 +316,10 @@ All three operations share the tested concurrency/shutdown, body, origin, route,
 proof and audit-rollback boundaries. A delivered encrypted read-only FileVault task
 can finish with the original certificate after authoritative cancellation; its
 recipient and signed receipt remain. Vet, tidy consistency and full Linux/Windows
-builds pass. Shared resolution proof/response fuzzing and CI also pass.
+builds pass. Shared resolution proof/response fuzzing and CI also pass. Console
+`da07f38` passes both its
+[push CI](https://github.com/the-luap/openuem-console/actions/runs/34480897518) and
+[PR CI](https://github.com/the-luap/openuem-console/actions/runs/34480901938).
 
 These tests use disposable PostgreSQL schemas and synthetic keys/certificates.
 They do not install an agent, execute FileVault on a physical volume, contact a

@@ -516,8 +516,10 @@ remove P2 from the user's instruction to implement the entire plan.
 Desktop PKI-01 implementation evidence is tracked in
 [the identity renewal lifecycle](desktop-identity-renewal.md): persistent issuance,
 activation, authoritative cancellation, protected native decisions and retained
-FileVault history are implemented and tested. Automatic service handoff/reconnect,
-release integration and physical-device acceptance remain open.
+FileVault history are implemented and tested. The installed individual-agent
+service now adds automatic scheduling, joined handoff/reconnect, startup recovery
+and native process ownership. Production release integration, historical server
+reconciliation and physical-device acceptance remain open.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
