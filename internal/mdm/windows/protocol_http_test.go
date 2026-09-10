@@ -235,13 +235,18 @@ func TestWindowsProtocolGatewayEnrollmentAndScheduledUpdate(t *testing.T) {
 	go func() { defer close(done); s.RunUpdateSchedules(worker, nil) }()
 	t.Cleanup(func() { stop(); <-done })
 	var rolloutID string
-	deadline := time.NewTimer(5 * time.Second)
+	deadline := time.NewTimer(15 * time.Second)
 	defer deadline.Stop()
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
 	for rolloutID == "" {
-		read := updateTestScheduleRead(t, f, schedule.ID)
-		rolloutID = read.RolloutID
+		// Observe committed fixture metadata without the console reader's FOR
+		// SHARE lock. That reader can make the worker's SKIP LOCKED pass skip
+		// this plan and wait its normal 15-second polling interval, especially
+		// on a loaded CI runner. Validate the protected public read afterward.
+		if err := s.db.QueryRowContext(t.Context(), `SELECT COALESCE(rollout_id::text,'') FROM mdm_windows_update_schedules WHERE id=$1`, schedule.ID).Scan(&rolloutID); err != nil {
+			t.Fatal(err)
+		}
 		if rolloutID != "" {
 			break
 		}
@@ -253,6 +258,9 @@ func TestWindowsProtocolGatewayEnrollmentAndScheduledUpdate(t *testing.T) {
 	}
 	stop()
 	<-done
+	if read := updateTestScheduleRead(t, f, schedule.ID); read.Phase != "activated" || read.RolloutID != rolloutID {
+		t.Fatal("activated schedule failed protected console read")
+	}
 	rollout, err := s.UpdateRolloutDetails(t.Context(), "operator", f.identity.Scope, rolloutID)
 	if err != nil {
 		t.Fatal(err)
