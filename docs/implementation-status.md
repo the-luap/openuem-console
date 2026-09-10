@@ -61,6 +61,37 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [reference composition](reference-composition.md) now runs seven separate
+  distribution containers with explicit private networks and credential mounts.
+  Its isolated Linux arm64 acceptance passes generated setup/database bootstrap,
+  gateway administrator source admission and forwarding-header rejection,
+  distinct Apple/desktop/Windows public listeners, real WSS broker authorization,
+  scoped worker mutation and durable command-consumer reconciliation. Actual
+  runtime inspection verifies exact mount recipients, privileges, network
+  membership, no published ports and no raw encryption/database environment
+  values; public clients cannot connect directly to private backend sockets.
+  All seven services stop successfully and restart with retained administrator,
+  device and JetStream state. Revocation disconnects a live WSS session and
+  subsequent connection receives an explicit broker authorization denial.
+  The publication overlay is validated as TCP 443 to gateway 8443 but is not
+  started by the fixture. Guided installer/provider/administrator-authority
+  setup, host firewall/IPv6 acceptance, restore and physical devices remain open.
+- Composition exposed a stale shared-library pin in the broker initializer:
+  its worker grant omitted `hardware`, `recovery` and `rotation`. The initializer
+  [update e7525ad](https://github.com/the-luap/openuem-cert-manager/commit/e7525ad161cc06323e8cc7573f1d6525379d88a7)
+  uses the current protocol and adds an exact worker-subscription regression
+  that fails with the old pin and passes with the update. Broker/race, private
+  PKI/CLI, vet and Windows cross-build checks pass locally. Console CI pins this
+  revision for all private setup tests. Installed broker files remain immutable
+  on ordinary retry; existing-configuration upgrade/reload is still separate work.
+- Native Windows management now accepts a protected
+  `WINDOWS_MDM_MASTER_KEY_FILE`, preserving the canonical Base64 key format and
+  rejecting conflicting sources, missing/unprotected files and malformed input.
+  File-input, existing configuration/lifecycle tests, the full reference listener
+  startup, Linux/Windows vet and Windows cross-build pass. The native console
+  workflow includes the new protected-file tests. The preceding
+  [81ddd66 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34531904715)
+  passes on Linux amd64, Linux arm64 and Windows.
 - The [private broker reference image](broker-container.md) builds the stock
   NATS 2.14.6 command from this repository's pinned module graph into a non-root
   scratch runtime. The exact executable/license audit and offline version/help
@@ -87,8 +118,8 @@ the table's package summaries do not remove any detail from the roadmap.
   all three private services), Windows cross-build and Linux/Windows vet pass
   locally. The fixture keeps a separate synthetic
   administrator CA and does not claim certificate login/OCSP or physical-device
-  acceptance. Native CI now requires these image and process checks. Full
-  composition, persistent log operations and administrator authority integration
+  acceptance. Native CI now requires these image and process checks. Complete
+  installer orchestration, persistent log operations and administrator authority integration
   remain open.
 - The preceding private service distribution pipeline
   [passes](https://github.com/the-luap/openuem-console/actions/runs/34526398961),

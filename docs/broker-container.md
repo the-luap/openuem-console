@@ -68,6 +68,8 @@ The local Linux arm64 image audit, complete PostgreSQL suite and affected vet
 checks pass with the stock distribution executable.
 
 Native Linux amd64 and arm64 console CI requires the image and process checks.
-The fixture uses one isolated container for its processes; separate container
-mount/network boundaries, a complete installation/restore workflow, public
-firewall/source-address proof and physical endpoint acceptance remain open.
+The process fixture uses one isolated container. Separate container mount/network
+boundaries and live WSS revocation are checked by the
+[reference composition](reference-composition.md). A complete installation/restore
+workflow, public firewall/source-address proof and physical endpoint acceptance
+remain open.

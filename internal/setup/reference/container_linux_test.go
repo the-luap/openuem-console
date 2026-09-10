@@ -1,0 +1,433 @@
+//go:build linux
+
+package reference
+
+import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"io"
+	"math/big"
+	"net"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/ent/agent"
+	"github.com/open-uem/ent/wingetconfigexclusion"
+	openuem "github.com/open-uem/nats"
+	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/keyfile"
+	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/nats/enrollment/servicecredentials"
+)
+
+func fixture(t *testing.T) {
+	t.Helper()
+	if os.Getenv("OPENUEM_REFERENCE_FIXTURE") != "1" {
+		t.Skip("requires the isolated reference composition runner")
+	}
+	if os.Geteuid() == 0 {
+		t.Fatal("reference fixture must run without root")
+	}
+}
+
+func write(t *testing.T, path string, data []byte) {
+	t.Helper()
+	if err := keyfile.Create(path, data); err != nil {
+		t.Fatal("cannot create a protected reference fixture input")
+	}
+}
+
+// These public/admin certificates and signing keys are synthetic acceptance
+// inputs. They are not an administrator authority or public ACME provisioner.
+func TestReferencePrepare(t *testing.T) {
+	fixture(t)
+	makeCA := func(name string) (*x509.Certificate, *ecdsa.PrivateKey, []byte) {
+		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 120))
+		certificate := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: name},
+			NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour), IsCA: true,
+			BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
+		der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, &key.PublicKey, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, _ := x509.ParseCertificate(der)
+		return parsed, key, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	}
+	ca, caKey, caPEM := makeCA("Reference public TLS fixture")
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf := &x509.Certificate{SerialNumber: big.NewInt(2), DNSNames: []string{"uem.example.test"},
+		NotBefore: ca.NotBefore, NotAfter: ca.NotAfter, KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, leaf, ca, &leafKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	private, _ := x509.MarshalPKCS8PrivateKey(leafKey)
+	write(t, "/state/public/server.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	write(t, "/state/public/server.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private}))
+	write(t, "/state/public-ca.pem", caPEM)
+	_, _, adminCA := makeCA("Independent administrator fixture")
+	write(t, "/state/administrator-ca.pem", adminCA)
+	windowsKey := make([]byte, 32)
+	if _, err := rand.Read(windowsKey); err != nil {
+		t.Fatal(err)
+	}
+	defer clear(windowsKey)
+	write(t, "/state/windows.key", []byte(base64.StdEncoding.EncodeToString(windowsKey)))
+	_, bootstrap, _ := ed25519.GenerateKey(rand.Reader)
+	defer clear(bootstrap)
+	encoded, _ := x509.MarshalPKCS8PrivateKey(bootstrap)
+	write(t, "/state/desktop-bootstrap.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: encoded}))
+	release, signing, _ := ed25519.GenerateKey(rand.Reader)
+	defer clear(signing)
+	encoded, _ = x509.MarshalPKIXPublicKey(release)
+	write(t, "/state/release-keys.pem", pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: encoded}))
+}
+
+func TestReferenceIdle(t *testing.T) {
+	fixture(t)
+	ctx, stop := signal.NotifyContext(t.Context(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	<-ctx.Done()
+}
+
+func roots(t *testing.T) *x509.CertPool {
+	t.Helper()
+	data, err := os.ReadFile("/trust.pem")
+	pool := x509.NewCertPool()
+	if err != nil || !pool.AppendCertsFromPEM(data) {
+		t.Fatal("reference client trust is unavailable")
+	}
+	return pool
+}
+
+func client(t *testing.T) *http.Client {
+	t.Helper()
+	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots(t)}, DisableKeepAlives: true}
+	t.Cleanup(transport.CloseIdleConnections)
+	jar, _ := cookiejar.New(nil)
+	return &http.Client{Transport: transport, Jar: jar, Timeout: 2 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+func request(t *testing.T, client *http.Client, path string, form url.Values) (int, string, string) {
+	t.Helper()
+	method := http.MethodGet
+	var body io.Reader
+	if form != nil {
+		method, body = http.MethodPost, strings.NewReader(form.Encode())
+	}
+	origin := "https://uem.example.test:8443"
+	req, _ := http.NewRequestWithContext(t.Context(), method, origin+path, body)
+	req.Header.Set("Accept-Language", "en")
+	if claimed := os.Getenv("OPENUEM_REFERENCE_FORGED_SOURCE"); claimed != "" {
+		req.Header.Set("X-Forwarded-For", claimed)
+		req.Header.Set("X-Real-IP", claimed)
+		req.Header.Set("Forwarded", "for="+claimed)
+	}
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", origin)
+		for _, cookie := range client.Jar.Cookies(req.URL) {
+			if cookie.Name == "__Host-openuem-csrf" {
+				req.Header.Set("X-CSRF-Token", cookie.Value)
+			}
+		}
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return 0, "", ""
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(response.Body, 512<<10))
+	if err != nil {
+		t.Fatal("reference HTTP response could not be read")
+	}
+	return response.StatusCode, string(data), response.Header.Get("Location")
+}
+
+func TestReferenceAdministrator(t *testing.T) {
+	fixture(t)
+	client := client(t)
+	ready := false
+	lastStatus := 0
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); {
+		status, body, _ := request(t, client, "/login", nil)
+		lastStatus = status
+		if status == http.StatusOK && strings.Contains(body, `name="username"`) {
+			ready = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !ready {
+		t.Fatalf("private administrator source did not reach the actual console through the gateway (HTTP %d)", lastStatus)
+	}
+	const replacement = "Reference-Administrator-Replacement-Password-123!"
+	if os.Getenv("OPENUEM_REFERENCE_RESTART") != "1" {
+		password, err := keyfile.Read("/initial-password", 128)
+		if err != nil {
+			t.Fatal("initial administrator fixture password is unavailable")
+		}
+		defer clear(password)
+		status, body, _ := request(t, client, "/login/userpass", url.Values{"username": {"first-admin"}, "password": {string(password)}})
+		if status != http.StatusOK || !strings.Contains(body, "confirm-password") {
+			t.Fatal("reference first login did not require password replacement")
+		}
+		status, body, _ = request(t, client, "/login/changepass", url.Values{"password": {replacement}, "confirm-password": {replacement}})
+		if status != http.StatusOK || !strings.Contains(body, `name="username"`) {
+			t.Fatal("reference administrator password replacement failed")
+		}
+	}
+	status, _, location := request(t, client, "/login/userpass", url.Values{"username": {"first-admin"}, "password": {replacement}})
+	if status != http.StatusFound || !strings.HasPrefix(location, "https://uem.example.test:8443/tenant/") || !strings.HasSuffix(location, "/dashboard") {
+		t.Fatal("reference console did not accept the retained administrator password")
+	}
+}
+
+func TestReferencePublicRoutes(t *testing.T) {
+	fixture(t)
+	client := client(t)
+	if status, _, _ := request(t, client, "/login", nil); status != http.StatusForbidden {
+		t.Fatal("unapproved source or forged forwarding headers reached administration")
+	}
+	for _, path := range []string{"/EnrollmentServer/Discovery.svc", "/enroll/desktop/bootstrap-keys"} {
+		if status, _, _ := request(t, client, path, nil); status != http.StatusOK {
+			t.Fatal("public native Windows or desktop listener is not routed through the gateway", path, status)
+		}
+	}
+	status, _, _ := request(t, client, "/mdm/apple/enroll/"+strings.Repeat("A", 43), nil)
+	if status != http.StatusNotFound && status != http.StatusGone {
+		t.Fatal("public Apple listener did not reject an unknown enrollment through the gateway", status)
+	}
+}
+
+func TestReferenceNetworkIsolation(t *testing.T) {
+	fixture(t)
+	addresses := strings.Split(os.Getenv("OPENUEM_REFERENCE_PRIVATE_TARGETS"), ",")
+	if len(addresses) < 4 {
+		t.Fatal("private network targets are incomplete")
+	}
+	for _, address := range addresses {
+		connection, err := net.DialTimeout("tcp", address, 500*time.Millisecond)
+		if err == nil {
+			connection.Close()
+			t.Fatal("public edge client reached a private backend socket")
+		}
+	}
+}
+
+type deviceRecord struct {
+	ID string
+	registry.Scope
+}
+
+func TestReferenceRegistry(t *testing.T) {
+	fixture(t)
+	dsn, err := servicecredentials.DatabaseURL("", "/run/database.url")
+	if err != nil {
+		t.Fatal("reference database credential is unavailable")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal("reference database could not open")
+	}
+	defer db.Close()
+	master, err := servicecredentials.EncryptionKey("", "/run/encryption.key")
+	if err != nil {
+		t.Fatal("reference registry key is unavailable")
+	}
+	store, err := registry.NewStore(db, master)
+	if err != nil {
+		t.Fatal("reference registry is unavailable")
+	}
+	ctx := t.Context()
+	var record deviceRecord
+	action := os.Getenv("OPENUEM_REFERENCE_ACTION")
+	if action == "enroll" {
+		if err := db.QueryRowContext(ctx, `SELECT tenant_sites,id FROM sites ORDER BY id LIMIT 1`).Scan(&record.TenantID, &record.SiteID); err != nil {
+			t.Fatal("console did not initialize the reference organization and site")
+		}
+		if _, err = store.EnsureAuthority(ctx, record.TenantID, "Reference", "https://uem.example.test:8443", "first-admin", nil, nil); err != nil {
+			t.Fatal("cannot initialize the synthetic organization enrollment authority")
+		}
+		invitation, err := store.Invite(ctx, registry.InvitationOptions{Scope: record.Scope, Platform: "windows", Architecture: "amd64", MaxUses: 1, ExpiresAt: time.Now().Add(time.Hour)}, "first-admin")
+		if err != nil {
+			t.Fatal("cannot create synthetic device invitation")
+		}
+		keys, err := enrollment.GenerateKeys()
+		if err != nil {
+			t.Fatal("cannot create synthetic endpoint keys")
+		}
+		defer keys.Broker.Wipe()
+		claim, err := keys.Request(invitation.URL[strings.LastIndex(invitation.URL, "/")+1:], "windows", "amd64", "Reference endpoint")
+		if err != nil {
+			t.Fatal("synthetic endpoint key proof failed")
+		}
+		issued, err := store.Claim(ctx, *claim)
+		if err != nil {
+			t.Fatal("synthetic registry claim failed")
+		}
+		record.ID = issued.DeviceID
+		orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+		if _, err := orm.Agent.Create().SetID(record.ID).SetOs("windows").SetHostname("Reference endpoint").SetIP("192.0.2.1").SetMAC("02:00:00:00:00:01").SetWan("192.0.2.1").AddSiteIDs(record.SiteID).Save(ctx); err != nil {
+			t.Fatal("cannot prepare scoped synthetic agent inventory")
+		}
+		seed, _ := keys.Broker.Seed()
+		defer clear(seed)
+		write(t, "/device/broker.seed", seed)
+		encoded, _ := json.Marshal(record)
+		write(t, "/device/record.json", encoded)
+	} else {
+		data, err := os.ReadFile("/device/record.json")
+		if err != nil || json.Unmarshal(data, &record) != nil {
+			t.Fatal("synthetic endpoint record is unavailable")
+		}
+		orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+		count, err := orm.WingetConfigExclusion.Query().Where(wingetconfigexclusion.HasOwnerWith(agent.ID(record.ID))).Count(ctx)
+		if err != nil || count != 1 {
+			t.Fatal("scoped device request did not persist exactly one worker mutation")
+		}
+		if action == "revoke" {
+			if store.RevokeIdentity(ctx, record.Scope, record.ID, "first-admin") != nil {
+				t.Fatal("synthetic endpoint revocation failed")
+			}
+		} else if action != "verify" {
+			t.Fatal("unknown reference registry action")
+		}
+	}
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); {
+		var desired, complete bool
+		err := db.QueryRowContext(ctx, `SELECT desired_active,revision=completed_revision FROM uem_agent_command_consumers WHERE device_id=$1`, record.ID).Scan(&desired, &complete)
+		if err == nil && complete && desired == (action != "revoke") {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("separate command provisioner did not reconcile the device consumer")
+}
+
+func TestReferenceDevice(t *testing.T) {
+	fixture(t)
+	var record deviceRecord
+	data, err := os.ReadFile("/device/record.json")
+	if err != nil || json.Unmarshal(data, &record) != nil {
+		t.Fatal("synthetic endpoint record is unavailable")
+	}
+	seed, err := keyfile.Read("/device/broker.seed", 512)
+	if err != nil {
+		t.Fatal("synthetic endpoint key is unavailable")
+	}
+	defer clear(seed)
+	key, err := nkeys.FromSeed(seed)
+	if err != nil {
+		t.Fatal("synthetic endpoint key is invalid")
+	}
+	defer key.Wipe()
+	public, _ := key.PublicKey()
+	inbox, _ := enrollment.ReplyPrefix(record.ID)
+	closed := make(chan struct{})
+	connection, err := nats.Connect("wss://uem.example.test:8443/agent-channel", nats.Nkey(public, key.Sign),
+		nats.CustomInboxPrefix(inbox), nats.Secure(&tls.Config{RootCAs: roots(t)}), nats.NoReconnect(),
+		nats.Timeout(5*time.Second), nats.ClosedHandler(func(*nats.Conn) { close(closed) }))
+	if os.Getenv("OPENUEM_REFERENCE_ACTION") == "denied" {
+		if err == nil {
+			connection.Close()
+			t.Fatal("revoked endpoint reconnected through the public gateway")
+		}
+		if !errors.Is(err, nats.ErrAuthorization) {
+			t.Fatal("revoked endpoint did not receive an explicit broker authorization denial")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatal("individual endpoint did not authenticate through gateway WSS and the authorization service")
+	}
+	defer connection.Close()
+	subject, _ := enrollment.RequestSubject(record.ID, "wingetcfg.exclude")
+	body, _ := json.Marshal(openuem.DeployAction{AgentId: record.ID, PackageId: "reference-fixture-package"})
+	response, err := connection.Request(subject, body, 5*time.Second)
+	if err != nil || len(response.Data) != 0 {
+		t.Fatal("public endpoint request did not reach its authorized worker mutation")
+	}
+	if os.Getenv("OPENUEM_REFERENCE_ACTION") == "hold" {
+		write(t, filepath.Join("/ready", "connected"), []byte("ready"))
+		select {
+		case <-closed:
+		case <-time.After(30 * time.Second):
+			t.Fatal("revocation did not disconnect the live public WSS session")
+		}
+	}
+}
+
+func TestReferenceHealth(t *testing.T) {
+	fixture(t)
+	client := &http.Client{Timeout: time.Second}
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); {
+		response, err := client.Get(os.Getenv("OPENUEM_REFERENCE_HEALTH_URL"))
+		if err == nil {
+			response.Body.Close()
+			if response.StatusCode == http.StatusNoContent {
+				return
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("private service health did not become ready")
+}
+
+func TestReferenceBrokerReady(t *testing.T) {
+	fixture(t)
+	seed, err := keyfile.Read("/run/broker.seed", 512)
+	if err != nil {
+		t.Fatal("private broker probe identity is unavailable")
+	}
+	defer clear(seed)
+	key, err := nkeys.FromSeed(seed)
+	if err != nil {
+		t.Fatal("private broker probe identity is invalid")
+	}
+	defer key.Wipe()
+	public, _ := key.PublicKey()
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); {
+		connection, err := nats.Connect("tls://broker.internal:4222", nats.Nkey(public, key.Sign),
+			nats.RootCAs("/run/backend-ca.pem"), nats.NoReconnect(), nats.Timeout(time.Second))
+		if err == nil {
+			connection.Close()
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("private broker did not become ready for an authenticated service")
+}

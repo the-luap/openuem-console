@@ -56,5 +56,7 @@ The test chooses a temporary account-owned directory. It does not create a host
 service account, configure persistent installation paths, migrate existing file
 ownership or prove complete service composition. A deployment must deliberately
 choose its dedicated account, prepare trusted parents and persist separate state
-and backups. Automatic installer preparation, administrator/device authorities,
-complete reference composition and restore acceptance remain open.
+and backups. The [reference composition](reference-composition.md) adds separate
+service containers, actual mount/network inspection and retained-state restart.
+Automatic installer preparation, administrator/device authority operations and
+restore acceptance remain open.

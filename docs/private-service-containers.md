@@ -69,6 +69,8 @@ is covered separately by the offline audit; this is not a full multi-container
 installation or ownership migration test.
 
 Local native Linux arm64 checks pass for all three image boundaries and the
-combined distribution-executable fixture (6.69 seconds). Full service composition,
-console/admin authority integration, installation/restore acceptance and signed
+combined distribution-executable fixture (6.69 seconds). The separate
+[reference composition](reference-composition.md) now checks actual runtime
+mount/network boundaries, a WSS worker mutation and live device revocation.
+Administrator authority integration, guided installation/restore acceptance and signed
 release publication remain open in the [implementation ledger](implementation-status.md).

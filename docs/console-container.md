@@ -108,6 +108,8 @@ authorization, command and worker processes. Windows cross-build and affected
 Linux/Windows vet checks pass. The console process
 fixture runs as its PostgreSQL container account with matching writable runtime
 mounts; the image-default UID and libraries are checked separately in the image
-audit/smoke. These checks do not yet prove complete multi-container reference
-composition, administrator certificate issuance/OCSP, provider connectivity,
-physical endpoint acceptance or complete installation/restore operations.
+audit/smoke. Separate-container wiring now has its own
+[reference composition acceptance](reference-composition.md). Administrator
+certificate issuance/OCSP, provider connectivity,
+physical endpoint acceptance and complete installation/restore operations
+still require their own acceptance evidence.
