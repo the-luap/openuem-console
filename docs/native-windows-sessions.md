@@ -4,17 +4,19 @@
 [direct TLS identity](native-windows-management.md) and the encrypted credentials
 created by [WSTEP enrollment](native-windows-enrollment.md). It persists an
 authenticated exchange and an initial read-only `Get ./DevInfo/DevId` probe.
-It is not registered in a production gateway or console enrollment flow yet.
+The optional [listener/gateway integration](native-windows-operations.md)
+registers this service with direct or pinned gateway TLS; console forms remain open.
 The [CSP command extension](native-windows-csp.md) adds administrative queues and
 correlated results. The [typed update extension](native-windows-updates.md) adds
 platform preflight and separate effective-policy read-back. Broader policies,
-update rings, certificate renewal and unenrollment remain open. WIN-02 remains
+automatic ring promotion, certificate renewal and unenrollment remain open. WIN-02 remains
 in progress.
 
 ## HTTP and authorization
 
 The handler accepts POST at the configured HTTPS host and path, with a completed
-direct TLS 1.2 or 1.3 handshake and the enrolled client leaf certificate. It
+TLS 1.2 or 1.3 handshake and the enrolled client leaf certificate, resolved from
+direct TLS or the explicitly pinned gateway. It
 requires `application/vnd.syncml.dm+xml`, optionally with `charset=utf-8`.
 Encoded path aliases, queries, redirects, other content parameters, content
 encoding and WBXML are rejected. The owner must configure TLS client certificate
@@ -159,6 +161,6 @@ Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-cr
 All certificates and device messages are synthetic; no Windows profile or
 certificate has been installed on the host. No physical Windows device has
 completed acceptance. The CSP extension adds scoped queues and audited result
-reads. Remaining work includes command/result views, configuration/update
-policies, enrollment console and gateway wiring,
+reads. Remaining work includes command/result views, broader configuration/update
+policies, enrollment console forms,
 renewal/unenrollment, recovery, Entra/Autopilot and hardware acceptance.

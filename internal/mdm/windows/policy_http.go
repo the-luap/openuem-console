@@ -8,9 +8,8 @@ import (
 )
 
 // PolicyHandler exposes the OnPremise XCEP operation against the durable store.
-// It is not registered on the production gateway until WSTEP and provisioning
-// are available. Its owner must configure TLS, bounded headers, request admission
-// and read/write timeouts; forwarded headers cannot establish endpoint authority.
+// ProtocolHandler supplies production TLS, gateway trust, bounded headers,
+// request admission and timeouts. Headers cannot change endpoint authority.
 type PolicyHandler struct {
 	store *Store
 	url   string

@@ -51,6 +51,12 @@ The current public allowlist contains only:
   `/enroll/desktop/<canonical token>/configuration`, when `--desktop-url` is configured
 - `GET` and `HEAD /enroll/desktop/releases/<release digest>/<platform>/<architecture>`
   when `--desktop-url` is configured; exact supported targets and no query parameters
+- `GET`, `HEAD` and `POST /EnrollmentServer/Discovery.svc`, when `--windows-url` is configured
+- `POST /EnrollmentServer/Policy.svc`, `/EnrollmentServer/Enrollment.svc` and
+  `/mdm/windows/syncml`, when `--windows-url` is configured; no query parameters or path aliases
+
+See [native Windows operations](native-windows-operations.md) for its optional
+private listener, pinned gateway identity and durable schedule worker.
 
 See [desktop protocol operations](desktop-public-protocol.md) for its independent
 private TLS listener, JSON proof, separate configuration/release signatures, read-only downloads,

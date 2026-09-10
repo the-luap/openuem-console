@@ -7,10 +7,9 @@ import (
 	"net/http"
 )
 
-// DiscoveryHandler is an immutable, read-only protocol handler. It is not
-// registered on the production gateway until authenticated enrollment exists.
-// Its owner must provide TLS, header/read/write timeouts and request admission
-// limits. Forwarded headers are never a substitute for TLS or the configured URL.
+// DiscoveryHandler is an immutable, read-only protocol handler. ProtocolHandler
+// provides production TLS, gateway trust, HTTP timeouts and request admission.
+// Forwarded headers never change the configured endpoint URL.
 type DiscoveryHandler struct {
 	url     string
 	options DiscoveryOptions

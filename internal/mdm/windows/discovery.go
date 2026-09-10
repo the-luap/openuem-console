@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/open-uem/openuem-console/internal/mdm/windows/protocol"
 )
 
 const (
 	EnrollmentNamespace     = "http://schemas.microsoft.com/windows/management/2012/01/enrollment"
-	DiscoveryPath           = "/EnrollmentServer/Discovery.svc"
+	DiscoveryPath           = protocol.DiscoveryPath
 	DiscoveryAction         = EnrollmentNamespace + "/IDiscoveryService/Discover"
 	DiscoveryResponseAction = DiscoveryAction + "Response"
 	MaxDiscoveryBytes       = 128 << 10

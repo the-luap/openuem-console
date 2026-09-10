@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/open-uem/openuem-console/internal/desktop/protocol"
+	windowsprotocol "github.com/open-uem/openuem-console/internal/mdm/windows/protocol"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
@@ -30,7 +31,9 @@ type Config struct {
 	AgentURL             string
 	AgentConnectionLimit int
 	// DesktopURL enables only the public installer metadata, claim and download routes.
-	DesktopURL    string
+	DesktopURL string
+	// WindowsURL enables only the four exact native Windows protocol endpoints.
+	WindowsURL    string
 	AdminNetworks []netip.Prefix
 	BackendTLS    *tls.Config
 }
@@ -70,7 +73,7 @@ func New(config Config) (*Gateway, error) {
 	}
 	g := &Gateway{connections: make(map[net.Conn]struct{}), slots: make(chan struct{}, limit)}
 	addresses := []string{config.AppleURL, config.ConsoleURL, config.AuthURL}
-	agentIndex, desktopIndex := -1, -1
+	agentIndex, desktopIndex, windowsIndex := -1, -1, -1
 	if config.AgentURL != "" {
 		agentIndex = len(addresses)
 		addresses = append(addresses, config.AgentURL)
@@ -78,6 +81,10 @@ func New(config Config) (*Gateway, error) {
 	if config.DesktopURL != "" {
 		desktopIndex = len(addresses)
 		addresses = append(addresses, config.DesktopURL)
+	}
+	if config.WindowsURL != "" {
+		windowsIndex = len(addresses)
+		addresses = append(addresses, config.WindowsURL)
 	}
 	downloads := make(chan struct{}, 16)
 	proxies := make([]http.Handler, len(addresses))
@@ -136,6 +143,10 @@ func New(config Config) (*Gateway, error) {
 		}
 		if appleDeviceRoute(r) {
 			proxies[0].ServeHTTP(w, r)
+			return
+		}
+		if windowsIndex >= 0 && windowsprotocol.Public(r) {
+			proxies[windowsIndex].ServeHTTP(w, r)
 			return
 		}
 		if config.AgentURL != "" && r.URL.Path == "/agent-channel" {

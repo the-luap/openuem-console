@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
 var ErrManagementIdentity = errors.New("native Windows management device authentication failed")
@@ -74,6 +75,10 @@ func (s *Store) AuthenticateManagementDevice(r *http.Request, options Enrollment
 }
 
 func managementPeerCertificate(r *http.Request, options EnrollmentOptions) (*x509.Certificate, error) {
+	return managementPeerCertificateWithIdentity(r, options, clientidentity.Policy{})
+}
+
+func managementPeerCertificateWithIdentity(r *http.Request, options EnrollmentOptions, identity clientidentity.Policy) (*x509.Certificate, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
@@ -85,9 +90,16 @@ func managementPeerCertificate(r *http.Request, options EnrollmentOptions) (*x50
 	if state == nil || !state.HandshakeComplete || (state.Version != tls.VersionTLS12 && state.Version != tls.VersionTLS13) || len(state.PeerCertificates) == 0 || len(state.PeerCertificates) > 8 || state.PeerCertificates[0] == nil {
 		return nil, ErrManagementIdentity
 	}
-	// Reparse the actual leaf bytes. Subject fields, later chain elements and
-	// VerifiedChains supplied by middleware cannot substitute another identity.
-	der := state.PeerCertificates[0].Raw
+	// Direct mode ignores identity headers. Gateway mode requires the exact
+	// pinned TLS peer and one canonical RFC 9440 certificate. Never synthesize
+	// TLS state by substituting the forwarded certificate for the actual peer.
+	peer, err := identity.Certificate(r)
+	if err != nil {
+		return nil, ErrManagementIdentity
+	}
+	// Reparse leaf bytes; caller-mutated fields and VerifiedChains cannot
+	// substitute another identity. Issuer/scope/revocation checks follow in SQL.
+	der := peer.Raw
 	if len(der) == 0 || len(der) > MaxEnrollmentCSRBytes {
 		return nil, ErrManagementIdentity
 	}

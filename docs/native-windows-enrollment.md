@@ -3,9 +3,11 @@
 The initial OnPremise WSTEP backend in [`internal/mdm/windows`](../internal/mdm/windows)
 now verifies device CSRs, issues scoped client certificates and persists encrypted
 provisioning with exact retries. It builds on the [discovery, credential and CA
-services](native-windows-mdm.md). WIN-02 remains in progress: production gateway/UI
-wiring, authenticated SyncML sessions, CSP commands/results, update workflows,
-renewal/unenrollment and physical Windows acceptance are still open. Issuing a
+services](native-windows-mdm.md). The optional
+[listener and gateway](native-windows-operations.md) now connect these services
+to authenticated SyncML, CSP commands/results and scheduled update policies.
+WIN-02 remains in progress: console forms, renewal/unenrollment, broader policy
+workflows and physical Windows acceptance are still open. Issuing a
 certificate does not mark a device as successfully managed.
 
 ## Request and proof boundaries

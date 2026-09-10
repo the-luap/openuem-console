@@ -5,8 +5,9 @@ OMA DM digest primitives and a [SyncML XML codec](native-windows-syncml.md).
 They build on [initial certificate enrollment and
 encrypted provisioning](native-windows-enrollment.md). The subsequent
 [session service](native-windows-sessions.md) persists authentication, nonces and
-a read-only probe. Administrative command/result processing and production gateway
-registration remain open. These authentication primitives do not report a managed device,
+a read-only probe. Subsequent [CSP processing](native-windows-csp.md) and
+[listener/gateway integration](native-windows-operations.md) use these checks.
+These authentication primitives do not report a managed device,
 create a session or execute a CSP operation.
 
 ## Direct TLS identity
@@ -112,6 +113,6 @@ go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=30s -parallel=2 ./internal/md
 Set the database environment variable according to the
 [reserved fixture instructions](native-windows-mdm.md#scoped-enrollment-credentials).
 The [CSP extension](native-windows-csp.md) adds administrative command queues and
-correlated results. Remaining work includes their console views, typed update workflows, enrollment
-console and gateway wiring, certificate renewal/unenrollment, key rotation,
+correlated results. Remaining work includes their console views, broader typed workflows, enrollment
+console forms, certificate renewal/unenrollment, key rotation,
 backup/restore and physical Windows acceptance. WIN-02 remains in progress.

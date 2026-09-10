@@ -56,8 +56,8 @@ func NewStoreWithMasterKey(db *sql.DB, masterKey string) (*Store, error) {
 var migrations embed.FS
 
 // Migrate only adds native Windows tables. The upstream organization/site/user
-// schema and console access migrations must already exist. Native Windows MDM
-// has no production startup registration yet.
+// schema and console access migrations must already exist. The optional native
+// Windows listener initializes this store after access migrations during startup.
 func (s *Store) Migrate(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

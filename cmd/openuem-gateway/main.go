@@ -39,6 +39,7 @@ func run() error {
 	auth := flag.String("auth-url", "", "Private certificate login HTTPS origin")
 	agent := flag.String("agent-url", "", "Optional private NATS WebSocket HTTPS origin")
 	desktop := flag.String("desktop-url", "", "Optional private desktop enrollment HTTPS origin")
+	windows := flag.String("windows-url", "", "Optional private native Windows MDM HTTPS origin")
 	agentLimit := flag.Int("agent-connection-limit", 4096, "Maximum simultaneous agent upgrades and streams")
 	admin := flag.String("admin-networks", "", "Comma-separated administrator source CIDRs (for example VPN networks)")
 	flag.Parse()
@@ -64,7 +65,7 @@ func run() error {
 	}
 	handler, err := gateway.New(gateway.Config{
 		PublicOrigin: *origin, AppleURL: *apple, ConsoleURL: *console, AuthURL: *auth,
-		AgentURL: *agent, AgentConnectionLimit: *agentLimit, DesktopURL: *desktop,
+		AgentURL: *agent, AgentConnectionLimit: *agentLimit, DesktopURL: *desktop, WindowsURL: *windows,
 		AdminNetworks: networks,
 		BackendTLS:    &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{identity}, RootCAs: roots},
 	})

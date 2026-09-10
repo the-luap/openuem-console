@@ -36,6 +36,8 @@ type WebServer struct {
 	auditMu        sync.Mutex
 	auditCancel    context.CancelFunc
 	auditDone      chan struct{}
+	windowsMu      sync.Mutex
+	windowsRuntime *windowsRuntime
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -105,6 +107,10 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	if err != nil {
 		return err
 	}
+	if err := w.startWindows(certFile, certKey, identity); err != nil {
+		return err
+	}
+	defer w.stopWindows()
 	if err := w.startDesktop(certFile, certKey); err != nil {
 		return err
 	}
@@ -123,6 +129,7 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 }
 
 func (w *WebServer) Close() error {
+	w.stopWindows()
 	w.stopAuditRetention()
 	w.stopAppleReminders()
 	w.stopDesktop()

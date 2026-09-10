@@ -6,8 +6,9 @@ revision and timing before creating any device commands. A bounded worker
 activates due plans through the same atomic cohort assignment used for immediate
 rollouts. Concurrent workers and process restarts cannot activate one plan twice.
 
-Production maintenance registration, console forms, dynamic group selection and
-pilot promotion gates remain implementation work. This is scheduled policy
+The [optional Windows listener](native-windows-operations.md) now starts the
+worker at server startup and cancels it during shutdown. Console forms, dynamic
+group selection and pilot promotion gates remain implementation work. This is scheduled policy
 assignment, not evidence of patch installation or an automatic patch rollout gate.
 
 ## Timing and operator controls

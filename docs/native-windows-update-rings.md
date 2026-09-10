@@ -6,9 +6,10 @@ receives the existing [typed update run](native-windows-updates.md), including
 platform preflight, Atomic configuration and effective-value read-back. Changing
 a ring does not rewrite an admitted run or its evidence.
 
-These APIs do not yet have production console forms or registered HTTP routes.
+These administrative APIs do not yet have production console forms or HTTP routes.
 The [scheduled activation backend](native-windows-update-schedules.md) now handles
-reviewed future cohorts. Dynamic groups, production worker registration,
+reviewed future cohorts. The [optional Windows listener](native-windows-operations.md)
+now starts and stops that worker. Dynamic groups,
 pilot-to-broad promotion gates, automatic reconciliation and end-user restart
 communication remain implementation work.
 An explicit cohort supports manual pilot selection; it is not an automatic ring

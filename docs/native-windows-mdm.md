@@ -11,13 +11,16 @@ device identity and OMA DM digest verification](native-windows-management.md), a
 the [bounded SyncML XML codec](native-windows-syncml.md) and
 [durable authenticated sessions with a read-only identity probe](native-windows-sessions.md),
 plus [scoped CSP command delivery and results](native-windows-csp.md) and
-[typed update policy runs with effective-value verification](native-windows-updates.md). These components
-are not registered in a production listener, gateway or console flow.
+[typed update policy runs with effective-value verification](native-windows-updates.md),
+[versioned rings](native-windows-update-rings.md) and
+[scheduled cohorts](native-windows-update-schedules.md). The optional
+[listener and gateway integration](native-windows-operations.md) registers the
+four device endpoints and schedule worker. Console forms remain implementation work.
 
 Initial certificate issuance and bootstrap provisioning are implemented and
 tested synthetically. A real Windows management session and applied CSP are
 not yet demonstrated on hardware. Administrative command/result views,
-broader typed policies and versioned update rings, certificate renewal,
+broader typed policies, automatic ring promotion, certificate renewal,
 unenrollment, console integration and physical Windows acceptance remain open.
 Entra/Autopilot require separate implementation and acceptance.
 
@@ -70,9 +73,9 @@ matrix remains to be implemented and verified.
 - Responses, including faults, have an explicit `Content-Length`, no chunked
   transfer and `Cache-Control: no-store`. Faults use fixed English text and do
   not reflect account hints, submitted XML or parser errors.
-- The handler requires a TLS connection. Its future server owner must add bounded
-  headers, read/write timeouts, admission limits and the trusted gateway boundary.
-  TLS termination and public routing have not been integrated in this step.
+- The handler requires a TLS connection. The optional
+  [production listener](native-windows-operations.md) supplies bounded headers,
+  read/write timeouts, admission limits and pinned gateway identity.
 
 ## Automated evidence
 
@@ -281,9 +284,9 @@ transactional service. GET/HEAD return 405 with `Allow: POST`; discovery owns th
 availability probes. SOAP responses and faults use explicit lengths. All invalid,
 expired, revoked and consumed credentials receive the same MDE2 authentication
 fault. Internal failures use a fixed enrollment-server fault without database,
-key, account or request details. The handler still needs production gateway,
-admission/timeouts and console configuration wiring once WSTEP/provisioning are
-implemented; the existing public route is not enabled by this backend change.
+key, account or request details. The optional
+[listener/gateway integration](native-windows-operations.md) now supplies
+admission, timeouts and public routing. Console configuration forms remain open.
 
 Synthetic tests cover encrypted-key tampering/context substitution, root/key
 validation and issuance windows, scoped CA creation/read, restart, eight concurrent

@@ -18,6 +18,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/desktop"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
@@ -30,6 +31,9 @@ type Handler struct {
 	Model                 *models.Model
 	Apple                 *apple.Store
 	AppleSetupError       string
+	Windows               *windows.Store
+	WindowsOptions        windows.EnrollmentOptions
+	WindowsSetupError     string
 	Desktop               *desktop.Store
 	DesktopCatalog        *desktop.Catalog
 	DesktopBootstrapReady bool

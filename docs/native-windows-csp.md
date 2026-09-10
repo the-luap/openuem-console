@@ -6,8 +6,9 @@ custom CSP operations, persists a scoped encrypted queue, delivers eligible work
 after mutual authentication and the DevId probe, and records correlated device
 statuses and Get results. All local device exchanges use synthetic fixtures.
 The [typed update extension](native-windows-updates.md) adds an operator-authorized
-preflight/configuration/read-back workflow on this service. Production
-console/gateway wiring and physical Windows acceptance remain open.
+preflight/configuration/read-back workflow on this service. The optional
+[listener/gateway integration](native-windows-operations.md) registers its device
+transport. Console forms and physical Windows acceptance remain open.
 
 ## Administrative command boundary
 
@@ -180,7 +181,7 @@ go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=30s -parallel=2 ./
 Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-credentials).
 No test executes a command, installs a profile/certificate or changes host settings.
 The typed update extension adds selected update policies and verified read-back.
-Remaining WIN-02 work includes broader typed configuration policies, versioned
-update rings, outgoing chunking, command/result console views,
-production enrollment and gateway flows, renewal/unenrollment, rotation/recovery,
+Remaining WIN-02 work includes broader typed configuration policies, automatic
+ring promotion, outgoing large-object chunking, command/result console views,
+enrollment console forms, renewal/unenrollment, rotation/recovery,
 Entra/Autopilot and physical device acceptance.

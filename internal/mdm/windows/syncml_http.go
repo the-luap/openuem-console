@@ -8,21 +8,26 @@ import (
 	"strings"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
 
 const syncMLContentType = "application/vnd.syncml.dm+xml"
 
-// SyncMLHandler implements durable, authenticated XML sessions and the initial
-// read-only DevInfo identity probe. It does not dispatch administrative CSP
-// mutations and is not yet registered on the production gateway. Its owner must
-// provide direct TLS with client certificates, admission limits and HTTP timeouts.
+// SyncMLHandler implements durable authenticated XML sessions, identity probes
+// and scoped CSP delivery/results. Use ProtocolHandler for the production TLS,
+// gateway identity, admission limits and HTTP timeouts.
 type SyncMLHandler struct {
-	store   *Store
-	options EnrollmentOptions
-	path    string
+	store    *Store
+	options  EnrollmentOptions
+	path     string
+	identity clientidentity.Policy
 }
 
 func NewSyncMLHandler(store *Store, options EnrollmentOptions) (*SyncMLHandler, error) {
+	return newSyncMLHandlerWithIdentity(store, options, clientidentity.Policy{})
+}
+
+func newSyncMLHandlerWithIdentity(store *Store, options EnrollmentOptions, identity clientidentity.Policy) (*SyncMLHandler, error) {
 	if store == nil || store.db == nil {
 		return nil, ErrStore
 	}
@@ -33,7 +38,7 @@ func NewSyncMLHandler(store *Store, options EnrollmentOptions) (*SyncMLHandler, 
 		return nil, err
 	}
 	u, _ := enrollmentEndpoint(options.ManagementURL)
-	return &SyncMLHandler{store: store, options: options, path: u.Path}, nil
+	return &SyncMLHandler{store: store, options: options, path: u.Path, identity: identity}, nil
 }
 
 func (h *SyncMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +58,7 @@ func (h *SyncMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeEnrollmentHTTP(w, r, http.StatusMethodNotAllowed, "", nil)
 		return
 	}
-	certificate, err := managementPeerCertificate(r, h.options)
+	certificate, err := managementPeerCertificateWithIdentity(r, h.options, h.identity)
 	if err != nil {
 		writeEnrollmentHTTP(w, r, http.StatusForbidden, "", nil)
 		return

@@ -8,9 +8,8 @@ import (
 )
 
 // WSTEPHandler implements initial OnPremise issuance and bounded exact retries.
-// It is not registered on the production gateway while the SyncML management
-// service and console enrollment configuration are still being implemented.
-// The owner must provide TLS, admission limits and header/read/write timeouts.
+// ProtocolHandler supplies production TLS, gateway trust, admission limits and
+// header/read/write timeouts. Enrollment console configuration is separate.
 type WSTEPHandler struct {
 	store   *Store
 	url     string
