@@ -52,8 +52,8 @@ func New(config Config) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	if config.BackendTLS == nil || config.BackendTLS.InsecureSkipVerify || len(config.BackendTLS.Certificates) == 0 || config.BackendTLS.RootCAs == nil {
-		return nil, errors.New("backend TLS requires a gateway identity and trusted server roots")
+	if config.BackendTLS == nil || config.BackendTLS.InsecureSkipVerify || len(config.BackendTLS.Certificates) != 1 || config.BackendTLS.RootCAs == nil || config.BackendTLS.GetClientCertificate != nil {
+		return nil, errors.New("backend TLS requires one explicit gateway identity and trusted server roots")
 	}
 	if len(config.AdminNetworks) == 0 {
 		return nil, errors.New("at least one explicit administrator source network is required")
@@ -98,6 +98,20 @@ func New(config Config) (*Gateway, error) {
 		// environment-provided outbound HTTP proxy.
 		transport.Proxy = nil
 		transport.TLSClientConfig = config.BackendTLS.Clone()
+		// A backend trusting an exact leaf advertises that leaf's subject as a
+		// CA hint. For a CA-issued gateway leaf this differs from its issuer, so
+		// Go's default selection would send no client certificate. The configured
+		// gateway identity is explicit; retain signature/version checks while
+		// ignoring only this advisory issuer list. Server verification is unchanged.
+		identity := config.BackendTLS.Certificates[0]
+		transport.TLSClientConfig.GetClientCertificate = func(request *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			selection := *request
+			selection.AcceptableCAs = nil
+			if err := selection.SupportsCertificate(&identity); err != nil {
+				return nil, errors.New("gateway identity does not support backend TLS parameters")
+			}
+			return &identity, nil
+		}
 		transport.TLSClientConfig.MinVersion = tls.VersionTLS12
 		transport.ResponseHeaderTimeout = 45 * time.Second
 		proxies[i] = &httputil.ReverseProxy{

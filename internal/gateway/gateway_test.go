@@ -222,6 +222,16 @@ func TestGatewayConfigurationRejectsUnsafeOriginsAndTrust(t *testing.T) {
 		t.Fatal("insecure backend TLS accepted")
 	}
 	config.BackendTLS.InsecureSkipVerify = false
+	config.BackendTLS.Certificates = []tls.Certificate{identity, identity}
+	if _, err := New(config); err == nil {
+		t.Fatal("ambiguous gateway identities accepted")
+	}
+	config.BackendTLS.Certificates = []tls.Certificate{identity}
+	config.BackendTLS.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) { return &identity, nil }
+	if _, err := New(config); err == nil {
+		t.Fatal("dynamic identity override accepted")
+	}
+	config.BackendTLS.GetClientCertificate = nil
 	config.AdminNetworks = []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
 	if _, err := New(config); err == nil {
 		t.Fatal("public administrator network accepted")

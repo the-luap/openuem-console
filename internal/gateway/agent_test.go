@@ -17,7 +17,12 @@ import (
 )
 
 func TestAgentChannelUsesPrivateMutualTLSAndSurvivesHTTPDeadlines(t *testing.T) {
-	gatewayIdentity, _ := testIdentity(t, "gateway")
+	issuer := newPublicTLSFixture(t)
+	gatewayIdentity := issuer.issue(t, func(cert *x509.Certificate) {
+		cert.Subject.CommonName = "CA-issued gateway client"
+		cert.DNSNames, cert.IPAddresses = nil, nil
+		cert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+	})
 	gatewayRoots := x509.NewCertPool()
 	gatewayRoots.AddCert(gatewayIdentity.Leaf)
 	certificateServer := httptest.NewTLSServer(http.NotFoundHandler())

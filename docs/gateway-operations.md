@@ -153,6 +153,13 @@ on SIGINT/SIGTERM. Upgraded agent streams have their HTTP deadlines cleared and
 are tracked explicitly: shutdown closes them because ordinary HTTP server shutdown
 does not close hijacked connections.
 
+Backend TLS uses exactly one configured gateway identity. It explicitly offers
+that certificate even when a backend's acceptable-issuer hints contain a pinned
+leaf subject rather than its issuing CA. Signature/version compatibility and
+normal backend server verification remain enforced. This also supports a private
+CA-issued gateway identity with NATS's exact-leaf client trust; the issuer hints
+do not select a different local credential or change the backend's authorization.
+
 In direct mode, leave `OPENUEM_TRUSTED_GATEWAY_CERTIFICATES` unset. Apple and admin
 certificate login then require the actual end-client TLS certificate and cannot
 use a forwarded header. A missing, invalid, empty or expired **configured** trust
