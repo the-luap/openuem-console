@@ -23,7 +23,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	if method == http.MethodGet && (route == "/windows" || route == "/windows/:id") {
 		return access.ReadDevices, true
 	}
-	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new") {
+	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new" || route == "/windows/update-rings" || route == "/windows/update-rings/new" || route == "/windows/update-rings/:ring" || route == "/windows/update-rings/:ring/edit") {
 		return access.ManageUpdates, true
 	}
 	if method == http.MethodPost {
@@ -34,7 +34,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/windows/:id/revoke":
 			return access.RevokeDevices, true
-		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create":
+		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save":
 			return access.ManageUpdates, true
 		}
 	}
@@ -45,6 +45,12 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 		g := e.Group(prefix, h.IsAuthenticated, h.WindowsCSRF)
 		g.GET("/windows", h.WindowsEnrollment)
+		g.GET("/windows/update-rings", h.WindowsUpdateRings)
+		g.GET("/windows/update-rings/new", h.WindowsEditUpdateRing)
+		g.GET("/windows/update-rings/:ring", h.WindowsUpdateRingHistory)
+		g.GET("/windows/update-rings/:ring/edit", h.WindowsEditUpdateRing)
+		g.POST("/windows/update-rings/preview", h.WindowsPreviewUpdateRing)
+		g.POST("/windows/update-rings/save", h.WindowsSaveUpdateRing)
 		g.GET("/windows/:id", h.WindowsDevice)
 		g.POST("/windows/setup", h.WindowsAuthority)
 		g.POST("/windows/invitations", h.WindowsInvitation)
@@ -162,6 +168,10 @@ func windowsFailure(err error) error {
 		return echo.NewHTTPError(409, "The organization already has a Windows enrollment authority")
 	case errors.Is(err, windows.ErrCSPAlreadySent):
 		return echo.NewHTTPError(409, "This run has no cancelable undelivered steps, or a step is already sent or uncertain")
+	case errors.Is(err, windows.ErrUpdateRingConflict):
+		return echo.NewHTTPError(409, "The ring or request has changed. Open the latest revision and review your changes again.")
+	case errors.Is(err, windows.ErrUpdateRing):
+		return echo.NewHTTPError(400, "Invalid Windows update ring request")
 	case errors.Is(err, windows.ErrCSPConflict):
 		return echo.NewHTTPError(409, "This request was already used with different settings. Start a new policy run.")
 	case errors.Is(err, windows.ErrCSPQueueFull):

@@ -124,6 +124,7 @@ corrected console/history commit `9f33aae`
 The fixtures create only isolated synthetic database state and loopback services.
 No host certificate, policy, account or device is changed. Native Windows management
 now includes [typed policy forms, run history and confirmed cancellation](native-windows-update-console.md).
-The roadmap still requires raw command/result and ring/schedule administration workflows, broader CSP
+It also includes [versioned ring creation, editing and history](native-windows-update-console.md#versioned-update-rings).
+The roadmap still requires raw command/result and cohort assignment/scheduling workflows, broader CSP
 policies, certificate renewal and unenrollment, key rotation/restore, verified
 native/agent association, Entra/Autopilot and physical Windows acceptance.

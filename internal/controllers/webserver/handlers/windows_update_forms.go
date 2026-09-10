@@ -44,6 +44,13 @@ func parseWindowsUpdatePolicy(form url.Values) (windows.UpdatePolicy, time.Durat
 	if err != nil || hours < 1 || hours > 168 || strconv.Itoa(hours) != form.Get("hours") {
 		return policy, 0, fmt.Errorf("Choose an admission lifetime from 1 to 168 whole hours")
 	}
+	policy, err = parseWindowsUpdateSettings(form)
+	return policy, time.Duration(hours) * time.Hour, err
+}
+
+// Runs and reusable rings use the same optional typed settings and dependencies.
+func parseWindowsUpdateSettings(form url.Values) (windows.UpdatePolicy, error) {
+	var policy windows.UpdatePolicy
 	values := map[string]any{}
 	for _, field := range windows_views.UpdatePolicyFields() {
 		value := form.Get(field.Name)
@@ -52,27 +59,27 @@ func parseWindowsUpdatePolicy(form url.Values) (windows.UpdatePolicy, time.Durat
 		}
 		if field.Boolean {
 			if value != "true" && value != "false" {
-				return policy, 0, fmt.Errorf("Choose Unmanaged, Yes or No for %s", field.Label)
+				return policy, fmt.Errorf("Choose Unmanaged, Yes or No for %s", field.Label)
 			}
 			values[field.Name] = value == "true"
 			continue
 		}
 		number, err := strconv.Atoi(value)
 		if err != nil || strconv.Itoa(number) != value || number < field.Minimum || number > field.Maximum {
-			return policy, 0, fmt.Errorf("%s must be a whole number from %d to %d, or blank for Unmanaged", field.Label, field.Minimum, field.Maximum)
+			return policy, fmt.Errorf("%s must be a whole number from %d to %d, or blank for Unmanaged", field.Label, field.Minimum, field.Maximum)
 		}
 		values[field.Name] = number
 	}
 	encoded, err := json.Marshal(values)
 	if err != nil {
-		return policy, 0, windows.ErrUpdatePolicy
+		return policy, windows.ErrUpdatePolicy
 	}
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&policy) != nil || policy.Validate() != nil {
-		return policy, 0, fmt.Errorf("Select at least one setting. Grace and reboot choices need their matching deadline. Set both active-hours endpoints with a nonzero span within the maximum range.")
+		return policy, fmt.Errorf("Select at least one setting. Grace and reboot choices need their matching deadline. Set both active-hours endpoints with a nonzero span within the maximum range.")
 	}
-	return policy, time.Duration(hours) * time.Hour, nil
+	return policy, nil
 }
 
 func (h *Handler) windowsUpdateFormContext(c echo.Context) (*partials.CommonInfo, access.Scope, *windows.DeviceMetadata, error) {

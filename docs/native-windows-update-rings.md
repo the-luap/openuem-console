@@ -6,7 +6,9 @@ receives the existing [typed update run](native-windows-updates.md), including
 platform preflight, Atomic configuration and effective-value read-back. Changing
 a ring does not rewrite an admitted run or its evidence.
 
-These administrative APIs do not yet have production console forms or HTTP routes.
+The [console](native-windows-update-console.md#versioned-update-rings) now provides
+site-scoped ring lists, immutable history and validated create/edit previews with
+confirmed revision saves. Cohort assignment forms remain implementation work.
 The [scheduled activation backend](native-windows-update-schedules.md) now handles
 reviewed future cohorts. The [optional Windows listener](native-windows-operations.md)
 now starts and stops that worker. Dynamic groups,
@@ -62,7 +64,8 @@ All methods require the existing `updates.manage` capability for the selected
 site. Console session authentication remains the caller's responsibility. Reads
 commit their audit before returning protected names, policies or cohort details.
 Generic JSON/XML serialization and formatters do not expose ring/rollout payloads.
-A future UI must escape names and device data and display the reviewed revision.
+The ring console escapes protected names and displays the reviewed revision;
+cohort assignment views must retain the same scope and provenance boundaries.
 
 Ring authorship and assignment authority are distinct. A currently authorized
 operator can explicitly select an existing ring revision; that assignment records

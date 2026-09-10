@@ -7,6 +7,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/mdm_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
 )
 
 templ UpdatePolicyForm(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft UpdatePolicyDraft) {
@@ -32,21 +33,7 @@ templ UpdatePolicyForm(c echo.Context, info *partials.CommonInfo, device windows
 						<label class="grid gap-2">Policy name<input class="uk-input" name="name" value={ draft.Form.Get("name") } maxlength="128" required/></label>
 						<label class="grid gap-2">Action<select class="uk-select" name="mode"><option value="apply" selected?={ draft.Form.Get("mode")=="apply" }>Apply selected settings</option><option value="remove" selected?={ draft.Form.Get("mode")=="remove" }>Remove selected settings from this management source</option></select></label>
 						<label class="grid gap-2">Admission lifetime (hours)<input class="uk-input" type="number" name="hours" min="1" max="168" step="1" value={ draft.Form.Get("hours") } required/><span class="uk-text-muted">Time allowed for new steps to be admitted, starting when you confirm. It does not set a Windows restart time or undo settings after expiry.</span></label>
-						<div class="windows-policy-fields">
-							for _, field := range UpdatePolicyFields() {
-								<label class="grid gap-2">
-									{ field.Label }
-									if field.Boolean {
-										<select class="uk-select" name={ field.Name }><option value="" selected?={ draft.Form.Get(field.Name)=="" }>Unmanaged</option><option value="true" selected?={ draft.Form.Get(field.Name)=="true" }>Yes</option><option value="false" selected?={ draft.Form.Get(field.Name)=="false" }>No</option></select>
-									} else {
-										<input class="uk-input" type="number" name={ field.Name } min={ fmt.Sprint(field.Minimum) } max={ fmt.Sprint(field.Maximum) } step="1" value={ draft.Form.Get(field.Name) } placeholder="Unmanaged"/>
-									}
-									if field.Help!="" {
-										<span class="uk-text-muted">{ field.Help }</span>
-									}
-								</label>
-							}
-						</div>
+						@updatePolicyInputs(draft.Form)
 						<button type="submit" class="uk-button uk-button-primary">Review policy and device</button>
 					</form>
 				</div>
@@ -104,4 +91,23 @@ templ UpdatePolicyPreview(c echo.Context, info *partials.CommonInfo, device wind
 			</section>
 		</main>
 	}
+}
+
+// Shared typed controls keep ring and per-device optional settings identical.
+templ updatePolicyInputs(form url.Values) {
+	<div class="windows-policy-fields">
+		for _, field := range UpdatePolicyFields() {
+			<label class="grid gap-2">
+				{ field.Label }
+				if field.Boolean {
+					<select class="uk-select" name={ field.Name }><option value="" selected?={ form.Get(field.Name)=="" }>Unmanaged</option><option value="true" selected?={ form.Get(field.Name)=="true" }>Yes</option><option value="false" selected?={ form.Get(field.Name)=="false" }>No</option></select>
+				} else {
+					<input class="uk-input" type="number" name={ field.Name } min={ fmt.Sprint(field.Minimum) } max={ fmt.Sprint(field.Maximum) } step="1" value={ form.Get(field.Name) } placeholder="Unmanaged"/>
+				}
+				if field.Help!="" {
+					<span class="uk-text-muted">{ field.Help }</span>
+				}
+			</label>
+		}
+	</div>
 }

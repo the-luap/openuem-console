@@ -1,0 +1,177 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ringNavigation(info *partials.CommonInfo) {
+	<p>{ ringScope(info) }</p>
+	<nav aria-label="Windows update rings" class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
+	</nav>
+}
+
+templ UpdateRings(c echo.Context, info *partials.CommonInfo, rings []windows.UpdateRingRevision, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: "Update rings"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Windows update rings</h1>@ringNavigation(info)
+<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/new")) }>Create update ring</a></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Each ring stores reusable update settings with an immutable revision history. Saving or disabling a ring does not assign devices, cancel existing work or remove settings from Windows.</p>
+					<div class="overflow-x-auto" role="region" aria-label="Windows update rings table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Current ring revisions in this site</caption><thead><tr><th scope="col">Ring</th><th scope="col">Revision</th><th scope="col">State</th><th scope="col">Saved</th></tr></thead>
+							<tbody>
+								for _, ring := range rings {
+									<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID)) }>{ ring.Name }</a><div class="text-sm break-all">{ ring.RingID }</div></td><td>{ fmt.Sprint(ring.Revision) }</td><td>{ ringState(ring.Enabled) }</td><td>{ timestamp(ring.CreatedAt) }</td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(rings)==0 {
+						<p class="my-4 uk-text-muted">No update rings in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings?offset=%d", max(0, offset-25)))) }>Previous rings</a>
+						}
+						if more && offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings?offset=%d", min(100000, offset+25)))) }>More rings</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UpdateRingHistory(c echo.Context, info *partials.CommonInfo, id string, rings []windows.UpdateRingRevision, before int64, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Revision history"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Update ring revision history</h1><p class="break-all">{ id }</p>@ringNavigation(info)
+<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+id+"/edit")) }>Edit latest revision</a></div>
+			<p>Every saved revision remains available. Existing device runs keep their original reviewed settings. Disabling a ring prevents new apply assignments; it does not cancel work or remove previously applied settings.</p>
+			for i, ring := range rings {
+				<section class="uk-card uk-card-default" id={ ringRevisionAnchor(ring.Revision) }>
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">{ ring.Name } · Revision { fmt.Sprint(ring.Revision) }</h2>
+						if before==0 && i==0 {
+							<p>Current revision</p>
+						} else {
+							<p>Saved revision</p>
+						}
+						<dl class="uk-description-list"><dt>State at this revision</dt><dd>{ ringState(ring.Enabled) }</dd><dt>Saved</dt><dd>{ timestamp(ring.CreatedAt) }</dd><dt>Saved by</dt><dd>{ ring.CreatedBy }</dd></dl>
+						<details class="mt-4" open?={ i==0 }><summary>Reviewed policy settings</summary>@ringPolicyValues(ring.Policy)
+</details>
+					</div>
+				</section>
+			}
+			if len(rings)==0 {
+				<p>No earlier revisions in this view.</p>
+			}
+			<div class="flex flex-wrap gap-3">
+				if before>0 {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+id)) }>Latest revisions</a>
+				}
+				if more && len(rings)>0 {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d", id, rings[len(rings)-1].Revision))) }>Older revisions</a>
+				}
+			</div>
+		</main>
+	}
+}
+
+templ ringPolicyValues(policy windows.UpdatePolicy) {
+	<dl class="uk-description-list">
+		for _, row := range updatePolicyRows(policy) {
+			<dt>{ row.Label }</dt>
+			<dd>{ row.Value }</dd>
+		}
+	</dl>
+}
+
+templ UpdateRingForm(c echo.Context, info *partials.CommonInfo, draft UpdateRingDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Ring editor"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Edit Windows update ring</h1>@ringNavigation(info)
+</div>
+			if draft.Error!="" {
+				<div class="uk-alert uk-alert-danger" role="alert">{ draft.Error }</div>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					if draft.Form.Get("expected_revision")=="0" {
+						<p>Create revision 1 of a new ring.</p>
+					} else {
+						<p>Based on revision { draft.Form.Get("expected_revision") }. Saving creates a new revision.</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+draft.Form.Get("ring_id")+"/edit")) }>Open the latest revision in a fresh editor</a>
+					}
+					<p class="my-3">Leave a value blank or choose Unmanaged to omit it. Zero and No are explicit settings. Saving a ring does not assign devices. Disabling a ring does not cancel existing work or remove settings from Windows.</p>
+					<p>Windows may restart according to the configured deadlines and grace periods when these settings are assigned. Active hours do not prevent a forced restart after those limits.</p>
+					<p><a class="underline" href="https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update" target="_blank" rel="noreferrer noopener">Microsoft update policy definitions</a></p>
+					<form class="grid gap-4 mt-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/update-rings/preview") }>
+						@mdm_views.CSRF(info)
+						for _, name := range []string{"ring_id","request_key","expected_revision"} {
+							<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+						}
+						<label class="grid gap-2">Ring name<input class="uk-input" name="name" maxlength="128" required value={ draft.Form.Get("name") }/></label>
+						<label class="grid gap-2">Ring state<select class="uk-select" name="enabled"><option value="true" selected?={ draft.Form.Get("enabled")=="true" }>Enabled</option><option value="false" selected?={ draft.Form.Get("enabled")=="false" }>Disabled</option></select></label>
+						@updatePolicyInputs(draft.Form)
+						<button class="uk-button uk-button-primary" type="submit">Review ring revision</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ ringDraftFields(draft UpdateRingDraft) {
+	for _, name := range []string{"ring_id","request_key","expected_revision","name","enabled"} {
+		<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+	}
+	for _, field := range UpdatePolicyFields() {
+		<input type="hidden" name={ field.Name } value={ draft.Form.Get(field.Name) }/>
+	}
+}
+
+templ UpdateRingPreview(c echo.Context, info *partials.CommonInfo, draft UpdateRingDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Review revision"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Review update ring revision</h1>@ringNavigation(info)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Nothing has been saved by this preview. Confirm the site, ring state and all settings below.</p>
+					<dl class="uk-description-list"><dt>Ring name</dt><dd>{ draft.Ring.Name }</dd><dt>Ring ID</dt><dd>{ draft.Ring.RingID }</dd><dt>Site</dt><dd>{ ringScope(info) }</dd><dt>New revision</dt><dd>{ fmt.Sprint(draft.Ring.Revision) }</dd><dt>Reviewed base revision</dt><dd>{ draft.Form.Get("expected_revision") }</dd><dt>Ring state</dt><dd>{ ringState(draft.Ring.Enabled) }</dd><dt>Request ID</dt><dd>{ draft.Ring.RequestKey }</dd></dl>
+					@ringPolicyValues(draft.Ring.Policy)
+					<p class="my-3">Saving creates an immutable revision. It does not assign devices or change existing runs. Disabled rings cannot receive new apply assignments. Disabling a ring does not remove Windows settings. Unmanaged values do not remove earlier configuration.</p>
+					<form class="grid gap-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/update-rings/save") }>
+						@mdm_views.CSRF(info)
+						@ringDraftFields(draft)
+						<label><input type="checkbox" name="confirm_ring" value="yes" required/> Save this reviewed ring revision in this site.</label><button class="uk-button uk-button-primary" type="submit">Confirm and save ring revision</button>
+					</form>
+					<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/update-rings/preview") }>
+						@mdm_views.CSRF(info)
+						@ringDraftFields(draft)
+						<button class="uk-button uk-button-default" name="edit_ring" value="yes" type="submit">Edit ring draft</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
