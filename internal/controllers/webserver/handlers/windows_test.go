@@ -17,7 +17,7 @@ func TestWindowsConsoleRoutesHaveExplicitCapabilities(t *testing.T) {
 	e := echo.New()
 	h.RegisterWindows(e)
 	want := map[string]access.Capability{"GET /windows": access.ReadDevices, "GET /windows/:id": access.ReadDevices, "POST /windows/setup": access.ManageCertificates, "POST /windows/invitations": access.EnrollDevices, "POST /windows/invitations/:id/revoke": access.EnrollDevices, "POST /windows/:id/revoke": access.RevokeDevices, "GET /windows/:id/updates": access.ManageUpdates, "GET /windows/:id/updates/:run": access.ManageUpdates, "POST /windows/:id/updates/:run/cancel": access.ManageUpdates, "GET /windows/:id/updates/new": access.ManageUpdates, "POST /windows/:id/updates/preview": access.ManageUpdates, "POST /windows/:id/updates/create": access.ManageUpdates}
-	for _, route := range []string{"GET /windows/update-rings", "GET /windows/update-rings/new", "GET /windows/update-rings/:ring", "GET /windows/update-rings/:ring/edit", "POST /windows/update-rings/preview", "POST /windows/update-rings/save"} {
+	for _, route := range []string{"GET /windows/update-rings", "GET /windows/update-rings/new", "GET /windows/update-rings/:ring", "GET /windows/update-rings/:ring/edit", "POST /windows/update-rings/preview", "POST /windows/update-rings/save", "GET /windows/update-rings/:ring/assign", "POST /windows/update-rings/:ring/assign/preview", "POST /windows/update-rings/:ring/assign/create", "GET /windows/update-rollouts/:rollout"} {
 		want[route] = access.ManageUpdates
 	}
 	count := 0

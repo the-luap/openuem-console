@@ -64,8 +64,9 @@ Every saved revision retains its original policy and enabled state. Saving or
 disabling a ring does not assign devices, cancel admitted work or remove Windows
 configuration. A later apply assignment requires the current enabled revision.
 Historical source removal and already admitted work retain the backend's existing
-[ring semantics](native-windows-update-rings.md). Assignment and scheduling forms
-remain separate work; ring creation alone never creates device commands.
+[ring semantics](native-windows-update-rings.md). The separate assignment form below
+creates device work; ring creation alone never creates commands. Scheduling forms
+remain implementation work.
 
 These additional routes use the same prefixes and require a concrete site and
 `ManageUpdates` throughout:
@@ -85,6 +86,60 @@ rechecked by the store; a sibling site cannot read or overwrite a ring. Protecte
 history/current reads return only after auditing commits. A failed save audit
 rolls back both its revision and any new ring head. Generic failures do not
 expose SQL errors or protected names.
+
+## Assign an exact revision to devices
+
+Open ring history and choose **Assign this revision** on the current enabled
+revision, or **Remove this revision's settings** on a saved revision. The latter
+supports explicit source cleanup after the ring was changed or disabled. The
+editor shows the original revision name, policy and enabled state; it never
+silently substitutes a newer revision.
+
+Enter 1–100 distinct native Windows UUIDs, one per line, from the selected site's
+native Windows inventory. This explicit list is separate from agent identities,
+reported hardware IDs and dynamic groups. Blank internal lines, duplicate IDs,
+noncanonical UUIDs and more than 100 targets are rejected. The field is bounded
+to 4,000 bytes inside the existing 8 KiB body limit. LF and CRLF lists and ordinary
+surrounding line whitespace produce the same canonical sorted target set.
+Choose apply or source removal and an admission lifetime of 1–168 whole hours.
+
+**Review revision and devices** resolves every ID through an audited scoped
+metadata read and shows the complete device list, names, site, revision, action,
+lifetime and all original settings. Invalid target drafts remain editable. New
+apply previews require the current enabled revision. The preview rejects device
+metadata already marked revoked or expired, without treating enrollment metadata
+as current device or policy evidence. Preview and editing create no commands.
+
+**Confirm and assign revision** requires explicit confirmation and submits the
+entire selection to `AssignUpdateRing`. The store rechecks current source/target
+and actor authority and atomically creates the rollout, each device run, commands
+and audits. A missing target or late audit error leaves no partial cohort.
+Competing ring changes produce a conflict. Identical confirmed retries return
+the original rollout even after its ring is edited or disabled; the handler does
+not apply new-work eligibility checks ahead of that exact replay path. Changed
+targets, mode, lifetime or source under a committed request UUID cannot become new
+work. Preview does not preserve authority after permission replacement.
+
+Confirmation redirects to **Windows ring assignment history**, which links each
+original device run to its protected evidence and per-device cancellation flow.
+The source link selects the exact historical ring revision. Per-device run pages
+link back to the cohort, including cohorts created by the scheduled backend.
+History uses audited rollout, device and run services. Device phases are separate
+historical observations, not a simultaneous compliance snapshot or evidence of
+patch installation/reboot. Assignment details do not offer a blanket cancellation
+that could bypass the existing sent/uncertain step boundaries.
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /windows/update-rings/:ring/assign?revision=N&mode=apply` | Draft an explicit revision/device assignment; mode may also be `remove` |
+| `POST /windows/update-rings/:ring/assign/preview` | Validate/review all selected devices or edit the draft |
+| `POST /windows/update-rings/:ring/assign/create` | Confirm atomic cohort admission |
+| `GET /windows/update-rollouts/:rollout` | Audited original cohort and per-device historical evidence |
+
+All four routes require a concrete authorized site and `ManageUpdates`, under
+the same three console prefixes. The unique-field/CSRF/no-query POST boundary
+also applies here. Names are escaped, and failed audited reads expose neither
+protected payloads nor internal SQL messages.
 
 ## Review a run
 
@@ -115,7 +170,7 @@ simultaneous snapshot or current continuous compliance.
 reboot. The UI links to Microsoft's
 [Update Policy CSP definitions](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update)
 for setting meanings. Policy changes create new immutable runs; existing run
-history is retained. Ring assignment/scheduling forms and actual update/restart
+history is retained. Scheduling forms and actual update/restart
 evidence remain separate work.
 
 ## Cancel undelivered work
@@ -181,10 +236,10 @@ overflow. No test installs policy or contacts a physical Windows device.
 The subsequent policy-form extension passes the full local handler/race suite
 in 9.673 seconds, with Windows/shared view suites passing in 1.823/1.977 seconds.
 The separate live browser-fixture run also passes, including its manual UI wait.
-Vet and Linux/Windows builds pass. The complete push workflow passes for policy
+Vet and Linux/Windows builds pass. Both complete workflows pass for policy
 form commit `f10b60b`
-([push](https://github.com/the-luap/openuem-console/actions/runs/34427128033));
-the corresponding pull-request workflow is still running.
+([push](https://github.com/the-luap/openuem-console/actions/runs/34427128033),
+[pull request](https://github.com/the-luap/openuem-console/actions/runs/34427131094)).
 
 The ring extension passes the full local handler/race suite in 8.919 seconds;
 Windows/shared views pass in 1.913/1.872 seconds. Parser and real console tests
@@ -193,7 +248,16 @@ preview/edit without writes, confirmation and CSRF, exact retries after later
 edits, competing editors, disabled history, cursor/list pagination, lost authority
 and complete read/write audit failure handling. A queue-count assertion verifies
 that ring edits never admit device work. Vet and Linux/Windows builds pass.
-Full CI for this extension is pending.
+The pull-request workflow for ring commit `d716bee` failed at Chrome startup,
+before the scoped-console suite
+([run](https://github.com/the-luap/openuem-console/actions/runs/34428496587)).
+Its Windows persistence/fuzz tests and both builds passed. The artifact recorded
+no completed browser cases and omitted startup stderr, so it does not establish
+the reason Chrome failed to publish a port within the previous polling budget.
+Commit `7d80f5f` observes the same browser for at most 45 seconds, tolerates partial
+port files and retains bounded startup diagnostics. Four synthetic child-process
+tests and all 81 existing Chrome form cases pass locally; no browser sandbox flags
+or form assertions were weakened. Complete CI validation remains pending.
 
 Set `OPENUEM_WINDOWS_RING_BROWSER_FIXTURE` to a private URL-file path to use the
 same opt-in loopback fixture for rings. Browser checks exercise invalid dependent
@@ -203,6 +267,24 @@ list scrolls inside its keyboard-focusable table region. The final stylesheet
 also wraps a 128-character unbroken ring name at 390 pixels. The separate live
 browser run passes in 135.491 seconds, including the manual inspection wait.
 A fresh fixture verifies the final long-name stylesheet and passes in 55.476 seconds.
+
+The explicit-cohort extension passes the full handler/race suite in 8.503 seconds;
+Windows/shared views pass in 1.984/2.028 seconds. Tests cover bounded normalized
+UUID sets, real route permissions, previews without writes, retained invalid
+drafts, two-device atomic admission, rollback after a late missing target or audit
+failure, exact retries after ring changes, changed-target conflicts, historical
+removal, sibling-site isolation and authority lost after review. Vet and both
+Linux/Windows builds pass. Full CI for this extension is pending.
+
+The opt-in `OPENUEM_WINDOWS_ASSIGNMENT_BROWSER_FIXTURE` uses the same loopback
+fixture lifecycle. Browser acceptance rejects stale apply intent, preserves two
+newline-separated targets through preview/edit and confirms historical source
+removal through the real cookie/Origin CSRF middleware. Both resulting run links
+retain the exact source revision and cohort backlink. Forms at 390/768/1440 pixels
+remain contained, as do the narrow preview/history tables inside their focusable
+scroll regions. The complete browser-fixture handler/race run passes in
+107.525 seconds, including manual inspection; Windows/shared views pass in
+1.913/1.891 seconds. These fixtures never install policy or contact physical devices.
 
 The previous enrollment-console CI runs exposed a timing assumption in the
 gateway schedule test: its repeated protected read could hold a shared lock when

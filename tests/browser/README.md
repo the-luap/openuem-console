@@ -39,7 +39,7 @@ handler integration tests exercise persistence, authorization and actual routes.
 runner creates a temporary directory and prints its path. `results.json` records
 the browser/Node version, timestamps, each completed case and the overall result.
 `chrome-startup.json` records the startup outcome, elapsed time, exit/signal and
-at most 8 KiB of browser stderr, including when Chrome never opens a debugging
+at most 8,192 characters of browser stderr, including when Chrome never opens a debugging
 port. A failure exits nonzero and attempts to save `failure.png`. The workflow preserves
 results and screenshots as `apple-mdm-browser`, including on failure.
 

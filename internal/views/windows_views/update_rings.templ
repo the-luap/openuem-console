@@ -22,8 +22,10 @@ templ UpdateRings(c echo.Context, info *partials.CommonInfo, rings []windows.Upd
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: "Update rings"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Windows update rings</h1>@ringNavigation(info)
-<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/new")) }>Create update ring</a></div>
+			<div>
+				<h1 class="text-2xl font-semibold">Windows update rings</h1>@ringNavigation(info)
+				<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/new")) }>Create update ring</a>
+			</div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<p>Each ring stores reusable update settings with an immutable revision history. Saving or disabling a ring does not assign devices, cancel existing work or remove settings from Windows.</p>
@@ -59,8 +61,11 @@ templ UpdateRingHistory(c echo.Context, info *partials.CommonInfo, id string, ri
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Revision history"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Update ring revision history</h1><p class="break-all">{ id }</p>@ringNavigation(info)
-<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+id+"/edit")) }>Edit latest revision</a></div>
+			<div>
+				<h1 class="text-2xl font-semibold">Update ring revision history</h1>
+				<p class="break-all">{ id }</p>@ringNavigation(info)
+				<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+id+"/edit")) }>Edit latest revision</a>
+			</div>
 			<p>Every saved revision remains available. Existing device runs keep their original reviewed settings. Disabling a ring prevents new apply assignments; it does not cancel work or remove previously applied settings.</p>
 			for i, ring := range rings {
 				<section class="uk-card uk-card-default" id={ ringRevisionAnchor(ring.Revision) }>
@@ -72,8 +77,15 @@ templ UpdateRingHistory(c echo.Context, info *partials.CommonInfo, id string, ri
 							<p>Saved revision</p>
 						}
 						<dl class="uk-description-list"><dt>State at this revision</dt><dd>{ ringState(ring.Enabled) }</dd><dt>Saved</dt><dd>{ timestamp(ring.CreatedAt) }</dd><dt>Saved by</dt><dd>{ ring.CreatedBy }</dd></dl>
-						<details class="mt-4" open?={ i==0 }><summary>Reviewed policy settings</summary>@ringPolicyValues(ring.Policy)
-</details>
+						<div class="flex flex-wrap gap-3 my-4">
+							if before==0 && i==0 && ring.Enabled {
+								<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/assign?revision=%d&mode=apply", id, ring.Revision))) }>Assign this revision</a>
+							}
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/assign?revision=%d&mode=remove", id, ring.Revision))) }>Remove this revision's settings</a>
+						</div>
+						<details class="mt-4" open?={ i==0 }>
+							<summary>Reviewed policy settings</summary>@ringPolicyValues(ring.Policy)
+						</details>
 					</div>
 				</section>
 			}
@@ -106,8 +118,9 @@ templ UpdateRingForm(c echo.Context, info *partials.CommonInfo, draft UpdateRing
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Ring editor"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Edit Windows update ring</h1>@ringNavigation(info)
-</div>
+			<div>
+				<h1 class="text-2xl font-semibold">Edit Windows update ring</h1>@ringNavigation(info)
+			</div>
 			if draft.Error!="" {
 				<div class="uk-alert uk-alert-danger" role="alert">{ draft.Error }</div>
 			}
@@ -152,8 +165,9 @@ templ UpdateRingPreview(c echo.Context, info *partials.CommonInfo, draft UpdateR
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Review revision"}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Review update ring revision</h1>@ringNavigation(info)
-</div>
+			<div>
+				<h1 class="text-2xl font-semibold">Review update ring revision</h1>@ringNavigation(info)
+			</div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<p>Nothing has been saved by this preview. Confirm the site, ring state and all settings below.</p>

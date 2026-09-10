@@ -23,7 +23,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 	if method == http.MethodGet && (route == "/windows" || route == "/windows/:id") {
 		return access.ReadDevices, true
 	}
-	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new" || route == "/windows/update-rings" || route == "/windows/update-rings/new" || route == "/windows/update-rings/:ring" || route == "/windows/update-rings/:ring/edit") {
+	if method == http.MethodGet && (route == "/windows/:id/updates" || route == "/windows/:id/updates/:run" || route == "/windows/:id/updates/new" || route == "/windows/update-rings" || route == "/windows/update-rings/new" || route == "/windows/update-rings/:ring" || route == "/windows/update-rings/:ring/edit" || route == "/windows/update-rings/:ring/assign" || route == "/windows/update-rollouts/:rollout") {
 		return access.ManageUpdates, true
 	}
 	if method == http.MethodPost {
@@ -34,7 +34,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 			return access.EnrollDevices, true
 		case "/windows/:id/revoke":
 			return access.RevokeDevices, true
-		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save":
+		case "/windows/:id/updates/:run/cancel", "/windows/:id/updates/preview", "/windows/:id/updates/create", "/windows/update-rings/preview", "/windows/update-rings/save", "/windows/update-rings/:ring/assign/preview", "/windows/update-rings/:ring/assign/create":
 			return access.ManageUpdates, true
 		}
 	}
@@ -51,6 +51,10 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.GET("/windows/update-rings/:ring/edit", h.WindowsEditUpdateRing)
 		g.POST("/windows/update-rings/preview", h.WindowsPreviewUpdateRing)
 		g.POST("/windows/update-rings/save", h.WindowsSaveUpdateRing)
+		g.GET("/windows/update-rings/:ring/assign", h.WindowsNewUpdateAssignment)
+		g.POST("/windows/update-rings/:ring/assign/preview", h.WindowsPreviewUpdateAssignment)
+		g.POST("/windows/update-rings/:ring/assign/create", h.WindowsCreateUpdateAssignment)
+		g.GET("/windows/update-rollouts/:rollout", h.WindowsUpdateRollout)
 		g.GET("/windows/:id", h.WindowsDevice)
 		g.POST("/windows/setup", h.WindowsAuthority)
 		g.POST("/windows/invitations", h.WindowsInvitation)

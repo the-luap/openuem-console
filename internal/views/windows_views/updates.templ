@@ -78,7 +78,7 @@ templ UpdateRun(c echo.Context, info *partials.CommonInfo, device windows.Device
 					}
 					<dl class="uk-description-list"><dt>Run ID</dt><dd>{ detail.Run.ID }</dd><dt>Action</dt><dd>{ updateMode(detail.Run.Mode) }</dd><dt>Created</dt><dd>{ timestamp(detail.Run.CreatedAt) }</dd><dt>Admission expires</dt><dd>{ timestamp(detail.Run.ExpiresAt) }</dd><dt>Created by</dt><dd>{ detail.Run.CreatedBy }</dd></dl>
 					if detail.Run.RingID!="" {
-						<dl class="uk-description-list"><dt>Source ring / revision</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", detail.Run.RingID, detail.Run.RingRevision+1, detail.Run.RingRevision))) }>{ detail.Run.RingID } · { fmt.Sprint(detail.Run.RingRevision) }</a></dd><dt>Cohort rollout</dt><dd>{ detail.Run.RolloutID }</dd></dl>
+						<dl class="uk-description-list"><dt>Source ring / revision</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", detail.Run.RingID, detail.Run.RingRevision+1, detail.Run.RingRevision))) }>{ detail.Run.RingID } · { fmt.Sprint(detail.Run.RingRevision) }</a></dd><dt>Cohort rollout</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rollouts/"+detail.Run.RolloutID)) }>{ detail.Run.RolloutID }</a></dd></dl>
 					}
 					if canCancelUpdate(detail.Steps) {
 						<details class="mt-4">
