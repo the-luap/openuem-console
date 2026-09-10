@@ -207,6 +207,12 @@ func TestACMEContainerDNS01(t *testing.T) {
 			_ = daemon.Process.Kill()
 			_ = daemon.Wait()
 		}
+		// Wait has joined the output copier before reading the buffer. Preserve
+		// the sanitized service result when a renewal deadline fails in CI.
+		if t.Failed() {
+			assertACMELogPrivacy(t, daemonLog.Bytes())
+			t.Logf("issuer daemon fixture result: %s", daemonLog.Bytes())
+		}
 	}()
 	eventuallyACME(t, ctx, func() bool {
 		current, err := os.Readlink(filepath.Join(c.PublicationDirectory, "current"))

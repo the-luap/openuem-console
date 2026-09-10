@@ -137,6 +137,14 @@ the table's package summaries do not remove any detail from the roadmap.
   also pass;
   full reference composition, first-administrator setup, other authority roles
   and coordinated private certificate renewal remain open.
+- ACME renewal diagnostic follow-up: the earlier arm64
+  [fixture run](https://github.com/the-luap/openuem-console/actions/runs/34512528587)
+  timed out waiting for daemon renewal. The subsequent unchanged ACME code passes
+  [both native jobs](https://github.com/the-luap/openuem-console/actions/runs/34513812819).
+  Three isolated Linux arm64 repetitions also pass (8.84, 11.30 and 9.93 seconds).
+  The fixture now preserves sanitized daemon output after process/output joining
+  on failure. The intermittent timeout's cause remains unconfirmed; this is
+  improved evidence collection, not a claimed renewal fix.
 - [Automatic gateway DNS-01](gateway-acme.md) adds a separate pinned lego v5.4.1
   runtime and issuer executable with explicit protected provider configuration,
   bounded attempts, ARI-aware periodic renewal and atomic validated publication.
