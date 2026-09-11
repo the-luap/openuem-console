@@ -171,8 +171,8 @@ matches its reviewed registration, in addition to the existing hash, Authenticod
 and PE architecture checks. Those existing checks alone do not establish bundle
 identity. The agent also currently rejects an emulated bootstrapper executable,
 even when its payload targets the native architecture. Source-derived Burn
-approval/history, capability advertisement, native execution/recovery and physical
-acceptance remain open.
+approval/history, capability advertisement and physical acceptance remain open;
+native execution and protocol recovery evidence are recorded below.
 
 The agent's separate
 [Burn metadata readers and preflight](https://github.com/the-luap/openuem-agent/blob/767bf1a9ec62456807bc783c2cd60db9dbc6f30e/docs/windows-burn-inspection.md)
@@ -216,7 +216,8 @@ inspection; parent cancellation and a child exit timer bound FDI work to ten
 seconds. Generic EXE inspection cannot silently select this path. The native
 helper fixture passes at `767bf1a9ec62456807bc783c2cd60db9dbc6f30e`, including machine
 and user scope, foreign architecture, x86, wrong identity/version/digest and closure.
-The remaining agent CI jobs are still running.
+The subsequent complete agent CI run passes at
+`68876c30fd6301327b5d3f2e45c82a54c5ce0311`.
 
 The shared protocol at `a4fe1e816a3b7feb051817728536fcd857c97aa1` requires Burn
 support in the device-signed recipient registration before sealing a task. A
@@ -226,8 +227,27 @@ a new recipient ID, cancel pending old work and preserve delivered uncertainty;
 audit failures roll back the complete transition. Full local module/registry race
 tests and 814,083 wire-fuzz inputs pass. Agent admission still advertises no Burn
 capability and rejects new Burn work before recording an attempt; its process
-builder cannot fall through to MSI. Source approval/dispatch stays disabled while
-native execution and recovery evidence are completed.
+builder cannot fall through to MSI. Source approval/dispatch stays disabled until
+the remaining capability and provenance integration is complete.
+
+The agent now maps explicit Burn plans directly to the retained EXE process
+boundary after native preflight. Owned native fixtures build unique bundles with
+pinned WiX/Bal `4.0.6`, fetch their own bytes through a private test HTTPS server,
+and bypass Authenticode only through a test seam for these generated unsigned
+artifacts. A registry-only MSI proves actual bundle and payload installation and
+removal, exact version checks, no-op behavior and repeated use of the same artifact.
+Additional bundles carry waiting owned processes; cancellation and an unfinished
+child must join those processes and retain an uncertain result without an exit
+code. No public installer, existing product identity or managed endpoint is used.
+
+The actual Burn branch passes native race tests at
+`39eb6c94d3436f00a24069dc2572be003284910f`: install/remove in 21.26 seconds,
+cancellation in 12.88 seconds and an unfinished child in 11.27 seconds.
+Portable agent recovery race tests pass in 4.066 seconds. They preserve a signed
+restart result byte-for-byte, retry a lost historical receipt without another
+installation, and bind later-boot install/removal observations to the original
+exact 64-bit registration. These protocol fixtures do not simulate a physical
+reboot. Native ARM64 runtime and physical endpoint acceptance remain open.
 
 The updated source adapter race suite passes in 1.781 seconds and another 368,767
 fuzz inputs pass in 21.498 seconds. It rejects 32-bit registry views for both native

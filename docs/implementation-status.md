@@ -61,6 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The agent now executes explicit Burn plans through its retained EXE boundary.
+  Owned Windows fixtures build a unique bundle containing only a generated
+  registry-only MSI and verify actual install/remove, exact bundle/MSI state,
+  an already-installed no-op, different-version refusal and same-artifact removal.
+  Native race tests at `39eb6c94d3436f00a24069dc2572be003284910f` pass in 21.26
+  seconds; cancellation and an unfinished child pass in 12.88/11.27 seconds.
+  Portable recovery tests preserve signed historical receipts and exact later-boot
+  observations without repeating execution. Capability advertisement and source
+  approval/dispatch remain open. See [Burn execution evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
+
+- A native Windows readiness shutdown hang is now traced and corrected. The
+  listener keeps a persistent stop event while draining pending connections,
+  preserving private namespace ownership and joined signing-key lifetime.
+  Native race tests at `589bf1b7e872984896307ccd185d57601c49b0b5` pass 96 owned
+  idle/pending/disconnected-client shutdown cycles in 0.34 seconds, alongside
+  the existing identity, PID, permission, held-signer and crash-recovery checks.
+  Full Windows storage/SCM integration awaits a run past a transient dependency
+  download failure. See the agent's
+  [native readiness evidence](https://github.com/the-luap/openuem-agent/blob/589bf1b7e872984896307ccd185d57601c49b0b5/docs/windows-local-readiness.md).
+
 - ACME renewal fixtures now verify both default and forced reuse of an existing
   valid authorization. This fixes a false failure caused by pinned Pebble allowing
   1% reuse even at zero, while retaining actual initial DNS validation, cleanup,
@@ -78,8 +98,8 @@ the table's package summaries do not remove any detail from the roadmap.
   Its pinned portable race suites, Windows cross-compilation/vet and new native
   helper CI pass. Existing console catalog/source/dispatch/migration race tests
   pass against PostgreSQL in 95.106 seconds; source-adapter race and 368,767 fuzz
-  inputs also pass. Capability advertisement, native execution
-  lifecycle and source approval/dispatch remain open. See the
+  inputs also pass. Subsequent execution/lifecycle evidence is recorded above;
+  capability advertisement and source approval/dispatch remain open. See the
   [Burn integration evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
 
 - Recovery CI now serializes package tests that create and drop whole databases
