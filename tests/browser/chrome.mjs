@@ -23,6 +23,7 @@ const assetRoot = realpathSync(
 const fixtures = new Set([
  ...["viewer","operator","organization_admin","administrator"].map(role=>`management-navigation-${role}`),
  ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-memory-${state}-${role}`)),
+ ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-shares-${state}-${role}`)),
  ...["monitors","printers"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-peripherals-${kind}-${state}-${role}`))),
  ...["physical","logical"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-storage-${kind}-${state}-${role}`))),
  ...["valid","renewal_due","expires_soon","expired","retired","empty"].map(state=>"windows-health-"+state),

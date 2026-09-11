@@ -22,6 +22,7 @@ import scopedNetwork from "./desktop-network-scoped.mjs";
 import storage from "./desktop-storage.mjs";
 import peripherals from "./desktop-peripherals.mjs";
 import memory from "./desktop-memory.mjs";
+import shares from "./desktop-shares.mjs";
 import managementNavigation from "./management-navigation.mjs";
 
 assert(
@@ -66,6 +67,7 @@ try {
         [storage, 48],
         [peripherals, 48],
         [memory, 24],
+        [shares, 24],
         [managementNavigation,12],
         [accountLanguage,30],
         [timestamps,21],

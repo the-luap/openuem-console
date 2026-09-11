@@ -42,6 +42,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Read and search reported physical/logical disks | Viewer in the selected organization or site |
 | Read and search reported monitors/printers | Viewer in the selected organization or site |
 | Read and search reported memory modules | Viewer in the selected organization or site |
+| Read and search reported shares | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -125,6 +126,11 @@ The **Reported memory modules** tab provides [scoped module reports](desktop-mem
 with literal search, bounded continuation and a committed read audit. Reported
 capacity and speed retain their original units; missing module information does
 not become a zero capacity or a claim of complete hardware coverage.
+
+The **Reported shares** tab provides [scoped share reports](desktop-shares-inventory.md)
+with literal search and bounded pagination. Names, descriptions and paths remain
+escaped text. Reports do not prove availability, access rights or complete
+coverage. The legacy share GET delegates scoped readers to this audited page.
 
 The shared inventory navigation identifies the current page through a highlighted,
 underlined link and `aria-current="page"`. The physical/logical storage selector

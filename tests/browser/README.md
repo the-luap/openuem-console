@@ -1,20 +1,30 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 318 cases:
+headless Chrome session. The runner covers 624 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
 | Enterprise Wi-Fi | System/User × existing/copied trust × three TLS ranges × three widths; reader at each width | 39 |
 | Active Directory certificates | System/User × omitted/explicit options × three widths; reader at each width | 15 |
 | IKEv2 certificate VPN | System/User × machine/EAP-TLS × existing/copied trust × three widths; reader at each width | 27 |
-| Desktop inventory | Complete/incomplete reports × three widths; viewer/operator × six refresh states × three widths | 42 |
+| Desktop inventory | Complete/incomplete and missing/zero-number reports × three widths; viewer/operator × six refresh states × three widths | 48 |
 | Desktop software | Viewer/operator × first/next/empty/long reports × three widths | 24 |
+| Desktop network | Four legacy DNS states and eight scoped report states × three widths | 36 |
+| Desktop storage | Physical/logical × viewer/operator × first/next/empty/long reports × three widths | 48 |
+| Desktop peripherals | Monitors/printers × viewer/operator × first/next/empty/long reports × three widths | 48 |
+| Desktop memory modules | Viewer/operator × first/next/empty/long reports × three widths | 24 |
+| Desktop shares | Viewer/operator × first/next/empty/long reports × three widths | 24 |
+| Management navigation | Four roles × three widths; native disclosure and scoped links | 12 |
+| Account language | Seven catalogs, browser default, unavailable storage and long profile × three widths | 30 |
+| Report timestamps | Seven catalogs × three widths | 21 |
+| Windows precise timestamps | Seven catalogs × three widths | 21 |
+| Windows health and update evidence times | Eleven states × three widths | 33 |
 | Approved Windows software | WinGet/MSI/EXE approval and detail, reader, withdrawn and filtered catalog × three widths | 27 |
 | Windows device requests | Prepared, reader, cancelled, expired, withdrawn and empty × three widths | 18 |
 | Windows dispatch | Install/remove review, pending, delivered, observed, restart, uncertain, reader, cancelled, expired, failed and rejected start × three widths | 36 |
 | Windows software checks | Install/remove review, empty, pending, delivered, observed, drifted, unknown, waiting, unavailable, cancelled, expired, reader and paged × three widths | 42 |
-| WinGet sources | Empty, pending, other owner, reader, site, expired, withdrawn, approved, focused, paged, compatible/incompatible review, expired/withdrawn/approved review and derived revision × three widths | 48 |
+| WinGet sources | Empty, pending, other owner, reader, site, expired, withdrawn, approved, focused, paged, compatible/incompatible review, expired/withdrawn/approved review and derived revision and authority changes × three widths | 51 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard
@@ -41,7 +51,7 @@ From the repository root, render the synthetic states using the existing Go test
 
 ```sh
 go tool templ generate
-APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui go test -count=1 ./internal/views/mdm_views ./internal/views/desktop_views
+APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui go test -count=1 ./internal/views/...
 APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui node tests/browser/run.mjs
 ```
 

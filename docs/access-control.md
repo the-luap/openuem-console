@@ -128,6 +128,12 @@ of slot, capacity/type, serial/part number, speed and manufacturer. Literal
 search and continuation share current authorization, exact membership and the
 committed `inventory.memory.read` audit. It grants no mutation permission.
 
+[Reported shares](desktop-shares-inventory.md) adds share name, description and
+path under the same current membership, bounded pagination and committed read
+rules. `inventory.shares.read` is required before returning data; audit failure
+returns a redacted error. The legacy share GET delegates scoped readers to this
+projection. Paths grant no file access and remain plain, escaped text.
+
 [Account display language](account-language.md) is a self-service preference.
 Its protected form always derives the account from the authenticated session;
 a language selection does not change roles or device permissions.
