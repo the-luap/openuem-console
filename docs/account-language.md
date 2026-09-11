@@ -37,5 +37,6 @@ malformed forms, cross-origin requests and a missing preference table. Rendered
 profile states cover all seven catalogs, browser default, storage unavailability
 and long account values. The permanent Chrome matrix exercises those ten states
 at 390/768/1440 pixels, native keyboard submission, exact form fields, locale
-metadata and page overflow. Date/number formatting, complete locale-key migration
-and wider accessibility acceptance remain separate UX-01 work.
+metadata and page overflow. [Report timestamps](localized-report-times.md) use the selected catalog while
+keeping UTC explicit. Remaining date/number formatting, complete locale-key
+migration and wider accessibility acceptance remain separate UX-01 work.

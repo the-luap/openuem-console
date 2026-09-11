@@ -19,7 +19,9 @@ templ WindowsSoftwareReconciliationReview(c echo.Context,info *partials.CommonIn
    <section class="uk-card uk-card-default">
     <div class="uk-card-header"><h2 class="uk-card-title">Read current software state</h2><p>This separate read-only check compares the device with its original software request.</p></div>
     <div class="uk-card-body">
-     <dl class="uk-description-list"><dt>Target device</dt><dd>{review.TargetName} · {review.Request.AgentID}</dd><dt>Original site</dt><dd>{fmt.Sprint(review.Request.SiteID)}</dd><dt>Approved revision</dt><dd>{review.Version.Name} · {review.Version.Version}</dd><dt>Original operation</dt><dd>{WindowsSoftwareOperation(review.Request.Operation)}</dd><dt>Original execution evidence</dt><dd>{WindowsSoftwareDispatchState(*review.Original)}</dd><dt>Original execution request</dt><dd>{review.Original.ID}</dd><dt>Check deadline</dt><dd>{When(&review.ExpiresAt)}</dd></dl>
+     <dl class="uk-description-list"><dt>Target device</dt><dd>{review.TargetName} · {review.Request.AgentID}</dd><dt>Original site</dt><dd>{fmt.Sprint(review.Request.SiteID)}</dd><dt>Approved revision</dt><dd>{review.Version.Name} · {review.Version.Version}</dd><dt>Original operation</dt><dd>{WindowsSoftwareOperation(review.Request.Operation)}</dd><dt>Original execution evidence</dt><dd>{WindowsSoftwareDispatchState(*review.Original)}</dd><dt>Original execution request</dt><dd>{review.Original.ID}</dd><dt>Check deadline</dt><dd>
+      @Timestamp(&review.ExpiresAt)
+     </dd></dl>
      if review.Request.Operation=="remove" {
       <p class="mt-4">The requested state is absence of the original product or machine registration.</p>
      } else {
@@ -49,9 +51,17 @@ templ WindowsSoftwareReconciliations(c echo.Context,info *partials.CommonInfo,pa
     <div class="uk-card-header"><h2 class="uk-card-title">Original execution evidence</h2></div>
     <div class="uk-card-body">
      <p role="status">{WindowsSoftwareDispatchState(*page.Original)}</p>
-     <dl class="uk-description-list mt-4"><dt>Original operation</dt><dd>{WindowsSoftwareOperation(page.Request.Operation)}</dd><dt>Execution request</dt><dd>{page.Original.ID}</dd><dt>Original site</dt><dd>{fmt.Sprint(page.Request.SiteID)}</dd><dt>Dispatched</dt><dd>{When(&page.Original.CreatedAt)}</dd><dt>Delivered</dt><dd>{When(page.Original.DeliveredAt)}</dd><dt>Execution result recorded</dt><dd>{When(page.Original.CompletedAt)}</dd></dl>
+     <dl class="uk-description-list mt-4"><dt>Original operation</dt><dd>{WindowsSoftwareOperation(page.Request.Operation)}</dd><dt>Execution request</dt><dd>{page.Original.ID}</dd><dt>Original site</dt><dd>{fmt.Sprint(page.Request.SiteID)}</dd><dt>Dispatched</dt><dd>
+      @Timestamp(&page.Original.CreatedAt)
+     </dd><dt>Delivered</dt><dd>
+      @Timestamp(page.Original.DeliveredAt)
+     </dd><dt>Execution result recorded</dt><dd>
+      @Timestamp(page.Original.CompletedAt)
+     </dd></dl>
      if page.Original.ReconciliationID!="" {
-      <p class="uk-alert mt-4">A verified software check released this reservation at {When(page.Original.ReconciledAt)}. Another installation or removal requires a new explicit request.</p>
+      <p class="uk-alert mt-4">A verified software check released this reservation at{ " " }
+        @Timestamp(page.Original.ReconciledAt)
+      . Another installation or removal requires a new explicit request.</p>
      } else if WindowsSoftwareCheckEligible(*page.Original) {
       <p class="mt-4">The device remains reserved while execution is uncertain or requires a restart. A separately confirmed check can establish its later software state.</p>
       if page.HasActive {
@@ -72,7 +82,15 @@ templ WindowsSoftwareReconciliations(c echo.Context,info *partials.CommonInfo,pa
      for _,check:=range page.Checks {
       <article class="software-row">
        <h3 class="font-semibold">Software check · {check.ID}</h3><p role="status" class="mt-2">{WindowsSoftwareCheckState(check)}</p>
-       <dl class="uk-description-list mt-4"><dt>Requested</dt><dd>{When(&check.CreatedAt)} · {check.Actor}</dd><dt>Deadline</dt><dd>{When(&check.ExpiresAt)}</dd><dt>Delivered</dt><dd>{When(check.DeliveredAt)}</dd><dt>Result recorded</dt><dd>{When(check.CompletedAt)}</dd></dl>
+       <dl class="uk-description-list mt-4"><dt>Requested</dt><dd>
+        @Timestamp(&check.CreatedAt)
+ { " · " }{check.Actor}</dd><dt>Deadline</dt><dd>
+  @Timestamp(&check.ExpiresAt)
+ </dd><dt>Delivered</dt><dd>
+  @Timestamp(check.DeliveredAt)
+ </dd><dt>Result recorded</dt><dd>
+  @Timestamp(check.CompletedAt)
+ </dd></dl>
        if check.Outcome!=nil {
         <dl class="uk-description-list mt-4"><dt>Observed software state</dt><dd>{check.Outcome.Observation.State} {check.Outcome.Observation.Version}</dd></dl>
         if check.ReleasesReservation {

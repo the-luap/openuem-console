@@ -19,8 +19,12 @@ templ WindowsSoftwareSourceIdentity(source apple.WindowsSoftwareSource) {
   <dt>Microsoft community repository commit</dt><dd><code>{source.Commit}</code></dd>
   <dt>Manifest SHA-256</dt><dd><code>{source.ManifestSHA256}</code></dd>
   <dt>Manifest path</dt><dd>{source.ManifestPath}</dd>
-  <dt>Saved</dt><dd>{When(&source.CreatedAt)} · {source.Actor}</dd>
-  <dt>Approval deadline</dt><dd>{When(&source.ExpiresAt)}</dd>
+  <dt>Saved</dt><dd>
+    @Timestamp(&source.CreatedAt)
+ { " · " }{source.Actor}</dd>
+  <dt>Approval deadline</dt><dd>
+    @Timestamp(&source.ExpiresAt)
+  </dd>
  </dl>
 }
 
@@ -83,9 +87,13 @@ templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple
        }
        @WindowsSoftwareSourceIdentity(source)
        if source.Approval!=nil {
-        <dl class="uk-description-list mt-4"><dt>Selected installer</dt><dd>{fmt.Sprint(source.Approval.InstallerIndex+1)}</dd><dt>Installer revision approved</dt><dd>{When(&source.Approval.ApprovedAt)} · {source.Approval.Actor}</dd></dl>
+        <dl class="uk-description-list mt-4"><dt>Selected installer</dt><dd>{fmt.Sprint(source.Approval.InstallerIndex+1)}</dd><dt>Installer revision approved</dt><dd>
+          @Timestamp(&source.Approval.ApprovedAt)
+ { " · " }{source.Approval.Actor}</dd></dl>
         if source.Approval.WithdrawnAt!=nil {
-         <p role="status" class="mt-4">The derived installer approval was withdrawn at {When(source.Approval.WithdrawnAt)}.</p>
+         <p role="status" class="mt-4">The derived installer approval was withdrawn at{ " " }
+          @Timestamp(source.Approval.WithdrawnAt)
+         .</p>
         }
         <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+source.Approval.VersionID)}>View installer revision</a>
        } else if !source.Expired && page.Version.WithdrawnAt==nil && canManage && source.Actor==actor {

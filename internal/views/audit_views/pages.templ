@@ -149,9 +149,7 @@ templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit
 							<div>
 								<dt>Time</dt>
 								<dd>
-									<time datetime={ event.CreatedAt.UTC().Format(time.RFC3339Nano) }>
-										{ dateTime(event.CreatedAt) }
-									</time>
+									@auditTimestamp(event.CreatedAt)
 								</dd>
 							</div>
 							<div>
@@ -211,7 +209,9 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 				</h2>
 				if policy.UpdatedAt != nil {
 					<p>
-						{ fmt.Sprintf("Updated by %s · %s · Revision %d", policy.UpdatedBy, dateTime(*policy.UpdatedAt), policy.Revision) }
+						{ fmt.Sprintf("Updated by %s · ",policy.UpdatedBy) }
+@auditTimestamp(*policy.UpdatedAt)
+{ fmt.Sprintf(" · Revision %d",policy.Revision) }
 					</p>
 				} else {
 					<p>No expiration policy has been configured. Existing audit events are retained.</p>
@@ -243,7 +243,9 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 					}
 					if preview.Cutoff != nil {
 						<p>
-							{ "Events before "+dateTime(*preview.Cutoff)+" currently qualify for deletion:" }
+							Events before{ " " }
+@auditTimestamp(*preview.Cutoff)
+{ " " }currently qualify for deletion:
 						</p>
 					} else {
 						<p>Automatic deletion will stop. Previously deleted events cannot be restored by this change.</p>
@@ -264,7 +266,9 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 					</dl>
 					<p>These counts are a preview. Confirming applies an ongoing age policy: qualifying events, including those that age later, are deleted in subsequent cleanup batches.</p>
 					<p>
-						{ "This preview is valid for your account until "+dateTime(preview.ExpiresAt)+" and can be used once." }
+						This preview is valid for your account until{ " " }
+@auditTimestamp(preview.ExpiresAt)
+{ " " }and can be used once.
 					</p>
 					<form method="post" action={ templ.URL(BaseURL(scope) + "/retention/apply") } class="audit-stack">
 						<input type="hidden" name="csrf" value={ info.CSRFToken }/><input type="hidden" name="preview" value={ preview.ID }/><input type="hidden" name="token" value={ preview.Token }/>
@@ -285,7 +289,8 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 							{ event.Action }
 						</h3>
 						<p>
-							{ event.Actor+" · "+dateTime(event.CreatedAt) }
+							{ event.Actor+" · " }
+@auditTimestamp(event.CreatedAt)
 						</p>
 						<p>
 							{ fmt.Sprintf("%s · Revision %d", policyLabel(event.Days), event.Revision) }
@@ -308,7 +313,8 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 						}
 						if event.Cutoff != nil {
 							<p>
-								{ "Cutoff: "+dateTime(*event.Cutoff) }
+								Cutoff:{ " " }
+@auditTimestamp(*event.Cutoff)
 							</p>
 						}
 					</article>
@@ -345,4 +351,9 @@ func retentionDaysSelection(policy audit.RetentionPolicy, preview *audit.Retenti
 		return preview.Days
 	}
 	return policy.Days
+}
+
+// Keep exact audit instants and second precision while localizing display.
+templ auditTimestamp(value time.Time) {
+ <time datetime={ value.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision="second" title={ value.UTC().Format(time.RFC3339Nano) }>{ dateTime(value) }</time>
 }

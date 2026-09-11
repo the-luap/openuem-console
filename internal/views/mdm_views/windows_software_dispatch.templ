@@ -23,8 +23,12 @@ templ WindowsSoftwareDispatch(c echo.Context,info *partials.CommonInfo,review ap
       <dt>Approved package version</dt><dd>{review.Version.Version} · {review.Version.Architecture}</dd>
       <dt>Exact observed version required</dt><dd>{review.Version.Windows.Detection.Version}</dd>
       <dt>Minimum Windows version</dt><dd>{review.Version.MinimumOS}</dd>
-      <dt>Prepared by</dt><dd>{review.Request.Actor} · {When(&review.Request.CreatedAt)}</dd>
-      <dt>Execution deadline</dt><dd>{When(&review.ExpiresAt)}</dd>
+      <dt>Prepared by</dt><dd>{review.Request.Actor} ·{ " " }
+        @Timestamp(&review.Request.CreatedAt)
+      </dd>
+      <dt>Execution deadline</dt><dd>
+        @Timestamp(&review.ExpiresAt)
+      </dd>
      </dl>
      if review.Request.Operation=="remove" {
       <p class="uk-alert uk-alert-warning mt-4">This operation removes the approved version. Application data may be affected. A different observed version will be rejected.</p>

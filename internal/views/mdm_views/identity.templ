@@ -4,7 +4,9 @@ templ DeviceIdentity(detail Detail) {
 	<section class="uk-card uk-card-default min-w-0" aria-labelledby="device-identity-heading">
 		<div class="uk-card-header"><h2 id="device-identity-heading" class="uk-card-title">Device identity</h2></div>
 		<div class="uk-card-body grid gap-4 min-w-0">
-			<p>{ "Current identity expires: "+detail.Device.CertificateExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+			<p>{ "Current identity expires: " }
+				@Timestamp(&detail.Device.CertificateExpiresAt)
+			</p>
 			if detail.Device.Status=="enrolled" {
 				<p>Automatic renewal starts 30 days before expiry. The device must install the replacement enrollment profile and connect with its new identity to complete the change.</p>
 				if detail.Device.IdentityRenewalError!="" {
@@ -18,15 +20,23 @@ templ DeviceIdentity(detail Detail) {
 				for _,renewal:=range detail.IdentityRenewals {
 					<article class="border rounded p-4 grid gap-3 min-w-0">
 						<h3 class="font-medium">{ IdentityRenewalState(renewal) }</h3>
-						<p>{ "Started: "+renewal.CreatedAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+						<p>{ "Started: " }
+							@Timestamp(&renewal.CreatedAt)
+						</p>
 						if renewal.Status=="queued" {
-							<p>{ "Device must request its certificate by: "+renewal.AuthorizationExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+							<p>{ "Device must request its certificate by: " }
+								@Timestamp(&renewal.AuthorizationExpiresAt)
+							</p>
 						}
 						if renewal.CertificateExpiresAt!=nil {
-							<p>{ "New certificate expires: "+When(renewal.CertificateExpiresAt) }</p>
+							<p>{ "New certificate expires: " }
+								@Timestamp(renewal.CertificateExpiresAt)
+							</p>
 						}
 						if renewal.ConfirmedAt!=nil {
-							<p>{ "Device confirmed the new identity: "+When(renewal.ConfirmedAt) }</p>
+							<p>{ "Device confirmed the new identity: " }
+								@Timestamp(renewal.ConfirmedAt)
+							</p>
 						}
 						if renewal.Error!="" {
 							<p>{ IdentityRenewalHelp(renewal.Error) }</p>

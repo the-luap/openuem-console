@@ -14,7 +14,9 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 				<dt>Encryption</dt>
 				<dd>{ FileVaultEncryption(detail.Device) }</dd>
 				<dt>Security report</dt>
-				<dd>{ When(detail.Device.SecurityAt) }</dd>
+				<dd>
+					@Timestamp(detail.Device.SecurityAt)
+				</dd>
 				<dt>Management policy</dt>
 				<dd>
 					if detail.FileVault==nil {
@@ -28,7 +30,9 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 					if detail.FileVault==nil || detail.FileVault.EscrowedAt==nil {
 						No recovery key stored
 					} else {
-						{ "Stored " + When(detail.FileVault.EscrowedAt) }
+						{ "Stored " }
+							@Timestamp(detail.FileVault.EscrowedAt)
+
 					}
 				</dd>
 				<dt>Recovery key validation</dt>
@@ -117,11 +121,17 @@ templ FileVaultPanel(info *partials.CommonInfo, detail Detail) {
 										} else {
 											Previous escrowed key
 										}
-									</strong>{ " · " + When(&key.CreatedAt) }
+									</strong>{ " · " }
+										@Timestamp(&key.CreatedAt)
+
 								</p>
-								<p class="mt-2">{ "Last received: " + When(&key.ObservedAt) }</p>
+								<p class="mt-2">{ "Last received: " }
+									@Timestamp(&key.ObservedAt)
+								</p>
 								if key.VerifiedAt!=nil {
-									<p class="mt-2">{ "Last successful validation: "+When(key.VerifiedAt) }</p>
+									<p class="mt-2">{ "Last successful validation: " }
+										@Timestamp(key.VerifiedAt)
+									</p>
 								}
 								<form class="mt-2" method="post" target="_blank" rel="noopener noreferrer" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/filevault/keys/"+key.ID+"/reveal") }>
 									@CSRF(info)

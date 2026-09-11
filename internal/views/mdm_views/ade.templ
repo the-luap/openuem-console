@@ -50,7 +50,9 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
         <h3 class="font-semibold text-lg">2. Add the certificate to your Apple server</h3>
         <p class="my-3">Download this public certificate and upload it to the matching device management server in Apple Business Manager or Apple School Manager. The private key stays on this OpenUEM server.</p>
         <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,"/ios/ade/servers/"+s.ID+"/certificate"))}>Download public certificate</a>
-        <p class="uk-text-muted mt-2">Certificate expires: {When(&s.CertificateExpiresAt)}</p>
+        <p class="uk-text-muted mt-2">Certificate expires:{ " " }
+          @Timestamp(&s.CertificateExpiresAt)
+        </p>
        </div>
        <div>
         <h3 class="font-semibold text-lg">3. Verify and import the Apple server token</h3>
@@ -67,13 +69,25 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
         <div><dt>Apple organization</dt><dd>{Show(s.AppleOrganizationName)} · {Show(s.AppleOrganizationID)}</dd></div>
         <div><dt>Apple server</dt><dd>{Show(s.AppleServerName)} · {Show(s.AppleServerID)}</dd></div>
         <div><dt>Apple administrator</dt><dd>{Show(s.AppleAdministrator)}</dd></div>
-        <div><dt>Token expires</dt><dd>{When(s.TokenExpiresAt)}</dd></div>
-        <div><dt>Token verified</dt><dd>{When(s.VerifiedAt)}</dd></div>
-        <div><dt>Last completed synchronization</dt><dd>{When(s.SyncedAt)}</dd></div>
-        <div><dt>Last attempt</dt><dd>{When(s.AttemptedAt)}</dd></div>
-        <div><dt>Next scheduled attempt</dt><dd>{When(s.NextSyncAt)}</dd></div>
+        <div><dt>Token expires</dt><dd>
+          @Timestamp(s.TokenExpiresAt)
+        </dd></div>
+        <div><dt>Token verified</dt><dd>
+          @Timestamp(s.VerifiedAt)
+        </dd></div>
+        <div><dt>Last completed synchronization</dt><dd>
+          @Timestamp(s.SyncedAt)
+        </dd></div>
+        <div><dt>Last attempt</dt><dd>
+          @Timestamp(s.AttemptedAt)
+        </dd></div>
+        <div><dt>Next scheduled attempt</dt><dd>
+          @Timestamp(s.NextSyncAt)
+        </dd></div>
         if s.RetryAfter!=nil {
-<div><dt>Apple retry deadline</dt><dd>{When(s.RetryAfter)}</dd></div>
+<div><dt>Apple retry deadline</dt><dd>
+	@Timestamp(s.RetryAfter)
+</dd></div>
 }
        </dl>
        <p role="status" class="uk-alert uk-alert-primary">{adeSyncMessage(s)}</p>
@@ -126,7 +140,9 @@ Assigned
 } else {
 Removed
 }
-</td><td>{Show(d.ProfileStatus)}<br/>{Show(d.ProfileID)}</td><td>{When(&d.ObservedAt)}</td></tr>
+</td><td>{Show(d.ProfileStatus)}<br/>{Show(d.ProfileID)}</td><td>
+	@Timestamp(&d.ObservedAt)
+</td></tr>
           }
 </tbody>
          </table>

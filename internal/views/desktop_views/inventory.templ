@@ -37,8 +37,12 @@ templ InventoryWithRefresh(c echo.Context, info *partials.CommonInfo, device *in
 						<dt>Platform</dt><dd>{ mdm_views.StateLabel(device.Platform) }</dd>
 						<dt>Device type</dt><dd>{ mdm_views.Show(device.EndpointType) }</dd>
 						<dt>Agent status</dt><dd>{ mdm_views.Show(device.Status) }</dd>
-						<dt>First report</dt><dd>{ mdm_views.When(device.FirstContact) }</dd>
-						<dt>Last report</dt><dd>{ mdm_views.When(device.LastContact) }</dd>
+						<dt>First report</dt><dd>
+							@mdm_views.Timestamp(device.FirstContact)
+						</dd>
+						<dt>Last report</dt><dd>
+							@mdm_views.Timestamp(device.LastContact)
+						</dd>
 						<dt>IP address</dt><dd>{ mdm_views.Show(device.IP) }</dd>
 						<dt>MAC address</dt><dd>{ mdm_views.Show(device.MAC) }</dd>
 					</dl>

@@ -27,7 +27,9 @@ templ MacCapabilities(d *apple.Device) {
 						}
 					</dd>
 					<dt>Software update device identifier</dt><dd>{ Show(d.SoftwareUpdateDeviceID) }</dd>
-					<dt>Security inventory collected</dt><dd>{ When(d.SecurityAt) }</dd>
+					<dt>Security inventory collected</dt><dd>
+						@Timestamp(d.SecurityAt)
+					</dd>
 				</dl>
 				<p class="uk-text-muted mt-4">Apple silicon updates require a bootstrap token from this Mac. A token-enabled user may need to sign in before macOS sends it. Use Refresh device, apps &amp; profiles to request current readiness information.</p>
 				<p class="uk-text-muted mt-4">Device enrollment manages system profiles. Verify the agent and MDM channels to show their shared Mac identity and channel history.</p>

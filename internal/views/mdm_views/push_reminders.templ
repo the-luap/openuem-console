@@ -15,9 +15,13 @@ templ PushReminderHistory(reminders []apple.PushReminderSummary) {
 				<ul class="grid gap-4 mt-4">
 					for _,r:=range reminders {
 						<li class="uk-card uk-card-default uk-card-body">
-							<h4 class="font-semibold">{ r.Label() } — { r.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</h4>
+							<h4 class="font-semibold">{ r.Label() } —{ " " }
+								@Timestamp(&r.ExpiresAt)
+							</h4>
 							<p class="break-all">Certificate SHA-256: { r.Fingerprint }</p>
-							<p>Recorded: { r.CreatedAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+							<p>Recorded:{ " " }
+								@Timestamp(&r.CreatedAt)
+							</p>
 							<p>Accepted by SMTP: { Number(r.Sent) }; pending: { Number(r.Pending) }; cancelled: { Number(r.Cancelled) }.</p>
 							if r.ResolvedAt!=nil {
 								<p>This reminder was superseded by a certificate change or a different warning stage.</p>
@@ -28,7 +32,9 @@ templ PushReminderHistory(reminders []apple.PushReminderSummary) {
 								<p role="status">Deliveries awaiting retry: { Number(r.Failed) }. Check this organization's SMTP settings and server connectivity.</p>
 							}
 							if r.NextAttemptAt!=nil {
-								<p>Next attempt no earlier than { r.NextAttemptAt.UTC().Format("2006-01-02 15:04 UTC") }.</p>
+								<p>Next attempt no earlier than{ " " }
+									@Timestamp(r.NextAttemptAt)
+								.</p>
 							}
 							<p class="uk-text-muted">SMTP acceptance does not confirm inbox delivery. A crash after acceptance can cause a repeated message.</p>
 							</li>

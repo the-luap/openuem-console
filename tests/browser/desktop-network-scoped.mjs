@@ -7,6 +7,7 @@ export default async function run(browser, record) {
         await visit("desktop-network-scoped-" + state + "-" + role, width);
         check(await evaluate(`document.querySelector('main').querySelectorAll('img,iframe,form[method="post"],[uk-tooltip]').length === 0 && !window.__ownedNetworkMarkup`), "Network report injected markup, rich tooltips or mutation controls");
         check(await evaluate(`document.querySelector('nav[aria-label="Computer inventory"] a[aria-current="page"]').textContent === 'Reported network'`), "Network navigation lost its active page");
+        check(await evaluate(`document.querySelector('main section').textContent.includes('Last agent report: Never reported')`), "Report label and timestamp ran together");
         const links = await evaluate(`(() => {
           const links = [...document.querySelectorAll('nav[aria-label="Network pages"] a')];
           return links.map(a => ({text:a.textContent, path:new URL(a.href).pathname, query:Object.fromEntries(new URL(a.href).searchParams)}));

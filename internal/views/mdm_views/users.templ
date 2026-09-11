@@ -55,7 +55,9 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 						<dt>Console session</dt>
 						<dd>{ userConsole(*detail.User) }</dd>
 						<dt>Last seen</dt>
-						<dd>{ When(&detail.User.LastSeen) }</dd>
+						<dd>
+							@Timestamp(&detail.User.LastSeen)
+						</dd>
 						<dt>Push status</dt>
 						<dd>{ StateLabel(detail.User.PushStatus) }</dd>
 						if detail.User.PushError!="" {
@@ -63,7 +65,9 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 							<dd>{ detail.User.PushError }</dd>
 						}
 						<dt>Profile inventory</dt>
-						<dd>{ When(detail.User.ProfilesAt) }</dd>
+						<dd>
+							@Timestamp(detail.User.ProfilesAt)
+						</dd>
 					</dl>
 					<p class="uk-text-muted">A user identifier is an OS-reported account handle, not proof of directory authentication. Commands wait while this user is not on the console.</p>
 					if detail.Device.Status=="enrolled" {
@@ -158,7 +162,9 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 					for _,command:=range detail.Commands {
 						<article class="border rounded p-4 grid gap-4">
 							<h3 class="font-semibold">{ command.RequestType+" · "+StateLabel(command.Status) }</h3>
-							<p>{ "Created: "+When(&command.CreatedAt)+" · Attempts: "+Number(command.Attempts) }</p>
+							<p>Created:{ " " }
+								@Timestamp(&command.CreatedAt)
+							{ " · Attempts: "+Number(command.Attempts) }</p>
 							<p class="uk-text-muted">{ command.ID }</p>
 							if command.Error!="" {
 								<p>{ command.Error }</p>

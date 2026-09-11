@@ -34,7 +34,9 @@ templ ADEPlatformSSOPanel(info *partials.CommonInfo, detail Detail) {
 			<div class="uk-card-body space-y-4">
 				@ADEPlatformSSORequirement(info, detail.ADEPlatformSSO)
 				<p role="status">{ adePlatformSSOMessage(detail.ADEPlatformSSO,detail.ADE.SetupState) }</p>
-				<p>Latest profile inventory: { When(detail.ADEPlatformSSO.ProfileObservedAt) }</p>
+				<p>Latest profile inventory:{ " " }
+					@Timestamp(detail.ADEPlatformSSO.ProfileObservedAt)
+				</p>
 				<p>Release also requires the exact provider application to be reported as installed and managed. Provider registration starts after release; profile and app inventory do not establish whether registration succeeded.</p>
 				<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/repairs")) }>Profile repair history</a></p>
 				<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/history")) }>Reviewed provider revision history</a></p>
@@ -88,7 +90,9 @@ templ ADEPlatformSSORevisions(c echo.Context, info *partials.CommonInfo, d *appl
 					}
 					for _,item:=range items {
 						<article class="software-revision">
-							<h2 class="font-semibold">{ When(&item.CreatedAt) } · { item.Actor }</h2>
+							<h2 class="font-semibold">
+								@Timestamp(&item.CreatedAt)
+ { " · " }{ item.Actor }</h2>
 							if item.PreviousID=="" {
 								<p>Original enrollment requirement</p>
 							} else {
@@ -136,7 +140,9 @@ templ ADEPlatformSSORepairs(c echo.Context, info *partials.CommonInfo, d *apple.
 					}
 					for _,item:=range items {
 						<article class="software-revision">
-							<h2 class="font-semibold">{ When(&item.CreatedAt) } · { item.Actor }</h2>
+							<h2 class="font-semibold">
+								@Timestamp(&item.CreatedAt)
+ { " · " }{ item.Actor }</h2>
 							<p>{ item.Reason }</p>
 							<p class="uk-text-muted">Retained revision: { item.ProfileRevisionID }</p>
 						</article>

@@ -1,4 +1,6 @@
 en:
+  timestamps:
+    never_reported: "Never reported"
   account_language:
     title: "Display language"
     label: "Language"

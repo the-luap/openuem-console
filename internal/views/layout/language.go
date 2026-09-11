@@ -5,7 +5,7 @@ import (
 	"github.com/invopop/ctxi18n"
 )
 
-func documentLanguage(ctx context.Context) string {
+func DocumentLanguage(ctx context.Context) string {
 	if locale := ctxi18n.Locale(ctx); locale != nil {
 		return string(locale.Code())
 	}

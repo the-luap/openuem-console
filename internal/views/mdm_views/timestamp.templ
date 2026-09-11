@@ -1,0 +1,39 @@
+package mdm_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"time"
+)
+
+// Timestamp represents an instant. Device-local policy deadlines and reported
+// date strings must retain their own semantics instead of using this component.
+templ Timestamp(value *time.Time) {
+	@timestamp(value, false)
+}
+
+templ TimestampSeconds(value *time.Time) {
+	@timestamp(value, true)
+}
+
+func timestampPrecision(seconds bool) string {
+	if seconds {
+		return "second"
+	}
+	return "minute"
+}
+
+func timestampFallback(value *time.Time, seconds bool) string {
+	if seconds && value != nil {
+		return value.UTC().Format("2006-01-02 15:04:05 UTC")
+	}
+	return When(value)
+}
+
+templ timestamp(value *time.Time, seconds bool) {
+	if value == nil {
+		<span>{ i18n.T(ctx,"timestamps.never_reported") }</span>
+	} else {
+		<time datetime={ value.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision={ timestampPrecision(seconds) } title={ value.UTC().Format(time.RFC3339Nano) }>{ timestampFallback(value,seconds) }</time>
+	}
+}

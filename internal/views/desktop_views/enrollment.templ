@@ -25,7 +25,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 				<div class="uk-card-header"><h2 class="uk-card-title">Organization identity</h2><p>Each enrolled computer generates its own private keys. The organization's certificate authority signs its public identity.</p></div>
 				<div class="uk-card-body min-w-0">
 					if data.Authority!=nil {
-						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Public enrollment address</dt><dd class="break-all">{ data.Authority.PublicOrigin }</dd><dt>Certificate authority expires</dt><dd>{ data.Authority.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</dd></dl>
+						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Public enrollment address</dt><dd class="break-all">{ data.Authority.PublicOrigin }</dd><dt>Certificate authority expires</dt><dd>
+							@mdm_views.Timestamp(&data.Authority.ExpiresAt)
+						</dd></dl>
 					} else if data.SetupError=="" {
 						if data.PublicOrigin=="" {
 							<p role="status">A server administrator must configure the public enrollment address before setup.</p>
@@ -58,7 +60,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 										<td class="break-all">{ row.ID }</td>
 										<td>{ row.Platform } / { row.Architecture }</td>
 										<td>{ fmt.Sprintf("%d / %d",row.Uses,row.MaxUses) }</td>
-										<td class="whitespace-nowrap">{ row.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.ExpiresAt)
+										</td>
 										<td>{ invitationState(row) }</td>
 										<td>
 											if row.RevokedAt==nil && info.Can(access.EnrollDevices) {
@@ -97,8 +101,12 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 									<tr>
 										<td><span class="font-medium break-words">{ row.DisplayName }</span><br/><span class="uk-text-muted break-all">{ row.ID }</span></td>
 										<td>{ row.Platform } / { row.Architecture }</td>
-										<td class="whitespace-nowrap">{ row.EnrolledAt.UTC().Format("2006-01-02 15:04 UTC") }</td>
-										<td class="whitespace-nowrap">{ row.CertificateExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.EnrolledAt)
+										</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.CertificateExpiresAt)
+										</td>
 										<td>{ identityState(row) }</td>
 										<td>
 											if row.RevokedAt==nil && info.Can(access.RevokeDevices) {
@@ -140,7 +148,9 @@ templ InvitationCreation(info *partials.CommonInfo, data EnrollmentData) {
 				<div role="status" class="uk-alert uk-alert-success">Invitation created. Copy its installation link now; it will not be shown again.</div>
 				<label class="grid min-w-0 gap-2">Installation link<input class="uk-input w-full min-w-0" readonly value={ data.Created.URL }/></label>
 				<a class="uk-button uk-button-primary" href={ templ.URL(data.Created.URL) } target="_blank" rel="noopener noreferrer">Open installation instructions</a>
-				<dl class="uk-description-list"><dt>Computer type</dt><dd>{ targetLabel(data.Created.Platform, data.Created.Architecture) }</dd><dt>Organization / site IDs</dt><dd>{ fmt.Sprintf("%d / %d",data.Created.TenantID,data.Created.SiteID) }</dd><dt>Approved agent</dt><dd>{ data.Created.Version }</dd><dt>Maximum computers</dt><dd>{ fmt.Sprint(data.Created.MaxUses) }</dd><dt>Expires</dt><dd>{ data.Created.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</dd></dl>
+				<dl class="uk-description-list"><dt>Computer type</dt><dd>{ targetLabel(data.Created.Platform, data.Created.Architecture) }</dd><dt>Organization / site IDs</dt><dd>{ fmt.Sprintf("%d / %d",data.Created.TenantID,data.Created.SiteID) }</dd><dt>Approved agent</dt><dd>{ data.Created.Version }</dd><dt>Maximum computers</dt><dd>{ fmt.Sprint(data.Created.MaxUses) }</dd><dt>Expires</dt><dd>
+					@mdm_views.Timestamp(&data.Created.ExpiresAt)
+				</dd></dl>
 				<label class="grid min-w-0 gap-2">Invitation token<textarea id="desktop-invitation-token" class="uk-textarea w-full min-w-0 font-mono" readonly rows="2" spellcheck="false" autocomplete="off">{ invitationToken(data.Created) }</textarea></label>
 				<p>Use this token with the installed, signed agent's <code>enroll</code> command. An administrator must place it in a private invitation file and authorize the server address and organization/site IDs. Share it only with the intended installer or administrator.</p>
 				<p class="uk-text-muted">An administrator completes installation and service activation. An invitation or saved identity does not confirm that a computer is online.</p>
@@ -159,7 +169,9 @@ templ InvitationCreation(info *partials.CommonInfo, data EnrollmentData) {
 			} else if data.InvitationSetup!="" {
 				<p role="status">{ data.InvitationSetup }</p>
 			} else {
-				<p>Approved agent: <strong>{ data.ReleaseVersion }</strong>. Invitations expire no later than { data.ReleaseExpires.UTC().Format("2006-01-02 15:04 UTC") }.</p>
+				<p>Approved agent: <strong>{ data.ReleaseVersion }</strong>. Invitations expire no later than{ " " }
+					@mdm_views.Timestamp(&data.ReleaseExpires)
+				.</p>
 				<form method="post" action={ partials.GetNavigationUrl(info,"/desktop/invitations") } class="grid min-w-0 gap-4">
 					@mdm_views.CSRF(info)
 					<input type="hidden" name="release_digest" value={ data.ReleaseDigest }/>

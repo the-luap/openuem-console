@@ -39,7 +39,11 @@ templ ADEApplicationPanel(info *partials.CommonInfo, detail Detail) {
 						<p role="status">{ adeApplicationMessage(r,detail.ADE) }</p>
 						if r.Assignment!=nil {
 							<p>{ MacAppState(*r.Assignment) }</p>
-							<p>Managed observation: { When(r.Assignment.ManagedAt) } · Installed observation: { When(r.Assignment.InstalledAt) }</p>
+							<p>Managed observation:{ " " }
+								@Timestamp(r.Assignment.ManagedAt)
+ { " · " }Installed observation:{ " " }
+  @Timestamp(r.Assignment.InstalledAt)
+ </p>
 						}
 						<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/applications")) }>Application actions and attempts</a> · <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/applications/"+r.ID+"/history")) }>Required revision history</a></p>
 						if r.PlatformSSO {
@@ -81,7 +85,9 @@ templ ADEApplicationHistory(c echo.Context, info *partials.CommonInfo, d *apple.
 					}
 					for _,change:=range changes {
 						<article class="software-revision">
-							<h2 class="font-semibold">{ When(&change.CreatedAt) } · { change.Actor }</h2>
+							<h2 class="font-semibold">
+								@Timestamp(&change.CreatedAt)
+ { " · " }{ change.Actor }</h2>
 							<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+change.PreviousVersionID)) }>{ change.PreviousVersion }</a> → <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+change.VersionID)) }>{ change.Version }</a></p>
 							<p>{ change.Reason }</p>
 						</article>

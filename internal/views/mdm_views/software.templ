@@ -61,9 +61,13 @@ templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []appl
 							<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+v.ID)) }>{ v.Name } · { v.Version }</a></h3>
 							<p>{ v.Identifier } · { SoftwarePackageKind(v.Kind) } · { v.Architecture } · minimum OS { v.MinimumOS }</p>
 							if v.WithdrawnAt!=nil {
-								<p>Withdrawn · { When(v.WithdrawnAt) }</p>
+								<p>Withdrawn ·{ " " }
+									@Timestamp(v.WithdrawnAt)
+								</p>
 							} else {
-								<p>Approved · { When(&v.ApprovedAt) }</p>
+								<p>Approved ·{ " " }
+									@Timestamp(&v.ApprovedAt)
+								</p>
 							}
 						</article>
 					}
@@ -88,7 +92,9 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Approved artifact</h2></div>
 				<div class="uk-card-body">
-					<dl class="uk-description-list"><dt>Package type</dt><dd>{SoftwarePackageKind(v.Kind)}</dd><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>{SoftwareVersionLabel(v.Platform)}</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>{v.Platform} { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ Show(v.SHA256) }</code></dd><dt>Approved</dt><dd>{ When(&v.ApprovedAt) } · { v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
+					<dl class="uk-description-list"><dt>Package type</dt><dd>{SoftwarePackageKind(v.Kind)}</dd><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>{SoftwareVersionLabel(v.Platform)}</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>{v.Platform} { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ Show(v.SHA256) }</code></dd><dt>Approved</dt><dd>
+						@Timestamp(&v.ApprovedAt)
+ { " · " }{ v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
 					if v.Platform=="windows" {
 						@WindowsSoftwareRequirements(v)
 						if v.Kind=="windows-winget" {
@@ -103,7 +109,9 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 						}
 					}
 					if v.WithdrawnAt!=nil {
-						<p role="status" class="uk-alert uk-alert-warning mt-4">Withdrawn at { When(v.WithdrawnAt) }. This revision cannot be sent for another installation.</p>
+						<p role="status" class="uk-alert uk-alert-warning mt-4">Withdrawn at{ " " }
+							@Timestamp(v.WithdrawnAt)
+						. This revision cannot be sent for another installation.</p>
 					}
 					if canManage && v.WithdrawnAt==nil {
 						<details class="mt-4">
@@ -185,7 +193,15 @@ templ MacApplications(c echo.Context, info *partials.CommonInfo, d *apple.Device
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ MacAppState(a) }</p></div>
 					<div class="uk-card-body">
-						<dl class="uk-description-list"><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested operation</dt><dd>{ a.Operation } · { When(&a.CreatedAt) }</dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } · { When(a.ManagedAt) }</dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } · { When(a.InstalledAt) }</dd><dt>Command accepted</dt><dd>{ When(a.AcceptedAt) }</dd></dl>
+						<dl class="uk-description-list"><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested operation</dt><dd>{ a.Operation } ·{ " " }
+							@Timestamp(&a.CreatedAt)
+						</dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } ·{ " " }
+							@Timestamp(a.ManagedAt)
+						</dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } ·{ " " }
+							@Timestamp(a.InstalledAt)
+						</dd><dt>Command accepted</dt><dd>
+							@Timestamp(a.AcceptedAt)
+						</dd></dl>
 						if message:=MacAppError(a.Error);message!="" {
 							<p class="uk-alert uk-alert-warning mt-4">{ message }</p>
 						}
@@ -244,7 +260,17 @@ templ MacApplicationHistory(c echo.Context, info *partials.CommonInfo, d *apple.
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ a.Operation } · { MacAppState(a) }</p></div>
 					<div class="uk-card-body">
-						<dl class="uk-description-list"><dt>Requested</dt><dd>{ When(&a.CreatedAt) } · { Show(a.RequestedBy) }</dd><dt>Sent</dt><dd>{ When(a.DispatchedAt) }</dd><dt>Command accepted</dt><dd>{ When(a.AcceptedAt) }</dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } · { When(a.ManagedAt) }</dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } · { When(a.InstalledAt) }</dd><dt>Operation identifier</dt><dd>{ a.AttemptID }</dd></dl>
+						<dl class="uk-description-list"><dt>Requested</dt><dd>
+							@Timestamp(&a.CreatedAt)
+ { " · " }{ Show(a.RequestedBy) }</dd><dt>Sent</dt><dd>
+  @Timestamp(a.DispatchedAt)
+ </dd><dt>Command accepted</dt><dd>
+  @Timestamp(a.AcceptedAt)
+ </dd><dt>Managed app report</dt><dd>{ MacAppObservationLabel(a.ManagedState) } ·{ " " }
+  @Timestamp(a.ManagedAt)
+ </dd><dt>Installed bundle version</dt><dd>{ Show(a.InstalledVersion) } · { MacAppObservationLabel(a.InstalledState) } ·{ " " }
+  @Timestamp(a.InstalledAt)
+ </dd><dt>Operation identifier</dt><dd>{ a.AttemptID }</dd></dl>
 						if message:=MacAppError(a.Error);message!="" {
 							<p class="uk-alert uk-alert-warning mt-4">{ message }</p>
 						}

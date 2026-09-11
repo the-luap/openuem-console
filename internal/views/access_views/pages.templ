@@ -7,6 +7,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"strconv"
+"time"
 )
 
 type SiteOption struct {
@@ -115,7 +116,7 @@ templ Audit(c echo.Context, info *partials.CommonInfo, events []access.AuditEven
 			<h1 class="text-2xl font-semibold">Permission change history</h1>
 			<p>Each successful change records its actor, user, previous permissions and resulting permissions. Times are shown in UTC.</p>
 			for _,event:=range events {
-				<article class="uk-card uk-card-default"><div class="uk-card-body grid gap-3"><h2 class="font-semibold break-all">{ event.Actor+" → "+event.Subject }</h2><p>{ event.Action+" · "+event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") }</p><details><summary>Permission details</summary><p>Before</p><pre class="whitespace-pre-wrap break-all">{ string(event.Before) }</pre><p>After</p><pre class="whitespace-pre-wrap break-all">{ string(event.After) }</pre></details></div></article>
+				<article class="uk-card uk-card-default"><div class="uk-card-body grid gap-3"><h2 class="font-semibold break-all">{ event.Actor+" → "+event.Subject }</h2><p>{ event.Action+" · " }<time datetime={ event.CreatedAt.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision="second">{ event.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") }</time></p><details><summary>Permission details</summary><p>Before</p><pre class="whitespace-pre-wrap break-all">{ string(event.Before) }</pre><p>After</p><pre class="whitespace-pre-wrap break-all">{ string(event.After) }</pre></details></div></article>
 			}
 			if len(events)==0 {
 				<p>No permission changes in this page.</p>

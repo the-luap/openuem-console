@@ -28,9 +28,15 @@ templ MacAppPreviousEnrollments(c echo.Context, info *partials.CommonInfo, d *ap
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ a.Operation } · { MacAppPriorState(a) }</p></div>
 					<div class="uk-card-body">
-						<dl class="uk-description-list"><dt>Previous enrollment</dt><dd>{ Show(a.PreviousName) } · { a.PreviousStatus }<br/>{ a.PreviousDeviceID }</dd><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested</dt><dd>{ When(&a.CreatedAt) }</dd><dt>Sent</dt><dd>{ When(a.DispatchedAt) }</dd><dt>Operation identifier</dt><dd>{ a.ID }</dd></dl>
+						<dl class="uk-description-list"><dt>Previous enrollment</dt><dd>{ Show(a.PreviousName) } · { a.PreviousStatus }<br/>{ a.PreviousDeviceID }</dd><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested</dt><dd>
+							@Timestamp(&a.CreatedAt)
+						</dd><dt>Sent</dt><dd>
+							@Timestamp(a.DispatchedAt)
+						</dd><dt>Operation identifier</dt><dd>{ a.ID }</dd></dl>
 						if a.Recovery!=nil {
-							<div class="uk-alert mt-4"><h3 class="font-semibold">Stopping evidence recorded</h3><p>{ MacAppEvidenceLabel(a.Recovery.Evidence) } · { When(&a.Recovery.CreatedAt) } · { a.Recovery.Actor }</p><p class="mt-2">{ a.Recovery.Reason }</p><p class="mt-2">Recorded for enrollment { a.Recovery.DeviceID }. This is an operator assertion; it does not verify the old installation outcome.</p></div>
+							<div class="uk-alert mt-4"><h3 class="font-semibold">Stopping evidence recorded</h3><p>{ MacAppEvidenceLabel(a.Recovery.Evidence) } ·{ " " }
+								@Timestamp(&a.Recovery.CreatedAt)
+ { " · " }{ a.Recovery.Actor }</p><p class="mt-2">{ a.Recovery.Reason }</p><p class="mt-2">Recorded for enrollment { a.Recovery.DeviceID }. This is an operator assertion; it does not verify the old installation outcome.</p></div>
 						} else if a.CanRecordEvidence() && !risk.ActiveIdentity && apple.MacAppManagementReady(*d,time.Now()) {
 							<details class="mt-4">
 								<summary>Record stopping evidence for this operation</summary>

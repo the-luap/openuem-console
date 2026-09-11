@@ -109,9 +109,13 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 						<br/>
 						Apple profile: { Show(p.RemoteID) }
 						<br/>
-						Last attempt: { When(p.AttemptedAt) }
+						Last attempt:{ " " }
+							@Timestamp(p.AttemptedAt)
+
 						<br/>
-						Next scheduled attempt: { When(&p.NextAttemptAt) }
+						Next scheduled attempt:{ " " }
+							@Timestamp(&p.NextAttemptAt)
+
 					</p>
 					if p.Error!="" {
 						<p role="status">
@@ -178,8 +182,12 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 							for _,t:=range data.Targets {
 								<tr>
 									<td>{ t.Serial }</td>
-									<td>{ adeProfileName(data.Profiles,t.ProfileID) }<br/>{ adeEnrollmentState(t.Status) }<br/>{ Show(t.ResponseStatus) }<br/>Next check: { When(&t.NextAttemptAt) }</td>
-									<td>{ Show(t.RemoteProfileID) }<br/>{ Show(t.RemoteStatus) }<br/>{ When(t.ObservedAt) }</td>
+									<td>{ adeProfileName(data.Profiles,t.ProfileID) }<br/>{ adeEnrollmentState(t.Status) }<br/>{ Show(t.ResponseStatus) }<br/>Next check:{ " " }
+										@Timestamp(&t.NextAttemptAt)
+									</td>
+									<td>{ Show(t.RemoteProfileID) }<br/>{ Show(t.RemoteStatus) }<br/>
+										@Timestamp(t.ObservedAt)
+									</td>
 									<td>
 										if t.DeviceID!="" {
 											<a class="uk-link" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+t.DeviceID)) }>{ StateLabel(t.DeviceStatus) }</a>
@@ -235,7 +243,9 @@ templ ADEDevicePanel(info *partials.CommonInfo, detail Detail) {
 					{ adeSetupMessage(detail.ADE) }
 				</p>
 				<p class="uk-text-muted">
-					Last setup update: { When(detail.ADE.SetupUpdatedAt) }
+					Last setup update:{ " " }
+						@Timestamp(detail.ADE.SetupUpdatedAt)
+
 				</p>
 				if detail.Device.Status=="enrolled" && detail.ADE.SetupState=="failed" && info.Can(access.EnrollDevices) {
 					<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/retry") }>

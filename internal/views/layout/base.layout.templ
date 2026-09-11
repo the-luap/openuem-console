@@ -8,7 +8,7 @@ import (
 
 templ Base(section string, commonInfo *partials.CommonInfo) {
 	<!DOCTYPE html>
-	<html lang={ documentLanguage(ctx) }>
+	<html lang={ DocumentLanguage(ctx) }>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -33,6 +33,7 @@ templ Base(section string, commonInfo *partials.CommonInfo) {
 			<script src="/assets/js/htmx.min.js"></script>
 			<script src="/assets/js/echarts.min.js"></script>
 			<script src="/assets/js/openuem.js" type="module"></script>
+ <script src="/assets/js/timestamps.js" defer></script>
 			if commonInfo.IsTurnstileEnabled {
 				<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
 			}

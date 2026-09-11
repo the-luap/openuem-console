@@ -28,7 +28,9 @@ templ ProfileRevisionHistory(c echo.Context, info *partials.CommonInfo, profile 
 							<dt>Profile identity</dt>
 							<dd>{ v.Identifier } · { v.Scope } scope</dd>
 							<dt>Recorded</dt>
-							<dd>{ When(&v.CreatedAt) } · { Show(v.Actor) }</dd>
+							<dd>
+								@Timestamp(&v.CreatedAt)
+ { " · " }{ Show(v.Actor) }</dd>
 							<dt>Payload types</dt>
 							<dd>
 								for _,kind:=range v.PayloadTypes {

@@ -78,7 +78,9 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 										<td>{ Show(d.Model) }</td>
 										<td>{ Show(d.Serial) }</td>
 										<td>{ StateLabel(d.Status) }</td>
-										<td>{ When(d.LastSeen) }</td>
+										<td>
+											@Timestamp(d.LastSeen)
+										</td>
 									</tr>
 								}
 							</tbody>
@@ -202,7 +204,9 @@ templ Invitation(c echo.Context, info *partials.CommonInfo, invite *apple.Invita
 					if code := EnrollmentQR(invite.URL); code != "" {
 						<img src={ code } alt="Scan to open the private enrollment invitation" width="256" height="256" class="max-w-full"/>
 					}
-					<p>{ "Expires: "+invite.ExpiresAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+					<p>{ "Expires: " }
+						@Timestamp(&invite.ExpiresAt)
+					</p>
 					<p>Share this link and QR code only with the intended device owner. Opening the page does not use the invitation. One browser can claim it; that browser then has up to three attempts within ten minutes to download the same profile.</p>
 					<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+invite.DeviceID)) }>View enrollment status</a>
 				</div>
@@ -259,9 +263,13 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						<dt>Management channel</dt>
 						<dd>Device channel · System profiles</dd>
 						<dt>Last contact</dt>
-						<dd>{ When(detail.Device.LastSeen) }</dd>
+						<dd>
+							@Timestamp(detail.Device.LastSeen)
+						</dd>
 						<dt>OS inventory collected</dt>
-						<dd>{ When(detail.Device.InventoryAt) }</dd>
+						<dd>
+							@Timestamp(detail.Device.InventoryAt)
+						</dd>
 						<dt>Push status</dt>
 						<dd>
 							{ StateLabel(detail.Device.PushStatus) }
@@ -328,7 +336,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 										}
 									</select>
 								</label>
-								<p class="uk-text-muted">{ "Apple release catalog checked: "+When(detail.CatalogAt) }</p>
+								<p class="uk-text-muted">{ "Apple release catalog checked: " }
+									@Timestamp(detail.CatalogAt)
+								</p>
 								if len(detail.Releases)==0 {
 									<p role="status">No current releases are available for this device. Refresh its inventory and check the Apple catalog connection before setting a policy.</p>
 								}
@@ -350,7 +360,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">Configuration profiles</h2><p>{ "Inventory collected: "+When(detail.Device.ProfilesAt) }</p></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">Configuration profiles</h2><p>{ "Inventory collected: " }
+					@Timestamp(detail.Device.ProfilesAt)
+				</p></div>
 				<div class="uk-card-body overflow-x-auto">
 					<table class="uk-table uk-table-divider">
 						<thead><tr><th>Profile</th><th>Revision</th><th>Desired state</th><th>Device result</th><th>Action</th></tr></thead>
@@ -388,7 +400,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">{ fmt.Sprintf("Installed apps · %d",len(detail.Device.Apps)) }</h2><p>{ "Inventory collected: "+When(detail.Device.AppsAt) }</p></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">{ fmt.Sprintf("Installed apps · %d",len(detail.Device.Apps)) }</h2><p>{ "Inventory collected: " }
+					@Timestamp(detail.Device.AppsAt)
+				</p></div>
 				<div class="uk-card-body overflow-x-auto">
 					<table class="uk-table uk-table-divider">
 						<thead><tr><th>Application</th><th>Identifier</th><th>Version</th><th>Installing</th></tr></thead>
@@ -425,7 +439,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ cmd.RequestType }</td>
 									<td>{ StateLabel(cmd.Status) }</td>
 									<td>{ Number(cmd.Attempts) }</td>
-									<td>{ cmd.CreatedAt.UTC().Format("2006-01-02 15:04") }</td>
+									<td>
+										@Timestamp(&cmd.CreatedAt)
+									</td>
 									<td>
 										{ cmd.Error }
 										if detail.Device.Status=="enrolled" && !cmd.IdentityRenewal && !cmd.MacBinding && !cmd.FileVault && !cmd.RecoveryLock && !cmd.ADESetup && !cmd.MacAdmin && !cmd.ManagedApp && (cmd.Status=="failed" || cmd.Status=="expired" || cmd.Status=="not_now") {

@@ -32,7 +32,9 @@ templ Network(c echo.Context, info *partials.CommonInfo, page *inventory.Network
 				<div class="uk-card-header"><h2 class="uk-card-title">Network inventory</h2></div>
 				<div class="uk-card-body min-w-0">
 					<p class="break-words">{ page.Organization } / { page.Site }</p>
-					<p class="uk-text-muted mt-2">Last agent report: { mdm_views.When(page.LastContact) }</p>
+					<p class="uk-text-muted mt-2">Last agent report:{ " " }
+						@mdm_views.Timestamp(page.LastContact)
+					</p>
 					<p class="uk-text-muted mt-2">These are stored agent reports. They do not verify current connectivity or configuration. A new report can change entries while you browse.</p>
 					<form method="get" action={ networkURL(info, page.DeviceID, "", 0) } class="mt-4">
 						<label for="network-search">Search by adapter name or address</label>

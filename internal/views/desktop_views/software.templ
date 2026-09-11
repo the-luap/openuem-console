@@ -31,7 +31,9 @@ templ Software(c echo.Context, info *partials.CommonInfo, page *inventory.Softwa
     <div class="uk-card-header"><h2 class="uk-card-title">Software inventory</h2></div>
     <div class="uk-card-body min-w-0">
      <p class="break-words">{ page.Organization } / { page.Site }</p>
-     <p class="uk-text-muted mt-2">Last agent report: { mdm_views.When(page.LastContact) }</p>
+     <p class="uk-text-muted mt-2">Last agent report:{ " " }
+      @mdm_views.Timestamp(page.LastContact)
+     </p>
      <p class="uk-text-muted mt-2">These are stored agent reports. They do not verify a software deployment or the device's current state. A new report can change entries while you browse.</p>
      <form method="get" action={ softwareURL(info, page.DeviceID, "", 0) } class="mt-4">
       <label for="software-search">Search by name or publisher</label>

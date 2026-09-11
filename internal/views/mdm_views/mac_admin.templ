@@ -26,11 +26,15 @@ templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
    <div class="uk-card-header"><h2 id="mac-admin-title" class="uk-card-title">Managed Mac administrator</h2></div>
    <div class="uk-card-body space-y-4">
     <p><strong>{ a.Options.ShortName }</strong> · { Show(a.Options.FullName) }</p>
-    <dl><dt>Account configuration</dt><dd>{ macAdminState(a.CreationState) }</dd><dt>Account inventory</dt><dd>{ macAdminState(a.InventoryState) } · { When(a.ObservedAt) }</dd><dt>Bound account ID</dt><dd class="break-all">{ Show(a.GUID) }</dd><dt>Latest password operation</dt><dd>{ Show(a.LatestOperation) } · { macAdminState(a.LatestStatus) }</dd><dt>Next scheduled rotation</dt><dd>
+    <dl><dt>Account configuration</dt><dd>{ macAdminState(a.CreationState) }</dd><dt>Account inventory</dt><dd>{ macAdminState(a.InventoryState) } ·{ " " }
+      @Timestamp(a.ObservedAt)
+    </dd><dt>Bound account ID</dt><dd class="break-all">{ Show(a.GUID) }</dd><dt>Latest password operation</dt><dd>{ Show(a.LatestOperation) } · { macAdminState(a.LatestStatus) }</dd><dt>Next scheduled rotation</dt><dd>
  if a.NextRotationAt==nil {
  Not scheduled
  } else {
- { When(a.NextRotationAt) }
+
+  @Timestamp(a.NextRotationAt)
+
  }
  </dd></dl>
     <p>Command acknowledgement confirms processing by macOS. It does not verify a login or the Secure Token password used for FileVault. Account inventory confirms the account identity, not its password.</p>
@@ -67,7 +71,9 @@ templ MacAdminPanel(info *partials.CommonInfo, detail Detail) {
       <p>Each reveal is audited. A retained password may be previous, proposed, or unconfirmed. The last acknowledged password can still be uncertain after a later failed or unanswered command.</p>
       for _,key:=range detail.MacAdminKeys {
        <article class="mt-4">
-        <p>{ Show(key.Operation) } · { macAdminState(key.Status) } · { When(&key.CreatedAt) }
+        <p>{ Show(key.Operation) } · { macAdminState(key.Status) } ·{ " " }
+          @Timestamp(&key.CreatedAt)
+
          if key.Current {
  <strong> · Last acknowledged password</strong>
  }

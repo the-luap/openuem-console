@@ -17,9 +17,13 @@ templ InventoryRefresh(info *partials.CommonInfo, device *inventory.Desktop, dat
    if data.Request != nil {
     <dl class="uk-description-list break-words mt-4">
      <dt>Latest request</dt><dd role="status">{ refreshState(data.Request) }</dd>
-     <dt>Requested</dt><dd>{ mdm_views.When(&data.Request.RequestedAt) }</dd>
+     <dt>Requested</dt><dd>
+      @mdm_views.Timestamp(&data.Request.RequestedAt)
+     </dd>
      if data.Request.Status == "accepted" {
-      <dt>Delivery accepted</dt><dd>{ mdm_views.When(data.Request.FinishedAt) }</dd>
+      <dt>Delivery accepted</dt><dd>
+        @mdm_views.Timestamp(data.Request.FinishedAt)
+      </dd>
      }
      <dt>Request ID</dt><dd class="break-all">{ data.Request.ID }</dd>
     </dl>

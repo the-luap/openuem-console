@@ -83,13 +83,19 @@ templ RecoveryLockPanel(info *partials.CommonInfo, detail Detail) {
 						<div class="grid gap-4 mt-3">
 							for _,key:=range detail.RecoveryLockKeys {
 								<div class="uk-card uk-card-body uk-card-small">
-									<p>{ key.Source } password · { key.CreatedAt.UTC().Format("2006-01-02 15:04 UTC") }</p>
+									<p>{ key.Source } password ·{ " " }
+										@Timestamp(&key.CreatedAt)
+									</p>
 									if key.Current {
 										<p>Current managed password</p>
 									}
-									<p>Last verification requested: { When(key.VerifiedAt) }</p>
+									<p>Last verification requested:{ " " }
+										@Timestamp(key.VerifiedAt)
+									</p>
 									if key.RejectedAt!=nil {
-										<p>Last rejected check requested: { When(key.RejectedAt) }</p>
+										<p>Last rejected check requested:{ " " }
+											@Timestamp(key.RejectedAt)
+										</p>
 									}
 									<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock/passwords/"+key.ID+"/reveal") }>
 										@CSRF(info)

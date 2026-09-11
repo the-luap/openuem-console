@@ -15,8 +15,12 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
      <dt>Device identity</dt><dd class="break-all">{ detail.Mac.ID }</dd>
      <dt>MDM channel</dt><dd>{ StateLabel(detail.Mac.MDMStatus) }</dd>
      <dt>Agent channel</dt><dd>{ StateLabel(detail.Mac.AgentStatus)+" · "+Show(detail.Mac.AgentName) }</dd>
-     <dt>Agent report received</dt><dd>{ When(detail.Mac.AgentSeen) }</dd>
-     <dt>Agent identity expires</dt><dd>{ When(&detail.Mac.AgentExpiresAt) }</dd>
+     <dt>Agent report received</dt><dd>
+      @Timestamp(detail.Mac.AgentSeen)
+     </dd>
+     <dt>Agent identity expires</dt><dd>
+      @Timestamp(&detail.Mac.AgentExpiresAt)
+     </dd>
     </dl>
     if detail.AgentURL!="" && info.Can(access.ReadDevices) {
      <a class="uk-button uk-button-default mt-4" href={ templ.URL(detail.AgentURL) }>Open agent inventory</a>
@@ -35,11 +39,15 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
         </strong>{ " · "+StateLabel(channel.Status) }</p>
         <p class="break-all uk-text-muted mt-2">{ channel.DeviceID }</p>
         <dl class="uk-description-list mt-2">
-         <dt>Attached</dt><dd>{ When(&channel.AttachedAt) }</dd>
+         <dt>Attached</dt><dd>
+          @Timestamp(&channel.AttachedAt)
+         </dd>
          if channel.RetiredAt==nil {
           <dt>Enrollment</dt><dd>Current channel</dd>
          } else {
-          <dt>Replaced</dt><dd>{ When(channel.RetiredAt) }</dd>
+          <dt>Replaced</dt><dd>
+            @Timestamp(channel.RetiredAt)
+          </dd>
          }
         </dl>
        </li>
@@ -55,8 +63,12 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
    if detail.MacBinding!=nil {
     <dl class="uk-description-list mt-4">
      <dt>Verification</dt><dd>{ StateLabel(detail.MacBinding.Status) }</dd>
-     <dt>Expires</dt><dd>{ When(&detail.MacBinding.ExpiresAt) }</dd>
-     <dt>MDM profile acknowledged</dt><dd>{ When(detail.MacBinding.InstalledAt) }</dd>
+     <dt>Expires</dt><dd>
+      @Timestamp(&detail.MacBinding.ExpiresAt)
+     </dd>
+     <dt>MDM profile acknowledged</dt><dd>
+      @Timestamp(detail.MacBinding.InstalledAt)
+     </dd>
      if detail.MacBinding.CompletedAt!=nil {
       <dt>Temporary profile cleanup</dt><dd>
        if detail.MacBinding.CleanupAt!=nil {

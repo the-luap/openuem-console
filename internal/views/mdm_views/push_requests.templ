@@ -13,7 +13,9 @@ templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests
 		}
 		<p class="mt-4">Responsible Apple account: { Show(settings.AppleAccount) }</p>
 		if settings.PushCheckedAt!=nil {
-			<dl class="uk-description-list"><dt>APNs connection checked (UTC)</dt><dd>{ settings.PushCheckedAt.UTC().Format("2006-01-02 15:04:05") }</dd><dt>Checked certificate fingerprint (SHA-256)</dt><dd>{ settings.PushFingerprint }</dd></dl>
+			<dl class="uk-description-list"><dt>APNs connection checked (UTC)</dt><dd>
+				@TimestampSeconds(settings.PushCheckedAt)
+			</dd><dt>Checked certificate fingerprint (SHA-256)</dt><dd>{ settings.PushFingerprint }</dd></dl>
 			<p class="uk-text-muted">This records a connection check at import. Device delivery and management acknowledgements are tracked separately.</p>
 		} else {
 			<p class="uk-text-muted">No APNs connection check is recorded for the active certificate. New imports require a successful check.</p>
@@ -46,7 +48,9 @@ templ PushRequests(info *partials.CommonInfo, settings *apple.Settings, requests
 					<dt>Organization</dt><dd>{ r.Organization }</dd>
 					<dt>Public management URL</dt><dd class="break-all">{ r.PublicURL }</dd>
 					<dt>Responsible Apple account</dt><dd class="break-all">{ r.AppleAccount }</dd>
-					<dt>Request expires (UTC)</dt><dd>{ r.ExpiresAt.UTC().Format("2006-01-02 15:04") }</dd>
+					<dt>Request expires (UTC)</dt><dd>
+						@Timestamp(&r.ExpiresAt)
+					</dd>
 					if r.ExpectedTopic!="" {
 						<dt>Renew this existing push topic</dt><dd class="break-all">{ r.ExpectedTopic }</dd>
 					}

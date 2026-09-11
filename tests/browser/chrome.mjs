@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["en","de","ca","es","fr","no","pt"].map(locale=>"timestamps-"+locale),
  ...["browser","en","de","es","ca","fr","no","pt","unavailable","long"].map(state=>"account-language-"+state),
   ...["viewer", "operator"].flatMap(role => ["first", "next", "empty", "long"].map(state => "desktop-network-scoped-" + state + "-" + role)),
  ...["ordinary","injected","long","empty"].map(state=>"desktop-network-"+state),

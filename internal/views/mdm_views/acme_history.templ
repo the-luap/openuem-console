@@ -39,7 +39,9 @@ templ ACMEHistory(c echo.Context, info *partials.CommonInfo, items []apple.ACMEL
 							<dd>{ v.ID }</dd>
 						</dl>
 						if v.State == "reviewed" {
-							<p class="mt-4">Reviewed { When(v.ReviewedAt) } · { v.ReviewedBy }</p>
+							<p class="mt-4">Reviewed{ " " }
+								@Timestamp(v.ReviewedAt)
+ { " · " }{ v.ReviewedBy }</p>
 							<p class="mt-2">{ v.Reason }</p>
 							<p class="mt-2">The submitted archive is retained encrypted as separate review evidence.</p>
 						} else if v.State == "unresolved" && canReview {

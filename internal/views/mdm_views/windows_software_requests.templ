@@ -65,12 +65,22 @@ templ WindowsSoftwareRequests(c echo.Context,info *partials.CommonInfo,page appl
       <article class="software-row">
        <h3 class="font-semibold">{WindowsSoftwareOperation(r.Operation)} · {r.AgentID}</h3>
        <p role="status">{WindowsSoftwareRequestState(r.Status)}</p>
-       <dl class="uk-description-list mt-4"><dt>Request</dt><dd>{r.ID}</dd><dt>Original site</dt><dd>{fmt.Sprint(r.SiteID)}</dd><dt>Prepared</dt><dd>{When(&r.CreatedAt)} · {r.Actor}</dd><dt>Deadline</dt><dd>{When(&r.ExpiresAt)}</dd></dl>
+       <dl class="uk-description-list mt-4"><dt>Request</dt><dd>{r.ID}</dd><dt>Original site</dt><dd>{fmt.Sprint(r.SiteID)}</dd><dt>Prepared</dt><dd>
+        @Timestamp(&r.CreatedAt)
+ { " · " }{r.Actor}</dd><dt>Deadline</dt><dd>
+  @Timestamp(&r.ExpiresAt)
+ </dd></dl>
        if r.Dispatch!=nil{
         <div class="mt-4">
          <p role="status" class="font-semibold">{WindowsSoftwareDispatchState(*r.Dispatch)}</p>
 		 <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests/"+r.ID+"/dispatch/reconciliations")}>Software checks and restart evidence</a>
-         <dl class="uk-description-list mt-4"><dt>Dispatched</dt><dd>{When(&r.Dispatch.CreatedAt)} · {r.Dispatch.Actor}</dd><dt>Delivered</dt><dd>{When(r.Dispatch.DeliveredAt)}</dd><dt>Result recorded</dt><dd>{When(r.Dispatch.CompletedAt)}</dd></dl>
+         <dl class="uk-description-list mt-4"><dt>Dispatched</dt><dd>
+          @Timestamp(&r.Dispatch.CreatedAt)
+ { " · " }{r.Dispatch.Actor}</dd><dt>Delivered</dt><dd>
+  @Timestamp(r.Dispatch.DeliveredAt)
+ </dd><dt>Result recorded</dt><dd>
+  @Timestamp(r.Dispatch.CompletedAt)
+ </dd></dl>
          if r.Dispatch.Outcome!=nil{
           <dl class="uk-description-list mt-4"><dt>Before execution</dt><dd>{r.Dispatch.Outcome.Before.State} {r.Dispatch.Outcome.Before.Version}</dd><dt>After execution</dt><dd>{r.Dispatch.Outcome.After.State} {r.Dispatch.Outcome.After.Version}</dd>
            if r.Dispatch.Outcome.ExitCode!=nil {
