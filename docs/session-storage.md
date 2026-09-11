@@ -28,7 +28,7 @@ OpenID MFA completion carries forward only an identity which still passes curren
 account/binding/policy validation. Its local confirmation remains conditional;
 missing identity requires sign-in again. This shared operation addresses session
 state and cookie publication. Further local credential/method validation and
-MFA/recovery workflow authorization remain separate security work.
+remaining MFA persistence and concurrency guarantees remain separate security work.
 
 Owned regressions reproduced inherited authority and usable cookies after failed
 owner association or login confirmation. Tests cover same-account reauthentication,
@@ -37,6 +37,38 @@ real mutual TLS using a disposable CA and local signed OCSP responses. The compl
 OpenID route matrix covers actual TOTP completion, retained valid identity and
 rejection of missing identity, with both token-encryption modes. The protected
 administrator password/recovery lifecycle also passes with the shared operation.
+
+## MFA and recovery boundaries
+
+A password-replacement session identifies its target account but cannot authorize
+MFA enrollment, enrollment confirmation, TOTP validation or backup-code use. Every
+public MFA action requires a `login-primary` proof retained only in the server-side
+session after a verified password, certificate or OpenID sign-in. The proof binds
+the account, method, credential digest and a fifteen-minute deadline. Password
+proofs match the current password hash; certificate proofs record the verified
+certificate digest; OpenID proofs match and revalidate the admitted identity.
+
+MFA admission also checks current account registration, authentication mode,
+enabled method and MFA configuration. Missing/expired proofs, password changes,
+mode changes, revoked/review accounts and disabled methods or MFA deny the step.
+An existing confirmed TOTP enrollment cannot be overwritten through the public
+login enrollment endpoints. TOTP/backup-code login requires confirmed enrollment.
+Successful MFA creates a fresh session and removes the pending primary proof.
+An older pending session without a proof must restart primary sign-in after this
+upgrade. Account-settings enrollment remains a separate protected workflow.
+
+The owned baseline demonstrated recovery sessions crossing all four MFA mutation
+or admission paths, with both storage modes. Regressions now deny those transitions
+and preserve account MFA state. Positive tests cover password/TOTP, password/backup
+code and first enrollment, plus actual certificate and OpenID MFA completion.
+Proof identity, method, lifetime, size and malformed-state tests run in CI; database
+checks cover changed credentials and disabled/revoked state.
+
+These checks do not make the existing enrollment/recovery-code mutations atomic.
+Durable one-use MFA consumption, TOTP replay counters, concurrent enrollment
+completion and comprehensive local sign-in validation remain open. A request which
+already loaded its primary proof may still race another completion; removing the
+proof from the completed session alone is not a durable consumption receipt.
 
 ## Durable deletion
 

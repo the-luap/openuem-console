@@ -21,6 +21,7 @@ import (
 	"github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -211,6 +212,13 @@ func (h *Handler) LoginPasswordChange(c echo.Context) error {
 }
 
 func (h *Handler) Register2FA(c echo.Context) error {
+	user, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if user.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -257,6 +265,13 @@ func (h *Handler) Register2FA(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -336,6 +351,13 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPValidate(c echo.Context) error {
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if !authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusForbidden, "Complete two-factor enrollment before using an authentication code.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -393,6 +415,10 @@ func (h *Handler) LoginTOTPValidate(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPBackupRequest(c echo.Context) error {
+	_, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
 	tsSiteKey, tsSecretKey, err := h.Model.GetTurnstileSettings()
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.turnstile_could_not_get_settings", err), true))
@@ -402,6 +428,13 @@ func (h *Handler) LoginTOTPBackupRequest(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if !authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusForbidden, "Complete two-factor enrollment before using an authentication code.")
+	}
 	// if CloudFlare Turnstile is used, check response
 	tsSiteKey, tsSecretKey, err := h.Model.GetTurnstileSettings()
 	if err != nil {
@@ -461,7 +494,7 @@ func (h *Handler) LoginForgotPass(c echo.Context) error {
 }
 
 func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
-	return h.establishUserSession(c, user, false, nil, nil)
+	return h.establishUserSession(c, user, false, map[string]any{loginproof.SessionKey: loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now())}, nil)
 }
 
 func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {

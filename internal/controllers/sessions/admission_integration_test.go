@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,8 @@ import (
 	certificate "github.com/open-uem/openuem-console/internal/controllers/authserver/handlers"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	console "github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/ocsp"
 )
 
@@ -179,7 +182,21 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 		for _, failure := range []string{"", "owner", "confirmation"} {
 			t.Run(sessionMode(encrypted)+"/"+failure, func(t *testing.T) {
 				f := newSessionFixture(t, encrypted)
-				if _, err := f.model.Client.User.Create().SetID("certificate-user").SetName("Owned certificate user").SetUse2fa(true).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context()); err != nil {
+				if err := f.model.CreateInitialSettings(); err != nil {
+					t.Fatal(err)
+				}
+				if err := f.model.CreateDefaultTenantAndSite(); err != nil {
+					t.Fatal(err)
+				}
+				settings, err := f.model.GetAuthenticationSettings()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = settings.Update().SetUseCertificates(true).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				const secret = "JBSWY3DPEHPK3PXP"
+				if _, err := f.model.Client.User.Create().SetID("certificate-user").SetName("Owned certificate user").SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret(secret).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context()); err != nil {
 					t.Fatal(err)
 				}
 				sm := scs.New()
@@ -238,6 +255,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 					t.Fatal("certificate admission ignored injected failure", response.StatusCode)
 				}
 				issued := false
+				latestToken := ""
 				for _, cookie := range response.Cookies() {
 					if cookie.Name != sm.Cookie.Name || cookie.Value == "" {
 						continue
@@ -252,6 +270,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 					}
 					if failure == "" {
 						issued = true
+						latestToken = cookie.Value
 						if uid != "certificate-user" || cookie.Value == token || sm.GetBool(ctx, "twofa") || sm.Exists(ctx, "forgot") || sm.Exists(ctx, "oidc-identity") {
 							t.Fatal("certificate login inherited old authority")
 						}
@@ -259,6 +278,30 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 				}
 				if failure == "" && !issued {
 					t.Fatal("certificate login did not issue a fresh pending MFA session")
+				}
+				if failure == "" {
+					ctx, err := sm.Load(t.Context(), latestToken)
+					if err != nil {
+						t.Fatal(err)
+					}
+					proof, err := loginproof.Read(sm.GetString(ctx, loginproof.SessionKey), "certificate-user", time.Now())
+					if err != nil || proof.Method != loginproof.Certificate || proof.Credential != loginproof.Digest(string(credential.Leaf.Raw)) {
+						t.Fatal("TLS identity did not bind the MFA flow", err)
+					}
+					code, err := totp.GenerateCode(secret, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					req := httptest.NewRequest("POST", "https://console.test/fixture/mfa", strings.NewReader(url.Values{"confirm-code": {code}}.Encode())).WithContext(ctx)
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+					c := echo.New().NewContext(req, httptest.NewRecorder())
+					web := &console.Handler{Model: f.model, SessionManager: h.SessionManager, EncryptionMasterKey: f.key, PublicOrigin: "https://console.test"}
+					if err = web.LoginTOTPValidate(c); err != nil {
+						t.Fatal("certificate-bound MFA failed", err)
+					}
+					if !sm.GetBool(ctx, "twofa") || sm.Exists(ctx, loginproof.SessionKey) {
+						t.Fatal("certificate MFA did not finish its primary flow")
+					}
 				}
 				if _, found, err := f.store.FindCtx(t.Context(), token); err != nil || found {
 					t.Fatal("old certificate session was not retired", err)

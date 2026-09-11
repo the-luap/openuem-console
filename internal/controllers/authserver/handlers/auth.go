@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -45,6 +47,9 @@ func (h *Handler) Auth(c echo.Context) error {
 	values := map[string]any{
 		"uid": user.ID, "username": user.Name, "email": user.Email, "usepasswd": user.Passwd, "twofa": false,
 		"user-agent": c.Request().UserAgent(), "ip-address": c.Request().RemoteAddr,
+	}
+	if user.Use2fa {
+		values[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.Certificate, string(cert.Raw), time.Now())
 	}
 	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {

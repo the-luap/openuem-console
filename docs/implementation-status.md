@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Public MFA actions now require a fifteen-minute, account/method/credential-bound
+  server-side primary-authentication proof. Password recovery cannot enroll or
+  confirm MFA, validate TOTP or use backup codes. Current password digest, account
+  mode/registration, enabled method and MFA state are checked before the step;
+  confirmed enrollment cannot be overwritten through login enrollment endpoints.
+  The eight-case owned baseline reproduced recovery-to-MFA transitions. The full
+  PostgreSQL/session race suite passes in 19.959 seconds, including positive
+  password/TOTP, backup-code and first-enrollment workflows, real certificate and
+  OpenID MFA, and missing/expired/changed-proof denials. Proof/parser and auth/router
+  race tests, actual Linux ARM64 console routes, protected administrator lifecycle
+  and full Linux build pass. Atomic MFA persistence, one-use/replay guarantees and
+  remaining local sign-in method/approval validation remain open.
+
 - Sign-in session creation is shared by password, certificate, OpenID, local
   MFA completion and password replacement. Old authority is cleared on every
   renewal, including the same account; owner association and required confirmation

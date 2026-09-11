@@ -25,6 +25,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/auth"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -456,7 +457,11 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcac
 	if err != nil {
 		return err
 	}
-	return h.establishUserSession(c, user, false, map[string]any{oidcSessionKey: string(identityJSON)}, func(ctx context.Context) error {
+	extra := map[string]any{oidcSessionKey: string(identityJSON)}
+	if user.Use2fa {
+		extra[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.OpenID, string(identityJSON), time.Now())
+	}
+	return h.establishUserSession(c, user, false, extra, func(ctx context.Context) error {
 		return h.Model.ConfirmOIDCLogIn(ctx, user.ID)
 	})
 }
