@@ -51,7 +51,7 @@ try {
         [wifi, 39],
         [ad, 15],
         [vpn, 27],
-        [inventory, 42],
+        [inventory, 48],
         [software, 24],
         [windowsSoftware, 27],
         [windowsRequests, 18],

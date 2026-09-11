@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Delegated hardware and operating-system GET aliases now open the existing
+  scoped, audited computer overview. The projection continues to exclude
+  signed-in users, notes and internal agent settings. Optional memory and core
+  counts retain SQL NULL as **Not reported**, distinct from stored zero; exact
+  integer values are preserved. The real Ent/PostgreSQL regression passes in
+  1.868 seconds, desktop view race tests in 4.396 seconds, and the full Linux
+  ARM64 console build passes. Real console-router checks cover the aliases at
+  all three prefixes, scoped roles, hidden objects, unchanged POST restrictions
+  and audit failure. Six additional missing/zero browser cases bring the full
+  passing suite to 516 cases. Remaining legacy details/actions stay under SEC-01.
+
 - [Scoped storage inventory](desktop-storage-inventory.md) now provides physical
   and logical disk reports to viewers, operators and administrators, including
   delegated legacy GET aliases. Literal search, 25-entry continuation, exact

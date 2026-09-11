@@ -39,15 +39,24 @@ func TestDesktopInventoryEscapesReportsAndOmitsMutationForms(t *testing.T) {
 	info := &partials.CommonInfo{SM: &sessions.SessionManager{Manager: sm}, TenantID: "1", SiteID: "1", IsComputer: true, CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Example organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/1/computers/desktop-report", nil).WithContext(ctx), httptest.NewRecorder())
 	now := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
-	device := inventory.Desktop{ID: "desktop-report", Name: strings.Repeat("Long-device-name-", 12), Hostname: `<img src=x onerror=alert(1)>`, Platform: "windows", Status: "Enabled", EndpointType: "Laptop", Organization: "Example organization", Site: "Berlin", LastContact: &now, Hardware: &inventory.Hardware{Model: "Example laptop", Serial: strings.Repeat("ABCD", 40), Memory: 16 << 30, Cores: 8}, OperatingSystem: &inventory.OperatingSystem{Version: "Windows 11", Edition: "Enterprise", Architecture: "amd64"}}
+	device := inventory.Desktop{ID: "desktop-report", Name: strings.Repeat("Long-device-name-", 12), Hostname: `<img src=x onerror=alert(1)>`, Platform: "windows", Status: "Enabled", EndpointType: "Laptop", Organization: "Example organization", Site: "Berlin", LastContact: &now, Hardware: &inventory.Hardware{Model: "Example laptop", Serial: strings.Repeat("ABCD", 40), Memory: new(uint64(16 << 30)), Cores: new(int64(8))}, OperatingSystem: &inventory.OperatingSystem{Version: "Windows 11", Edition: "Enterprise", Architecture: "amd64"}}
 	for _, role := range []access.Role{access.Viewer, access.Operator, access.TenantAdmin} {
 		info.Principal = access.Principal{UserID: "inventory-reader", Grants: []access.Grant{{Role: role, Scope: access.Scope{TenantID: 1}}}}
-		for _, partial := range []bool{false, true} {
+		for _, state := range []string{"complete", "partial", "missing-numbers", "zero-numbers"} {
+			partial := state == "partial"
 			d := device
 			name := "desktop-inventory"
 			if partial {
 				d.Hardware, d.OperatingSystem, d.LastContact = nil, nil, nil
 				name += "-partial"
+			}
+			if state == "missing-numbers" {
+				d.Hardware = &inventory.Hardware{Model: "Incomplete report"}
+				name += "-missing-numbers"
+			}
+			if state == "zero-numbers" {
+				d.Hardware = &inventory.Hardware{Model: "Reported zero", Memory: new(uint64(0)), Cores: new(int64(0))}
+				name += "-zero-numbers"
 			}
 			var body bytes.Buffer
 			if err = Inventory(c, info, &d).Render(ctx, &body); err != nil {

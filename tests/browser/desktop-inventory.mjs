@@ -1,7 +1,7 @@
 // Rendered inventory and refresh forms; keyboard submissions never leave the page.
 export default async function run(browser, record) {
   const { visit, evaluate, check, enter, capture } = browser;
-  for (const page of ["desktop-inventory", "desktop-inventory-partial"])
+  for (const page of ["desktop-inventory", "desktop-inventory-partial", "desktop-inventory-missing-numbers", "desktop-inventory-zero-numbers"])
     for (const width of [390, 768, 1440]) {
       await visit(page, width);
       check(
@@ -15,6 +15,15 @@ export default async function run(browser, record) {
           await evaluate(`document.querySelector('main').textContent.includes('No hardware report received yet.')`),
           "Incomplete inventory state missing",
         );
+      else {
+        const fields = await evaluate(`(() => {
+          const section=Array.from(document.querySelectorAll('main section')).find(s=>s.querySelector('h2')?.textContent==='Hardware');
+          return Object.fromEntries(Array.from(section.querySelectorAll('dt'),dt=>[dt.textContent,dt.nextElementSibling.textContent]));
+        })()`);
+        const missing=page.endsWith('missing-numbers'), zero=page.endsWith('zero-numbers');
+        check(fields.Memory===(missing?'Not reported':zero?'0.0 GiB':'16.0 GiB') && fields['Processor cores']===(missing?'Not reported':zero?'0':'8'),"Missing hardware values and reported zero were conflated");
+        check(await evaluate(`document.querySelector('main').textContent.includes('a reported zero does not verify that memory or processor cores are absent')`),"Stored hardware report was presented as verified");
+      }
       check(
         await evaluate("document.documentElement.scrollWidth <= innerWidth + 1"),
         "Inventory page overflow",

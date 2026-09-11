@@ -1,4 +1,7 @@
 en:
+  inventory_report:
+    not_reported: "Not reported"
+    hardware_evidence: "These are stored agent reports. Missing values are not zero, and a reported zero does not verify that memory or processor cores are absent."
   storage_inventory:
     reported: "Reported storage"
     title: "Storage inventory"

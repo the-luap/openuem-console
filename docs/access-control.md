@@ -71,6 +71,12 @@ report times, addresses, hardware and operating system version. Missing reports
 have explicit empty states. Notes, task output, agent configuration, remote access
 data and signed-in user information are excluded from the database projection.
 
+The existing GET `/computers/:uuid/hardware` and `/computers/:uuid/os` aliases
+also open this scoped overview for delegated roles, with the same projection,
+authorization and committed read audit. They do not expose the legacy OS page's
+signed-in user fields. Missing memory/core counts remain **Not reported**;
+stored zero values remain distinct, and the page identifies them as reports.
+
 The read transaction rechecks current grants and records `inventory.desktop.read`
 with the actual organization, site and legacy agent ID before returning data.
 Audit failure returns an unavailable response without inventory. Waiting,

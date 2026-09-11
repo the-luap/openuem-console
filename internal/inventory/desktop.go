@@ -28,8 +28,8 @@ type Desktop struct {
 
 type Hardware struct {
 	Manufacturer, Model, Serial, Processor, Architecture string
-	Memory                                               uint64
-	Cores                                                int64
+	Memory                                               *uint64
+	Cores                                                *int64
 }
 
 type OperatingSystem struct {
@@ -65,7 +65,7 @@ func ReadDesktop(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	// requested scope. Filtering edges first would hide ambiguous assignments.
 	err = tx.QueryRowContext(ctx, `SELECT a.oid,COALESCE(NULLIF(a.nickname,''),a.hostname),a.hostname,a.os,a.agent_status,COALESCE(a.endpoint_type,''),a.ip,a.mac,
  a.first_contact,a.last_contact,t.id,t.description,s.id,s.description,
- c.id,COALESCE(c.manufacturer,''),COALESCE(c.model,''),COALESCE(c.serial,''),COALESCE(c.processor,''),COALESCE(c.processor_arch,''),COALESCE(c.memory,0),COALESCE(c.processor_cores,0),
+ c.id,COALESCE(c.manufacturer,''),COALESCE(c.model,''),COALESCE(c.serial,''),COALESCE(c.processor,''),COALESCE(c.processor_arch,''),c.memory,c.processor_cores,
  o.id,COALESCE(o.version,''),COALESCE(o.edition,''),COALESCE(o.arch,'')
  FROM agents a JOIN site_agents sa ON sa.agent_id=a.oid
  JOIN sites s ON s.id=sa.site_id JOIN tenants t ON t.id=s.tenant_sites

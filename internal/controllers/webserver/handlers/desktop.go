@@ -19,7 +19,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks":
+		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os":
 			return access.ReadDevices, true
 		}
 	}

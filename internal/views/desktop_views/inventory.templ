@@ -2,6 +2,7 @@ package desktop_views
 
 import (
 	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/layout"
@@ -54,13 +55,26 @@ templ InventoryWithRefresh(c echo.Context, info *partials.CommonInfo, device *in
 					if device.Hardware == nil {
 						<p role="status">No hardware report received yet.</p>
 					} else {
+						<p class="uk-text-muted mb-4">{ i18n.T(ctx,"inventory_report.hardware_evidence") }</p>
 						<dl class="uk-description-list break-words">
 							<dt>Manufacturer</dt><dd>{ mdm_views.Show(device.Hardware.Manufacturer) }</dd>
 							<dt>Model</dt><dd>{ mdm_views.Show(device.Hardware.Model) }</dd>
 							<dt>Serial number</dt><dd>{ mdm_views.Show(device.Hardware.Serial) }</dd>
-							<dt>Memory</dt><dd>{ fmt.Sprintf("%.1f GiB", float64(device.Hardware.Memory)/(1<<30)) }</dd>
+							<dt>Memory</dt><dd>
+								if device.Hardware.Memory == nil {
+									{ i18n.T(ctx,"inventory_report.not_reported") }
+								} else {
+									{ fmt.Sprintf("%.1f GiB", float64(*device.Hardware.Memory)/(1<<30)) }
+								}
+							</dd>
 							<dt>Processor</dt><dd>{ mdm_views.Show(device.Hardware.Processor) }</dd>
-							<dt>Processor cores</dt><dd>{ fmt.Sprint(device.Hardware.Cores) }</dd>
+							<dt>Processor cores</dt><dd>
+								if device.Hardware.Cores == nil {
+									{ i18n.T(ctx,"inventory_report.not_reported") }
+								} else {
+									{ fmt.Sprint(*device.Hardware.Cores) }
+								}
+							</dd>
 							<dt>Processor architecture</dt><dd>{ mdm_views.Show(device.Hardware.Architecture) }</dd>
 						</dl>
 					}

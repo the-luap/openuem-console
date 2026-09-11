@@ -55,7 +55,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenant, site)
 	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin"} {
 		for _, prefix := range []string{"", fmt.Sprintf("/tenant/%d", tenant), base} {
-			for _, suffix := range []string{"", "/overview"} {
+			for _, suffix := range []string{"", "/overview", "/hardware", "/os"} {
 				rec := request(user, "GET", prefix+"/computers/windows-fixture"+suffix+"?delete=yes&tenant="+fmt.Sprint(otherTenant), nil)
 				if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-store" {
 					t.Fatalf("%s inventory %s%s: %d %s", user, prefix, suffix, rec.Code, rec.Body.String())
@@ -113,8 +113,10 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 		t.Fatal("partial report unavailable", rec.Code, rec.Body.String())
 	}
 	for _, id := range []string{"inventory-sibling", "inventory-foreign", "inventory-ambiguous", "inventory-two-local-sites", "inventory-orphan", "inventory-waiting", "missing-device"} {
-		if rec := request("scoped-viewer", "GET", base+"/computers/"+id, nil); rec.Code != 404 || strings.Contains(rec.Body.String(), "Computer inventory") {
-			t.Errorf("hidden device %s returned %d: %s", id, rec.Code, rec.Body.String())
+		for _, suffix := range []string{"", "/hardware", "/os"} {
+			if rec := request("scoped-viewer", "GET", base+"/computers/"+id+suffix, nil); rec.Code != 404 || strings.Contains(rec.Body.String(), "Computer inventory") {
+				t.Errorf("hidden device %s returned %d: %s", id, rec.Code, rec.Body.String())
+			}
 		}
 	}
 	for _, id := range []string{"inventory-ambiguous", "inventory-two-local-sites"} {
@@ -128,19 +130,19 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 		}
 	}
 	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin"} {
-		for _, endpoint := range []struct{ method, suffix string }{{"POST", "/overview"}, {"DELETE", ""}, {"GET", "/notes"}, {"GET", "/remote-assistance"}, {"GET", "/power"}, {"POST", "/software"}, {"POST", "/network-adapters"}, {"POST", "/inventory/network"}, {"POST", "/physical-disks"}, {"POST", "/inventory/storage"}, {"POST", "/logical-disks"}, {"POST", "/logical-disks/file"}, {"PUT", "/logical-disks/file"}, {"DELETE", "/logical-disks/file"}, {"POST", "/logical-disks/downloadfile"}, {"POST", "/logical-disks/downloadfolder"}, {"POST", "/logical-disks/downloadmany"}, {"POST", "/logical-disks/folder"}, {"PUT", "/logical-disks/folder"}, {"DELETE", "/logical-disks/folder"}, {"DELETE", "/logical-disks/many"}, {"GET", "/hardware"}} {
+		for _, endpoint := range []struct{ method, suffix string }{{"POST", "/overview"}, {"DELETE", ""}, {"GET", "/notes"}, {"GET", "/remote-assistance"}, {"GET", "/power"}, {"POST", "/software"}, {"POST", "/network-adapters"}, {"POST", "/inventory/network"}, {"POST", "/physical-disks"}, {"POST", "/inventory/storage"}, {"POST", "/logical-disks"}, {"POST", "/logical-disks/file"}, {"PUT", "/logical-disks/file"}, {"DELETE", "/logical-disks/file"}, {"POST", "/logical-disks/downloadfile"}, {"POST", "/logical-disks/downloadfolder"}, {"POST", "/logical-disks/downloadmany"}, {"POST", "/logical-disks/folder"}, {"PUT", "/logical-disks/folder"}, {"DELETE", "/logical-disks/folder"}, {"DELETE", "/logical-disks/many"}, {"POST", "/hardware"}, {"POST", "/os"}} {
 			if rec := request(user, endpoint.method, base+"/computers/windows-fixture"+endpoint.suffix, url.Values{"endpoint-description": {"unauthorized-change"}, "tenant": {fmt.Sprint(otherTenant)}, "site": {fmt.Sprint(otherSite)}}); rec.Code != 403 {
 				t.Errorf("legacy action %s %s for %s returned %d", endpoint.method, endpoint.suffix, user, rec.Code)
 			}
 		}
 	}
 	var count int
-	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_inventory_audit WHERE tenant_id=$1 AND site_id=$2 AND actor='scoped-viewer' AND action='inventory.desktop.read' AND resource_id='windows-fixture'`, tenant, site).Scan(&count); err != nil || count != 6 {
+	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_inventory_audit WHERE tenant_id=$1 AND site_id=$2 AND actor='scoped-viewer' AND action='inventory.desktop.read' AND resource_id='windows-fixture'`, tenant, site).Scan(&count); err != nil || count != 12 {
 		t.Fatal("read audit has incorrect device scope", count, err)
 	}
 	filter := audit.Filter{Scope: access.Scope{TenantID: tenant, SiteID: site}, Source: "inventory", From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Minute)}
 	page, err := h.Audit.List(ctx, "organization-admin", filter, "")
-	if err != nil || len(page.Events) != 19 {
+	if err != nil || len(page.Events) != 37 {
 		t.Fatal("inventory reads missing from scoped audit", page, err)
 	}
 	if _, err = h.Model.DB.ExecContext(ctx, `ALTER TABLE uem_inventory_audit ADD CONSTRAINT inventory_test_failure CHECK(actor<>'scoped-viewer') NOT VALID`); err != nil {
@@ -149,8 +151,10 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 	t.Cleanup(func() {
 		_, _ = h.Model.DB.ExecContext(context.Background(), `ALTER TABLE uem_inventory_audit DROP CONSTRAINT IF EXISTS inventory_test_failure`)
 	})
-	if rec := request("scoped-viewer", "GET", base+"/computers/windows-fixture", nil); rec.Code != 503 || strings.Contains(rec.Body.String(), "Finance Windows") || strings.Contains(rec.Body.String(), "inventory_test_failure") {
-		t.Fatal("audit failure disclosed inventory or database details", rec.Code, rec.Body.String())
+	for _, suffix := range []string{"", "/hardware", "/os"} {
+		if rec := request("scoped-viewer", "GET", base+"/computers/windows-fixture"+suffix, nil); rec.Code != 503 || strings.Contains(rec.Body.String(), "Finance Windows") || strings.Contains(rec.Body.String(), "inventory_test_failure") {
+			t.Fatal("audit failure disclosed inventory or database details", rec.Code, rec.Body.String())
+		}
 	}
 	if _, err = h.Model.DB.ExecContext(ctx, `ALTER TABLE uem_inventory_audit DROP CONSTRAINT inventory_test_failure`); err != nil {
 		t.Fatal(err)

@@ -100,6 +100,11 @@ The **Reported software** inventory tab provides [scoped search and pagination](
 It reads only report metadata and records access before responding. Stored
 software reports are distinct from verified deployment outcomes.
 
+Delegated hardware and operating-system GET aliases open the same scoped
+overview. Optional memory and processor-core values remain **Not reported**
+when absent, preserving a distinction from a stored zero. Internal agent
+settings and signed-in user information remain outside this projection.
+
 The **Reported network** tab provides [scoped adapter reports](desktop-network-inventory.md)
 with literal name/MAC/IP search, bounded pagination and a committed read audit.
 Missing flags and empty reports retain their uncertainty; stored configuration
