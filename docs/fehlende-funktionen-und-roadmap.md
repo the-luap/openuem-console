@@ -535,9 +535,11 @@ encrypted manifest at an exact Microsoft community commit and explicitly approve
 a compatible machine MSI as a separate catalog revision. Scoped immutable history,
 concurrent confirmation, audit rollback, expiry and exact encrypted install/remove
 dispatch have PostgreSQL/race, route and browser evidence. A separate Burn source
-adapter and bounded native bundle-layout reader now provide translation and
-read-only format foundations; embedded registration proof and Burn delivery
-integration remain open. Further WinGet installer
+adapter and bounded native metadata readers now provide translation and embedded
+registration proof, including CAB/XML, header identity, fixed scope, version and
+registry view. Native generated-bundle/race and portable fuzz checks pass. Requiring
+that proof in the preflight subprocess, capability negotiation and Burn delivery
+integration remains open. Further WinGet installer
 formats and physical installation, removal, offline, restart and hibernate
 acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.

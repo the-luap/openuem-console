@@ -83,8 +83,9 @@ jobs:
           OPENUEM_RECOVERY_TEST_PG_DUMP: /usr/lib/postgresql/17/bin/pg_dump
           OPENUEM_RECOVERY_TEST_PG_RESTORE: /usr/lib/postgresql/17/bin/pg_restore
         run: |
-          go test -race -count=1 ./internal/recovery ./cmd/openuem-recovery
-          go test -race -count=1 -run 'Test(Apple|Windows|Desktop)Recovery' ./internal/mdm/apple ./internal/mdm/windows ./internal/desktop
+          # Whole-database create/drop operations share one PostgreSQL instance.
+          go test -race -p 1 -count=1 ./internal/recovery ./cmd/openuem-recovery
+          go test -race -p 1 -count=1 -run 'Test(Apple|Windows|Desktop)Recovery' ./internal/mdm/apple ./internal/mdm/windows ./internal/desktop
       - name: Bounded recovery bundle grammar fuzzing
         run: go test -run '^$' -fuzz='^FuzzRecoveryBundle$' -fuzztime=15s -parallel=2 ./internal/recovery
       - name: Native Windows enrollment, authenticated SyncML and CSP persistence

@@ -170,12 +170,12 @@ matches its reviewed registration, in addition to the existing hash, Authenticod
 and PE architecture checks. Those existing checks alone do not establish bundle
 identity. The agent also currently rejects an emulated bootstrapper executable,
 even when its payload targets the native architecture. Source-derived Burn
-approval/history, native package proof, complete execution/recovery tests and
+approval/history, required native proof during execution, complete recovery tests and
 physical acceptance remain open.
 
 The agent's separate
-[Burn layout reader](https://github.com/the-luap/openuem-agent/blob/10ce65d7aacee6265cf17625cb571691a9cd5cab/docs/windows-burn-inspection.md)
-now locates a version-2 `.wixburn` bundle code and bounded UX cabinet without
+[Burn metadata readers](https://github.com/the-luap/openuem-agent/blob/190228a5ca7b8744368aa7b52e4f2f12a68510eb/docs/windows-burn-inspection.md)
+locate a version-2 `.wixburn` bundle code and bounded UX cabinet without
 extracting or executing its contents. At most seven reads and 4,512 requested
 bytes inspect standard x86/AMD64/ARM64 PE layouts, overlapping/truncated section
 and certificate ranges, exact cabinet length and bounded container declarations.
@@ -188,9 +188,28 @@ and tagged Windows test compilation pass. A separate Windows CI fixture builds
 owned bundles with WiX/Bal `4.0.6` and independently extracts their manifests to
 compare the header code with the version-specific `Registration/@Id` field.
 All three native architecture fixtures pass at agent commit
-`383c6fd1d1e31564ede725eac00317d94423959f`. Neither generated bundles nor payloads are executed. CAB member decoding and
-registration/scope/version/view verification remain required before integrating
-this reader into native preflight or source-derived Burn delivery.
+`383c6fd1d1e31564ede725eac00317d94423959f`. Neither generated bundles nor payloads
+are executed.
+
+The separate `ReadRegistration` path now checks every bounded CAB directory entry
+and block range, then decodes only the first manifest into memory using the fixed
+Windows system FDI API. It binds the header code to the manifest's registration,
+exact displayed version, fixed machine/user scope and architecture-consistent
+registry view. The known `Id`/`PerMachine` and `Code`/`Scope` shapes cannot be mixed;
+flexible scope, duplicate identities, directives and external entities fail.
+Archive names never become filesystem paths, and no payload is written or run.
+Native callbacks have explicit read, allocation, output and reuse limits. Complete
+manifest output must end with the deliberate FDI abort and closed resources;
+ordinary I/O errors and partial output cannot become registration evidence.
+
+The final local race suite passes in 1.588 seconds; CAB and XML fuzzing pass
+3,412,453 and 629,931 inputs. Native Windows race tests pass in 1.472 seconds,
+and the complete reader passes all three generated architectures and changed
+header checks in 15.10 seconds. All agent CI jobs pass at
+`bf1f80adf9960387f82e414d60263b7054816c23`. These native runtime tests use an AMD64
+Windows process; ARM64 process and physical endpoint acceptance remain open.
+Integration must require this proof inside the bounded preflight subprocess and
+negotiate the capability before source-derived Burn approval/dispatch is enabled.
 
 The combined source/MSI/Burn race suite passes in 1.799 seconds. The final Burn
 and MSI fuzz runs pass 242,390 and 233,586 inputs respectively. Tests cover both

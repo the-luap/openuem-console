@@ -61,6 +61,27 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Recovery CI now serializes package tests that create and drop whole databases
+  on the shared PostgreSQL instance. This addresses a database-cleanup deadline
+  failure without weakening timeouts or identity assertions. A fresh, isolated
+  PostgreSQL 17 instance passes the encrypted bundle, CLI restore and Apple,
+  Windows and desktop continuity tests sequentially; all temporary databases
+  are removed afterward. CI retains race detection for these checks.
+
+- The agent's [embedded Burn registration reader](windows-winget-resolution.md#burn-exe-translation-foundation)
+  now validates the complete bounded CAB directory and decodes only the manifest
+  through memory-backed Windows FDI callbacks. It binds header identity, displayed
+  version, fixed machine/user scope and 32/64-bit registry view, rejecting mixed
+  schemas, flexible scope, duplicate identities and external XML entities. No
+  archive path is opened and no bundle/payload is executed. Local race tests pass
+  in 1.588 seconds; CAB/XML fuzz runs pass 3,412,453/629,931 inputs. Native Windows
+  race tests pass in 1.472 seconds, and all three generated bundle architectures
+  pass complete registration/tampered-header checks in 15.10 seconds. All agent
+  CI jobs pass at `bf1f80adf9960387f82e414d60263b7054816c23`. These native runs use
+  an AMD64 Windows process; native ARM64 process acceptance remains open. The
+  bounded preflight subprocess, authenticated capability negotiation and source
+  approval/dispatch must require this proof before Burn delivery is enabled.
+
 - The agent's [bounded Burn layout reader](windows-winget-resolution.md#burn-exe-translation-foundation)
   now locates the section-declared bundle code and UX cabinet with at most seven
   reads and 4,512 requested bytes. It rejects ambiguous, overlapping, truncated
@@ -72,8 +93,8 @@ the table's package summaries do not remove any detail from the roadmap.
   with pinned WiX/Bal and compares their independently extracted registration
   identifiers without executing a bundle or payload. All three generated native
   architecture cases pass at agent commit `383c6fd1d1e31564ede725eac00317d94423959f`.
-  Embedded CAB/registration
-  proof and native delivery integration remain open; this reader enables no
+  Embedded registration proof is recorded above; native delivery integration
+  remains open. These readers enable no
   additional installer execution. The full roadmap remains in progress.
 
 - A separate [Burn source adapter](windows-winget-resolution.md#burn-exe-translation-foundation)
