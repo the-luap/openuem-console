@@ -12,6 +12,8 @@ import (
 )
 
 func (h *Handler) RegisterAccess(e *echo.Echo) {
+	e.GET("/admin/oidc-accounts", h.OIDCAccountBindings, h.IsAuthenticated)
+	e.POST("/admin/oidc-accounts", h.ChangeOIDCAccountBinding, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/admin/access", h.AccessPermissions, h.IsAuthenticated)
 	e.POST("/admin/access", h.SaveAccessPermissions, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/admin/access/audit", h.AccessAudit, h.IsAuthenticated)

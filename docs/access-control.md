@@ -22,6 +22,12 @@ permissions; it does not create or authenticate an account. Existing password,
 certificate and OIDC accounts require the same explicit grants. Existing users
 are not automatically made administrators during migration.
 
+OIDC accounts require an explicit, verified issuer/subject association before
+existing-account sign-in. Server administrators manage it under
+[OpenID account identities](oidc-sign-in.md); provider names and email addresses
+cannot inherit another account's grants. Automatically registered identities
+receive independent local IDs and still need explicit permissions.
+
 The legacy reset of the built-in account changes its credentials in place,
 invalidates its sessions and removes its existing second-factor registration and
 recovery codes. It preserves its user ID and grants. It cannot turn a previously

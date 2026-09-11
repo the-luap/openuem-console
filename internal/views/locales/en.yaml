@@ -837,7 +837,7 @@ en:
       uid_help: "This user ID must be a unique string and will be used to identify the digital certificate's owner or match the username after a successful Open ID Connect authentication"
       success: "A new user has been added. The user will receive an email to confirm the address. Afterwards the administrator must generate a digital certificate"
       success_passwd: "A new user has been added. The user will receive an email to set a password to log in. The link included in the email is valid for one hour"
-      success_oidc: "A new user has been added"
+      success_oidc: "A new OpenID user has been added. Link the provider subject in OpenID account identities before sign-in."
       authentication: "Authentication type"
   users:
     add: "Add User"

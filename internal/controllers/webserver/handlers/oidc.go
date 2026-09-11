@@ -25,6 +25,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/auth"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
 	"golang.org/x/oauth2"
@@ -62,7 +63,7 @@ type ZitadelRolesResponse struct {
 
 type OIDCSessionInfo struct {
 	Issuer, Subject, Policy string
-	ID, Name, Email, Phone  string
+	Name, Email, Phone      string
 	EmailVerified           bool
 }
 
@@ -260,14 +261,13 @@ func (h *Handler) OIDCCallback(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not get user info from OIDC endpoint")
 	}
 
-	if u.Subject != idToken.Subject || u.PreferredUsername == "" || len(u.PreferredUsername) > 255 || strings.IndexFunc(u.PreferredUsername, unicode.IsControl) >= 0 {
+	if u.Subject != idToken.Subject || len(u.PreferredUsername) > 255 || strings.IndexFunc(u.PreferredUsername, unicode.IsControl) >= 0 {
 		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID identity verification failed")
 	}
 
 	// Get user information
 	oidcUser := OIDCSessionInfo{
 		Issuer: idToken.Issuer, Subject: idToken.Subject, Policy: flow.Policy,
-		ID:            u.PreferredUsername,
 		Name:          u.Name,
 		Email:         u.Email,
 		EmailVerified: u.EmailVerified,
@@ -495,30 +495,24 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID configuration changed; start sign-in again")
 	}
 
-	// Check if user exists
-	userExists, err := h.Model.UserExists(u.ID)
+	if h.OIDCAccounts == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID account registration is unavailable")
+	}
+	uid, err := h.OIDCAccounts.Resolve(c.Request().Context(), oidcaccounts.PolicyFrom(settings), oidcaccounts.Identity{
+		Issuer: u.Issuer, Subject: u.Subject, Name: u.Name, Email: u.Email, Phone: u.Phone, EmailVerified: u.EmailVerified,
+	})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, i18n.T(c.Request().Context(), "authentication.cannot_check_if_user_exists"))
-	}
-
-	// If user doesn't exist create user in database if auto creation is enabled
-	if !userExists {
-		if settings.OIDCAutoCreateAccount {
-			if err := h.Model.AddOIDCUser(u.ID, u.Name, u.Email, u.Phone, u.EmailVerified, settings.OIDCAutoApprove); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, i18n.T(c.Request().Context(), "authentication.cannot_create_oidc_user", err.Error()))
-			}
-		} else {
-			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "authentication.an_admin_must_create_your_account"))
+		if errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "OpenID account access is unavailable; ask an administrator to review the identity binding")
 		}
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID account registration is unavailable")
 	}
-
-	// If user exists, check if account is in a valid state
-	account, err := h.Model.GetUserById(u.ID)
+	account, err := h.Model.GetUserById(uid)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "cannot get user from database")
 	}
 
-	if !account.Openid || account.Register == nats.REGISTER_REVOKED {
+	if !account.Openid || account.Passwd || account.Register == nats.REGISTER_REVOKED {
 		return echo.NewHTTPError(http.StatusUnauthorized, "This account cannot use OpenID sign-in")
 	}
 
@@ -530,7 +524,7 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 		}
 
 		if h.AuthLogger != nil {
-			h.AuthLogger.Printf("user %s has logged in with OpenID (%s)", u.ID, settings.OIDCProvider)
+			h.AuthLogger.Printf("user %s has logged in with OpenID (%s)", uid, settings.OIDCProvider)
 		}
 
 		myTenant, err := h.Model.GetDefaultTenant()

@@ -26,6 +26,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 	"github.com/open-uem/openuem-console/internal/software/winget"
 )
 
@@ -34,6 +35,7 @@ type Handler struct {
 	IndividualAgentService *openuem_nats.ServiceConnection
 	IndividualBroker       *consolebroker.Broker
 	Access                 *access.Store
+	OIDCAccounts           *oidcaccounts.Store
 	Preferences            *preferences.Store
 	Audit                  *audit.Store
 	InventoryRefresh       *inventory.RefreshStore

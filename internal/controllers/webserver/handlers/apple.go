@@ -126,7 +126,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
+			case "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
 			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
 				limit = 8192

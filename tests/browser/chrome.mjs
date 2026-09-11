@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["unlinked","active","disabled","ineligible","long","provider_disabled"].map(state=>`oidc-accounts-${state}`),
  ...["viewer","operator","organization_admin","administrator"].map(role=>`management-navigation-${role}`),
  ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-memory-${state}-${role}`)),
  ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-shares-${state}-${role}`)),

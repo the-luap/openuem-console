@@ -36,7 +36,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | Package | Current evidence | Remaining work |
 | --- | --- | --- |
 | NET-01 | Reviewed resumable installation with supplied TLS or automatic DNS-01 and retained renewal service; provider-neutral DNS-01 issuer with pinned lego, protected account identity and atomic publication; native HTTPS gateway with atomic public TLS file renewal, retained live streams and per-handshake lifetime checks; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/configuration/key/claim/download routes with pinned private TLS and bounded streaming; optional exact Windows discovery/XCEP/WSTEP/SyncML routes with pinned gateway identity; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; deployment firewall proof; live DNS/ACME provider operations, proxy/browser/timeouts/load acceptance |
-| SEC-01 | Header-only certificate login removed; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked; scoped desktop overview with explicit inventory projection, transaction-bound authorization and audit, incomplete-report handling and linked Mac navigation; durable scoped inventory refresh with current-authority dispatch checks, independent attempt evidence, bounded retries and truthful delivery states; scoped software, network, storage, peripheral, memory-module, share and security report search and 25-entry pagination with transaction-bound read audits | Remaining legacy desktop detail/action permissions beyond scoped inventory reads and refresh; audit all existing mutation paths; complete authorization and direct-access regression matrix |
+| SEC-01 | Header-only certificate login removed; verified bounded OIDC flows, permanent issuer/subject account bindings, explicit administrator migration and atomic audited registration; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked; scoped desktop overview with explicit inventory projection, transaction-bound authorization and audit, incomplete-report handling and linked Mac navigation; durable scoped inventory refresh with current-authority dispatch checks, independent attempt evidence, bounded retries and truthful delivery states; scoped software, network, storage, peripheral, memory-module, share and security report search and 25-entry pagination with transaction-bound read audits | Remaining legacy desktop detail/action permissions beyond scoped inventory reads and refresh; audit all existing mutation paths; complete authorization and direct-access regression matrix |
 | ENR-01 | Device-generated Apple SCEP enrollment with one-time challenge, exact request retries, separate encrypted RA, scoped certificate pinning and TLS/gateway/PostgreSQL tests; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows/macOS activation, macOS app bundle assembly and authenticated local readiness, and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS signed-release registration/approval acceptance, signed installer distribution, binding migration/updates, renewal and release integration |
 | APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain/production usage verification and a mandatory fresh TLS/HTTP2 APNs connection gate; atomic renewal revision/topic checks, account metadata, setup warning and persistent scoped SMTP expiry reminders/history; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; independent certificate revocation checking; deployment SMTP delivery and actual Apple issuance/renewal/device continuity |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px; persisted account language selection, browser default, English catalog fallback and responsive profile checks; shared localized UTC report timestamps with exact instants, preserved audit precision and browser fallback | Shared platform navigation/components, remaining locale keys, pagination/filter/export/bulk consistency, remaining dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Permanent OpenID account identities](oidc-sign-in.md) now replace username
+  lookup with exact issuer/subject bindings. Existing accounts require explicit
+  administrator migration; new automatic accounts receive independent IDs and
+  no inherited grants. Reserved disabled identities, account-mode checks,
+  transaction-bound permission/configuration checks, revision confirmation and
+  committed audit history protect registration and changes. Protected deletion
+  preserves identity ownership. PostgreSQL race tests pass in 2.426 seconds,
+  including preserved grants, issuer changes, concurrent registration and audit
+  rollback. Owned TLS protocol race tests pass in 2.250 seconds; actual Linux
+  ARM64 console routes, all view race suites and the full console build pass.
+  Eighteen new browser cases cover migration and identity states with keyboard
+  confirmation; all 678 cases pass. Provider acceptance and atomic revocation of
+  already admitted/in-progress sessions remain separate work.
+
 - [OIDC protocol verification](oidc-sign-in.md) now binds the configured callback,
   expiring encrypted flow, PKCE and nonce; verifies signed ID tokens and matching
   UserInfo subjects; and bounds all provider requests to HTTPS, deadlines and
@@ -69,9 +83,9 @@ the table's package summaries do not remove any detail from the roadmap.
   authentication settings and emergency overrides. Owned TLS cryptographic
   race tests pass in 2.439 seconds; disposable PostgreSQL tests pass through the
   actual Linux ARM64 router, all four provider adapters and real session store.
-  The full Linux ARM64 console build passes. Immutable issuer/subject account
-  binding and explicit administrator migration remain open; this is partial
-  SSO/SEC-01 evidence, not completion or production provider acceptance.
+  The full Linux ARM64 console build passes. The subsequent account-binding
+  evidence above covers issuer/subject registration and administrator migration;
+  full SSO/SEC-01 and production provider acceptance remain open.
 
 - [Scoped security inventory](desktop-security-inventory.md) now exposes
   antivirus/update reports and bounded update history, including delegated

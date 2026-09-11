@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/validator/v10"
 	"github.com/invopop/ctxi18n/i18n"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/labstack/echo/v4"
 	openuem_ent "github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
@@ -293,6 +295,10 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 
 	// Delete user
 	if err := h.Model.DeleteUser(uid); err != nil {
+		var constraint *pgconn.PgError
+		if errors.As(err, &constraint) && constraint.Code == "23503" && constraint.ConstraintName == "uem_oidc_accounts_user_id_fkey" {
+			return echo.NewHTTPError(409, "This account has permanent OpenID identity records. Disable its identity links and remove its access permissions instead of deleting it.")
+		}
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
 

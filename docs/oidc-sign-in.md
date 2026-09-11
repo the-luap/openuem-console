@@ -41,17 +41,75 @@ those overrides change only after a successful settings save.
 Authelia, Authentik and Keycloak continue to use the configured UserInfo group
 requirement; Zitadel uses its authenticated role endpoint. Policy changes during
 sign-in invalidate the flow, and session admission rechecks the same policy.
-The selected local account must permit OIDC. A provider username cannot select
-a password-only or certificate-only account, and automatic approval cannot
-reactivate a revoked OIDC account. Existing organization/site grants continue
+The selected local account must permit OIDC exclusively. Automatic approval
+cannot reactivate a revoked account. Existing organization/site grants continue
 to be checked by the console's authorization layer.
 
-The local account lookup still uses `preferred_username` for existing OIDC
-accounts. Immutable issuer/subject-to-account registration and its explicit
-administrator migration remain separate implementation work; these protocol
-checks do not claim to complete that account-linking requirement or SSO/SEC-01.
-Provider-specific production configuration and actual IdP acceptance also remain
-open.
+## Account identity and existing-account migration
+
+The verified, case-sensitive `(issuer, sub)` pair selects the local account.
+`preferred_username`, name and email never select or merge accounts. Changes to
+those profile claims cannot transfer existing permissions. UserInfo may omit
+`preferred_username`. Issuer changes require an explicit new binding, even when
+the new provider reports the same subject.
+
+Before upgrading an installation that uses OIDC, retain a tested password or
+certificate administrator account. Existing OIDC accounts are not automatically
+bound by username and cannot sign in until an administrator registers their
+subject. If a valid fallback administrator exists but its authentication method
+is disabled, the console's existing `--re-enable-passwd-auth` or
+`--re-enable-certificates-auth` startup option can restore that method during
+migration. These options do not create an account or grant administrator rights.
+Keep the fallback available until the migrated identities have been tested.
+
+1. Sign in as a server administrator and open **Manage OpenID account identities**
+   from Users or Authentication settings, or visit `/admin/oidc-accounts`.
+2. Enter the existing local account ID and review its name, configured issuer and
+   client ID. Obtain the provider's exact subject for this client through a
+   trusted administrative channel. Pairwise subjects may differ between clients;
+   an email address or displayed username is not sufficient evidence.
+3. Enter the subject, confirm the target account and select **Link identity**.
+   The account's existing grants remain unchanged. Organization administrators,
+   operators and viewers cannot register identities.
+4. Test the user's sign-in and required organization/site access. Review the
+   identity history and retain the fallback administrator until acceptance is
+   complete. A changed account revision or provider configuration requires a
+   fresh review before saving.
+
+Each issuer/subject pair permanently belongs to one account. An account can have
+one active subject per issuer and at most 100 retained bindings. For a subject
+replacement, disable the current binding first, then explicitly link its
+replacement. Disabled pairs remain reserved, preventing automatic registration
+or another administrator from transferring them to a different local account.
+They can be enabled again only for their original account. An administrator
+cannot disable their own identity; another server administrator must do so.
+Bindings for a different configured issuer remain dormant until that issuer is
+selected again. Review them before changing the provider back.
+
+Disabling a binding blocks future sign-ins; existing sessions must be reviewed
+and revoked separately under Active sessions. Remove the account's access grants
+when retiring it. Accounts with identity records cannot be deleted and recreated:
+database foreign keys preserve the permanent association and its audit history.
+The UI explains this restriction instead of exposing a database error.
+
+When automatic creation is enabled, a previously unseen verified pair creates a
+new opaque `oidc-<UUID>` local ID, its binding and an audit event atomically. It
+never adopts an existing account's ID or permissions, including when its name
+or email matches an administrator. Automatic approval controls its registration
+state; explicit access grants are still required. With automatic creation
+disabled, an administrator must create an OIDC account and link its identity.
+Repeated or concurrent first sign-ins reuse the same binding.
+
+Authentication configuration is rechecked under a database lock during account
+resolution. Administrator changes recheck current server permissions within the
+same transaction, serialize binding changes, compare the account revision and
+require committed audit evidence. Account creation, binding changes and revision
+increments roll back if auditing fails. The page shows the latest 25 changes;
+records are retained. Binding changes do not claim atomic revocation of an
+already admitted or in-progress session.
+
+Provider-specific production configuration, actual IdP acceptance and the other
+SSO/SEC-01 requirements remain open.
 
 Regression evidence includes the previously referrer-controlled callback,
 owned TLS discovery/JWKS with real RSA-signed tokens, invalid signature/issuer/
@@ -61,3 +119,12 @@ real router, PKCE exchange, all four provider adapters, actual session cookies,
 single-use authorization codes, role denial, mismatched UserInfo, other account
 modes and revoked accounts. The production authentication form is also tested
 against unsafe issuer URLs and unchanged settings/overrides on rejection.
+
+Additional disposable PostgreSQL race tests cover explicit existing-account
+migration with preserved grants, issuer isolation, disabled/revoked identities,
+account-mode conflicts, competing administrator links, twelve concurrent first
+sign-ins, audit rollback and protected account deletion. Real console routes
+exercise administrator-only reads/mutations, CSRF, confirmation, stale forms,
+provider changes and redacted deletion failures. Browser tests cover unlinked,
+active, disabled, ineligible, long and disabled-provider states at 390/768/1440
+pixels, including keyboard confirmation and exact hidden account/provider fields.

@@ -137,6 +137,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		return func(c echo.Context) error { c.Set("csrf", "console-test-token"); return next(c) }
 	})
 	h.Register(e, 3)
+	t.Run("OIDC account identity administration", func(t *testing.T) { exerciseOIDCAccountRoutes(t, h, e, ctx, tenant.ID, site.ID) })
 	base := "/tenant/" + strconv.Itoa(tenant.ID)
 	request := func(method, path, contentType string, body []byte) *httptest.ResponseRecorder {
 		t.Helper()

@@ -133,7 +133,7 @@ jobs:
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
       - name: Render synthetic console states before database regression
-        run: go test -race -count=1 ./internal/views/mdm_views ./internal/views/windows_views ./internal/views/desktop_views ./internal/views/computers_views ./internal/views/account_views
+        run: go test -race -count=1 ./internal/views/mdm_views ./internal/views/windows_views ./internal/views/desktop_views ./internal/views/computers_views ./internal/views/account_views ./internal/views/access_views
         env:
           APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui
       - name: Preserve synthetic console renderings for browser checks
@@ -173,7 +173,7 @@ jobs:
       - name: Protocol, persistence and TLS
         run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver
       - name: Gateway identity, route isolation, certificate login and CSRF
-        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/audit ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/audit ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
       - name: Existing Windows deployment and SMTP settings models
         run: go test -count=1 -run 'TestDeploymentTestSuite|TestSMTPTestSuite' ./internal/models
       - name: Individual agent authorization and command service lifecycles

@@ -52,7 +52,7 @@ templ Permissions(c echo.Context, info *partials.CommonInfo, target access.Princ
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h1 class="uk-card-title">Access permissions</h1><p>Assign the actions and organizations a user can access. Changes take effect on their next request.</p></div>
 				<div class="uk-card-body grid gap-4">
-					<div class="flex flex-wrap gap-4"><a class="underline" href="/admin/users">Users</a><a class="underline" href="/admin/access/audit">Permission change history</a></div>
+					<div class="flex flex-wrap gap-4"><a class="underline" href="/admin/users">Users</a><a class="underline" href="/admin/access/audit">Permission change history</a><a class="underline" href="/admin/oidc-accounts">OpenID accounts</a></div>
 					<form method="get" action="/admin/access" class="flex flex-wrap items-end gap-3">
 						<label>User ID<input class="uk-input" name="user_id" value={ target.UserID } required/></label><button class="uk-button uk-button-primary" type="submit">Open user</button>
 					</form>

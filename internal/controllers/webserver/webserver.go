@@ -21,6 +21,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 type WebServer struct {
@@ -106,6 +107,13 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	w.Handler.Access = permissions
+	w.Handler.OIDCAccounts, err = oidcaccounts.NewStore(w.Handler.Model.DB, permissions)
+	if err != nil {
+		return err
+	}
+	if err = w.Handler.OIDCAccounts.Migrate(ctx); err != nil {
+		return err
+	}
 	w.Handler.Preferences, err = preferences.NewStore(w.Handler.Model.DB)
 	if err != nil {
 		return err

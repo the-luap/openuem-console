@@ -1,0 +1,100 @@
+package access_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+)
+
+templ oidcFields(info *partials.CommonInfo, page *oidcaccounts.Page) {
+	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+	<input type="hidden" name="user_id" value={ page.UserID }/>
+	<input type="hidden" name="revision" value={ strconv.FormatInt(page.Revision, 10) }/>
+	<input type="hidden" name="issuer" value={ page.Issuer }/>
+	<input type="hidden" name="client_id" value={ page.ClientID }/>
+}
+
+templ OIDCAccount(c echo.Context, info *partials.CommonInfo, page *oidcaccounts.Page) {
+	@layout.Base("admin", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "OpenID accounts", Url: "/admin/oidc-accounts"}}, info)
+		<main class="grid min-w-0 flex-1 gap-6 p-4 sm:px-6">
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h1 class="uk-card-title">OpenID account identity</h1><p>Link the provider's exact subject identifier to a local account. Usernames and email addresses do not establish identity.</p></div>
+				<div class="uk-card-body grid gap-4 min-w-0">
+					<nav aria-label="Account administration" class="flex flex-wrap gap-4"><a class="underline" href="/admin/users">Users</a><a class="underline" href="/admin/authentication">Authentication settings</a><a class="underline" href={ templ.URL("/admin/access?user_id=" + url.QueryEscape(page.UserID)) }>Access permissions</a><a class="underline" href="/admin/sessions">Active sessions</a></nav>
+					<form method="get" action="/admin/oidc-accounts" class="flex flex-wrap items-end gap-3">
+						<label class="min-w-0 flex-1">Local account ID<input class="uk-input w-full" name="user_id" value={ page.UserID } maxlength="255" required/></label><button class="uk-button uk-button-primary" type="submit">Open account</button>
+					</form>
+					<h2 class="text-xl font-semibold break-all">{ page.Name+" · "+page.UserID }</h2>
+					<dl class="grid gap-2 break-all"><dt class="font-semibold">Configured issuer</dt><dd>{ page.Issuer }</dd><dt class="font-semibold">Client ID</dt><dd>{ page.ClientID }</dd></dl>
+					<p>Obtain the subject for this client from the identity provider through a trusted administrative channel. It is case-sensitive and may differ between clients. Linking retains this account's existing permissions.</p>
+					<p>Disabling a link blocks future sign-ins. Review active sessions separately. Linked accounts are retained to prevent identity reuse; revoke their access instead of deleting them.</p>
+					if !page.Enabled {
+						<p role="status">OpenID sign-in is disabled. Configure the provider before linking an account.</p>
+					} else if !page.Eligible {
+						<p role="status">This account cannot receive an OpenID identity. Use a non-revoked account configured exclusively for OpenID.</p>
+					} else if page.CanLink() {
+						<form method="post" action="/admin/oidc-accounts" class="grid gap-3 rounded-lg border p-4 min-w-0" data-oidc-link>
+							@oidcFields(info, page)
+							<input type="hidden" name="action" value="link"/>
+							<label>Provider subject<input class="uk-input w-full" name="subject" maxlength="255" required autocomplete="off"/></label>
+							<label><input type="checkbox" name="confirmed" value="yes" required/>{ " I verified this provider subject belongs to "+page.UserID+"." }</label>
+							<button class="uk-button uk-button-primary" type="submit">Link identity</button>
+						</form>
+					} else {
+						<p>This account already has an active identity for this issuer. Disable it before linking a replacement subject.</p>
+					}
+					<h2 class="text-xl font-semibold">Registered identities</h2>
+					if len(page.Bindings)==0 {
+						<p role="status">No identities are linked. Existing OpenID accounts require an explicit administrator link before sign-in.</p>
+					}
+					for _,binding:=range page.Bindings {
+						<article class="grid gap-3 rounded-lg border p-4 min-w-0" data-oidc-binding>
+							<p class="break-all">{ binding.Issuer }</p>
+							<p class="break-all">{ binding.Subject }</p>
+							if binding.Active {
+								<p>Active</p>
+							} else {
+								<p>Disabled · reserved for this account</p>
+							}
+							if page.Enabled && binding.Issuer==page.Issuer && (binding.Active || page.Eligible) && (!binding.Active || page.UserID!=info.Principal.UserID) {
+								<form method="post" action="/admin/oidc-accounts" class="grid gap-3">
+									@oidcFields(info, page)
+									<input type="hidden" name="subject" value={ binding.Subject }/>
+									if binding.Active {
+										<input type="hidden" name="action" value="disable"/>
+									} else {
+										<input type="hidden" name="action" value="enable"/>
+									}
+									<label><input type="checkbox" name="confirmed" value="yes" required/> Confirm this identity change.</label>
+									if binding.Active {
+										<button class="uk-button uk-button-danger" type="submit">Disable identity</button>
+									} else {
+										<button class="uk-button uk-button-primary" type="submit">Enable identity</button>
+									}
+								</form>
+							}
+						</article>
+					}
+					<h2 class="text-xl font-semibold">Latest 25 identity changes</h2>
+					if len(page.Events)==0 {
+						<p>No identity changes recorded.</p>
+					}
+					for _,event:=range page.Events {
+						<article class="grid gap-2 rounded-lg border p-4 min-w-0" data-oidc-event>
+							<p>{ "Revision "+strconv.FormatInt(event.Revision,10)+" · "+event.Action }</p>
+							<p class="break-all">{ event.Actor }</p>
+							<p class="break-all">{ event.Issuer }</p>
+							<p class="break-all">{ event.Subject }</p>
+							@mdm_views.TimestampSeconds(&event.At)
+						</article>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

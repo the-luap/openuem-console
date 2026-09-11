@@ -25,6 +25,7 @@ import memory from "./desktop-memory.mjs";
 import shares from "./desktop-shares.mjs";
 import security from "./desktop-security.mjs";
 import managementNavigation from "./management-navigation.mjs";
+import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -71,6 +72,7 @@ try {
         [shares, 24],
         [security, 36],
         [managementNavigation,12],
+        [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],
         [windowsTimestamps,21],

@@ -25,11 +25,13 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 type ownedOIDCGrant struct {
-	query          url.Values
-	mode, username string
+	query                   url.Values
+	mode, username, subject string
 }
 type ownedOIDCProvider struct {
 	server           *httptest.Server
@@ -86,7 +88,7 @@ func newOwnedOIDCProvider(t *testing.T) *ownedOIDCProvider {
 				w.Write([]byte(`{"error":"invalid_grant","error_description":"owned-secret-canary"}`))
 				return
 			}
-			claims := map[string]any{"iss": p.server.URL, "sub": "subject-" + grant.username, "aud": "owned-client", "iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(), "nonce": grant.query.Get("nonce")}
+			claims := map[string]any{"iss": p.server.URL, "sub": grant.subject, "aud": "owned-client", "iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(), "nonce": grant.query.Get("nonce")}
 			if grant.mode == "wrong_nonce" {
 				claims["nonce"] = "wrong"
 			}
@@ -121,7 +123,7 @@ func newOwnedOIDCProvider(t *testing.T) *ownedOIDCProvider {
 				w.Write([]byte(`{"error":"owned-secret-canary"}`))
 				return
 			}
-			subject := "subject-" + grant.username
+			subject := grant.subject
 			if grant.mode == "wrong_subject" {
 				subject = "different-subject"
 			}
@@ -134,7 +136,7 @@ func newOwnedOIDCProvider(t *testing.T) *ownedOIDCProvider {
 	return p
 }
 
-func (p *ownedOIDCProvider) grant(t *testing.T, location, mode, username string) string {
+func (p *ownedOIDCProvider) grant(t *testing.T, location, mode, username string, subjects ...string) string {
 	t.Helper()
 	u, err := url.Parse(location)
 	if err != nil || u.String() == "" || !strings.HasPrefix(location, p.server.URL+"/authorize?") {
@@ -148,7 +150,11 @@ func (p *ownedOIDCProvider) grant(t *testing.T, location, mode, username string)
 	defer p.mu.Unlock()
 	p.serial++
 	code := fmt.Sprintf("owned-code-%d", p.serial)
-	p.codes[code] = ownedOIDCGrant{query: q, mode: mode, username: username}
+	subject := "subject-" + username
+	if len(subjects) > 0 {
+		subject = subjects[0]
+	}
+	p.codes[code] = ownedOIDCGrant{query: q, mode: mode, username: username, subject: subject}
 	return "/oidc/callback?" + url.Values{"code": {code}, "state": {q.Get("state")}, "iss": {p.server.URL}}.Encode()
 }
 
@@ -206,6 +212,28 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		}
 	}
 	configure("authelia")
+	permissions, err := access.NewStore(m.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = permissions.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err = permissions.Bootstrap(t.Context(), "certificate-victim"); err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := oidcaccounts.NewStore(m.DB, permissions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = accounts.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, uid := range []string{"oidc-reader", "revoked-oidc"} {
+		if err = accounts.Change(t.Context(), "certificate-victim", uid, provider.server.URL, "owned-client", "subject-"+uid, "link", 0); err != nil {
+			t.Fatal(err)
+		}
+	}
 	pool, err := pgxpool.New(t.Context(), u.String())
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +242,7 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 	sm := scs.New()
 	sm.Store = sessions.NewWithConfig(pool, sessions.Config{})
 	sm.Cookie.Secure = true
-	h := &Handler{Model: m, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport}
+	h := &Handler{Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport}
 	e := router.New(h.SessionManager, "console.test", "443", "1M")
 	e.GET("/oidc", h.OIDCLogIn)
 	e.GET("/oidc/callback", h.OIDCCallback)
@@ -241,7 +269,7 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		}
 		return rec
 	}
-	begin := func(b browser, mode, username string) string {
+	begin := func(b browser, mode, username string, subjects ...string) string {
 		t.Helper()
 		rec := request(b, "/oidc")
 		if rec.Code != 302 || rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("Referrer-Policy") != "no-referrer" {
@@ -251,7 +279,7 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		if cookie == nil || !cookie.Secure || !cookie.HttpOnly || cookie.Domain != "" || cookie.Path != "/" || cookie.SameSite != http.SameSiteLaxMode {
 			t.Fatal("OIDC flow cookie lost host binding")
 		}
-		return provider.grant(t, rec.Header().Get("Location"), mode, username)
+		return provider.grant(t, rec.Header().Get("Location"), mode, username, subjects...)
 	}
 	for _, endpoint := range []string{"authorization_endpoint", "token_endpoint", "userinfo_endpoint"} {
 		provider.mu.Lock()
@@ -284,6 +312,32 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		if rec.Code < 400 || request(denied, "/fixture/session").Body.String() != "" {
 			t.Fatal("provider role requirement bypassed", kind, rec.Code)
 		}
+	}
+	configure("authelia")
+	for _, username := range []string{"renamed-user", "password-victim", "certificate-victim", ""} {
+		b := browser{}
+		if rec := request(b, begin(b, "valid", username, "subject-oidc-reader")); rec.Code != 302 || request(b, "/fixture/session").Body.String() != "oidc-reader" {
+			t.Fatal("verified subject lost account after username change", rec.Code)
+		}
+	}
+	recycled := browser{}
+	if rec := request(recycled, begin(recycled, "valid", "oidc-reader", "replacement-subject")); rec.Code != 401 || request(recycled, "/fixture/session").Body.String() != "" {
+		t.Fatal("recycled username inherited an existing account", rec.Code)
+	}
+	if err = settings.Update().SetOIDCAutoCreateAccount(true).SetOIDCAutoApprove(true).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	newAccount := browser{}
+	if rec := request(newAccount, begin(newAccount, "valid", "certificate-victim", "brand-new-subject")); rec.Code != 302 {
+		t.Fatal("automatic identity registration failed", rec.Code)
+	}
+	newUID := request(newAccount, "/fixture/session").Body.String()
+	if !strings.HasPrefix(newUID, "oidc-") {
+		t.Fatal("automatic registration used a provider username")
+	}
+	principal, err := permissions.Principal(t.Context(), newUID)
+	if err != nil || len(principal.Grants) != 0 {
+		t.Fatal("new identity inherited account permissions", err)
 	}
 	configure("authelia")
 	for _, mode := range []string{"missing_id_token", "wrong_nonce", "wrong_subject", "token_error", "userinfo_error"} {
