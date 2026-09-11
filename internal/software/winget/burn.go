@@ -1,6 +1,7 @@
 package winget
 
 import (
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -24,14 +25,40 @@ var burnBundleID = regexp.MustCompile(`^\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0
 // Binary bundle-identity verification and console approval/provenance integration
 // are required before enabling source-derived Burn dispatch.
 func BurnPlan(snapshot Snapshot, index int, target BurnTarget, operation string) (enrollment.SoftwarePlan, error) {
+	manifest, err := snapshot.Inspect()
+	if err != nil {
+		return enrollment.SoftwarePlan{}, err
+	}
+	return burnPlan(snapshot, manifest, index, target, operation)
+}
+
+// BurnOptions inspects once and preserves exact manifest indexes and plan hashes.
+func BurnOptions(snapshot Snapshot, target BurnTarget) ([]InstallerOption, error) {
+	manifest, err := snapshot.Inspect()
+	if err != nil {
+		return nil, err
+	}
+	var options []InstallerOption
+	for index := range manifest.Installers {
+		plan, err := burnPlan(snapshot, manifest, index, target, "install")
+		if err != nil {
+			continue
+		}
+		artifact, _ := url.Parse(plan.Artifact.URL)
+		digest, err := plan.Digest()
+		if err != nil {
+			return nil, ErrInstaller
+		}
+		options = append(options, InstallerOption{Kind: plan.Kind, Index: index, MinimumOS: plan.MinimumOS, SHA256: plan.Artifact.SHA256, DownloadHost: artifact.Hostname(), PlanDigest: digest})
+	}
+	return options, nil
+}
+
+func burnPlan(snapshot Snapshot, manifest *Manifest, index int, target BurnTarget, operation string) (enrollment.SoftwarePlan, error) {
 	var empty enrollment.SoftwarePlan
 	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[target.Architecture]
 	if architecture == "" || !target.Detection.Valid() || target.Detection.Kind != "uninstall-key" || target.Detection.RegistryView != "64" || !burnBundleID.MatchString(target.Detection.UninstallKey) || (operation != "install" && operation != "remove") {
 		return empty, ErrInstaller
-	}
-	manifest, err := snapshot.Inspect()
-	if err != nil {
-		return empty, err
 	}
 	fields, err := installerFields(manifest, index, architecture, "burn")
 	if err != nil {

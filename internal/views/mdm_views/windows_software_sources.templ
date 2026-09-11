@@ -32,6 +32,9 @@ templ WindowsSoftwareSourceRequirements(v apple.SoftwareVersion) {
   <dt>Detection rule</dt><dd>{v.Windows.Detection.Kind} · exact version {v.Windows.Detection.Version}</dd>
   if v.Windows.Detection.Kind=="msi-product" {
    <dt>MSI product code</dt><dd>{v.Windows.Detection.ProductCode}</dd>
+  } else {
+   <dt>Machine uninstall key</dt><dd>{v.Windows.Detection.UninstallKey}</dd>
+   <dt>Registry view</dt><dd>{v.Windows.Detection.RegistryView}-bit</dd>
   }
  </dl>
 }
@@ -47,9 +50,9 @@ templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple
     <div class="uk-card-body">
      @WindowsSoftwareSourceRequirements(*page.Version)
      if page.Version.WithdrawnAt!=nil {
-      <p role="status" class="uk-alert mt-4">This package approval was withdrawn. Its saved sources and MSI approvals remain in history.</p>
+      <p role="status" class="uk-alert mt-4">This package approval was withdrawn. Its saved sources and installer approvals remain in history.</p>
      } else if !page.Focused && canManage {
-      <p class="mt-4">Save the manifest for this exact package version from the Microsoft community repository. Review a compatible machine MSI installer and approve its digest in a separate step.</p>
+      <p class="mt-4">Save the manifest for this exact package version from the Microsoft community repository. Review a compatible machine MSI or Burn installer and approve its digest in a separate step.</p>
       <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources")}>
        @CSRF(info)
        <input type="hidden" name="request_id" value={requestID}/>
@@ -64,7 +67,7 @@ templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple
     </div>
    </section>
    <section class="uk-card uk-card-default">
-    <div class="uk-card-header"><h2 class="uk-card-title">Saved source history</h2><p>Each source is retained at its exact repository commit. An MSI approval records the selected installer and creates a separate catalog revision.</p></div>
+    <div class="uk-card-header"><h2 class="uk-card-title">Saved source history</h2><p>Each source is retained at its exact repository commit. An installer approval records the selected installer and creates a separate catalog revision.</p></div>
     <div class="uk-card-body">
      if len(page.Sources)==0 {
       <p>No installer sources saved for this package revision.</p>
@@ -72,7 +75,7 @@ templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple
      for _,source:=range page.Sources {
       <article class="software-row">
        if source.Approval!=nil {
-        <h3 class="font-semibold">MSI revision approved</h3>
+        <h3 class="font-semibold">Installer revision approved</h3>
        } else if source.Expired {
         <h3 class="font-semibold">Source review expired</h3>
        } else {
@@ -80,11 +83,11 @@ templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple
        }
        @WindowsSoftwareSourceIdentity(source)
        if source.Approval!=nil {
-        <dl class="uk-description-list mt-4"><dt>Selected installer</dt><dd>{fmt.Sprint(source.Approval.InstallerIndex+1)}</dd><dt>MSI revision approved</dt><dd>{When(&source.Approval.ApprovedAt)} · {source.Approval.Actor}</dd></dl>
+        <dl class="uk-description-list mt-4"><dt>Selected installer</dt><dd>{fmt.Sprint(source.Approval.InstallerIndex+1)}</dd><dt>Installer revision approved</dt><dd>{When(&source.Approval.ApprovedAt)} · {source.Approval.Actor}</dd></dl>
         if source.Approval.WithdrawnAt!=nil {
-         <p role="status" class="mt-4">The derived MSI approval was withdrawn at {When(source.Approval.WithdrawnAt)}.</p>
+         <p role="status" class="mt-4">The derived installer approval was withdrawn at {When(source.Approval.WithdrawnAt)}.</p>
         }
-        <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+source.Approval.VersionID)}>View MSI revision</a>
+        <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+source.Approval.VersionID)}>View installer revision</a>
        } else if !source.Expired && page.Version.WithdrawnAt==nil && canManage && source.Actor==actor {
         <a class="uk-button uk-button-primary mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources/"+source.ID+"/review")}>Review installer choices</a>
        }
@@ -117,28 +120,38 @@ templ WindowsSoftwareSourceReview(c echo.Context,info *partials.CommonInfo,revie
     </div>
    </section>
    <section class="uk-card uk-card-default">
-    <div class="uk-card-header"><h2 class="uk-card-title">Compatible machine MSI installers</h2></div>
+    <div class="uk-card-header"><h2 class="uk-card-title">Compatible machine MSI or Burn installers</h2></div>
     <div class="uk-card-body">
      if review.Source.Approval!=nil {
-      <p role="status">An MSI revision was already approved from this source.</p>
-      <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+review.Source.Approval.VersionID)}>View MSI revision</a>
+      <p role="status">An installer revision was already approved from this source.</p>
+      <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+review.Source.Approval.VersionID)}>View installer revision</a>
      } else if review.Version.WithdrawnAt!=nil {
-      <p role="status">The original package approval was withdrawn. Further MSI approval from this source is unavailable.</p>
+      <p role="status">The original package approval was withdrawn. Further installer approval from this source is unavailable.</p>
      } else if review.Expired {
       <p role="status">The approval deadline has passed. Save a new source to review this package again.</p>
      } else if len(review.Options)==0 {
-      <p role="status">None of the {fmt.Sprint(review.InstallerCount)} manifest installers meet the supported machine MSI rules and this revision's exact architecture, detection and version requirements.</p>
+      <p role="status">None of the {fmt.Sprint(review.InstallerCount)} manifest installers meet the supported machine MSI/Burn rules and this revision's exact architecture, detection and version requirements.</p>
      } else {
-      <p>Choose one installer. Approval creates a separate MSI revision with its exact binary digest and detection rule. Preparing and dispatching a device request requires later confirmation.</p>
+      <p>Choose one installer. Approval creates a separate installer revision with its exact binary digest and detection rule. Preparing and dispatching a device request requires later confirmation.</p>
       for _,option:=range review.Options {
        <article class="software-row">
-        <h3 class="font-semibold">Installer {fmt.Sprint(option.Index+1)} · {review.Version.Architecture}</h3>
-        <dl class="uk-description-list mt-4"><dt>Download host</dt><dd>{option.DownloadHost}</dd><dt>MSI SHA-256</dt><dd><code>{option.SHA256}</code></dd><dt>Minimum Windows version</dt><dd>{option.MinimumOS}</dd><dt>Required MSI product code</dt><dd>{review.Version.Windows.Detection.ProductCode}</dd><dt>Exact installed version</dt><dd>{review.Version.Windows.Detection.Version}</dd></dl>
+        <h3 class="font-semibold">Installer {fmt.Sprint(option.Index+1)} · {SoftwarePackageKind(option.Kind)} · {review.Version.Architecture}</h3>
+        <dl class="uk-description-list mt-4"><dt>Download host</dt><dd>{option.DownloadHost}</dd><dt>Installer SHA-256</dt><dd><code>{option.SHA256}</code></dd><dt>Minimum Windows version</dt><dd>{option.MinimumOS}</dd>
+        if option.Kind=="windows-burn" {
+         <dt>Required Burn bundle code</dt><dd>{review.Version.Windows.Detection.UninstallKey}</dd>
+         <dt>Registry view</dt><dd>64-bit machine registration</dd>
+        } else {
+         <dt>Required MSI product code</dt><dd>{review.Version.Windows.Detection.ProductCode}</dd>
+        }
+        <dt>Exact installed version</dt><dd>{review.Version.Windows.Detection.Version}</dd></dl>
+        if option.Kind=="windows-burn" {
+         <p class="mt-4">Installation and removal use this same pinned bundle. The agent verifies its embedded bundle code and exact version before starting. Dispatch requires an agent with Burn support.</p>
+        }
         <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID+"/sources/"+review.Source.ID+"/approve")}>
          @CSRF(info)
          <input type="hidden" name="approval_id" value={approvalID}/><input type="hidden" name="installer_index" value={fmt.Sprint(option.Index)}/><input type="hidden" name="review_hash" value={option.ReviewHash}/>
-         <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Approve this exact MSI installer as a new catalog revision.</label>
-         <button class="uk-button uk-button-primary mt-4" type="submit">Approve this MSI revision</button>
+         <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Approve this exact installer as a new catalog revision.</label>
+         <button class="uk-button uk-button-primary mt-4" type="submit">Approve this installer revision</button>
         </form>
        </article>
       }

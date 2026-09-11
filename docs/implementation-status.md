@@ -51,7 +51,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history; UTC schedule preview/confirmation, protected plan history and revision-checked pending cancellation; administrator-only CSP request/result history, undelivered custom-command cancellation and explicit uncertain-queue resolution; bounded custom JSON command editor with shared-compiler preview and confirmed idempotent admission; protected cumulative observation history with authenticated pagination and single-message detail; bounded CMS/PKCS#10 old/new-key renewal proof verification; persistent scoped renewal issuance/retries, encrypted lifecycle history/cancellation, atomic SyncML replacement confirmation and immutable session anchor with TLS/database tests; registered certificate-authenticated Renew SOAP with direct/gateway TLS, disjoint request grammars, timestamp freshness and restart/fuzz tests; scoped certificate replacement history, protected source/replacement details, confirmation evidence and revision/CSRF-checked pending cancellation with database/router/browser tests; authenticated first-packet disconnection reports, atomic access retirement and interrupted-command uncertainty with protected history and console status; typed fixed-provider disconnection requests, protected lifecycle history, priority delivery, revision-checked cancellation and explicit review of missing notifications; scoped disconnection preview/confirmed creation, ten-row history, independent report/outcome/review details and CSRF/revision-checked cancellation/release with router/browser tests; audited organization/site certificate health, bounded expiry filters, authenticated current/pending generations and CA issuance warnings; staged device/CA expiry reminders with protected retry state, live source/recipient checks, runtime shutdown and scoped SMTP history; revision-bound audited JSON command/observation downloads with bounded preparation and integrity checks; twelve native audit sources in the shared viewer/export with explicitly confirmed organization retention and immutable deletion receipts | CSP command/packet/observation retention, broader typed policies, automatic ring promotion, account-authenticated renewal, renewal scheduling, production SMTP/inbox acceptance, end-to-end missing-notification recovery and physical Windows cleanup acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks; all twelve native Windows audit sources with original scope and opt-in guarded retention | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
-| SW-01 | Upstream Windows/Homebrew foundation; common approved macOS PKG and Windows WinGet/MSI/EXE catalog; native Mac install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation; authenticated, journaled Windows MSI/EXE service execution with native compatibility, trust and observation checks; explicit console review/dispatch, verified results and queued cancellation; read-only Windows reconciliation with later-boot evidence and separate immutable release history; fixed-commit WinGet source review and separate exact MSI approval with retained provenance | Further WinGet installer formats; Homebrew delivery, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
+| SW-01 | Upstream Windows/Homebrew foundation; common approved macOS PKG and Windows WinGet/MSI/EXE/Burn catalog; native Mac install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation; authenticated, journaled Windows MSI/EXE/Burn service execution with native compatibility, trust and observation checks; explicit console review/dispatch, verified results and queued cancellation; read-only Windows reconciliation with later-boot evidence and separate immutable release history; fixed-commit WinGet source review and separate exact MSI/Burn approval with retained provenance and device-signed Burn capability | Further WinGet installer formats; Homebrew delivery, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
 
 Cross-cutting scope includes native User Enrollment/privacy limits, SCIM and IdP
 associations, macOS recovery/local-admin/Platform SSO extensions, certificate
@@ -74,7 +74,11 @@ the table's package summaries do not remove any detail from the roadmap.
   Portable recovery tests preserve signed historical receipts and exact later-boot
   observations without repeating execution. The private profile hint and
   device-signed Burn recipient negotiation are implemented, with downgrade and
-  admission checks passing portable race tests. Source approval/dispatch remains open. See [Burn execution evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
+  admission checks passing portable race tests. Source review now publishes an
+  explicit Burn revision with immutable provenance and the same pinned artifact
+  for installation/removal. Dispatch requires its current signed recipient grant.
+  The source/catalog/dispatch/migration race suite passes in 39.571 seconds;
+  route and responsive browser checks also pass. Physical acceptance remains open. See [Burn execution evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
 
 - A native Windows readiness shutdown hang is now traced and corrected. The
   listener keeps a persistent stop event while draining pending connections,
@@ -104,8 +108,8 @@ the table's package summaries do not remove any detail from the roadmap.
   Its pinned portable race suites, Windows cross-compilation/vet and new native
   helper CI pass. Existing console catalog/source/dispatch/migration race tests
   pass against PostgreSQL in 95.106 seconds; source-adapter race and 368,767 fuzz
-  inputs also pass. Subsequent execution/lifecycle evidence is recorded above;
-  capability advertisement and source approval/dispatch remain open. See the
+  inputs also pass. Subsequent native lifecycle, capability and source approval/dispatch
+  evidence is recorded above. See the
   [Burn integration evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
 
 - Recovery CI now serializes package tests that create and drop whole databases
@@ -129,9 +133,8 @@ the table's package summaries do not remove any detail from the roadmap.
   race tests pass in 1.472 seconds, and all three generated bundle architectures
   pass complete registration/tampered-header checks in 15.10 seconds. All agent
   CI jobs pass at `bf1f80adf9960387f82e414d60263b7054816c23`. These native runs use
-  an AMD64 Windows process; native ARM64 process acceptance remains open. The
-  preflight subprocess and signed capability contract are recorded above. Native
-  execution and source approval/dispatch remain required before delivery is enabled.
+  an AMD64 Windows process. Subsequent native ARM64 execution, preflight, signed
+  capability negotiation and source approval/dispatch evidence is recorded above.
 
 - The agent's [bounded Burn layout reader](windows-winget-resolution.md#burn-exe-translation-foundation)
   now locates the section-declared bundle code and UX cabinet with at most seven
@@ -144,18 +147,16 @@ the table's package summaries do not remove any detail from the roadmap.
   with pinned WiX/Bal and compares their independently extracted registration
   identifiers without executing a bundle or payload. All three generated native
   architecture cases pass at agent commit `383c6fd1d1e31564ede725eac00317d94423959f`.
-  Embedded registration proof is recorded above; native delivery integration
-  remains open. These readers enable no
-  additional installer execution. The full roadmap remains in progress.
+  Embedded registration and native delivery integration are recorded above.
+  These readers themselves execute no installer. The full roadmap remains in progress.
 
 - A separate [Burn source adapter](windows-winget-resolution.md#burn-exe-translation-foundation)
   now binds source-declared installation/removal to the same exact EXE, native
   target, bundle identifier and reviewed machine uninstall-registry view. Shared
   parsing preserves inherited requirements; MSI and Burn reject non-ASCII switch
-  folding and non-Windows argument separators. This foundation does not enable
-  Burn in the console. Embedded binary bundle-identity proof, appropriate native
-  delivery negotiation, explicit source approval/provenance and physical acceptance
-  remain required before source-derived Burn execution.
+  folding and non-Windows argument separators. Subsequent embedded binary proof,
+  native capability negotiation and source approval/provenance integration are
+  recorded above. Physical acceptance remains open.
   Combined source/MSI/Burn race tests pass in 1.799 seconds; final Burn and MSI
   fuzz runs pass 242,390 and 233,586 inputs. Source/catalog PostgreSQL race tests
   pass in 17.265 seconds, with full handler, focused vet and Windows compilation

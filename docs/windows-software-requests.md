@@ -5,15 +5,16 @@ operator can select an individually enrolled Windows endpoint, choose installati
 or removal, and explicitly confirm the exact revision and operation. Readers can
 inspect the scoped history. Preparation does not download an artifact, run an
 installer, remove an application or establish installed state. For an approved
-AMD64/ARM64 MSI or EXE, select **Review execution**, inspect the exact device,
+AMD64/ARM64 MSI, EXE or source-approved Burn revision, select **Review execution**, inspect the exact device,
 revision, operation and deadline, then confirm **Dispatch to this device**.
 
 Preparations remain inert, including rows created before the dispatch migration.
 Only the separate review and confirmed POST can atomically create a signed,
 encrypted individual-agent task and mark its preparation `dispatched`. The worker
 never consumes preparation rows. For WinGet, first use the separate
-[source review](windows-winget-resolution.md) to approve a compatible machine MSI
-as a derived revision, then prepare that MSI revision. Unresolved coordinates
+[source review](windows-winget-resolution.md) to approve a compatible machine MSI or Burn
+as a derived revision, then prepare that exact revision. Burn dispatch requires
+current device-signed support and verified saved-source provenance. Unresolved coordinates
 and x86 delivery remain unavailable.
 
 ## Admission and lifetime

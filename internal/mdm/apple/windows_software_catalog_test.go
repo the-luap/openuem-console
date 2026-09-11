@@ -25,11 +25,15 @@ func testWindowsSoftware(kind string) WindowsSoftwareInput {
 	if kind == "windows-exe" {
 		p.Execution = WindowsSoftwareExecution{SourceURL: "https://packages.example.test/owned.exe?token=private-download", InstallArguments: []string{"/silent", "private-install-argument"}, UninstallURL: "https://packages.example.test/remove.exe?token=private-removal", UninstallSHA256: strings.Repeat("b", 64), UninstallArguments: []string{"/silent", "private-remove-argument"}}
 	}
+	if kind == "windows-burn" {
+		p.Detection = WindowsSoftwareDetection{Kind: "uninstall-key", UninstallKey: p.Detection.ProductCode, RegistryView: "64", Version: p.Detection.Version}
+		p.Execution = WindowsSoftwareExecution{SourceURL: "https://packages.example.test/owned.exe?token=private-download", InstallArguments: []string{"/quiet", "/norestart"}, UninstallURL: "https://packages.example.test/owned.exe?token=private-download", UninstallSHA256: p.SHA256, UninstallArguments: []string{"/uninstall", "/quiet", "/norestart"}}
+	}
 	return p
 }
 
 func TestWindowsSoftwareDefinitionAndCredentialProjection(t *testing.T) {
-	for _, kind := range []string{"windows-winget", "windows-msi", "windows-exe"} {
+	for _, kind := range []string{"windows-winget", "windows-msi", "windows-exe", "windows-burn"} {
 		p := testWindowsSoftware(kind)
 		if err := p.Validate(); err != nil {
 			t.Fatalf("%s: %v", kind, err)

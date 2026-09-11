@@ -421,8 +421,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	winSourceReview := func(state string) apple.WindowsSoftwareSourceReview {
 		p := winSourcePage(state)
 		r := apple.WindowsSoftwareSourceReview{Version: p.Version, Source: p.Sources[0], Expired: p.Sources[0].Expired, InstallerCount: 2}
-		if state == "review" {
-			r.Options = []apple.WindowsSoftwareSourceOption{{MSIOption: winget.MSIOption{Index: 0, MinimumOS: p.Version.MinimumOS, SHA256: strings.Repeat("c", 64), DownloadHost: "downloads.example.test"}, ReviewHash: strings.Repeat("d", 64)}}
+		if state == "review" || state == "burn-review" {
+			r.Options = []apple.WindowsSoftwareSourceOption{{InstallerOption: winget.InstallerOption{Kind: "windows-msi", Index: 0, MinimumOS: p.Version.MinimumOS, SHA256: strings.Repeat("c", 64), DownloadHost: "downloads.example.test"}, ReviewHash: strings.Repeat("d", 64)}}
+		}
+		if state == "burn-review" {
+			r.Options[0].Kind = "windows-burn"
+			r.Version.Windows.Detection = apple.WindowsSoftwareDetection{Kind: "uninstall-key", UninstallKey: "{90000000-0000-4000-8000-000000000001}", RegistryView: "64", Version: "42.0"}
 		}
 		return r
 	}
@@ -443,14 +447,15 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"windows-source-site", WindowsSoftwareSources(c, &sourceSite, winSourcePage("pending"), "", "preview-admin", false), []string{"View source evidence"}},
 		{"windows-source-expired", WindowsSoftwareSources(c, info, winSourcePage("expired"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Source review expired"}},
 		{"windows-source-withdrawn", WindowsSoftwareSources(c, info, winSourcePage("withdrawn"), "", "preview-admin", true), []string{"package approval was withdrawn"}},
-		{"windows-source-approved", WindowsSoftwareSources(c, info, winSourcePage("approved"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"MSI revision approved", "View MSI revision"}},
+		{"windows-source-approved", WindowsSoftwareSources(c, info, winSourcePage("approved"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Installer revision approved", "View installer revision"}},
 		{"windows-source-focused", WindowsSoftwareSources(c, &reader, winSourcePage("focused"), "", "preview-reader", false), []string{"WinGet source evidence", "All saved sources"}},
 		{"windows-source-paged", WindowsSoftwareSources(c, info, winSourcePage("paged"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Older saved sources"}},
-		{"windows-source-review", WindowsSoftwareSourceReview(c, info, winSourceReview("review"), "90000000-0000-4000-8000-000000000043"), []string{"Approve this MSI revision", "downloads.example.test", "name=\"review_hash\""}},
+		{"windows-source-review", WindowsSoftwareSourceReview(c, info, winSourceReview("review"), "90000000-0000-4000-8000-000000000043"), []string{"Approve this installer revision", "downloads.example.test", "name=\"review_hash\""}},
+		{"windows-source-burn-review", WindowsSoftwareSourceReview(c, info, winSourceReview("burn-review"), "90000000-0000-4000-8000-000000000043"), []string{"Windows · Burn", "Required Burn bundle code", "64-bit machine registration", "same pinned bundle", "Approve this installer revision"}},
 		{"windows-source-incompatible", WindowsSoftwareSourceReview(c, info, winSourceReview("incompatible"), ""), []string{"None of the 2 manifest installers"}},
 		{"windows-source-review-expired", WindowsSoftwareSourceReview(c, info, winSourceReview("review-expired"), ""), []string{"approval deadline has passed"}},
-		{"windows-source-review-withdrawn", WindowsSoftwareSourceReview(c, info, winSourceReview("review-withdrawn"), ""), []string{"Further MSI approval from this source is unavailable"}},
-		{"windows-source-review-approved", WindowsSoftwareSourceReview(c, info, winSourceReview("review-approved"), ""), []string{"MSI revision was already approved"}},
+		{"windows-source-review-withdrawn", WindowsSoftwareSourceReview(c, info, winSourceReview("review-withdrawn"), ""), []string{"Further installer approval from this source is unavailable"}},
+		{"windows-source-review-approved", WindowsSoftwareSourceReview(c, info, winSourceReview("review-approved"), ""), []string{"installer revision was already approved"}},
 		{"windows-source-derived", SoftwareVersion(c, &reader, winDerived, nil, false, SoftwareDeviceSearch{}), []string{"View WinGet source evidence"}},
 		{"wifi-eap-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an enterprise Wi-Fi profile (EAP-TLS)", "Device &lt;identity&gt;", `value="70000000-0000-4000-8000-000000000001/7"`, `value="70000000-0000-4000-8000-000000000004/2"`, `data-scope="User"`, `name="trust_revision" required`, `value="existing" selected`, "Source updates and deletion do not change the saved copy.", "32 UTF-8 bytes", "iOS/iPadOS 17 or macOS 14", "/assets/js/apple-wifi-eap.js"}},
 		{"wifi-eap-reader", Profiles(c, &reader, wifiCertificates, []apple.Device{*d}), []string{"Device &lt;identity&gt;"}},

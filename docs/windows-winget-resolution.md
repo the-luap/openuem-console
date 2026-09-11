@@ -1,15 +1,15 @@
-# WinGet source review and immutable MSI approval
+# WinGet source review and immutable installer approval
 
 Open an approved WinGet revision and select **WinGet installers**. An organization
 software manager can confirm **Save installer source**, review compatible machine
-MSI choices and confirm **Approve this MSI revision**. The resulting MSI revision
+MSI or Burn choices and confirm **Approve this installer revision**. The resulting revision
 has its own approval, binary digest and source evidence link. Select its
 **Windows device requests** to prepare and explicitly dispatch installation or
 removal through the existing individual-agent protocol.
 
-Saving a source and approving an MSI do not create device requests or installer
+Saving a source and approving an installer do not create device requests or installer
 tasks. An unresolved WinGet coordinate remains non-executable. This integration
-supports the exact machine MSI/WiX subset described below; unsupported installer
+supports the exact machine MSI/WiX and Burn subsets described below; unsupported installer
 kinds or behavior do not become executable by selecting a package name.
 
 ## Fixed Microsoft community source
@@ -106,7 +106,7 @@ The capture's 15-minute deadline comes from the database clock. Only its creator
 with current organization rights receives approval choices. Each choice binds
 the original exact architecture and detection rule, selected installer index,
 manifest digest/commit, translated plan digest, actor and deadline. Confirmation
-revalidates those fields and atomically publishes a separate MSI revision, its
+revalidates those fields and atomically publishes a separate installer revision, its
 source link and audit events. A final deadline check prevents a transaction
 delayed during auditing from committing an expired approval. Exact approval
 retries return the same revision; another request ID cannot reuse the source or
@@ -114,12 +114,12 @@ reattribute an existing ordinary catalog approval.
 
 The original WinGet coordinate is retained. Original and derived withdrawals are
 independent: withdrawal of the coordinate prevents new captures/approvals, while
-withdrawal of the derived MSI prevents its future installation. Neither erases
+withdrawal of the derived installer prevents its future installation. Neither erases
 history. Historical retries preserve withdrawal and never restore approval.
 Expired, incompatible and withdrawn source reviews expose no approval forms.
 
 Authorized organization/site readers can inspect source evidence and history,
-including the originating source from an MSI detail page. History is bounded to
+including the originating source from an MSI or Burn detail page. History is bounded to
 50 entries per page with an original-revision/organization-bound cursor. Read
 audit must commit before data is returned. Views show only repository provenance,
 digests, requirements and the compatible download host; installer paths, query
@@ -164,15 +164,29 @@ Both MSI and Burn require literal ASCII switches with space/tab separators.
 Unicode case folding, Unicode whitespace and embedded line breaks cannot turn
 an unsupported manifest token into an accepted quiet flag.
 
-This is source metadata translation, not enabled Burn delivery. Console source
-review and immutable approval currently admit only MSI/WiX. Before integrating
-Burn, the native contract must verify that the binary's embedded bundle identity
-matches its reviewed registration, in addition to the existing hash, Authenticode
-and PE architecture checks. Those existing checks alone do not establish bundle
-identity. The agent also currently rejects an emulated bootstrapper executable,
-even when its payload targets the native architecture. Source-derived Burn
-approval/history and physical acceptance remain open;
-native execution and protocol recovery evidence are recorded below.
+Console review now offers Burn only for a source-declared `burn` entry matching
+the separately approved native architecture, canonical bundle code, exact display
+version and 64-bit machine registration. GUID-shaped metadata cannot promote an
+MSI or generic EXE manifest to Burn. Public options retain the original index,
+explicit adapter kind, digest and download host, without the artifact path or
+query. The selection hash binds the complete translated plan.
+
+Migration `042_windows_burn_sources.sql` adds explicit Burn revisions and extends
+the existing source and preparation guards. It does not rewrite old approvals or
+preparations. The derived encrypted definition pins the same URL and SHA-256 for
+both operations, with exact quiet/no-restart and uninstall arguments. Catalog
+reads revalidate the retained source against this immutable definition. Direct
+HTTP publication of a Burn revision is rejected; it requires saved-source review.
+
+Dispatch requires the current device-signed Burn recipient capability and verified
+source provenance. A replaced recipient invalidates an earlier review, including
+when support is later restored. Missing or corrupted source history prevents
+dispatch. Withdrawing the original coordinate preserves an independently approved
+Burn revision and its history. The native agent verifies the retained binary's
+embedded bundle code, exact version, machine scope and native architecture in
+addition to its approved hash and Authenticode policy. Emulated bootstrappers
+remain unsupported, even when their payloads target the native architecture.
+Physical endpoint acceptance remains separate.
 
 The agent's separate
 [Burn metadata readers and preflight](https://github.com/the-luap/openuem-agent/blob/767bf1a9ec62456807bc783c2cd60db9dbc6f30e/docs/windows-burn-inspection.md)
@@ -226,10 +240,9 @@ challenge alone grants no capability. Migration `014` preserves old recipients
 at zero, and their JSON wire encoding remains unchanged. Capability changes issue
 a new recipient ID, cancel pending old work and preserve delivered uncertainty;
 audit failures roll back the complete transition. Full local module/registry race
-tests and 814,083 wire-fuzz inputs pass. Agent admission still advertises no Burn
-capability and rejects new Burn work before recording an attempt; its process
-builder cannot fall through to MSI. Source approval/dispatch stays disabled until
-the remaining capability and provenance integration is complete.
+tests and 814,083 wire-fuzz inputs pass. The agent now negotiates the private
+profile hint through a matching device signature before admitting Burn; its
+process builder cannot fall through to MSI.
 
 The agent now maps explicit Burn plans directly to the retained EXE process
 boundary after native preflight. Owned native fixtures build unique bundles with
@@ -297,3 +310,18 @@ at admission and retained result retry pass portable race tests in 8.521 seconds
 The actual Linux ARM64 worker passes profile/schema/broker checks in 1.32 seconds.
 All consumers pin the published module. This profile hint alone does not approve
 or dispatch a source-derived package.
+
+The source/catalog/dispatch/migration PostgreSQL race suite passes in 39.571
+seconds, including exact encrypted Burn install/remove, absent and downgraded
+capabilities, replaced review IDs, withdrawn original coordinates, changed source
+history and missing provenance. The source adapter and view race suites pass in
+1.807/2.096 seconds. Actual route tests on Linux ARM64 also cover Burn source
+review, scope/CSRF/body boundaries, exact approval retry, credential-free history,
+withdrawal and rejection of direct publication. Owned Chrome checks pass four
+source pages at 390, 768 and 1440 pixels without horizontal overflow, including
+the Burn bundle code and same-artifact removal explanation.
+
+Focused vet and full Linux ARM64/Windows AMD64 builds pass. Another 80,092 Burn
+fuzz inputs pass in 16.496 seconds. All seven agent CI jobs pass with signed Burn
+negotiation at `763c6a5`, including native AMD64 and ARM64 lifecycle fixtures
+([agent run](https://github.com/the-luap/openuem-agent/actions/runs/34629673589)).

@@ -176,6 +176,11 @@ func (p WindowsSoftwareInput) Validate() error {
 		if !windowsCatalogIdentifier.MatchString(p.Identifier) || !validWindowsDigest(p.SHA256) || !validWindowsSource(e.SourceURL, ".msi") || p.Detection.Kind != "msi-product" || len(e.InstallArguments) != 0 || len(e.UninstallArguments) != 0 || e.UninstallURL != "" || e.UninstallSHA256 != "" || !slices.Equal(p.SuccessCodes, []uint32{0}) || !slices.Equal(p.RebootCodes, []uint32{3010}) {
 			return ErrWindowsSoftware
 		}
+	case "windows-burn":
+		id, err := uuid.Parse(strings.TrimSuffix(strings.TrimPrefix(p.Detection.UninstallKey, "{"), "}"))
+		if err != nil || id == uuid.Nil || p.Detection.UninstallKey != "{"+strings.ToUpper(id.String())+"}" || p.Detection.Kind != "uninstall-key" || p.Detection.RegistryView != "64" || p.Architecture == "x86" || !windowsCatalogIdentifier.MatchString(p.Identifier) || !validWindowsDigest(p.SHA256) || !validWindowsSource(e.SourceURL, ".exe") || e.UninstallURL != e.SourceURL || e.UninstallSHA256 != p.SHA256 || len(e.MSIProperties) != 0 || !slices.Equal(e.InstallArguments, []string{"/quiet", "/norestart"}) || !slices.Equal(e.UninstallArguments, []string{"/uninstall", "/quiet", "/norestart"}) || !slices.Equal(p.SuccessCodes, []uint32{0}) || !slices.Equal(p.RebootCodes, []uint32{3010}) {
+			return ErrWindowsSoftware
+		}
 	case "windows-exe":
 		if !windowsCatalogIdentifier.MatchString(p.Identifier) || !validWindowsDigest(p.SHA256) || !validWindowsSource(e.SourceURL, ".exe") || !validWindowsDigest(e.UninstallSHA256) || !validWindowsSource(e.UninstallURL, ".exe") || len(e.MSIProperties) != 0 || len(e.InstallArguments) == 0 || len(e.UninstallArguments) == 0 {
 			return ErrWindowsSoftware

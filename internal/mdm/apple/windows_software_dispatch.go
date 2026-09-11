@@ -38,7 +38,7 @@ func windowsExecutablePlan(data []byte, operation string) (enrollment.SoftwarePl
 	input.Execution = definition.Execution
 	canonical, err := input.canonical()
 	defer clear(canonical)
-	if err != nil || !bytes.Equal(data, canonical) || input.Validate() != nil || (operation != "install" && operation != "remove") || (input.Kind != "windows-msi" && input.Kind != "windows-exe") {
+	if err != nil || !bytes.Equal(data, canonical) || input.Validate() != nil || (operation != "install" && operation != "remove") || (input.Kind != "windows-msi" && input.Kind != "windows-exe" && input.Kind != "windows-burn") {
 		return plan, ErrWindowsSoftware
 	}
 	plan = enrollment.SoftwarePlan{Kind: input.Kind, Operation: operation, Identifier: input.Identifier, Version: input.Version, Architecture: map[string]string{"x86_64": "amd64", "arm64": "arm64"}[input.Architecture], MinimumOS: input.MinimumOS, Detection: enrollment.SoftwareDetection{Kind: input.Detection.Kind, ProductCode: input.Detection.ProductCode, UninstallKey: input.Detection.UninstallKey, RegistryView: input.Detection.RegistryView, Version: input.Detection.Version}, SuccessCodes: slices.Clone(input.SuccessCodes), RebootCodes: slices.Clone(input.RebootCodes)}
@@ -127,6 +127,9 @@ func (s *Store) windowsDispatchReview(ctx context.Context, tx *sql.Tx, scope Sco
 	if err != nil || plan.Architecture != architecture {
 		return nil, empty, ErrWindowsSoftware
 	}
+	if !recipient.Supports(plan) {
+		return nil, empty, ErrConflict
+	}
 	v, err := softwareVersionTx(ctx, tx, bound, version)
 	if err != nil {
 		return nil, empty, err
@@ -134,11 +137,17 @@ func (s *Store) windowsDispatchReview(ctx context.Context, tx *sql.Tx, scope Sco
 	if v.Platform != "windows" || v.Identifier != plan.Identifier || v.Kind != plan.Kind || v.Version != plan.Version || v.MinimumOS != plan.MinimumOS || map[string]string{"x86_64": "amd64", "arm64": "arm64"}[v.Architecture] != plan.Architecture {
 		return nil, empty, ErrConflict
 	}
+	if plan.Kind == "windows-burn" {
+		v.WinGetSource, err = s.readWindowsDerivedSource(ctx, tx, bound, *v)
+		if err != nil || v.WinGetSource == nil {
+			return nil, empty, ErrWindowsSoftware
+		}
+	}
 	metadata := v.Windows
 	if metadata.Kind != plan.Kind || metadata.Detection.Kind != plan.Detection.Kind || metadata.Detection.ProductCode != plan.Detection.ProductCode || metadata.Detection.UninstallKey != plan.Detection.UninstallKey || metadata.Detection.RegistryView != plan.Detection.RegistryView || metadata.Detection.Version != plan.Detection.Version || !slices.Equal(metadata.SuccessCodes, plan.SuccessCodes) || !slices.Equal(metadata.RebootCodes, plan.RebootCodes) {
 		return nil, empty, ErrConflict
 	}
-	if plan.Operation == "install" && v.SHA256 != plan.Artifact.SHA256 || plan.Operation == "remove" && plan.Kind == "windows-exe" && metadata.UninstallSHA256 != plan.Artifact.SHA256 {
+	if plan.Operation == "install" && v.SHA256 != plan.Artifact.SHA256 || plan.Operation == "remove" && (plan.Kind == "windows-exe" || plan.Kind == "windows-burn") && metadata.UninstallSHA256 != plan.Artifact.SHA256 {
 		return nil, empty, ErrConflict
 	}
 	deadline := r.ExpiresAt.Truncate(time.Second)

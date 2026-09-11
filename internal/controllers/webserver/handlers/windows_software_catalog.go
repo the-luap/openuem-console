@@ -46,6 +46,9 @@ func (h *Handler) PublishWindowsSoftware(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if f.Get("kind") == "windows-burn" {
+		return echo.NewHTTPError(400, "Approve Burn installers through a saved WinGet source review")
+	}
 	p := apple.WindowsSoftwareInput{Name: f.Get("name"), Identifier: f.Get("identifier"), Version: f.Get("version"), Kind: f.Get("kind"), Architecture: f.Get("architecture"), MinimumOS: f.Get("minimum_os"), SHA256: f.Get("sha256"), Detection: apple.WindowsSoftwareDetection{Kind: f.Get("detection_kind"), ProductCode: f.Get("product_code"), UninstallKey: f.Get("uninstall_key"), RegistryView: f.Get("registry_view"), Version: f.Get("detection_version")}}
 	p.Execution = apple.WindowsSoftwareExecution{SourceURL: f.Get("source_url"), InstallArguments: softwareArgumentLines(f.Get("install_arguments")), UninstallURL: f.Get("uninstall_url"), UninstallSHA256: f.Get("uninstall_sha256"), UninstallArguments: softwareArgumentLines(f.Get("uninstall_arguments"))}
 	if p.SuccessCodes, err = softwareExitCodes(f.Get("success_codes")); err != nil {

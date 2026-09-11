@@ -54,7 +54,7 @@ func TestWindowsSoftwareDispatchMigrationLeavesExistingPreparationInert(t *testi
 }
 
 func TestWindowsSoftwareExecutablePlanRejectsUnresolvedAndNoncanonicalDefinitions(t *testing.T) {
-	for _, kind := range []string{"windows-winget", "windows-msi", "windows-exe"} {
+	for _, kind := range []string{"windows-winget", "windows-msi", "windows-exe", "windows-burn"} {
 		input := testWindowsSoftware(kind)
 		data, err := input.canonical()
 		if err != nil {

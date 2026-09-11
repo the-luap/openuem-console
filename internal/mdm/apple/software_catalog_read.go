@@ -44,7 +44,7 @@ func (s *Store) ReadSoftwareVersion(ctx context.Context, scope Scope, id, actor 
 	if err != nil {
 		return nil, err
 	}
-	if v.Kind == "windows-msi" {
+	if v.Kind == "windows-msi" || v.Kind == "windows-burn" {
 		v.WinGetSource, err = s.readWindowsDerivedSource(ctx, tx, scope, *v)
 		if err != nil {
 			return nil, err

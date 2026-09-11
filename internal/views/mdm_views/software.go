@@ -34,7 +34,7 @@ func WindowsSoftwareRequestState(status string) string {
 }
 
 func WindowsSoftwareDispatchSupported(v apple.SoftwareVersion) bool {
-	return (v.Kind == "windows-msi" || v.Kind == "windows-exe") && (v.Architecture == "x86_64" || v.Architecture == "arm64")
+	return (v.Kind == "windows-msi" || v.Kind == "windows-exe" || v.Kind == "windows-burn") && (v.Architecture == "x86_64" || v.Architecture == "arm64")
 }
 
 func WindowsSoftwareDispatchState(task registry.SoftwareTaskStatus) string {
@@ -132,6 +132,8 @@ func SoftwarePackageKind(kind string) string {
 		return "Windows · WinGet"
 	case "windows-msi":
 		return "Windows · MSI"
+	case "windows-burn":
+		return "Windows · Burn"
 	case "windows-exe":
 		return "Windows · EXE"
 	default:

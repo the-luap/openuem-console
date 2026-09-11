@@ -34,7 +34,7 @@ type WindowsSoftwareSourceApproval struct {
 }
 
 type WindowsSoftwareSourceOption struct {
-	winget.MSIOption
+	winget.InstallerOption
 	ReviewHash string
 }
 
@@ -123,6 +123,22 @@ func sourceMSITarget(input WindowsSoftwareInput) winget.MSITarget {
 	return winget.MSITarget{Architecture: map[string]string{"x86_64": "amd64", "arm64": "arm64"}[input.Architecture], MinimumOS: input.MinimumOS, Detection: enrollment.SoftwareDetection{Kind: input.Detection.Kind, ProductCode: input.Detection.ProductCode, UninstallKey: input.Detection.UninstallKey, RegistryView: input.Detection.RegistryView, Version: input.Detection.Version}}
 }
 
+func sourceInstallerPlan(snapshot winget.Snapshot, index int, input WindowsSoftwareInput, operation string) (enrollment.SoftwarePlan, error) {
+	target := sourceMSITarget(input)
+	if input.Detection.Kind == "uninstall-key" {
+		return winget.BurnPlan(snapshot, index, winget.BurnTarget(target), operation)
+	}
+	return winget.MSIPlan(snapshot, index, target, operation)
+}
+
+func sourceInstallerOptions(snapshot winget.Snapshot, input WindowsSoftwareInput) ([]winget.InstallerOption, error) {
+	target := sourceMSITarget(input)
+	if input.Detection.Kind == "uninstall-key" {
+		return winget.BurnOptions(snapshot, winget.BurnTarget(target))
+	}
+	return winget.MSIOptions(snapshot, target)
+}
+
 func (s *Store) windowsSourceRecord(ctx context.Context, tx *sql.Tx, scope Scope, version, id string, input WindowsSoftwareInput) (*WindowsSoftwareSource, winget.Snapshot, error) {
 	var r WindowsSoftwareSource
 	var sealed []byte
@@ -179,13 +195,21 @@ func sourceReviewDigest(tenant int, r WindowsSoftwareSource, index int, digest, 
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func derivedWindowsMSI(input WindowsSoftwareInput, plan enrollment.SoftwarePlan) (WindowsSoftwareInput, error) {
-	input.Kind = "windows-msi"
+func derivedWindowsInstaller(input WindowsSoftwareInput, plan enrollment.SoftwarePlan) (WindowsSoftwareInput, error) {
+	if plan.Kind != "windows-msi" && plan.Kind != "windows-burn" || !plan.Valid() {
+		return WindowsSoftwareInput{}, ErrWindowsSoftware
+	}
+	input.Kind = plan.Kind
 	input.MinimumOS = plan.MinimumOS
 	input.SHA256 = plan.Artifact.SHA256
 	input.SuccessCodes = slices.Clone(plan.SuccessCodes)
 	input.RebootCodes = slices.Clone(plan.RebootCodes)
 	input.Execution = WindowsSoftwareExecution{SourceURL: plan.Artifact.URL}
+	if plan.Kind == "windows-burn" {
+		input.Execution.InstallArguments = slices.Clone(plan.Arguments)
+		input.Execution.UninstallURL, input.Execution.UninstallSHA256 = plan.Artifact.URL, plan.Artifact.SHA256
+		input.Execution.UninstallArguments = []string{"/uninstall", "/quiet", "/norestart"}
+	}
 	if input.Validate() != nil {
 		return WindowsSoftwareInput{}, ErrWindowsSoftware
 	}
@@ -205,7 +229,7 @@ func (s *Store) sourceApproval(ctx context.Context, tx *sql.Tx, scope Scope, r *
 	if sourceVersion != r.SourceVersionID || sourcePackage != r.PackageID || a.ApprovedAt.Before(r.CreatedAt) || !a.ApprovedAt.Before(r.ExpiresAt) {
 		return ErrWindowsSoftware
 	}
-	plan, err := winget.MSIPlan(snapshot, a.InstallerIndex, sourceMSITarget(input), "install")
+	plan, err := sourceInstallerPlan(snapshot, a.InstallerIndex, input, "install")
 	if err != nil || a.Actor != r.Actor {
 		return ErrWindowsSoftware
 	}
@@ -213,7 +237,7 @@ func (s *Store) sourceApproval(ctx context.Context, tx *sql.Tx, scope Scope, r *
 	if err != nil || hash != a.ReviewHash {
 		return ErrWindowsSoftware
 	}
-	derived, err := derivedWindowsMSI(input, plan)
+	derived, err := derivedWindowsInstaller(input, plan)
 	if err != nil {
 		return err
 	}
@@ -409,7 +433,7 @@ func (s *Store) ReviewWindowsSoftwareSource(ctx context.Context, scope Scope, ve
 	}
 	page := &WindowsSoftwareSourceReview{Version: v, Source: *r, Expired: expired, InstallerCount: len(manifest.Installers)}
 	if !expired && r.Approval == nil && v.WithdrawnAt == nil {
-		options, err := winget.MSIOptions(snapshot, sourceMSITarget(input))
+		options, err := sourceInstallerOptions(snapshot, input)
 		if err != nil {
 			return nil, ErrWindowsSoftware
 		}
@@ -418,7 +442,7 @@ func (s *Store) ReviewWindowsSoftwareSource(ctx context.Context, scope Scope, ve
 			if err != nil {
 				return nil, err
 			}
-			page.Options = append(page.Options, WindowsSoftwareSourceOption{MSIOption: option, ReviewHash: hash})
+			page.Options = append(page.Options, WindowsSoftwareSourceOption{InstallerOption: option, ReviewHash: hash})
 		}
 	}
 	if err = windowsRequestAudit(ctx, tx, scope, actor, "software.windows.source.review", id); err != nil {
@@ -477,7 +501,7 @@ func (s *Store) ApproveWindowsSoftwareSource(ctx context.Context, scope Scope, v
 	if expired || v.WithdrawnAt != nil {
 		return nil, ErrConflict
 	}
-	plan, err := winget.MSIPlan(snapshot, index, sourceMSITarget(input), "install")
+	plan, err := sourceInstallerPlan(snapshot, index, input, "install")
 	if err != nil {
 		return nil, ErrWindowsSoftware
 	}
@@ -485,7 +509,7 @@ func (s *Store) ApproveWindowsSoftwareSource(ctx context.Context, scope Scope, v
 	if err != nil || hash != reviewHash {
 		return nil, ErrConflict
 	}
-	derivedInput, err := derivedWindowsMSI(input, plan)
+	derivedInput, err := derivedWindowsInstaller(input, plan)
 	if err != nil {
 		return nil, err
 	}

@@ -19,19 +19,19 @@ type MSITarget struct {
 	Detection    enrollment.SoftwareDetection
 }
 
-// MSIOption is a safe review projection, with no artifact path, query or switches.
-type MSIOption struct {
-	Index                                       int
-	MinimumOS, SHA256, DownloadHost, PlanDigest string
+// InstallerOption is a safe review projection, without artifact paths or switches.
+type InstallerOption struct {
+	Index                                             int
+	Kind, MinimumOS, SHA256, DownloadHost, PlanDigest string
 }
 
 // MSIOptions inspects a snapshot once and lists only exact compatible choices.
-func MSIOptions(snapshot Snapshot, target MSITarget) ([]MSIOption, error) {
+func MSIOptions(snapshot Snapshot, target MSITarget) ([]InstallerOption, error) {
 	manifest, err := snapshot.Inspect()
 	if err != nil {
 		return nil, err
 	}
-	var options []MSIOption
+	var options []InstallerOption
 	for index := range manifest.Installers {
 		plan, err := msiPlan(snapshot, manifest, index, target, "install")
 		if err != nil {
@@ -42,7 +42,7 @@ func MSIOptions(snapshot Snapshot, target MSITarget) ([]MSIOption, error) {
 		if err != nil {
 			return nil, ErrInstaller
 		}
-		options = append(options, MSIOption{Index: index, MinimumOS: plan.MinimumOS, SHA256: plan.Artifact.SHA256, DownloadHost: artifact.Hostname(), PlanDigest: digest})
+		options = append(options, InstallerOption{Kind: plan.Kind, Index: index, MinimumOS: plan.MinimumOS, SHA256: plan.Artifact.SHA256, DownloadHost: artifact.Hostname(), PlanDigest: digest})
 	}
 	return options, nil
 }

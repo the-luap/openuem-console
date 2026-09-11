@@ -95,7 +95,7 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 							<a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+v.ID+"/sources")}>WinGet installers</a>
 						}
 						if v.WinGetSource!=nil {
-							<p class="mt-4">This MSI revision was approved from a saved Microsoft community WinGet manifest.</p>
+							<p class="mt-4">This installer revision was approved from a saved Microsoft community WinGet manifest.</p>
 							<a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+v.WinGetSource.SourceVersionID+"/sources/"+v.WinGetSource.ID)}>View WinGet source evidence</a>
 						}
 						if info.Can(access.ReadDevices) {

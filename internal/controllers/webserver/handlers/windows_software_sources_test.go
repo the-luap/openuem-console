@@ -15,7 +15,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/software/winget"
 )
 
-func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Context, tenant, site int, version string, request func(string, string, string, url.Values) *httptest.ResponseRecorder) {
+func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Context, tenant, site int, version, installerKind string, request func(string, string, string, url.Values) *httptest.ResponseRecorder) {
 	t.Helper()
 	base := fmt.Sprintf("/tenant/%d/software/catalog/%s", tenant, version)
 	scoped := fmt.Sprintf("/tenant/%d/site/%d/software/catalog/%s/sources", tenant, site, version)
@@ -26,12 +26,15 @@ func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Contex
 	h.winGetSource = func(ctx context.Context, c winget.Coordinate) (*winget.Snapshot, error) {
 		calls++
 		content := fmt.Sprintf("PackageIdentifier: %s\nPackageVersion: %s\nInstallerType: wix\nScope: machine\nInstallers:\n- Architecture: x64\n  InstallerUrl: https://packages.example.test/private-source.msi?token=source-route-secret\n  InstallerSha256: %s\n  ProductCode: '{AABBCCDD-0000-4000-8000-000000000001}'\nManifestType: installer\nManifestVersion: 1.12.0\n", c.Identifier, c.Version, strings.Repeat("a", 64))
+		if installerKind == "burn" {
+			content = strings.ReplaceAll(strings.ReplaceAll(content, "InstallerType: wix", "InstallerType: burn"), ".msi", ".exe")
+		}
 		sum := sha256.Sum256([]byte(content))
 		return &winget.Snapshot{Coordinate: c, Commit: strings.Repeat("a", 40), Path: "manifests/v/Vendor/RouteEditor/1.2.3/Vendor.RouteEditor.installer.yaml", SHA256: hex.EncodeToString(sum[:]), Content: []byte(content)}, ctx.Err()
 	}
 	safe := func(rec *httptest.ResponseRecorder) {
 		t.Helper()
-		for _, private := range []string{"source-route-secret", "private-source.msi", "InstallerUrl:", "BEGIN CERTIFICATE"} {
+		for _, private := range []string{"source-route-secret", "private-source.msi", "private-source.exe", "InstallerUrl:", "BEGIN CERTIFICATE"} {
 			if strings.Contains(rec.Body.String(), private) {
 				t.Fatal("source response exposed private manifest content")
 			}
@@ -105,6 +108,9 @@ func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Contex
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "packages.example.test") {
 		t.Fatal("source review missing compatible host", rec.Code, rec.Body.String())
 	}
+	if installerKind == "burn" && (!strings.Contains(rec.Body.String(), "Required Burn bundle code") || !strings.Contains(rec.Body.String(), "same pinned bundle")) {
+		t.Fatal("Burn review omitted its exact registration or removal behavior")
+	}
 	approval := url.Values{"confirmed": {"yes"}}
 	for _, name := range []string{"approval_id", "installer_index", "review_hash"} {
 		match := regexp.MustCompile(`name="` + name + `" value="([^"]+)"`).FindStringSubmatch(rec.Body.String())
@@ -172,6 +178,10 @@ func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Contex
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), scoped+"/"+capture.Get("request_id")) {
 		t.Fatal("derived detail lost scoped provenance", rec.Code, rec.Body.String())
 	}
+	var storedKind string
+	if err := h.Model.DB.QueryRowContext(ctx, `SELECT kind FROM uem_software_versions WHERE id=$1`, derivedID).Scan(&storedKind); err != nil || installerKind == "burn" && storedKind != "windows-burn" || installerKind == "wix" && storedKind != "windows-msi" {
+		t.Fatal("source approval changed the explicit adapter kind", err)
+	}
 	var tasks int
 	if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_windows_software_requests WHERE version_id=$1`, derivedID).Scan(&tasks); err != nil || tasks != 0 {
 		t.Fatal("source approval prepared a device operation", err)
@@ -181,7 +191,7 @@ func exerciseWindowsSoftwareSources(t *testing.T, h *Handler, ctx context.Contex
 	}
 	rec = request("scoped-viewer", "GET", scoped+"/"+capture.Get("request_id"), nil)
 	safe(rec)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "derived MSI approval was withdrawn") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "derived installer approval was withdrawn") {
 		t.Fatal("withdrawal erased source history", rec.Code)
 	}
 	h.winGetSource = func(context.Context, winget.Coordinate) (*winget.Snapshot, error) {

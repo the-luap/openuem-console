@@ -532,15 +532,19 @@ Unknown, unavailable or same-boot evidence cannot release it. PostgreSQL, privat
 WSS, native Windows journal/helper and 390/768/1440-pixel browser fixtures cover
 this path. [WinGet source review](windows-winget-resolution.md) now retains an
 encrypted manifest at an exact Microsoft community commit and explicitly approves
-a compatible machine MSI as a separate catalog revision. Scoped immutable history,
+a compatible machine MSI or Burn bundle as a separate catalog revision. Scoped immutable history,
 concurrent confirmation, audit rollback, expiry and exact encrypted install/remove
 dispatch have PostgreSQL/race, route and browser evidence. A separate Burn source
 adapter and bounded native metadata readers now provide translation and embedded
 registration proof, including CAB/XML, header identity, fixed scope, version and
 registry view. Native generated-bundle/race and portable fuzz checks pass. Explicit
 signed Burn plans now require the bounded preflight proof and a device-signed
-recipient capability; its new native helper CI also passes. Agent capability
-advertisement, native execution/recovery and source approval/dispatch remain open. Further WinGet installer
+recipient capability. Private profile negotiation, native AMD64/ARM64 execution,
+retained-result recovery and source approval/dispatch now have automated evidence.
+All seven agent CI jobs pass with signed capability support. Source/catalog/
+dispatch/migration race checks, actual HTTP route tests and responsive browser
+checks pass. Both operations retain the same approved Burn artifact; a downgraded
+recipient or altered source history prevents dispatch. Further WinGet installer
 formats and physical installation, removal, offline, restart and hibernate
 acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.
