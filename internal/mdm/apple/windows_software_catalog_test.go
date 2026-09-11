@@ -55,6 +55,7 @@ func TestWindowsSoftwareDefinitionAndCredentialProjection(t *testing.T) {
 		func(p *WindowsSoftwareInput) { p.Execution.MSIProperties["REBOOT"] = "Force" },
 		func(p *WindowsSoftwareInput) { p.Execution.MSIProperties["TRANSFORMS"] = "unapproved.mst" },
 		func(p *WindowsSoftwareInput) { p.Execution.MSIProperties["LICENSEKEY"] = "private\nvalue" },
+		func(p *WindowsSoftwareInput) { p.Execution.MSIProperties["LICENSEKEY"] = `private"value` },
 		func(p *WindowsSoftwareInput) { p.Detection.ProductCode = strings.ToLower(p.Detection.ProductCode) },
 		func(p *WindowsSoftwareInput) { p.Detection.RegistryView = "64" },
 		func(p *WindowsSoftwareInput) { p.SuccessCodes = []uint32{0, 3010} },

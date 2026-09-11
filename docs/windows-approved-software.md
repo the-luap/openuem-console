@@ -9,7 +9,7 @@ catalog and inspect safe metadata from their authorized organization/site.
 
 This milestone records approval intent. [Windows device requests](windows-software-requests.md)
 can now be prepared with an immutable revision, scoped individual identity and a
-short deadline. Agent delivery is not implemented yet. Approval does not verify
+short deadline. Explicit console dispatch is not implemented yet. Approval does not verify
 an installer, install software or establish an observed device state. The existing
 upstream WinGet deployment workflow remains separate.
 
@@ -35,6 +35,8 @@ Arguments preserve spaces and punctuation without interpreting shell quoting.
 Line endings separate arguments; a final line ending terminates the last argument.
 MSI properties require unique uppercase names. Properties that alter installation
 scope, restart behavior, transforms or the installation action are rejected.
+Property values containing double quotes are rejected to match the authenticated
+native MSI adapter; approved values are never silently escaped into another value.
 There are at most 32 arguments per operation and 32 MSI properties, with 2,048-byte
 values and a 32 KiB total encrypted definition. HTTPS sources reject embedded
 user/password authority, fragments and invalid ports.
@@ -50,8 +52,8 @@ MSI intent fixes success to `0` and restart-required to `3010`; WinGet intent us
 `0` for command success. EXE publishers declare disjoint success/restart-required
 code sets, each containing at most 16 unsigned 32-bit codes, with `0` included in
 success. These declarations do not establish completed restart or detection.
-The future native adapter must preserve command results and separately verify
-the requested state.
+The native adapter preserves command results and separately verifies the requested
+state; catalog approval alone does not invoke it.
 
 ## Authorization, privacy and persistence
 
@@ -105,7 +107,12 @@ The agent now has a separate
 It reads the declared MSI product or exact registry view/key in a bounded local
 process. Its [Linux/macOS/Windows CI](https://github.com/the-luap/openuem-agent/actions/runs/34571170520)
 passes, including three mandatory native Windows observation fixtures. This helper
-is not yet connected to a catalog operation or authenticated result report.
+provides the native observation boundary used by the new authenticated executor.
+The [individual agent service](https://github.com/the-luap/openuem-agent/blob/b6a5a1fb8b3592054b343ae0a4a3cccc00f6ef57/docs/windows-software-delivery.md)
+now joins protected current-generation recipient registration, immutable attempt
+admission, HTTPS/hash/Authenticode staging, native compatibility checks, MSI/EXE
+process ownership and signed durable outcomes. An approved exit requires exact
+native state; restart-required and uncertain outcomes do not become completion.
 
 Device preparation is a separate, audited intent record with explicit cancellation
 and expiry. It does not invoke this helper or send a package command; the new
@@ -113,9 +120,8 @@ schema contains no deliverable state. Existing preparations expire without
 automatic execution.
 
 WIN-01 remains in progress. Required next work includes immutable WinGet manifest
-resolution, approved artifact/signature verification, authenticated individual-agent
-dispatch admission, native installation/removal and operation-bound detection,
-reboot evidence, durable offline results, restart recovery and real endpoint
+resolution, explicit console dispatch with fresh authorization, cancellation and
+result history, uncertainty reconciliation, completed reboot evidence and real endpoint
 acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's
 [bounded Windows execution implementation](https://github.com/the-luap/openuem-agent/blob/b87cbce5c5ff6990f9db98ad808b5a8fcc122eae/docs/windows-package-execution.md)

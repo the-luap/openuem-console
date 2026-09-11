@@ -163,7 +163,7 @@ func (p WindowsSoftwareInput) Validate() error {
 	}
 	for name, value := range e.MSIProperties {
 		// Restart, scope, logging and external transforms remain adapter-owned.
-		if !windowsMSIProperty.MatchString(name) || !validWindowsArgument(value) || slices.Contains([]string{"REBOOT", "REBOOTPROMPT", "ALLUSERS", "MSIINSTALLPERUSER", "TRANSFORMS", "PATCH", "ADDLOCAL", "REMOVE", "ACTION", "INSTALL", "UNINSTALL", "TARGETDIR"}, name) {
+		if !windowsMSIProperty.MatchString(name) || !validWindowsArgument(value) || strings.Contains(value, `"`) || slices.Contains([]string{"REBOOT", "REBOOTPROMPT", "ALLUSERS", "MSIINSTALLPERUSER", "TRANSFORMS", "PATCH", "ADDLOCAL", "REMOVE", "ACTION", "INSTALL", "UNINSTALL", "TARGETDIR"}, name) {
 			return ErrWindowsSoftware
 		}
 	}
