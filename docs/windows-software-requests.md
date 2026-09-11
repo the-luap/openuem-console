@@ -192,12 +192,14 @@ results for all five outcomes, concurrent exact and competing confirmations,
 current identity/permission changes, atomic review/result audit failures, expired
 certificates, immutable original receipts, cancellation and bounded history. Route
 tests exercise the complete review/queue/report/history path and strict form/CSRF
-boundaries. The browser suite passes all 270 cases, including the 42 check cases.
+boundaries. At `78fced1`, the complete browser suite passes all 321 cases, including
+42 reconciliation cases and 51 source cases with separate MSI/Burn approvals.
 
 WIN-01 remains in progress. Further WinGet installer formats and physical
 install/remove, offline, restart and hibernate acceptance remain required. The
 reconciliation tests use synthetic boot evidence; they do not reboot a physical
 endpoint. Native staging, installation/removal and durable agent receipts have
 separate agent tests, including owned synthetic Windows MSI execution. See
+[Windows compatibility and native client/Server coverage](https://github.com/the-luap/openuem-agent/blob/40e0d35d72a9737f60a865bbc1befa9f11aeca46/docs/windows-software-compatibility.md),
 [approved Windows software](windows-approved-software.md) and the unchanged
 [full roadmap](fehlende-funktionen-und-roadmap.md).
