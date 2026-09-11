@@ -39,6 +39,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/software/catalog/:version/windows-requests/:request/dispatch", h.ReviewWindowsSoftwareDispatch)
 		g.POST("/software/catalog/:version/windows-requests/:request/dispatch", h.DispatchWindowsSoftware)
 		g.POST("/software/catalog/:version/windows-requests/:request/dispatch/cancel", h.CancelWindowsSoftwareDispatch)
+		g.GET("/software/catalog/:version/windows-requests/:request/dispatch/reconcile", h.ReviewWindowsSoftwareReconciliation)
+		g.POST("/software/catalog/:version/windows-requests/:request/dispatch/reconcile", h.QueueWindowsSoftwareReconciliation)
+		g.GET("/software/catalog/:version/windows-requests/:request/dispatch/reconciliations", h.WindowsSoftwareReconciliations)
+		g.POST("/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel", h.CancelWindowsSoftwareReconciliation)
 		g.POST("/software/catalog/:version/withdraw", h.WithdrawSoftwareVersion)
 		g.POST("/software/catalog/:version/install", h.InstallMacApp)
 		g.GET("/ios/:id/applications", h.MacApplications)
@@ -117,6 +121,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
+				limit = 8192
 			case "/software/catalog/:version/windows-requests", "/software/catalog/:version/windows-requests/:request/cancel", "/software/catalog/:version/windows-requests/:request/dispatch", "/software/catalog/:version/windows-requests/:request/dispatch/cancel":
 				limit = 8192
 			case "/software/catalog/windows":

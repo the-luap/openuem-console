@@ -97,7 +97,7 @@ applications and ADE/Platform SSO prerequisite regressions use the expanded
 catalog projection. Handler tests exercise real scoped routes, role restrictions,
 strict forms, CSRF, redacted details, filtering and withdrawal.
 
-The browser suite includes 27 Windows catalog cases within 228 total cases at
+The browser suite includes 27 Windows catalog cases within 270 total cases at
 390/768/1440 pixels: all three approval/detail forms, reader and withdrawn states,
 keyboard confirmation, exact argument preservation, filtered pagination and
 horizontal overflow. These are owned synthetic fixtures, with intercepted form
@@ -120,9 +120,16 @@ and expiry. It does not invoke this helper or send a package command. A separate
 confirmed dispatch creates an authenticated task and closes its preparation in
 the same audited transaction. Existing preparations never execute automatically.
 
+An explicit [read-only software check](windows-software-requests.md#read-only-reconciliation-after-uncertainty-or-a-required-restart)
+now handles retained uncertainty and restart-required operations. Signed evidence
+of a later kernel boot and a definite native observation can release the original
+reservation while preserving its original outcome. Unknown state, missing evidence
+or the same boot cannot release it. This path has separate review, cancellation,
+verified history, protected native receipt recovery and current-certificate proof.
+
 WIN-01 remains in progress. Required next work includes immutable WinGet manifest
-resolution, uncertainty reconciliation, completed reboot evidence and real endpoint
-acceptance. The legacy package subjects must not be enabled for individual agents
+resolution and physical install/remove, offline, restart and hibernate acceptance.
+Synthetic boot evidence is not physical acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's
 [bounded Windows execution implementation](https://github.com/the-luap/openuem-agent/blob/b87cbce5c5ff6990f9db98ad808b5a8fcc122eae/docs/windows-package-execution.md)
 for the existing execution foundation and its limits.

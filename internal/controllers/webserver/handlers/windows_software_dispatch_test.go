@@ -171,4 +171,5 @@ func exerciseWindowsSoftwareDispatch(t *testing.T, h *Handler, ctx context.Conte
 	if reply := call(enrollment.SoftwareRequest{Action: "poll", RecipientID: registered.Recipient.ID}); reply.Task != nil {
 		t.Fatal("cancelled route task delivered")
 	}
+	exerciseWindowsSoftwareReconciliation(t, h, identity, keys, path, request, key, registered.Recipient, cert, call)
 }

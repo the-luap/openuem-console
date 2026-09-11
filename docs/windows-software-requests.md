@@ -91,6 +91,52 @@ preparation. Repeating a completed cancellation does not duplicate its audit.
 History remains in the original scope and verifies retained task/receipt
 signatures, including their certificate chain, without exposing private payloads.
 
+## Read-only reconciliation after uncertainty or a required restart
+
+Open **Software checks and restart evidence** in dispatch history. For a delivered
+operation that is uncertain or requires a restart, an operator can select
+**Review software check**, review the original device, operation, exact detection
+expectation and deadline, then confirm **Check software state**. This separate
+request authorizes only reading the original machine state. It neither installs
+software nor initiates a restart. A withdrawn revision remains observable.
+
+Review and confirmation require current software/device read and assignment
+rights in the original site, an enabled Windows endpoint in that same sole site,
+and its current individual identity. The review binds the actor, original signed
+task, current certificate, exact scope and a separate deadline (normally fifteen
+minutes, capped by certificate expiry). Changed authority or evidence invalidates
+confirmation. Only one live check for the original operation can be admitted.
+Its signed task, immutable console review link and audits commit together; failed
+audits or expiry roll everything back. Exact retries return the same task without
+extending its lifetime or re-admitting a changed endpoint.
+
+The joined Windows service compares protected admission evidence with its current
+native boot session. A service restart, resumed kernel session or changed boot
+evidence around observation cannot establish a completed restart. Only a proven
+later kernel boot and an exact native observation can produce a definite result.
+The agent preserves the signed receipt before transmission and its acknowledgement
+before allowing another executable task. It can resubmit an already signed receipt
+after expiry or certificate renewal using fresh current-certificate proof.
+
+| Check result | Meaning and reservation |
+| --- | --- |
+| Observed | Exact expected version or removal absence was read after a later boot; verified evidence releases the original reservation. |
+| Drifted | Exact state differs from the original expectation after a later boot; verified evidence releases the reservation without claiming the original installer succeeded. |
+| Waiting for boot | No later kernel boot is established; no package query runs and the reservation remains. |
+| Unknown | The bounded native query failed or returned unusable output; the reservation remains. |
+| Unavailable | Original admission or reliable boot evidence is unavailable; the reservation remains. |
+
+History keeps original execution evidence separate from subsequent checks and
+explicitly records which check released its reservation. It never changes an
+uncertain installer outcome into success. Release permits a newly reviewed,
+explicit execution request; it does not retry the original installer. Pending
+checks can be cancelled with confirmation, including after an inventory move or
+revocation when the operator retains original-site rights. Delivered checks cannot
+be cancelled. Expired or inconclusive checks permit another explicit review while
+the original reservation remains. Readers can inspect the verified history, with
+50-entry scoped pagination, without mutation controls. Boot counters, nonces,
+certificates and private installer data are not rendered.
+
 ## Forms, privacy and history
 
 All routes are registered under the existing administrator,
@@ -102,6 +148,10 @@ organization and site console prefixes:
 - `GET /software/catalog/:version/windows-requests/:request/dispatch`
 - `POST /software/catalog/:version/windows-requests/:request/dispatch`
 - `POST /software/catalog/:version/windows-requests/:request/dispatch/cancel`
+- `GET /software/catalog/:version/windows-requests/:request/dispatch/reconcile`
+- `POST /software/catalog/:version/windows-requests/:request/dispatch/reconcile`
+- `GET /software/catalog/:version/windows-requests/:request/dispatch/reconciliations`
+- `POST /software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel`
 
 POST bodies are limited to 8 KiB before CSRF parsing. They accept only unambiguous
 body fields, the CSRF token and explicit confirmation. Query parameters cannot
@@ -127,17 +177,24 @@ concurrent exact/different requests, native-identity aliases, scope and platform
 changes, inventory ambiguity, withdrawal, revoked rights, audit rollback,
 certificate expiry after audit, expired reservations, immutable history and
 pagination. Console tests use the real Ent schema, scoped router, sessions and
-CSRF middleware. Browser checks cover six preparation states and twelve review/result states at
+CSRF middleware. Browser checks cover six preparation states, twelve dispatch
+states and fourteen read-only check states at
 390/768/1440 pixels, including keyboard review/cancellation, exact device and
 revision fields, paging, reader restrictions and overflow. Dispatch tests cover
 four MSI/EXE install/remove plans, actual recipient registration, encrypted task
 decryption, signed outcomes, concurrent retries, stale reviews, atomic audit
 rollback, historical migration and cancellation. No package is downloaded or
-executed in these console tests.
+executed in these console tests. Reconciliation tests use actual signed tasks and
+results for all five outcomes, concurrent exact and competing confirmations,
+current identity/permission changes, atomic review/result audit failures, expired
+certificates, immutable original receipts, cancellation and bounded history. Route
+tests exercise the complete review/queue/report/history path and strict form/CSRF
+boundaries. The browser suite passes all 270 cases, including the 42 check cases.
 
-WIN-01 remains in progress. Immutable WinGet manifest resolution, uncertainty
-reconciliation, completed reboot evidence and actual endpoint acceptance remain
-required. Native staging, installation/removal and durable agent receipts have
+WIN-01 remains in progress. Immutable WinGet manifest resolution and physical
+install/remove, offline, restart and hibernate acceptance remain required. The
+reconciliation tests use synthetic boot evidence; they do not reboot a physical
+endpoint. Native staging, installation/removal and durable agent receipts have
 separate agent tests, including owned synthetic Windows MSI execution. See
 [approved Windows software](windows-approved-software.md) and the unchanged
 [full roadmap](fehlende-funktionen-und-roadmap.md).

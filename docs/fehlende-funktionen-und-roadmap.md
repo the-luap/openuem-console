@@ -523,6 +523,17 @@ signed current-key check to each old completed rotation, including erased return
 keys, and preserves all earlier evidence. Production release integration and
 physical-device acceptance remain open.
 
+WIN-01 now includes [explicit read-only software reconciliation](windows-software-requests.md#read-only-reconciliation-after-uncertainty-or-a-required-restart)
+across the console, shared registry, worker and Windows agent. A separately
+confirmed check binds the original executable task and current identity. Protected
+admission evidence, a later native kernel boot and a signed definite observation
+can release the original reservation while retaining its original outcome.
+Unknown, unavailable or same-boot evidence cannot release it. PostgreSQL, private
+WSS, native Windows journal/helper and 390/768/1440-pixel browser fixtures cover
+this path. Immutable WinGet resolution and physical installation, removal, offline,
+restart and hibernate acceptance remain open. Synthetic boot fixtures do not
+satisfy those physical acceptance gates.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.

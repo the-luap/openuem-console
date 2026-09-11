@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 228 cases:
+headless Chrome session. The runner covers 270 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -13,6 +13,7 @@ headless Chrome session. The runner covers 228 cases:
 | Approved Windows software | WinGet/MSI/EXE approval and detail, reader, withdrawn and filtered catalog × three widths | 27 |
 | Windows device requests | Prepared, reader, cancelled, expired, withdrawn and empty × three widths | 18 |
 | Windows dispatch | Install/remove review, pending, delivered, observed, restart, uncertain, reader, cancelled, expired, failed and rejected start × three widths | 36 |
+| Windows software checks | Install/remove review, empty, pending, delivered, observed, drifted, unknown, waiting, unavailable, cancelled, expired, reader and paged × three widths | 42 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard
@@ -21,6 +22,9 @@ and horizontal overflow. Each suite captures a narrow screenshot. Assertions use
 actual browser state; they do not replace the production scripts or mock the DOM.
 Inventory checks also preserve read-only views, distinguish broker acceptance from
 report completion, and check the refresh form's scope, CSRF token and request ID.
+Software check cases preserve the original execution outcome after a verified
+reservation release, validate exact review and cancellation fields, and check
+scoped pagination and reader controls. They run no installer or endpoint query.
 
 ## Run locally
 

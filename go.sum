@@ -253,6 +253,8 @@ github.com/the-luap/openuem-nats v0.11.1-0.20260910195931-87aa1bdf56ea h1:7H+2gf
 github.com/the-luap/openuem-nats v0.11.1-0.20260910195931-87aa1bdf56ea/go.mod h1:GWRchq7CFK1F+ELrC4N7OeOptBGvaJbBwjdR6JS1aQc=
 github.com/the-luap/openuem-nats v0.11.1-0.20260911100108-de9cd6f67c5e h1:vwwU2KVuLOjfsSIoQdFWvbdtC6HqwlupfIPVVcp9gzE=
 github.com/the-luap/openuem-nats v0.11.1-0.20260911100108-de9cd6f67c5e/go.mod h1:GWRchq7CFK1F+ELrC4N7OeOptBGvaJbBwjdR6JS1aQc=
+github.com/the-luap/openuem-nats v0.11.1-0.20260911114225-bf936f99ce71 h1:v4oAHGy0efTcpJQlXlRTZQ3SkrSNXXCieTKMxg+UZJE=
+github.com/the-luap/openuem-nats v0.11.1-0.20260911114225-bf936f99ce71/go.mod h1:GWRchq7CFK1F+ELrC4N7OeOptBGvaJbBwjdR6JS1aQc=
 github.com/tiendc/go-deepcopy v1.7.2 h1:Ut2yYR7W9tWjTQitganoIue4UGxZwCcJy3orjrrIj44=
 github.com/tiendc/go-deepcopy v1.7.2/go.mod h1:4bKjNC2r7boYOkD2IOuZpYjmlDdzjbpTRyCx+goBCJQ=
 github.com/urfave/cli/v2 v2.27.7 h1:bH59vdhbjLv3LAvIu6gd0usJHgoTTPhCFib8qqOwXYU=

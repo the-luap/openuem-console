@@ -50,8 +50,14 @@ func WindowsSoftwareDispatchState(task registry.SoftwareTaskStatus) string {
 		case "failed":
 			return "Installer failed; review the reported observations"
 		case "restart_required":
+			if task.ReconciliationID != "" {
+				return "Original execution required a restart; a later software check released the reservation"
+			}
 			return "Restart required; completion is not established and another operation is blocked"
 		case "uncertain":
+			if task.ReconciliationID != "" {
+				return "Original execution remains uncertain; a later software check released the reservation"
+			}
 			return "Outcome uncertain; another operation is blocked"
 		}
 	}
@@ -65,9 +71,44 @@ func WindowsSoftwareDispatchState(task registry.SoftwareTaskStatus) string {
 	case "expired":
 		return "Expired before delivery"
 	case "uncertain":
+		if task.ReconciliationID != "" {
+			return "Original execution remains uncertain; a later software check released the reservation"
+		}
 		return "Delivery expired; execution is uncertain and another operation is blocked"
 	}
 	return "Outcome unavailable"
+}
+
+func WindowsSoftwareCheckEligible(task registry.SoftwareTaskStatus) bool {
+	return task.DeliveredAt != nil && task.ReconciliationID == "" && (task.Status == "uncertain" || task.Status == "restart_required")
+}
+
+func WindowsSoftwareCheckState(check registry.SoftwareReconciliationStatus) string {
+	if check.Outcome != nil {
+		switch check.Outcome.State {
+		case "observed":
+			return "Requested software state observed after a later Windows restart"
+		case "drifted":
+			return "Different software state observed after a later Windows restart"
+		case "unknown":
+			return "Later Windows restart verified; exact software state could not be established"
+		case "waiting_for_boot":
+			return "No later Windows restart established for this check"
+		case "unavailable":
+			return "Required protected history or restart evidence was unavailable"
+		}
+	}
+	switch check.Status {
+	case "pending":
+		return "Queued; waiting for a compatible agent"
+	case "delivered":
+		return "Delivered; read-only observation pending"
+	case "cancelled":
+		return "Cancelled before delivery"
+	case "expired":
+		return "Check expired; the original reservation is unchanged"
+	}
+	return "Software check state unavailable"
 }
 
 func WindowsSoftwareOutcomeReason(reason string) string {

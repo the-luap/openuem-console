@@ -44,14 +44,14 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping; per-user enrollment, separate encrypted push/command/profile state, capability-gated user profiles, renewal staging, pause/resume and scoped console controls | Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
 | MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; staged FileVault profiles, per-device encrypted recovery escrow/history, authenticated agent validation, journaled rotation, explicit uncertainty resolution and audited retrieval; opt-in native Recovery Lock with encrypted password history and conservative result reconciliation; PostgreSQL/HTTP/browser tests | Physical FileVault rotation/recovery acceptance, escrow certificate rotation, complete Mac security workflows and hardware update/reboot acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
-| WIN-01 | Upstream deployment/model tests; exact WinGet arguments and owned native processes; immutable encrypted WinGet/MSI/EXE approvals and scoped device preparation; authenticated generation-bound MSI/EXE task delivery, current-certificate receipt proofs, immutable DPAPI admission/results and joined Windows service; private HTTPS/hash/Authenticode staging, native host/package preflight, exact state observations and conservative restart/interruption outcomes; native synthetic MSI install/property/removal and combined executor fixtures, service activation/recovery and cross-platform CI; fresh explicit console dispatch, atomic signed task linkage, verified scoped outcome history and pre-delivery cancellation with PostgreSQL/router/browser tests | Immutable WinGet source resolution; uncertainty reconciliation and completed reboot evidence; physical install/remove/offline/restart acceptance; update rings/policies and supported-OS matrix |
+| WIN-01 | Upstream deployment/model tests; exact WinGet arguments and owned native processes; immutable encrypted WinGet/MSI/EXE approvals and scoped device preparation; authenticated generation-bound MSI/EXE task delivery, current-certificate receipt proofs, immutable DPAPI admission/results and joined Windows service; private HTTPS/hash/Authenticode staging, native host/package preflight, exact state observations and conservative restart/interruption outcomes; native synthetic MSI install/property/removal and combined executor fixtures, service activation/recovery and cross-platform CI; fresh explicit console dispatch, atomic signed task linkage, verified scoped outcome history and pre-delivery cancellation; separate confirmed read-only reconciliation with protected later-boot evidence, signed durable observations and verified reservation release, retaining original execution outcomes; PostgreSQL/router/browser tests | Immutable WinGet source resolution; physical install/remove/offline/restart/hibernate acceptance; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession; audited native Windows certificate health with current/pending identity separation and CA issuance warnings; persistent Windows certificate/CA reminders with live recipient checks, protected outboxes and scoped delivery history; encrypted database backups with separately encrypted recovery keys/configuration, confirmed isolated restore and synthetic Apple/Windows/desktop identity continuity; shared desktop renewal preparation/confirmation with permanent key ownership, immutable generations and atomic FileVault key-processing acknowledgements; bound HTTPS renewal client and exact gateway/console routes with proof, retry, concurrency, audit rollback and recovery-coordination tests; native protected candidate/decision/activation journals, automatic installed-service scheduling, joined handoff/reconnect, stoppable startup recovery, authoritative cancellation and historical FileVault reconciliation with immutable receipt continuity | Physical-device renewal/disaster-recovery acceptance; production desktop release integration; CA/master-key rotation and cross-platform expiry health |
 | OPS-01 | Console CI builds and gateway/service CLIs; minimal unprivileged gateway image with pinned build inputs and isolated native process checks; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, released-distribution and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
 | WIN-02 | Separate native discovery XML/SOAP codec and read-only TLS handler, OnPremise XCEP request decoding, scoped PostgreSQL enrollment credentials with permission revisions, revocation and atomic one-use consumption; encrypted organization CAs and authenticated XCEP policies; initial WSTEP CSR proof, scoped client certificates, encrypted provisioning/SyncML bootstrap secrets and durable exact retries; direct TLS identity, OMA DM digest/XML codecs and durable authenticated sessions with nonce transitions and a correlated read-only DevInfo probe, with protocol/TLS/PostgreSQL/race/fuzz tests; scoped CSP queues/results, typed update verification, versioned rings and scheduled cohorts; optional listener/gateway registration and bounded schedule worker lifecycle; CA/invitation/device console with scoped inventory, one-time credentials, audit and access revocation; protected update run history and cancellation; typed policy apply/removal forms with validated preview and idempotent confirmed admission; scoped ring lists/history and confirmed create/edit revisions; reviewed explicit cohort apply/removal and protected assignment history; UTC schedule preview/confirmation, protected plan history and revision-checked pending cancellation; administrator-only CSP request/result history, undelivered custom-command cancellation and explicit uncertain-queue resolution; bounded custom JSON command editor with shared-compiler preview and confirmed idempotent admission; protected cumulative observation history with authenticated pagination and single-message detail; bounded CMS/PKCS#10 old/new-key renewal proof verification; persistent scoped renewal issuance/retries, encrypted lifecycle history/cancellation, atomic SyncML replacement confirmation and immutable session anchor with TLS/database tests; registered certificate-authenticated Renew SOAP with direct/gateway TLS, disjoint request grammars, timestamp freshness and restart/fuzz tests; scoped certificate replacement history, protected source/replacement details, confirmation evidence and revision/CSRF-checked pending cancellation with database/router/browser tests; authenticated first-packet disconnection reports, atomic access retirement and interrupted-command uncertainty with protected history and console status; typed fixed-provider disconnection requests, protected lifecycle history, priority delivery, revision-checked cancellation and explicit review of missing notifications; scoped disconnection preview/confirmed creation, ten-row history, independent report/outcome/review details and CSRF/revision-checked cancellation/release with router/browser tests; audited organization/site certificate health, bounded expiry filters, authenticated current/pending generations and CA issuance warnings; staged device/CA expiry reminders with protected retry state, live source/recipient checks, runtime shutdown and scoped SMTP history; revision-bound audited JSON command/observation downloads with bounded preparation and integrity checks; twelve native audit sources in the shared viewer/export with explicitly confirmed organization retention and immutable deletion receipts | CSP command/packet/observation retention, broader typed policies, automatic ring promotion, account-authenticated renewal, renewal scheduling, production SMTP/inbox acceptance, end-to-end missing-notification recovery and physical Windows cleanup acceptance; separate Entra/Autopilot integration evidence |
 | SEC-02 | Existing security inventory; Apple inventory-read/download audit events; permission-change history with before/after grants; scoped multi-source audit viewer, bounded CSV/JSON exports and explicit preview/confirmation retention with permanent deletion receipts, transaction authorization and PostgreSQL/browser checks; all twelve native Windows audit sources with original scope and opt-in guarded retention | BitLocker/FileVault recovery lifecycle, lock/wipe, further policies, compliance/conditional access, vulnerability/KEV prioritization; comprehensive legacy mutation audit coverage and production-scale operational acceptance |
 | API-01 | Internal console handlers only | Versioned management API, scoped authentication, desired-state validation/reconciliation, CLI/GitOps, webhooks/retries and equivalent UI outcomes |
-| SW-01 | Upstream Windows/Homebrew foundation; common approved macOS PKG and Windows WinGet/MSI/EXE catalog; native Mac install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation; authenticated, journaled Windows MSI/EXE service execution with native compatibility, trust and observation checks; explicit console review/dispatch, verified results and queued cancellation | Windows uncertainty/reboot reconciliation and WinGet resolution; Homebrew delivery, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
+| SW-01 | Upstream Windows/Homebrew foundation; common approved macOS PKG and Windows WinGet/MSI/EXE catalog; native Mac install/remove with exact managed-version observations, scoped console assignment/search/history and PostgreSQL/race/browser validation; authenticated, journaled Windows MSI/EXE service execution with native compatibility, trust and observation checks; explicit console review/dispatch, verified results and queued cancellation; read-only Windows reconciliation with later-boot evidence and separate immutable release history | WinGet resolution; Homebrew delivery, DDM applications, Apps & Books/license lifecycle, updates/self-service and physical package acceptance; later BYOD/Shared iPad acceptance as specified |
 
 Cross-cutting scope includes native User Enrollment/privacy limits, SCIM and IdP
 associations, macOS recovery/local-admin/Platform SSO extensions, certificate
@@ -60,6 +60,30 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Windows software reconciliation](windows-software-requests.md#read-only-reconciliation-after-uncertainty-or-a-required-restart)
+  now joins the console, signed registry protocol, private worker RPC and protected
+  Windows service. Independent capability negotiation enables only the read-only
+  protocol. A fresh console review binds current authority, original task and
+  certificate, exact expectation and deadline; confirmation atomically records
+  its signed task, immutable review link and audits. The native consumer retains
+  original admission evidence, requires a later kernel boot before querying exact
+  state, and persists signed results and acknowledgements across restarts and
+  certificate renewal. Only verified `observed` or `drifted` evidence releases a
+  reservation. Other outcomes retain it; original installer outcomes and receipts
+  remain unchanged. History, pagination and queued cancellation retain original
+  scope and current permissions. The [registry/configuration CI](https://github.com/the-luap/openuem-nats/actions/runs/34595324940),
+  [worker CI](https://github.com/the-luap/openuem-worker/actions/runs/34596892195),
+  [protected journal CI](https://github.com/the-luap/openuem-agent/actions/runs/34596998567)
+  and [native consumer CI](https://github.com/the-luap/openuem-agent/actions/runs/34598058930)
+  pass, including mandatory Windows DPAPI and actual read-only MSI helper checks.
+  Console targeted PostgreSQL/race checks pass in 46.349 seconds and the complete
+  Apple model PostgreSQL/race suite passes in 447.710 seconds. Full scoped
+  handler, rendered-view, Linux/Windows build and focused vet checks pass. All 270 browser
+  cases pass, including 42 new reconciliation cases at 390/768/1440 pixels.
+  These fixtures use synthetic boot evidence and do not reboot an endpoint.
+  Immutable WinGet resolution and physical package, offline, restart and hibernate
+  acceptance remain required; WIN-01/SW-01 and the full roadmap remain open.
 
 - Windows software delivery now has matching reference PKI and worker pins.
   The [broker migration](https://github.com/the-luap/openuem-cert-manager/blob/466c4b3170ef10bae3350ebff971d4e276b93fdf/docs/broker-upgrade.md)
@@ -90,8 +114,9 @@ the table's package summaries do not remove any detail from the roadmap.
   amd64/arm64 builds and focused vet pass. [Agent CI](https://github.com/the-luap/openuem-agent/actions/runs/34590356368)
   passes on Linux, macOS and Windows, including the native Windows reader,
   separate-process comparison and DPAPI journal tests without skips. No test
-  rebooted a physical endpoint. Signed post-boot reconciliation, reservation
-  release and physical restart/hibernate acceptance remain open.
+  rebooted a physical endpoint. Signed post-boot reconciliation and reservation
+  release are integrated in the milestone above; physical restart/hibernate
+  acceptance remains open.
 
 - [Explicit Windows software dispatch](windows-software-requests.md) joins the
   approved MSI/EXE catalog to the authenticated individual-agent channel. A fresh
@@ -112,7 +137,7 @@ the table's package summaries do not remove any detail from the roadmap.
   arm64 handler suite passes against owned PostgreSQL; rendered-view race tests,
   all 228 browser cases (36 new dispatch cases), full
   Linux/Windows builds and focused vet pass. Console tests execute no installer.
-  Uncertainty reconciliation, completed reboot evidence, immutable WinGet
+  Subsequent read-only reconciliation is recorded above. Immutable WinGet
   resolution and physical endpoint acceptance remain open. WIN-01/SW-01 and the
   complete roadmap remain in progress.
 
@@ -143,8 +168,8 @@ the table's package summaries do not remove any detail from the roadmap.
   rejects embedded property quotes to match
   the native wire contract; focused real PostgreSQL/race regressions pass in
   39.474 seconds. Console dispatch and cancellation/history are implemented in
-  the subsequent milestone above. Uncertainty reconciliation, completed reboot
-  evidence, immutable WinGet resolution and
+  the subsequent milestones above, alongside signed read-only reconciliation.
+  Immutable WinGet resolution and
   physical package acceptance remain open. WIN-01/SW-01 and the full roadmap
   remain in progress.
 
@@ -170,7 +195,7 @@ the table's package summaries do not remove any detail from the roadmap.
   and [worker CI](https://github.com/the-luap/openuem-worker/actions/runs/34581149919)
   all passed. Subsequent service/native adapter and explicit console dispatch work
   are recorded above. Preparations remain non-executable without a fresh confirmed
-  dispatch; uncertainty reconciliation, WinGet artifact resolution and
+  dispatch. Signed reconciliation is recorded above; WinGet artifact resolution and
   physical endpoint acceptance remain open. WIN-01/SW-01 and the full roadmap
   scope remain in progress.
 

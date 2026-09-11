@@ -43,6 +43,10 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile":
+			return access.AssignSoftware, true
+		case "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations":
+			return access.ReadSoftware, true
 		case "/software/catalog/windows/new":
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/windows-requests":
@@ -63,6 +67,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
+			return access.AssignSoftware, true
 		case "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/ios/:id/setup/platform-sso/repair", "/ios/:id/setup/platform-sso/correct":
 			return access.ManageCertificates, true
 		case "/software/catalog", "/software/catalog/windows", "/software/catalog/:version/withdraw":

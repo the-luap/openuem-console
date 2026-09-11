@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: the-luap/openuem-worker
-          ref: a9886d2135f6b00c294fc8014650fcfb596463d2
+          ref: e06c89815841c95503dbcf294553e455b015ea0e
           path: .worker-source
           persist-credentials: false
       - uses: actions/setup-go@v5

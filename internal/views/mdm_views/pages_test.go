@@ -348,6 +348,50 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		p.Requests[0].Dispatch = task
 		return p
 	}
+	winCheckPage := func(state string) apple.WindowsSoftwareReconciliationsPage {
+		p := winDispatchPage("uncertain")
+		page := apple.WindowsSoftwareReconciliationsPage{Request: p.Requests[0], Version: p.Version, Original: p.Requests[0].Dispatch}
+		if state == "empty" {
+			return page
+		}
+		check := registry.SoftwareReconciliationStatus{ID: "90000000-0000-4000-8000-000000000040", OriginalTaskID: page.Original.ID, AgentID: page.Request.AgentID, Actor: "Checker <C>", Status: state, CreatedAt: now, ExpiresAt: now.Add(15 * time.Minute)}
+		if state == "reader" {
+			check.Status = "pending"
+		}
+		page.HasActive = check.Status == "pending" || check.Status == "delivered"
+		if check.Status != "pending" && check.Status != "cancelled" {
+			check.DeliveredAt = &now
+		}
+		if !page.HasActive {
+			check.CompletedAt = &now
+		}
+		if state == "waiting" {
+			state = "waiting_for_boot"
+		}
+		if state == "paged" {
+			state = "unknown"
+			page.Next = "90000000-0000-4000-8000-000000000041"
+		}
+		if state == "observed" || state == "drifted" || state == "unknown" || state == "waiting_for_boot" || state == "unavailable" {
+			check.Status = "reported"
+			check.Outcome = &enrollment.SoftwareReconciliationOutcome{State: state, Observation: enrollment.SoftwareObservation{State: "unknown"}}
+			if state == "observed" || state == "drifted" {
+				check.ReleasesReservation = true
+				page.Original.ReconciliationID, page.Original.ReconciledAt = check.ID, &now
+				check.Outcome.Observation = enrollment.SoftwareObservation{State: "present", Version: "42.0"}
+				if state == "drifted" {
+					check.Outcome.Observation.Version = "41.0"
+				}
+			}
+		}
+		page.Checks = []registry.SoftwareReconciliationStatus{check}
+		return page
+	}
+	winCheckReview := func(operation string) apple.WindowsSoftwareReconciliationReview {
+		p := winCheckPage("empty")
+		p.Request.Operation = operation
+		return apple.WindowsSoftwareReconciliationReview{Request: p.Request, Version: p.Version, Original: p.Original, TargetName: "Windows <Device>", ReviewHash: strings.Repeat("a", 64), ExpiresAt: now.Add(15 * time.Minute).Truncate(time.Second), Expectation: enrollment.SoftwareExpectation{Operation: operation, Detection: enrollment.SoftwareDetection{Version: "42.0"}}}
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -406,6 +450,20 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"windows-dispatch-expired", WindowsSoftwareRequests(c, info, winDispatchPage("expired"), "", "", "", ""), []string{"Expired before delivery"}},
 		{"windows-dispatch-failed", WindowsSoftwareRequests(c, info, winDispatchPage("failed"), "", "", "", ""), []string{"Installer failed"}},
 		{"windows-dispatch-not-started", WindowsSoftwareRequests(c, info, winDispatchPage("not_started"), "", "", "", ""), []string{"Not started; device checks rejected execution"}},
+		{"windows-check-install", WindowsSoftwareReconciliationReview(c, info, winCheckReview("install"), "90000000-0000-4000-8000-000000000040"), []string{"Review software check", "Windows &lt;Device&gt;", "Check software state", "42.0", "name=\"expires_at\""}},
+		{"windows-check-remove", WindowsSoftwareReconciliationReview(c, info, winCheckReview("remove"), "90000000-0000-4000-8000-000000000040"), []string{"absence of the original product", "Check software state"}},
+		{"windows-check-empty", WindowsSoftwareReconciliations(c, info, winCheckPage("empty")), []string{"Original execution evidence", "No software checks recorded", "Review a read-only check"}},
+		{"windows-check-pending", WindowsSoftwareReconciliations(c, info, winCheckPage("pending")), []string{"Queued; waiting for a compatible agent", "Cancel queued check", "Checker &lt;C&gt;"}},
+		{"windows-check-delivered", WindowsSoftwareReconciliations(c, info, winCheckPage("delivered")), []string{"Delivered; read-only observation pending"}},
+		{"windows-check-observed", WindowsSoftwareReconciliations(c, info, winCheckPage("observed")), []string{"Original execution remains uncertain", "Requested software state observed", "This verified observation released the original reservation", "present 42.0"}},
+		{"windows-check-drifted", WindowsSoftwareReconciliations(c, info, winCheckPage("drifted")), []string{"Different software state observed", "present 41.0"}},
+		{"windows-check-unknown", WindowsSoftwareReconciliations(c, info, winCheckPage("unknown")), []string{"exact software state could not be established", "This check did not release", "Review a read-only check"}},
+		{"windows-check-waiting", WindowsSoftwareReconciliations(c, info, winCheckPage("waiting")), []string{"No later Windows restart established", "This check did not release"}},
+		{"windows-check-unavailable", WindowsSoftwareReconciliations(c, info, winCheckPage("unavailable")), []string{"Required protected history or restart evidence was unavailable"}},
+		{"windows-check-cancelled", WindowsSoftwareReconciliations(c, info, winCheckPage("cancelled")), []string{"Cancelled before delivery"}},
+		{"windows-check-expired", WindowsSoftwareReconciliations(c, info, winCheckPage("expired")), []string{"Check expired; the original reservation is unchanged"}},
+		{"windows-check-reader", WindowsSoftwareReconciliations(c, &reader, winCheckPage("reader")), []string{"Queued; waiting for a compatible agent"}},
+		{"windows-check-paged", WindowsSoftwareReconciliations(c, info, winCheckPage("paged")), []string{"Older software checks", "?before=90000000-0000-4000-8000-000000000041"}},
 		{"windows-requests-prepared", WindowsSoftwareRequests(c, info, winRequestPage("prepared"), "%_&", "90000000-0000-4000-8000-000000000037", "90000000-0000-4000-8000-000000000038", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; explicit review and dispatch required", "Prepare request", "Cancel preparation", "Older requests"}},
 		{"windows-requests-reader", WindowsSoftwareRequests(c, &reader, winRequestPage("prepared"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; explicit review and dispatch required", "Operator &lt;A&gt;"}},
 		{"windows-requests-cancelled", WindowsSoftwareRequests(c, info, winRequestPage("cancelled"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Cancelled before delivery"}},

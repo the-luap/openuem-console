@@ -146,7 +146,7 @@ func (s *Store) windowsDispatchReview(ctx context.Context, tx *sql.Tx, scope Sco
 		return nil, empty, ErrConflict
 	}
 	var busy bool
-	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_agent_software_tasks WHERE device_id=$1 AND (status IN ('delivered','uncertain','restart_required') OR status='pending' AND expires_at>clock_timestamp()))`, r.AgentID).Scan(&busy); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_agent_software_tasks WHERE device_id=$1 AND reconciliation_id IS NULL AND (status IN ('delivered','uncertain','restart_required') OR status='pending' AND expires_at>clock_timestamp()))`, r.AgentID).Scan(&busy); err != nil {
 		return nil, empty, err
 	}
 	if busy {
