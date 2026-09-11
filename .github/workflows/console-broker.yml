@@ -213,6 +213,7 @@ jobs:
         run: |
           set -euo pipefail
           docker build -f Dockerfile.acme --target runtime -t reference-acme:check .
+          docker build -f Dockerfile.acme --target smoke -t reference-acme-fixture:check .
           python3 scripts/check-reference-public-tls.py reference-acme:check
       - name: Reviewed reference installation and interrupted bootstrap recovery
         if: runner.os == 'Linux'
@@ -220,9 +221,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 tests/setup/test_reference_installation.py
-          for scenario in fresh interrupted; do
+          for scenario in fresh interrupted acme acme-interrupted; do
             options=()
-            if [ "$scenario" = interrupted ]; then options+=(--interrupt); fi
+            if [[ "$scenario" = *interrupted ]]; then options+=(--interrupt); fi
+            if [[ "$scenario" = acme* ]]; then options+=(--acme-image reference-acme:check --acme-fixture-image reference-acme-fixture:check); fi
             python3 scripts/check-reference-installation.py \
               setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
               setup-database-bootstrap:check database-private-pki:check setup-reference-probe:check \

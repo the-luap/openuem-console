@@ -8,12 +8,11 @@ starts the console, broker, authorization service, command provisioner, worker a
 gateway. It verifies the first administrator's password replacement before
 recreating the console without its initial-password mount.
 
-This workflow uses already available local images, supplied public HTTPS files
-and independently obtained release public keys. Automatic DNS/ACME provisioning,
-signed image distribution, a graphical setup wizard, general upgrades/rollback,
+This workflow uses already available local images, supplied public HTTPS files or
+automatic DNS-01 issuance, and independently obtained release public keys.
+Signed image distribution, a graphical setup wizard, general upgrades/rollback,
 complete restore orchestration and external/device acceptance remain separate
-roadmap requirements. The installer does not issue a public certificate or approve
-an agent release on the operator's behalf.
+roadmap requirements. Release approval remains an independent operation.
 
 ## Prepare the configuration
 
@@ -73,13 +72,52 @@ and TLS usage without opening a network socket. This does not establish the trus
 that external clients need; deploy the appropriate public/enterprise certificate
 chain for those clients.
 
+For automatic public TLS, use configuration version `2`, remove `tls_certificate`
+and `tls_key`, and add this field. Keep all other fields and the twelve role images
+from the version-1 example:
+
+```json
+"public_tls": {
+  "configuration": "/home/openuem/inputs/issuer",
+  "image": "openuem-acme:local"
+}
+```
+
+The image must support the [issuer input check](gateway-acme.md). Create the
+external configuration directory with mode 0700. It contains private `issuer.json`
+and `provider.json`, plus only their explicitly referenced files. Configure the
+same public HTTPS hostname, ACME directory, contact, explicit terms acceptance and
+DNS provider. Use these fixed container paths:
+
+| Issuer setting | Required value |
+| --- | --- |
+| `provider_environment_file` | `/run/openuem-acme/provider.json` |
+| `state_directory` | `/var/lib/openuem-acme` |
+| `publication_directory` | `/var/lib/openuem-public-tls` |
+
+Provider `_FILE` values and optional `acme_roots_file` must name separate flat files
+inside `/run/openuem-acme/`; use mode 0600 for credentials. The installer retains
+these exact inputs in `acme/config/`. It creates `acme/state/` for the original ACME
+account and `public/` for the publication. Its separate `<project>-public-tls`
+service owns only those mounts and an outbound network. It receives no private
+backend network or credentials and publishes no port. Only the public directory
+is shared read-only with the gateway.
+
+The first successful DNS-01 attempt must publish a matching, valid certificate
+before private provisioning continues. The controller then starts the retained
+renewal service and selects the gateway's atomic-publication overlay. The gateway
+checks for reloads once per minute; renewal uses the configured issuer interval.
+No TCP 80 listener is required. Provider authorization, reachable
+DNS/ACME services and client trust in the issued chain remain deployment inputs.
+
 Public mode publishes only gateway TCP 443. The four backend networks are private;
 the gateway's source-network policy controls administrator access. Select the
 actual VPN or management source networks as observed at the gateway. Source
 preservation through the intended ingress/NAT and host firewall behavior still
 require deployment acceptance. Isolated acceptance mode uses `"access":"isolated"`
 and an HTTPS origin on port 8443; it publishes no port and also makes the edge and
-egress networks internal.
+egress networks internal. With version 2, the issuer network is also internal;
+the issuer's canonical HTTPS origin still uses the hostname without port 8443.
 
 ## Review and initialize
 
@@ -90,8 +128,12 @@ python3 scripts/install-reference.py \
 
 The read-only review reports the exact local image IDs, public TLS/release-key
 fingerprints, account-bound directory, source networks and intended publication.
-It neither creates installation files nor starts containers. It does not pull
-images. Preserve the returned `review_sha256` and apply that exact review:
+Version 2 reports the directory URL and provider instead of a certificate
+fingerprint before issuance; afterward it reports the retained initial certificate
+fingerprint. Its bounded issuer checker runs without networking
+or writable mounts and is removed afterward. Neither mode creates installation
+files, starts provisioning or pulls images. Preserve the returned `review_sha256`
+and apply that exact review:
 
 ```sh
 python3 scripts/install-reference.py \
@@ -135,6 +177,15 @@ does not mean the job stopped. Only a verified terminal failed job may be replac
 using its existing protected output and journal. Containers and networks belonging
 to another review are not adopted.
 
+Version 2 also joins an interrupted initial issuer process before starting
+renewal. A failed provider attempt retains the original account for retry. The
+account key and matching account/publication identity bindings become immutable
+provisioning anchors; renewed certificate generations are deliberately excluded
+from that snapshot. A missing original account key is rejected, including after
+a failed first attempt. Keep external inputs available and unchanged until setup
+completes. Completed receipts no longer read those external files; the renewal
+service uses the protected retained configuration.
+
 The controller can resume around bootstrap console replacement, including a
 replacement already created before its progress record or a console absent during
 that transition. It validates existing resources before starting or creating
@@ -158,9 +209,19 @@ the CLI, and checks that the original credentials and authorities are preserved.
 It also exercises stopped-database recovery and interruption around console
 replacement. Cleanup removes only the owned test containers, networks and data.
 
+Passing both `--acme-image` and `--acme-fixture-image` exercises version 2 against
+separate local Pebble/DNS containers. The fixture uses an explicitly allocated,
+reviewed test network and the real issuer executable. It verifies DNS TXT creation,
+validation and cleanup, the gateway's chain against fixture CA trust, the retained
+renewal container and unchanged completed retries. With `--interrupt`, it also
+rejects a missing original account key after a provider failure and interrupts the
+actual controller during a held DNS request before joining the same live issuer
+process. No preissued certificate is substituted into installation state.
+
 `tests/setup/test_reference_installation.py` covers review and lease boundaries,
-retained artifact loss, journal integrity, public-key shape, foreign job state and
-joining a live job after an observation timeout. The separate full reference
+retained artifact loss, journal integrity, public-key shape, protected issuer inputs,
+paired account identities, foreign job state and joining a live job after an
+observation timeout. The separate full reference
 composition continues to test source-network denial, public enrollment/downloads,
 broker maintenance, retained commands and live WSS revocation. Neither fixture
 executes a native installer, contacts a real provider or proves hardware acceptance.

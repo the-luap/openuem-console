@@ -22,6 +22,7 @@ import subprocess
 import sys
 import time
 import urllib.parse
+import uuid
 
 
 sys.dont_write_bytecode = True
@@ -52,6 +53,7 @@ DIRECTORIES = ("installation", "protocol", "credentials", "pki", "broker", "jour
 PROJECT_LABEL = "io.openuem.setup.project"
 REVIEW_LABEL = "io.openuem.setup.review"
 JOB_LABEL = "io.openuem.setup.job"
+ISSUER_EXECUTABLE = "/openuem-acme"
 
 
 def read_file(path, limit=1 << 20, secret=True, allow_empty=False):
@@ -126,9 +128,11 @@ def release_keys(data):
 def profile(path):
     value = decode(read_file(path, 64 << 10))
     required = {"version", "project", "directory", "domain", "organization", "public_origin", "administrator", "administrator_networks", "access", "tls_certificate", "tls_key", "release_keys", "images"}
-    if not isinstance(value, dict) or set(value) != required or type(value["version"]) is not int or value["version"] != 1:
-        raise InstallationError("installation configuration must contain the exact version-one fields")
-    if not all(isinstance(value[name], str) for name in required - {"version", "images", "administrator_networks"}):
+    if isinstance(value, dict) and type(value.get("version")) is int and value["version"] == 2:
+        required = required - {"tls_certificate", "tls_key"} | {"public_tls"}
+    if not isinstance(value, dict) or set(value) != required or type(value["version"]) is not int or value["version"] not in (1, 2):
+        raise InstallationError("installation configuration must contain the exact fields for its supported version")
+    if not all(isinstance(value[name], str) for name in required - {"version", "images", "administrator_networks", "public_tls"}):
         raise InstallationError("installation configuration contains an invalid field type")
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,47}", value["project"]) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._@+\-]{0,127}", value["administrator"]):
         raise InstallationError("installation project or administrator name is invalid")
@@ -155,7 +159,51 @@ def profile(path):
     if not root.is_absolute() or root == root.parent or str(root) != str(root.resolve(strict=True)) or "," in str(root):
         raise InstallationError("installation directory must be an existing canonical private absolute path")
     private(root, True)
+    if value["version"] == 2:
+        issuer = value["public_tls"]
+        if not isinstance(issuer, dict) or set(issuer) != {"configuration", "image"} or not all(isinstance(item, str) for item in issuer.values()) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./:@-]{0,511}", issuer["image"]):
+            raise InstallationError("automatic public TLS requires an explicit issuer image and protected configuration directory")
+        directory = pathlib.Path(issuer["configuration"])
+        if not directory.is_absolute() or directory == directory.parent or str(directory) != str(directory.resolve()) or "," in str(directory) or directory == root or root in directory.parents:
+            raise InstallationError("issuer configuration must be a canonical private directory outside installation state")
     return value
+
+
+def issuer_inputs(config):
+    """Read only the exact provider inputs needed by the fixed issuer mounts."""
+    directory = pathlib.Path(config["public_tls"]["configuration"])
+    private(directory, True)
+    issuer_data = read_file(directory / "issuer.json", 64 << 10)
+    issuer = decode(issuer_data)
+    origin = "https://" + urllib.parse.urlsplit(config["public_origin"]).hostname
+    expected = {"public_origin": origin, "provider_environment_file": "/run/openuem-acme/provider.json",
+                "state_directory": "/var/lib/openuem-acme", "publication_directory": "/var/lib/openuem-public-tls"}
+    if not isinstance(issuer, dict) or any(issuer.get(name) != value for name, value in expected.items()):
+        raise InstallationError("issuer configuration does not match the reviewed origin and fixed private mounts")
+    provider_data = read_file(directory / "provider.json", 64 << 10)
+    provider = decode(provider_data)
+    if not isinstance(provider, dict) or not 1 <= len(provider) <= 128 or not all(isinstance(value, str) for value in provider.values()):
+        raise InstallationError("issuer provider inputs must be a bounded explicit environment")
+    files = {"issuer.json": issuer_data, "provider.json": provider_data}
+
+    def referenced(path, public=False):
+        prefix = "/run/openuem-acme/"
+        name = path.removeprefix(prefix) if isinstance(path, str) else ""
+        if not isinstance(path, str) or path != prefix + name or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", name) or name in ("issuer.json", "provider.json"):
+            raise InstallationError("issuer file inputs must name separate files within the protected configuration mount")
+        data = read_file(directory / name, 1 << 20 if public else 64 << 10, secret=not public)
+        if name in files and files[name] != data:
+            raise InstallationError("issuer file inputs changed while reading")
+        files[name] = data
+
+    for name, value in provider.items():
+        if name.endswith("_FILE"):
+            referenced(value)
+    if issuer.get("acme_roots_file"):
+        referenced(issuer["acme_roots_file"], public=True)
+    if set(path.name for path in directory.iterdir()) != set(files):
+        raise InstallationError("issuer configuration directory contains unreferenced files or directories")
+    return {"acme/config/" + name: data for name, data in files.items()}, issuer
 
 
 class Docker(maintenance.Docker):
@@ -185,10 +233,15 @@ class Docker(maintenance.Docker):
 
 
 class Installation:
+    sequence = STEPS
+
     def __init__(self, config, docker=None, after_step=None):
         if os.name != "posix" or os.geteuid() == 0 or os.getegid() == 0:
             raise InstallationError("reference installation requires a non-root POSIX account")
         self.config = config
+        self.acme = config["version"] == 2
+        self.sequence = ("inputs", "public-tls", *STEPS[1:]) if self.acme else STEPS
+        self.issuer_config = None
         self.root = pathlib.Path(config["directory"])
         info = private(self.root, True)
         self.root_identity = (info.st_dev, info.st_ino)
@@ -203,6 +256,8 @@ class Installation:
         self.images = {}
         self.image_configs = {}
         self.base = ["compose", "--project-name", self.project, "--project-directory", str(self.root)]
+        self.issuer_project = self.project + "-public-tls"
+        self.issuer_base = ["compose", "--project-name", self.issuer_project, "--project-directory", str(self.root)]
         if self.state.exists() or self.state.is_symlink():
             private(self.state, True)
             self.record = read_record(self.state / "review.json")
@@ -211,13 +266,18 @@ class Installation:
                 raise InstallationError("retained installation review is missing")
         elif any(self.root.iterdir()):
             raise InstallationError("fresh installation requires an empty private directory")
-        for role, reference in {**config["images"], "database": DATABASE_IMAGE}.items():
+        references = {**config["images"], "database": DATABASE_IMAGE}
+        if self.acme:
+            references["acme"] = config["public_tls"]["image"]
+        for role, reference in references.items():
             image = self.docker.objects("local installation image", "image", "inspect", reference)[0]
-            if image.get("Os") != "linux" or not re.fullmatch(r"sha256:[0-9a-f]{64}", image.get("Id", "")) or role != "database" and image["Config"].get("Entrypoint") != [EXECUTABLES[role]]:
+            executable = ISSUER_EXECUTABLE if role == "acme" else EXECUTABLES.get(role)
+            if image.get("Os") != "linux" or not re.fullmatch(r"sha256:[0-9a-f]{64}", image.get("Id", "")) or role != "database" and image["Config"].get("Entrypoint") != [executable]:
                 raise InstallationError("a local image does not match its selected reference role")
             self.images[role] = image["Id"]
             self.image_configs[role] = image["Config"]
-        self.sources = {name: read_file(REPOSITORY / "deploy/reference" / name, secret=False) for name in ("compose.yaml", "compose.bootstrap.yaml")}
+        sources = ("compose.yaml", "compose.bootstrap.yaml", "compose.acme.yaml", "compose.issuer.yaml") if self.acme else ("compose.yaml", "compose.bootstrap.yaml")
+        self.sources = {name: read_file(REPOSITORY / "deploy/reference" / name, secret=False) for name in sources}
         binding = {"version": 1, "configuration": config, "account": self.account, "daemon": self.docker.identity,
                    "root_identity": list(self.root_identity), "images": self.images,
                    "templates": {name: hashlib.sha256(data).hexdigest() for name, data in self.sources.items()}}
@@ -227,47 +287,82 @@ class Installation:
             self.review = self.record["review_sha256"]
             self.inputs = None
             return
-        self.inputs = {"public/server.pem": read_file(config["tls_certificate"], 64 << 10, False),
-                       "public/server.key": read_file(config["tls_key"], 64 << 10),
-                       "release-keys.pem": read_file(config["release_keys"], 64 << 10, False)}
-        if any(self.root == pathlib.Path(config[name]) or self.root in pathlib.Path(config[name]).parents for name in ("tls_certificate", "tls_key", "release_keys")):
+        self.inputs = {"release-keys.pem": read_file(config["release_keys"], 64 << 10, False)}
+        names = ("release_keys",) if self.acme else ("tls_certificate", "tls_key", "release_keys")
+        if any(self.root == pathlib.Path(config[name]) or self.root in pathlib.Path(config[name]).parents for name in names):
             raise InstallationError("external installation inputs must remain outside the fresh state directory")
-        tls_fingerprint = public_tls(config["tls_certificate"], config["tls_key"], urllib.parse.urlsplit(config["public_origin"]).hostname)
-        if self.inputs != {"public/server.pem": read_file(config["tls_certificate"], 64 << 10, False),
-                           "public/server.key": read_file(config["tls_key"], 64 << 10),
-                           "release-keys.pem": read_file(config["release_keys"], 64 << 10, False)}:
-            raise InstallationError("installation inputs changed during TLS verification")
+        if self.acme:
+            inputs, self.issuer_config = issuer_inputs(config)
+            self.inputs.update(inputs)
+            self.check_issuer_inputs()
+            repeated, repeated_config = issuer_inputs(config)
+            if repeated != inputs or repeated_config != self.issuer_config or self.inputs["release-keys.pem"] != read_file(config["release_keys"], 64 << 10, False):
+                raise InstallationError("issuer inputs changed during read-only verification")
+            tls_fingerprint = None
+        else:
+            self.inputs.update({"public/server.pem": read_file(config["tls_certificate"], 64 << 10, False),
+                                "public/server.key": read_file(config["tls_key"], 64 << 10)})
+            tls_fingerprint = public_tls(config["tls_certificate"], config["tls_key"], urllib.parse.urlsplit(config["public_origin"]).hostname)
+            if self.inputs != {"public/server.pem": read_file(config["tls_certificate"], 64 << 10, False),
+                               "public/server.key": read_file(config["tls_key"], 64 << 10),
+                               "release-keys.pem": read_file(config["release_keys"], 64 << 10, False)}:
+                raise InstallationError("installation inputs changed during TLS verification")
         keys = release_keys(self.inputs["release-keys.pem"])
         input_hashes = {name: hashlib.sha256(data).hexdigest() for name, data in self.inputs.items()}
         self.review = digest({"binding": binding, "inputs": input_hashes})
         proposed = {"binding": binding, "inputs": input_hashes, "public_tls_sha256": tls_fingerprint, "release_keys": keys, "review_sha256": self.review}
+        if self.acme:
+            proposed["public_tls"] = {"mode": "dns-01", "acme_directory_url": self.issuer_config["acme_directory_url"], "dns_provider": self.issuer_config["dns_provider"]}
         if self.record is not None and self.record != proposed:
             raise InstallationError("retained installation differs from the reviewed inputs or images")
         self.record = proposed
         if not self.state.exists():
-            for label in ("com.docker.compose.project", PROJECT_LABEL):
-                if self.docker.run("fresh project reservation", "ps", "--all", "--quiet", "--filter", "label=" + label + "=" + self.project).strip():
-                    raise InstallationError("installation project already has containers")
-            if self.docker.run("fresh network reservation", "network", "ls", "--quiet", "--filter", "label=com.docker.compose.project=" + self.project).strip():
-                raise InstallationError("installation project already has networks")
+            for project in (self.project, self.issuer_project) if self.acme else (self.project,):
+                for label in ("com.docker.compose.project", PROJECT_LABEL):
+                    if self.docker.run("fresh project reservation", "ps", "--all", "--quiet", "--filter", "label=" + label + "=" + project).strip():
+                        raise InstallationError("installation project already has containers")
+                if self.docker.run("fresh network reservation", "network", "ls", "--quiet", "--filter", "label=com.docker.compose.project=" + project).strip():
+                    raise InstallationError("installation project already has networks")
+
+    def check_issuer_inputs(self):
+        name = "openuem-issuer-inputs-" + uuid.uuid4().hex[:16]
+        try:
+            output = self.docker.run("read-only issuer input verification", "run", "--rm", "--name", name, "--network", "none",
+                "--user", self.account, "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                "--pids-limit", "32", "--memory", "128m", *mount(self.config["public_tls"]["configuration"], "/run/openuem-acme"),
+                self.images["acme"], "--config", "/run/openuem-acme/issuer.json", "--check")
+            if decode(output) != {"inputs_valid": True}:
+                raise InstallationError("issuer image did not positively verify the protected inputs")
+        finally:
+            # This bounded checker has no writable mounts or network. It is
+            # separate from retained provisioning jobs, which must be joined.
+            with contextlib.suppress(Exception):
+                self.docker.run("owned read-only input checker cleanup", "rm", "--force", name, check=False)
 
     def public_plan(self):
-        return {"status": "complete" if "complete" in self.steps else "awaiting-administrator" if "runtime" in self.steps else "ready-to-resume" if self.steps else "ready-to-initialize",
+        result = {"status": "complete" if "complete" in self.steps else "awaiting-administrator" if "runtime" in self.steps else "ready-to-resume" if self.steps else "ready-to-initialize",
                 "review_sha256": self.review, "project": self.project, "directory": str(self.root),
                 "public_origin": self.config["public_origin"], "published_tcp_ports": [443] if self.config["access"] == "public" else [],
                 "administrator_networks": self.config["administrator_networks"], "images": self.images,
                 "public_tls_sha256": self.record["public_tls_sha256"], "release_keys": self.record["release_keys"], "steps": self.steps}
+        if self.acme:
+            result["public_tls"] = self.record["public_tls"]
+            if "public-tls" in self.steps:
+                result["public_tls_sha256"] = read_record(self.state / "2-public-tls.json")["metadata"]["certificate_sha256"]
+        return result
 
     def read_steps(self):
         result = []
         allowed = {"lease", "review.json", "source-compose.yaml", "source-compose.bootstrap.yaml",
                    "compose-bootstrap.json", "compose-bootstrap.wire.json", "compose-steady.json", "compose-steady.wire.json"}
-        allowed |= {str(index) + "-" + step + ".json" for index, step in enumerate(STEPS, 1)}
+        if getattr(self, "acme", False):
+            allowed |= {"source-compose.acme.yaml", "source-compose.issuer.yaml", "compose-issuer.json", "compose-issuer.wire.json"}
+        allowed |= {str(index) + "-" + step + ".json" for index, step in enumerate(self.sequence, 1)}
         if set(path.name for path in self.state.iterdir()) - allowed:
             raise InstallationError("retained installation journal contains unexpected entries")
         def relative(value):
             return isinstance(value, str) and value not in ("", ".") and not pathlib.Path(value).is_absolute() and ".." not in pathlib.Path(value).parts and str(pathlib.Path(value)) == value
-        for index, step in enumerate(STEPS, 1):
+        for index, step in enumerate(self.sequence, 1):
             path = self.state / (str(index) + "-" + step + ".json")
             value = read_record(path)
             if value is None:
@@ -277,8 +372,9 @@ class Installation:
             if not isinstance(value["paths"], list) or len(value["paths"]) > 64 or not all(relative(path) for path in value["paths"]) or not isinstance(value["files"], dict) or len(value["files"]) > 2048 or not all(relative(path) and isinstance(checksum, str) and re.fullmatch(r"[0-9a-f]{64}", checksum) for path, checksum in value["files"].items()):
                 raise InstallationError("retained installation artifact inventory is invalid")
             metadata = value["metadata"]
-            if step in ("installation", "administrator"):
-                field, length = ("installation", 32) if step == "installation" else ("console", 64)
+            identities = {"installation": ("installation", 32), "administrator": ("console", 64), "public-tls": ("certificate_sha256", 64)}
+            if step in identities:
+                field, length = identities[step]
                 if not isinstance(metadata, dict) or set(metadata) != {field} or not isinstance(metadata[field], str) or not re.fullmatch(r"[0-9a-f]{" + str(length) + "}", metadata[field]):
                     raise InstallationError("retained installation identity metadata is invalid")
             elif metadata is not None:
@@ -315,13 +411,13 @@ class Installation:
 
     def step(self, name, paths=(), metadata=None):
         self.check_lease()
-        path = self.state / (str(STEPS.index(name) + 1) + "-" + name + ".json")
+        path = self.state / (str(self.sequence.index(name) + 1) + "-" + name + ".json")
         if name in self.steps:
             value = read_record(path)
             if value["files"] != self.snapshot(value["paths"]):
                 raise InstallationError("completed provisioning material was changed or removed")
             return value["metadata"]
-        if STEPS[len(self.steps)] != name:
+        if self.sequence[len(self.steps)] != name:
             raise InstallationError("installation attempted to skip a required step")
         write_record(path, {"step": name, "review_sha256": self.review, "paths": list(paths), "files": self.snapshot(paths), "metadata": metadata})
         self.steps.append(name)
@@ -346,6 +442,11 @@ class Installation:
         self.check_lease()
         container_name = self.project + "-setup-" + name
         specification = {"image": self.images[role], "network": network, "mounts": mounts, "arguments": arguments, "account": self.account}
+        issuer = role == "acme"
+        tmpfs = "/tmp:rw,nosuid,nodev,noexec,size=16m,mode=0700,uid=" + str(os.geteuid()) + ",gid=" + str(os.getegid())
+        if issuer:
+            specification.update({"init": True, "tmpfs": tmpfs})
+        executable = ISSUER_EXECUTABLE if issuer else EXECUTABLES[role]
         signature = digest(specification)
         identities = self.docker.run("retained setup job lookup", "ps", "--all", "--quiet", "--filter", "name=^/" + container_name + "$").split()
         if len(identities) > 1:
@@ -353,13 +454,14 @@ class Installation:
         if identities:
             current = self.docker.objects("retained setup job inspection", "inspect", identities[0])[0]
             labels = current["Config"].get("Labels") or {}
-            if labels.get(PROJECT_LABEL) != self.project or labels.get(REVIEW_LABEL) != self.review or labels.get(JOB_LABEL) != signature or current["Image"] != self.images[role] or current["Config"].get("User") != self.account or current["Config"].get("Entrypoint") != [EXECUTABLES[role]] or current["Config"].get("Cmd") != arguments:
+            if labels.get(PROJECT_LABEL) != self.project or labels.get(REVIEW_LABEL) != self.review or labels.get(JOB_LABEL) != signature or current["Image"] != self.images[role] or current["Config"].get("User") != self.account or current["Config"].get("Entrypoint") != [executable] or current["Config"].get("Cmd") != arguments:
                 raise InstallationError("retained setup job does not match the reviewed operation")
             policy = current["HostConfig"]
             expected_mounts = {item.split("destination=", 1)[1].split(",", 1)[0]: (item.split("source=", 1)[1].split(",", 1)[0], ",readonly" not in item) for item in mounts[1::2]}
             if maintenance.Maintenance.environment(current["Config"].get("Env")) != maintenance.Maintenance.environment(self.image_configs[role].get("Env")):
                 raise InstallationError("retained setup job environment differs from its reviewed image")
-            if not policy["ReadonlyRootfs"] or policy.get("Privileged") or policy.get("CapAdd") or policy.get("Devices") or policy.get("DeviceRequests") or policy.get("PidMode") or policy.get("IpcMode") not in ("private", "") or policy.get("PortBindings") or policy.get("CapDrop") != ["ALL"] or not set(policy.get("SecurityOpt", [])) & {"no-new-privileges", "no-new-privileges:true"} or policy.get("Memory") != 512 << 20 or policy.get("PidsLimit") != 128 or policy.get("Tmpfs") or policy.get("NetworkMode") != network or set(current["NetworkSettings"]["Networks"]) != {network} or any(item["Type"] != "bind" for item in current["Mounts"]) or {item["Destination"]: (item["Source"], item["RW"]) for item in current["Mounts"]} != expected_mounts:
+            expected_tmpfs = {"/tmp": tmpfs.partition(":")[2]} if issuer else {}
+            if not policy["ReadonlyRootfs"] or policy.get("Privileged") or policy.get("CapAdd") or policy.get("Devices") or policy.get("DeviceRequests") or policy.get("PidMode") or policy.get("IpcMode") not in ("private", "") or policy.get("PortBindings") or policy.get("CapDrop") != ["ALL"] or not set(policy.get("SecurityOpt", [])) & {"no-new-privileges", "no-new-privileges:true"} or policy.get("Memory") != 512 << 20 or policy.get("PidsLimit") != 128 or bool(policy.get("Init")) != issuer or (policy.get("Tmpfs") or {}) != expected_tmpfs or policy.get("NetworkMode") != network or set(current["NetworkSettings"]["Networks"]) != {network} or any(item["Type"] != "bind" for item in current["Mounts"]) or {item["Destination"]: (item["Source"], item["RW"]) for item in current["Mounts"]} != expected_mounts:
                 raise InstallationError("retained setup job isolation changed")
             identity = current["Id"]
             if not current["State"]["Running"] and current["State"]["Status"] != "created" and current["State"]["ExitCode"] != 0:
@@ -373,14 +475,14 @@ class Installation:
             identity = self.docker.run("setup job creation", "create", "--name", container_name, "--network", network,
                 "--label", PROJECT_LABEL + "=" + self.project, "--label", REVIEW_LABEL + "=" + self.review,
                 "--label", JOB_LABEL + "=" + signature, "--user", self.account, "--read-only", "--cap-drop", "ALL",
-                "--security-opt", "no-new-privileges", "--pids-limit", "128", "--memory", "512m", *mounts,
+                "--security-opt", "no-new-privileges", "--pids-limit", "128", "--memory", "512m", *(["--init", "--tmpfs", tmpfs] if issuer else []), *mounts,
                 self.images[role], *arguments).strip()
         current = self.docker.objects("setup process state", "inspect", identity)[0]
         if current["State"]["Status"] == "created":
             self.docker.run("setup process startup", "start", identity)
         # A controller interruption can leave its Docker job alive. Always join
         # that actual process; never infer completion from a journal or timeout.
-        code = self.docker.run("setup process completion", "wait", identity, timeout=150).strip()
+        code = self.docker.run("setup process completion", "wait", identity, timeout=1900 if issuer else 150).strip()
         output = self.docker.run("setup process result", "logs", identity)
         if code != "0":
             if allow_failure and output.strip() == "reference service did not become ready before the probe deadline":
@@ -390,7 +492,134 @@ class Installation:
         self.docker.run("completed setup job removal", "rm", identity)
         # These PKI commands deliberately report readiness without a JSON
         # result. Their retained artifacts are checked by the following step.
-        return None if role == "pki" else decode(output)
+        return None if role in ("pki", "acme") else decode(output)
+
+    def issuer_definition(self):
+        self.retain(self.state / "source-compose.issuer.yaml", self.sources["compose.issuer.yaml"])
+        environment = {**self.docker.environment, "OPENUEM_REFERENCE_STATE": str(self.root),
+                       "OPENUEM_RUNTIME_UID": str(os.geteuid()), "OPENUEM_RUNTIME_GID": str(os.getegid()), "OPENUEM_ACME_IMAGE": self.images["acme"]}
+        labels = {REVIEW_LABEL: self.review, PROJECT_LABEL: self.project}
+        override = {"services": {"acme": {"labels": labels}},
+                    "networks": {"public_tls": {"labels": labels, "internal": self.config["access"] == "isolated"}}}
+        result = subprocess.run(["docker", *self.issuer_base, "--env-file", "/dev/null", "--file", str(self.state / "source-compose.issuer.yaml"),
+                                 "--file", "-", "config", "--format", "json"], input=encoded(override).decode(), env=environment,
+                                text=True, capture_output=True, timeout=30)
+        if result.returncode:
+            raise InstallationError("reviewed issuer configuration could not be rendered")
+        model = maintenance.compose_model(decode(result.stdout))
+        model = {name: value for name, value in model.items() if not name.startswith("x-")}
+        if model.get("name") != self.issuer_project or set(model.get("services", {})) != {"acme"} or set(model.get("networks", {})) != {"public_tls"}:
+            raise InstallationError("issuer composition must contain only its dedicated service and network")
+        service, network = model["services"]["acme"], model["networks"]["public_tls"]
+        forbidden = ("privileged", "cap_add", "devices", "device_cgroup_rules", "network_mode", "pid", "ipc", "volumes_from", "secrets", "configs", "build", "provider", "pre_start", "post_start", "pre_stop", "use_api_socket", "ports")
+        expected = {"/run/openuem-acme": (str(self.root / "acme/config"), True),
+                    "/var/lib/openuem-acme": (str(self.root / "acme/state"), False), "/var/lib/openuem-public-tls": (str(self.root / "public"), False)}
+        mounts = service.get("volumes", [])
+        if any(service.get(name) for name in forbidden) or service.get("image") != self.images["acme"] or service.get("user") != self.account or not service.get("read_only") or not service.get("init") or service.get("cap_drop") != ["ALL"] or "no-new-privileges:true" not in service.get("security_opt", []) or service.get("pull_policy") != "never" or set(service.get("networks", {})) != {"public_tls"}:
+            raise InstallationError("issuer service does not retain its reviewed privilege and network boundaries")
+        if service.get("command") != ["--config", "/run/openuem-acme/issuer.json"] or service.get("entrypoint") is not None or service.get("environment") or str(service.get("mem_limit")) != str(128 << 20) or service.get("pids_limit") != 64 or service.get("restart") != "unless-stopped" or service.get("stop_grace_period") != "15s":
+            raise InstallationError("issuer command, environment or resource limits changed")
+        if len(mounts) != 3 or any(item.get("type") != "bind" or item.get("bind", {}).get("create_host_path") for item in mounts) or {item["target"]: (item["source"], bool(item.get("read_only"))) for item in mounts} != expected:
+            raise InstallationError("issuer account, provider and publication mounts changed")
+        if network.get("name") != self.issuer_project + "_public_tls" or network.get("external") or network.get("driver", "bridge") != "bridge" or bool(network.get("internal")) != (self.config["access"] == "isolated"):
+            raise InstallationError("issuer network ownership or isolation changed")
+        if any(model.get(name) for name in ("volumes", "secrets", "configs", "models")):
+            raise InstallationError("issuer composition cannot create additional resources")
+        self.retain(self.state / "compose-issuer.json", encoded(model))
+        self.retain(self.state / "compose-issuer.wire.json", encoded(model).decode().replace("$", "$$").encode())
+        return model
+
+    def issuer_resources(self, model):
+        self.check_lease()
+        service = model["services"]["acme"]
+        network = model["networks"]["public_tls"]
+        identities = self.docker.run("retained issuer containers", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.project=" + self.issuer_project).split()
+        if len(identities) > 1:
+            raise InstallationError("issuer service identity is ambiguous")
+        current = None
+        if identities:
+            current = self.docker.objects("retained issuer boundaries", "inspect", identities[0])[0]
+            config, host = current["Config"], current["HostConfig"]
+            labels = config.get("Labels") or {}
+            if labels.get("com.docker.compose.service") != "acme" or labels.get("com.docker.compose.oneoff", "false").lower() != "false" or labels.get(REVIEW_LABEL) != self.review or labels.get(PROJECT_LABEL) != self.project:
+                raise InstallationError("existing issuer does not belong to this installation review")
+            entrypoint, arguments = maintenance.Maintenance.invocation(service, self.image_configs["acme"])
+            if current["Image"] != self.images["acme"] or config.get("User") != self.account or (config.get("Entrypoint") or []) != entrypoint or (config.get("Cmd") or []) != arguments or maintenance.Maintenance.environment(config.get("Env")) != maintenance.Maintenance.environment(self.image_configs["acme"].get("Env")):
+                raise InstallationError("existing issuer image, command or environment differs from the review")
+            if not host.get("ReadonlyRootfs") or not host.get("Init") or host.get("Privileged") or host.get("CapAdd") or host.get("Devices") or host.get("DeviceRequests") or host.get("PidMode") or host.get("UTSMode") or host.get("UsernsMode") or host.get("IpcMode") not in ("private", "") or host.get("CapDrop") != ["ALL"] or not set(host.get("SecurityOpt", [])) & {"no-new-privileges", "no-new-privileges:true"} or host.get("Memory") != 128 << 20 or host.get("PidsLimit") != 64 or host.get("PortBindings") or host.get("RestartPolicy") != {"Name": "unless-stopped", "MaximumRetryCount": 0} or config.get("StopTimeout") != 15:
+                raise InstallationError("existing issuer privileges or resource limits changed")
+            expected = {item["target"]: (item["source"], not item.get("read_only", False)) for item in service["volumes"]}
+            if len(current["Mounts"]) != len(expected) or any(item["Type"] != "bind" for item in current["Mounts"]) or {item["Destination"]: (item["Source"], item["RW"]) for item in current["Mounts"]} != expected or host.get("NetworkMode") != network["name"] or set(current["NetworkSettings"]["Networks"]) != {network["name"]}:
+                raise InstallationError("existing issuer storage or network membership changed")
+            expected_tmpfs = {item.partition(":")[0]: item.partition(":")[2] for item in service.get("tmpfs", [])}
+            if (host.get("Tmpfs") or {}) != expected_tmpfs:
+                raise InstallationError("existing issuer temporary storage changed")
+        elif "public-tls" not in self.steps and (any((self.root / "acme/state").iterdir()) or any((self.root / "public").iterdir())):
+            raise InstallationError("occupied issuer state has no reviewed owning service")
+        found = self.docker.run("issuer network lookup", "network", "ls", "--quiet", "--filter", "name=^" + network["name"] + "$").split()
+        if len(found) > 1:
+            raise InstallationError("issuer network identity is ambiguous")
+        owned = self.docker.run("owned issuer network lookup", "network", "ls", "--quiet", "--filter", "label=com.docker.compose.project=" + self.issuer_project).split()
+        if set(owned) != set(found):
+            raise InstallationError("issuer project has unexpected or foreign networks")
+        if found:
+            actual = self.docker.objects("issuer network inspection", "network", "inspect", found[0])[0]
+            labels = actual.get("Labels") or {}
+            if actual.get("Name") != network["name"] or actual.get("Driver") != "bridge" or labels.get(REVIEW_LABEL) != self.review or labels.get(PROJECT_LABEL) != self.project or labels.get("com.docker.compose.project") != self.issuer_project or labels.get("com.docker.compose.network") != "public_tls" or bool(actual.get("Internal")) != bool(network.get("internal")):
+                raise InstallationError("issuer network isolation or review identity changed")
+            for expected in network.get("ipam", {}).get("config", []):
+                if not any(item.get("Subnet") == expected.get("subnet") for item in actual.get("IPAM", {}).get("Config", [])):
+                    raise InstallationError("issuer network address allocation differs from its reviewed definition")
+        return current
+
+    def issuer_anchors(self):
+        account = decode(read_file(self.root / "acme/state/account-key.json", 8192))
+        directory = urllib.parse.urlsplit(self.issuer_config["acme_directory_url"]).netloc
+        key_path = "lego/accounts/" + directory.replace(":", "_").replace("/", "_").replace("\\", "_") + "/" + self.issuer_config["email"] + "/" + self.issuer_config["email"] + ".key"
+        if not isinstance(account, dict) or set(account) != {"version", "key_path", "sha256"} or type(account["version"]) is not int or account["version"] != 1 or account["key_path"] != key_path or not isinstance(account["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", account["sha256"]):
+            raise InstallationError("issuer did not retain the expected original account key binding")
+        key = self.root / "acme/state" / key_path
+        if hashlib.sha256(read_file(key, 64 << 10)).hexdigest() != account["sha256"]:
+            raise InstallationError("issuer original account key changed or is unavailable")
+        state = decode(read_file(self.root / "acme/state/installation.json", 8192))
+        public = decode(read_file(self.root / "public/installation.json", 8192))
+        if not isinstance(state, dict) or state != public or set(state) != {"version", "installation", "origin", "directory", "email", "provider"} or type(state["version"]) is not int or state["version"] != 1:
+            raise InstallationError("issuer account and publication are not a retained matching pair")
+        installation = uuid.UUID(state["installation"])
+        if installation.int == 0 or str(installation) != state["installation"] or state["origin"] != self.issuer_config["public_origin"] or state["directory"] != self.issuer_config["acme_directory_url"] or state["email"] != self.issuer_config["email"] or state["provider"] != self.issuer_config["dns_provider"]:
+            raise InstallationError("issuer installation identity does not match the reviewed configuration")
+        return ("acme/state/account-key.json", "acme/state/installation.json", "public/installation.json", "acme/state/" + key_path)
+
+    def initialize_public_tls(self):
+        model = self.issuer_definition()
+        current = self.issuer_resources(model)
+        if current is None:
+            self.docker.compose(self.issuer_base, model, "create", "--no-build")
+            current = self.issuer_resources(model)
+        if current is None:
+            raise InstallationError("reviewed issuer service was not created")
+        if "public-tls" not in self.steps:
+            if current["State"]["Running"]:
+                self.docker.run("initial issuer shutdown", "stop", "--time", "20", current["Id"])
+                stopped = self.docker.objects("initial issuer joined shutdown", "inspect", current["Id"])[0]["State"]
+                if stopped["Running"] or stopped["ExitCode"] != 0:
+                    raise InstallationError("issuer did not join a successful shutdown before initial issuance")
+            self.job("public-tls", "acme", self.issuer_project + "_public_tls",
+                [*mount(self.root / "acme/config", "/run/openuem-acme"), *mount(self.root / "acme/state", "/var/lib/openuem-acme", True),
+                 *mount(self.root / "public", "/var/lib/openuem-public-tls", True)], ["--config", "/run/openuem-acme/issuer.json", "--once"])
+            anchors = self.issuer_anchors()
+            certificate = maintenance.gateway_trust(self.root, {"command": ["--tls-cert", "/run/public/current/fullchain.pem", "--tls-key", "/run/public/current/private.pem"]})
+            key = certificate.parent / "private.pem"
+            read_file(key, 64 << 10)
+            fingerprint = public_tls(str(certificate), str(key), urllib.parse.urlsplit(self.config["public_origin"]).hostname)
+            self.step("public-tls", (*anchors, ".setup/source-compose.issuer.yaml", ".setup/compose-issuer.json", ".setup/compose-issuer.wire.json"), {"certificate_sha256": fingerprint})
+        else:
+            self.issuer_anchors()
+        current = self.issuer_resources(model)
+        if not current["State"]["Running"]:
+            self.docker.run("retained issuer startup", "start", current["Id"])
+        if not self.docker.objects("issuer startup state", "inspect", current["Id"])[0]["State"]["Running"]:
+            raise InstallationError("retained issuer exited before its renewal service started")
 
     def runtime_model(self, installation, bootstrap):
         environment = {**self.docker.environment, "OPENUEM_REFERENCE_STATE": str(self.root),
@@ -404,6 +633,8 @@ class Installation:
         for name, data in self.sources.items():
             self.retain(self.state / ("source-" + name), data)
         files = ["--file", str(self.state / "source-compose.yaml")]
+        if self.acme:
+            files += ["--file", str(self.state / "source-compose.acme.yaml")]
         if bootstrap:
             files += ["--file", str(self.state / "source-compose.bootstrap.yaml")]
         labels = {REVIEW_LABEL: self.review}
@@ -491,7 +722,8 @@ class Installation:
     def gateway_ready(self, runtime):
         runtime.inspect()
         endpoint = runtime.roles["gateway"]["NetworkSettings"]["Networks"][self.project + "_edge"]["IPAddress"]
-        if self.job("gateway", "probe", self.project + "_edge", mount(self.root / "public/server.pem", "/gateway.pem"),
+        certificate = maintenance.gateway_trust(self.root, runtime.definition["services"]["gateway"])
+        if self.job("gateway", "probe", self.project + "_edge", mount(certificate, "/gateway.pem"),
             ["--mode", "gateway", "--address", endpoint + ":8443", "--origin", self.config["public_origin"], "--trust-file", "/gateway.pem", "--timeout", "1m"]) != {"ready": True}:
             raise InstallationError("gateway readiness was not established")
 
@@ -542,11 +774,16 @@ class Installation:
                 self.step(name)
             for directory in DIRECTORIES:
                 ensure_directory(self.root / directory)
+            if self.acme:
+                for directory in ("acme", "acme/config", "acme/state"):
+                    ensure_directory(self.root / directory)
             if "inputs" not in self.steps:
                 for name, data in self.inputs.items():
                     self.retain(self.root / name, data)
                 self.retain(self.root / "pg_hba.conf", b"local all all trust\nhostssl all all all scram-sha-256\nhostnossl all all all reject\n")
-                self.step("inputs", ("public", "release-keys.pem", "pg_hba.conf"))
+                self.step("inputs", ("acme/config" if self.acme else "public", "release-keys.pem", "pg_hba.conf"))
+            if self.acme:
+                self.initialize_public_tls()
             if "installation" not in self.steps:
                 public = self.job("installation", "installation", "none", mount(self.root / "installation", "/work", True), ["--directory", "/work/state"])
                 if not isinstance(public, dict) or set(public) != {"installation"} or not re.fullmatch(r"[0-9a-f]{32}", public.get("installation", "")):
@@ -583,7 +820,8 @@ class Installation:
                     self.retain(self.state / ("compose-" + kind + ".json"), encoded(model))
                     self.retain(self.state / ("compose-" + kind + ".wire.json"), encoded(model).decode().replace("$", "$$").encode())
                 self.step("configuration", (".setup/compose-bootstrap.json", ".setup/compose-steady.json",
-                    ".setup/compose-bootstrap.wire.json", ".setup/compose-steady.wire.json", ".setup/source-compose.yaml", ".setup/source-compose.bootstrap.yaml"))
+                    ".setup/compose-bootstrap.wire.json", ".setup/compose-steady.wire.json", ".setup/source-compose.yaml", ".setup/source-compose.bootstrap.yaml",
+                    *((".setup/source-compose.acme.yaml",) if self.acme else ())))
             bootstrap_model = read_record(self.state / "compose-bootstrap.json")
             steady_model = read_record(self.state / "compose-steady.json")
             if "database" not in self.steps:

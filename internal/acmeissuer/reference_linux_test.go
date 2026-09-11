@@ -18,6 +18,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -58,9 +59,12 @@ func TestACMEReferenceServer(t *testing.T) {
 	ctx, stop := signal.NotifyContext(t.Context(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	dns := startACMEDNSOn(t, "0.0.0.0", address.As4())
+	var gateMu sync.Mutex
+	var gate chan struct{}
+	held := 0
 	provider := &http.Server{ReadHeaderTimeout: time.Second, ReadTimeout: 2 * time.Second, WriteTimeout: 2 * time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/fixture/fail" || r.URL.Path == "/fixture/allow" {
+			if r.URL.Path == "/fixture/fail" || r.URL.Path == "/fixture/allow" || r.URL.Path == "/fixture/hold" {
 				username, password, valid := r.BasicAuth()
 				if r.Method != http.MethodPost || !valid || username != "fixture" || password != "synthetic-dns-secret" {
 					w.WriteHeader(http.StatusForbidden)
@@ -69,14 +73,46 @@ func TestACMEReferenceServer(t *testing.T) {
 				dns.mu.Lock()
 				dns.fail = r.URL.Path == "/fixture/fail"
 				dns.mu.Unlock()
+				gateMu.Lock()
+				if r.URL.Path == "/fixture/hold" && gate == nil {
+					gate = make(chan struct{})
+				} else if r.URL.Path != "/fixture/hold" && gate != nil {
+					close(gate)
+					gate = nil
+				}
+				gateMu.Unlock()
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			if r.URL.Path == "/fixture/status" && r.Method == http.MethodGet {
+				gateMu.Lock()
+				waiting := held
+				gateMu.Unlock()
 				dns.mu.Lock()
 				defer dns.mu.Unlock()
-				_ = json.NewEncoder(w).Encode(map[string]int{"present": dns.present, "cleanup": dns.cleanup, "txt": dns.txt, "records": len(dns.records)})
+				_ = json.NewEncoder(w).Encode(map[string]int{"present": dns.present, "cleanup": dns.cleanup, "txt": dns.txt, "records": len(dns.records), "held": waiting})
 				return
+			}
+			if r.URL.Path == "/present" {
+				gateMu.Lock()
+				waiting := gate
+				if waiting != nil {
+					held++
+				}
+				gateMu.Unlock()
+				if waiting != nil {
+					// Only this test server supports holding a real DNS request
+					// while an installation controller is interrupted and joined.
+					_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(time.Minute))
+					select {
+					case <-waiting:
+					case <-r.Context().Done():
+					case <-ctx.Done():
+					}
+					gateMu.Lock()
+					held--
+					gateMu.Unlock()
+				}
 			}
 			dns.provider(w, r)
 		})}
@@ -128,6 +164,37 @@ func TestACMEReferenceServer(t *testing.T) {
 	writeFixture(t, "/fixture/gateway-roots.pem", roots)
 	writeFixture(t, "/fixture/ready.json", []byte(`{"ready":true}`))
 	<-ctx.Done()
+}
+
+func TestACMEReferenceControl(t *testing.T) {
+	address := referenceACME(t, false)
+	action := os.Getenv("OPENUEM_ACME_REFERENCE_ACTION")
+	if action != "fail" && action != "allow" && action != "hold" && action != "status" {
+		t.Fatal("reference provider control action is invalid")
+	}
+	method, status := http.MethodPost, http.StatusNoContent
+	if action == "status" {
+		method, status = http.MethodGet, http.StatusOK
+	}
+	request, _ := http.NewRequestWithContext(t.Context(), method, "http://"+net.JoinHostPort(address.String(), "18080")+"/fixture/"+action, nil)
+	request.SetBasicAuth("fixture", "synthetic-dns-secret")
+	transport := &http.Transport{}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: 2 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal("reference provider control did not respond")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != status {
+		t.Fatal("reference provider control was rejected")
+	}
+	if action == "status" {
+		var counts map[string]int
+		if json.NewDecoder(response.Body).Decode(&counts) != nil || json.NewEncoder(os.Stdout).Encode(counts) != nil {
+			t.Fatal("reference provider counters are unavailable")
+		}
+	}
 }
 
 func TestACMEReferenceClient(t *testing.T) {

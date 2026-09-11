@@ -13,11 +13,12 @@ services never receive its account or DNS provider configuration. Only the issue
 can write the publication; the gateway reads that complete directory so renewed
 generations remain visible without container replacement.
 
-This is a configuration option for a newly provisioned reference composition.
-The [reviewed installation controller](reference-installation.md) currently
-accepts supplied TLS files. Its automatic DNS-01 orchestration remains separate
-work; do not change its frozen configuration or provisioning journal to select
-this layout.
+The [reviewed installation controller](reference-installation.md) selects this
+layout with configuration version 2. It verifies protected inputs, issues the first
+certificate, starts renewal and records the retained account/publication identity.
+Version 1 continues to accept supplied TLS files. The manual composition procedure
+below applies to separately provisioned projects; an existing installer's frozen
+configuration and journal cannot be changed to switch layouts.
 
 ## Prepare the issuer
 
@@ -101,8 +102,8 @@ files. The probe receives no publication private key or issuer configuration.
 
 Back up account and publication as a consistent pair while the issuer is stopped,
 and protect the provider configuration separately. Preserve the selected relative
-link and private permissions. General installation restore and automated installer
-handoff remain separate roadmap requirements.
+link and private permissions. General installation restore remains a separate
+roadmap requirement.
 
 ## Acceptance scope
 
@@ -122,5 +123,7 @@ claim production-provider, firewall or physical-device acceptance.
 from the Pebble/DNS provider process across an isolated Docker network. It verifies
 actual TXT validation and cleanup, a failed-provider retry with the retained
 account, the issued chain against pinned fixture trust and clean server shutdown.
-This provides the provider boundary for automatic installer integration without
-contacting external services or preparing a substitute gateway certificate.
+The installer's ACME acceptance options use this provider boundary for actual
+fresh setup, interrupted process join, administrator completion and retained
+renewal without contacting external services or preparing a substitute gateway
+certificate.

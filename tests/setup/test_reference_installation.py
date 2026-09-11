@@ -147,20 +147,135 @@ class ProtectedInstallation(unittest.TestCase):
                 with self.assertRaises((installer.InstallationError, ValueError)):
                     installer.profile(source)
 
-    def retained_job(self):
+    def issuer_configuration(self):
+        directory = self.root / "issuer-config"
+        directory.mkdir(mode=0o700)
+        config = {"public_origin": "https://uem.example.test:8443", "public_tls": {"configuration": str(directory), "image": "issuer:check"}}
+        issuer = {"version": 1, "public_origin": "https://uem.example.test", "acme_directory_url": "https://acme.example.test/dir",
+                  "email": "operator@example.test", "accept_terms": True, "dns_provider": "httpreq",
+                  "provider_environment_file": "/run/openuem-acme/provider.json", "state_directory": "/var/lib/openuem-acme",
+                  "publication_directory": "/var/lib/openuem-public-tls", "acme_roots_file": "/run/openuem-acme/roots.pem"}
+        provider = {"HTTPREQ_ENDPOINT": "http://acme.example.test:18080", "HTTPREQ_PASSWORD_FILE": "/run/openuem-acme/secret"}
+        for name, value in (("issuer.json", issuer), ("provider.json", provider), ("secret", {"synthetic": "secret"}), ("roots.pem", {"synthetic": "public trust"})):
+            installer.write_record(directory / name, value)
+        (directory / "roots.pem").chmod(0o644)
+        return config, directory, issuer, provider
+
+    def test_automatic_tls_profile_cannot_mix_modes_or_embed_provider_inputs_in_state(self):
+        value = {"version": 2, "project": "reference-unit", "directory": str(self.root), "domain": "example.test",
+                 "organization": "Reference", "public_origin": "https://uem.example.test", "administrator": "first-admin",
+                 "administrator_networks": ["10.42.0.0/24"], "access": "public", "release_keys": "/inputs/release-keys.pem",
+                 "public_tls": {"configuration": str(self.root.parent / "external-issuer-inputs"), "image": "issuer:local"},
+                 "images": {role: "local/" + role + ":check" for role in installer.EXECUTABLES}}
+        source = self.root / "profile.json"
+        installer.write_record(source, value)
+        # Completed receipts permit removed external inputs; opening them is
+        # required only by the unfinished installation's actual input check.
+        self.assertEqual(installer.profile(source), value)
+        for changed in ({**value, "tls_key": "/inputs/server.key"}, {**value, "version": 1},
+                        {**value, "public_tls": {**value["public_tls"], "configuration": str(self.root / "issuer")}},
+                        {**value, "public_tls": {**value["public_tls"], "image": "--privileged"}}):
+            source.write_bytes(installer.encoded(changed))
+            with self.assertRaises(installer.InstallationError):
+                installer.profile(source)
+
+    def test_issuer_inputs_bind_only_explicit_files_without_writing_state(self):
+        config, directory, expected, _ = self.issuer_configuration()
+        before = {path.name: path.read_bytes() for path in directory.iterdir()}
+        files, issuer = installer.issuer_inputs(config)
+        self.assertEqual(issuer, expected)
+        self.assertEqual(files, {"acme/config/" + name: data for name, data in before.items()})
+        self.assertEqual({path.name for path in self.root.iterdir()}, {"issuer-config"})
+        self.assertEqual(before, {path.name: path.read_bytes() for path in directory.iterdir()})
+
+    def test_issuer_inputs_reject_file_escapes_aliases_and_unreferenced_material(self):
+        config, directory, issuer, provider = self.issuer_configuration()
+        for path in ("/outside/secret", "/run/openuem-acme/../secret", "/run/openuem-acme/provider.json", "/run/openuem-acme/issuer.json"):
+            (directory / "provider.json").write_bytes(installer.encoded({**provider, "HTTPREQ_PASSWORD_FILE": path}))
+            with self.assertRaises(installer.InstallationError):
+                installer.issuer_inputs(config)
+        (directory / "provider.json").write_bytes(installer.encoded(provider))
+        installer.write_record(directory / "unreferenced.key", {"synthetic": "unreferenced"})
+        with self.assertRaises(installer.InstallationError):
+            installer.issuer_inputs(config)
+        (directory / "unreferenced.key").unlink()
+        secret = directory / "secret"
+        secret.unlink()
+        secret.symlink_to("roots.pem")
+        with self.assertRaises(installer.InstallationError):
+            installer.issuer_inputs(config)
+        secret.unlink()
+        installer.write_record(secret, {"synthetic": "secret"})
+        (directory / "issuer.json").write_bytes(installer.encoded({**issuer, "public_origin": "https://different.example.test"}))
+        with self.assertRaises(installer.InstallationError):
+            installer.issuer_inputs(config)
+
+    def test_automatic_tls_journal_requires_issuance_before_private_provisioning(self):
         operation = self.operation()
+        operation.acme = True
+        operation.sequence = ("inputs", "public-tls", *installer.STEPS[1:])
+        operation.step("inputs")
+        with self.assertRaises(installer.InstallationError):
+            operation.step("installation", metadata={"installation": "d" * 32})
+        operation.step("public-tls", metadata={"certificate_sha256": "e" * 64})
+        operation.step("installation", metadata={"installation": "d" * 32})
+        self.assertEqual(operation.read_steps(), ["inputs", "public-tls", "installation"])
+        (operation.state / "2-public-tls.json").unlink()
+        with self.assertRaises(installer.InstallationError):
+            operation.read_steps()
+
+    def test_issuer_anchors_require_the_original_account_and_matching_publication(self):
+        operation = self.operation()
+        operation.issuer_config = {"acme_directory_url": "https://acme.example.test:14000/dir", "email": "operator@example.test",
+                                   "public_origin": "https://uem.example.test", "dns_provider": "httpreq"}
+        key_path = "lego/accounts/acme.example.test_14000/operator@example.test/operator@example.test.key"
+        key = self.root / "acme/state" / key_path
+        key.parent.mkdir(mode=0o700, parents=True)
+        (self.root / "public").mkdir(mode=0o700)
+        operation.retain(key, b"original synthetic account key")
+        binding = {"version": 1, "installation": str(installer.uuid.uuid4()), "origin": "https://uem.example.test",
+                   "directory": "https://acme.example.test:14000/dir", "email": "operator@example.test", "provider": "httpreq"}
+        for relative in ("acme/state/installation.json", "public/installation.json"):
+            # Go's field order is valid; it is deliberately not maintenance's
+            # canonical JSON encoding used for Python journal records.
+            operation.retain(self.root / relative, installer.json.dumps(binding).encode())
+        operation.retain(self.root / "acme/state/account-key.json", installer.json.dumps(
+            {"version": 1, "key_path": key_path, "sha256": installer.hashlib.sha256(key.read_bytes()).hexdigest()}).encode())
+        self.assertIn("acme/state/" + key_path, operation.issuer_anchors())
+        key.unlink()
+        with self.assertRaises(FileNotFoundError):
+            operation.issuer_anchors()
+        self.assertFalse(key.exists())
+        operation.retain(key, b"replacement synthetic account key")
+        with self.assertRaises(installer.InstallationError):
+            operation.issuer_anchors()
+        key.unlink()
+        operation.retain(key, b"original synthetic account key")
+        (self.root / "public/installation.json").write_bytes(installer.encoded({**binding, "installation": str(installer.uuid.uuid4())}))
+        with self.assertRaises(installer.InstallationError):
+            operation.issuer_anchors()
+
+    def retained_job(self, issuer=False):
+        operation = self.operation()
+        role = "acme" if issuer else "installation"
         operation.account = str(os.geteuid()) + ":" + str(os.getegid())
-        operation.images = {"installation": "sha256:" + "b" * 64}
-        operation.image_configs = {"installation": {"Env": ["PATH=/usr/bin"]}}
+        operation.images = {role: "sha256:" + "b" * 64}
+        operation.image_configs = {role: {"Env": ["PATH=/usr/bin"]}}
         arguments = ["--directory", "/work/state"]
         mounts = installer.mount(self.root, "/work", True)
-        signature = installer.digest({"image": operation.images["installation"], "network": "none", "mounts": mounts, "arguments": arguments, "account": operation.account})
-        state = {"Id": "c" * 64, "Image": operation.images["installation"],
-                 "Config": {"User": operation.account, "Entrypoint": ["/openuem-installation-secrets"], "Cmd": arguments, "Env": ["PATH=/usr/bin"],
+        specification = {"image": operation.images[role], "network": "none", "mounts": mounts, "arguments": arguments, "account": operation.account}
+        temporary = "rw,nosuid,nodev,noexec,size=16m,mode=0700,uid=" + str(os.geteuid()) + ",gid=" + str(os.getegid())
+        if issuer:
+            specification.update({"init": True, "tmpfs": "/tmp:" + temporary})
+        signature = installer.digest(specification)
+        state = {"Id": "c" * 64, "Image": operation.images[role],
+                 "Config": {"User": operation.account, "Entrypoint": ["/openuem-acme" if issuer else "/openuem-installation-secrets"], "Cmd": arguments, "Env": ["PATH=/usr/bin"],
                             "Labels": {installer.PROJECT_LABEL: operation.project, installer.REVIEW_LABEL: operation.review, installer.JOB_LABEL: signature}},
                  "HostConfig": {"ReadonlyRootfs": True, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges"], "NetworkMode": "none", "IpcMode": "private", "Memory": 512 << 20, "PidsLimit": 128},
                  "NetworkSettings": {"Networks": {"none": {}}}, "Mounts": [{"Type": "bind", "Destination": "/work", "Source": str(self.root), "RW": True}],
                  "State": {"Running": True, "Status": "running", "ExitCode": 0}}
+        if issuer:
+            state["HostConfig"].update({"Init": True, "Tmpfs": {"/tmp": temporary}})
 
         class RetainedDocker(QuietDocker):
             observing = True
@@ -177,7 +292,7 @@ class ProtectedInstallation(unittest.TestCase):
                         raise subprocess.TimeoutExpired("docker wait", 1)
                     return "0"
                 if arguments[0] == "logs":
-                    return '{"installation":"' + "d" * 32 + '"}'
+                    return "" if issuer else '{"installation":"' + "d" * 32 + '"}'
                 if arguments[0] == "rm":
                     return ""
                 raise AssertionError("retained live job must not be recreated or restarted")
@@ -193,6 +308,70 @@ class ProtectedInstallation(unittest.TestCase):
         operation.docker.observing = True
         self.assertEqual(operation.job("installation", "installation", "none", mounts, arguments), {"installation": "d" * 32})
         self.assertFalse(any(args[0] in ("create", "start") for _, args in operation.docker.calls))
+
+    def test_live_issuer_job_requires_init_and_bounded_private_temporary_storage(self):
+        operation, mounts, arguments, state = self.retained_job(True)
+        for field, value in (("Init", False), ("Tmpfs", {"/tmp": "rw"}), ("Tmpfs", {"/tmp": "rw", "/extra": "rw"})):
+            original = state["HostConfig"][field]
+            state["HostConfig"][field] = value
+            with self.assertRaises(installer.InstallationError):
+                operation.job("public-tls", "acme", "none", mounts, arguments)
+            state["HostConfig"][field] = original
+        operation.docker.observing = False
+        with self.assertRaises(subprocess.TimeoutExpired):
+            operation.job("public-tls", "acme", "none", mounts, arguments)
+        self.assertFalse(any(args[0] == "rm" for _, args in operation.docker.calls))
+        operation.docker.observing = True
+        self.assertIsNone(operation.job("public-tls", "acme", "none", mounts, arguments))
+        self.assertFalse(any(args[0] in ("create", "start") for _, args in operation.docker.calls))
+
+    def test_renewal_service_rejects_foreign_identity_mounts_and_networks(self):
+        operation, _, arguments, current = self.retained_job(True)
+        operation.issuer_project = operation.project + "-public-tls"
+        network_name = operation.issuer_project + "_public_tls"
+        operation.image_configs["acme"]["Entrypoint"] = ["/openuem-acme"]
+        current["Config"]["Labels"].update({"com.docker.compose.project": operation.issuer_project,
+                                          "com.docker.compose.service": "acme", "com.docker.compose.oneoff": "False"})
+        current["HostConfig"].update({"Memory": 128 << 20, "PidsLimit": 64, "NetworkMode": network_name})
+        current["HostConfig"]["RestartPolicy"] = {"Name": "unless-stopped", "MaximumRetryCount": 0}
+        current["Config"]["StopTimeout"] = 15
+        current["NetworkSettings"]["Networks"] = {network_name: {}}
+        paths = (("acme/config", "/run/openuem-acme", True), ("acme/state", "/var/lib/openuem-acme", False),
+                 ("public", "/var/lib/openuem-public-tls", False))
+        volumes = [{"source": str(self.root / source), "target": target, "read_only": readonly} for source, target, readonly in paths]
+        current["Mounts"] = [{"Type": "bind", "Source": item["source"], "Destination": item["target"], "RW": not item["read_only"]} for item in volumes]
+        network = {"Name": network_name, "Driver": "bridge", "Internal": True,
+                   "Labels": {installer.REVIEW_LABEL: operation.review, installer.PROJECT_LABEL: operation.project,
+                              "com.docker.compose.project": operation.issuer_project, "com.docker.compose.network": "public_tls"}}
+        model = {"services": {"acme": {"command": arguments, "volumes": volumes,
+                   "tmpfs": ["/tmp:" + current["HostConfig"]["Tmpfs"]["/tmp"]]}}, "networks": {"public_tls": {"name": network_name, "internal": True}}}
+
+        class IssuerDocker(QuietDocker):
+            def run(self, stage, *arguments, **options):
+                self.calls.append((stage, arguments))
+                if arguments[0] == "ps":
+                    return current["Id"]
+                if arguments[:2] == ("network", "ls"):
+                    return "f" * 12
+                raise AssertionError("issuer inspection must not mutate its resources")
+
+            def objects(self, stage, *arguments):
+                return [copy.deepcopy(network if arguments[0] == "network" else current)]
+
+        operation.docker = IssuerDocker()
+        self.assertEqual(operation.issuer_resources(model)["Id"], current["Id"])
+        for target, field, value in ((current["Config"]["Labels"], installer.REVIEW_LABEL, "b" * 64),
+                                    (current["Mounts"][0], "RW", True), (current["Mounts"][0], "Source", "/different"),
+                                    (current["HostConfig"], "NetworkMode", "host"), (current["HostConfig"], "Memory", 0),
+                                    (current["HostConfig"], "RestartPolicy", {"Name": "no", "MaximumRetryCount": 0}),
+                                    (current["NetworkSettings"], "Networks", {network_name: {}, "private-backend": {}}),
+                                    (network, "Internal", False), (network["Labels"], installer.PROJECT_LABEL, "different")):
+            with self.subTest(field=field):
+                original = target[field]
+                target[field] = value
+                with self.assertRaises(installer.InstallationError):
+                    operation.issuer_resources(model)
+                target[field] = original
 
     def test_retained_job_mount_or_review_substitution_is_rejected(self):
         operation, mounts, arguments, state = self.retained_job()
