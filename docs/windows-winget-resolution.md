@@ -171,7 +171,7 @@ matches its reviewed registration, in addition to the existing hash, Authenticod
 and PE architecture checks. Those existing checks alone do not establish bundle
 identity. The agent also currently rejects an emulated bootstrapper executable,
 even when its payload targets the native architecture. Source-derived Burn
-approval/history, capability advertisement and physical acceptance remain open;
+approval/history and physical acceptance remain open;
 native execution and protocol recovery evidence are recorded below.
 
 The agent's separate
@@ -208,7 +208,8 @@ The final local race suite passes in 1.588 seconds; CAB and XML fuzzing pass
 and the complete reader passes all three generated architectures and changed
 header checks in 15.10 seconds. All agent CI jobs pass at
 `bf1f80adf9960387f82e414d60263b7054816c23`. These native runtime tests use an AMD64
-Windows process; ARM64 process and physical endpoint acceptance remain open.
+Windows process; later native ARM64 results are recorded below. Physical endpoint
+acceptance remains open.
 The bounded preflight subprocess now requires this proof for explicit Burn plans,
 comparing exact machine identity, displayed version and native 64-bit registry
 view. The retained stage and its approved digest are verified before and after
@@ -247,7 +248,13 @@ Portable agent recovery race tests pass in 4.066 seconds. They preserve a signed
 restart result byte-for-byte, retry a lost historical receipt without another
 installation, and bind later-boot install/removal observations to the original
 exact 64-bit registration. These protocol fixtures do not simulate a physical
-reboot. Native ARM64 runtime and physical endpoint acceptance remain open.
+reboot. Native ARM64 installation/removal, cancellation and unfinished-child
+checks pass in 7.66/6.81/6.66 seconds at agent `a1096ed`; all seven jobs pass
+([CI run](https://github.com/the-luap/openuem-agent/actions/runs/34628087765)).
+The generated execution bundles disable host restore points after diagnostics
+identified remaining `SrTasks.exe` and `conhost.exe` processes in a default-restore
+fixture. Production child joining and uncertainty remain unchanged. Physical
+endpoint acceptance remains open.
 
 The updated source adapter race suite passes in 1.781 seconds and another 368,767
 fuzz inputs pass in 21.498 seconds. It rejects 32-bit registry views for both native
@@ -279,3 +286,14 @@ version and installed display version can differ. Those distinctions must be
 preserved by the subsequent execution adapter.
 Its inheritance checks also follow the pinned
 [WinGet manifest population implementation](https://github.com/microsoft/winget-cli/blob/c17eadbcacf2f5244b13de0d563d921c33ac4af6/src/AppInstallerCommonCore/Manifest/ManifestYamlPopulator.cpp).
+
+The shared profile contract at `1be84d1b5bc3ce65b699a5fc6f30f520859d6f62`
+adds an optional `software_burn_version` hint without changing legacy JSON. The
+worker advertises version 1 only for private Windows profiles with both signed
+capability columns available. The agent negotiates that exact version in its
+device-signed recipient registration and checks current permission before new
+admission and native execution. Upgrade/downgrade, mismatched replies, withdrawal
+at admission and retained result retry pass portable race tests in 8.521 seconds.
+The actual Linux ARM64 worker passes profile/schema/broker checks in 1.32 seconds.
+All consumers pin the published module. This profile hint alone does not approve
+or dispatch a source-derived package.

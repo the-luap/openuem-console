@@ -67,9 +67,14 @@ the table's package summaries do not remove any detail from the roadmap.
   an already-installed no-op, different-version refusal and same-artifact removal.
   Native race tests at `39eb6c94d3436f00a24069dc2572be003284910f` pass in 21.26
   seconds; cancellation and an unfinished child pass in 12.88/11.27 seconds.
+  Native ARM64 installation/removal, cancellation and unfinished-child checks
+  pass in 7.66/6.81/6.66 seconds at `a1096ed`; all seven agent CI jobs pass.
+  The generated execution bundles disable host restore points. Production keeps
+  reporting uncertainty when child work remains active.
   Portable recovery tests preserve signed historical receipts and exact later-boot
-  observations without repeating execution. Capability advertisement and source
-  approval/dispatch remain open. See [Burn execution evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
+  observations without repeating execution. The private profile hint and
+  device-signed Burn recipient negotiation are implemented, with downgrade and
+  admission checks passing portable race tests. Source approval/dispatch remains open. See [Burn execution evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
 
 - A native Windows readiness shutdown hang is now traced and corrected. The
   listener keeps a persistent stop event while draining pending connections,
@@ -77,9 +82,10 @@ the table's package summaries do not remove any detail from the roadmap.
   Native race tests at `589bf1b7e872984896307ccd185d57601c49b0b5` pass 96 owned
   idle/pending/disconnected-client shutdown cycles in 0.34 seconds, alongside
   the existing identity, PID, permission, held-signer and crash-recovery checks.
-  Full Windows storage/SCM integration awaits a run past a transient dependency
-  download failure. See the agent's
-  [native readiness evidence](https://github.com/the-luap/openuem-agent/blob/589bf1b7e872984896307ccd185d57601c49b0b5/docs/windows-local-readiness.md).
+  Full Windows storage/LocalSystem service integration passes at `23c4d31` and
+  again at `a1096ed`. Native ARM64 also passes all readiness checks, including
+  the same 96 shutdown cycles in 0.41 seconds. See the agent's
+  [native readiness evidence](https://github.com/the-luap/openuem-agent/actions/runs/34628087765).
 
 - ACME renewal fixtures now verify both default and forced reuse of an existing
   valid authorization. This fixes a false failure caused by pinned Pebble allowing
