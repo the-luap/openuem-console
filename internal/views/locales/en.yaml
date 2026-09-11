@@ -1803,6 +1803,7 @@ en:
     provider_not_valid: "The selected provider is not valid"
     client_id_is_required: "The Client ID is required"
     oidc_url_is_required: "The OIDC URL is required"
+    oidc_url_https: "The OIDC issuer must be an HTTPS URL without credentials, a query or a fragment"
     role_required: "The role or group is required"
     keycloak_public_key_required: "The public key for Keycloak is required"
     at_least_one_auth_method: "At least one authentication method must be enabled"

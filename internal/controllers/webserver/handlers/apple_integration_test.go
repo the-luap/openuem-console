@@ -273,6 +273,31 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if err != nil || d.Status != "revoked" {
 		t.Fatal("revocation not persisted", d, err)
 	}
+	t.Run("OIDC issuer settings reject unsafe URLs", func(t *testing.T) {
+		oldCert, oldPasswd := h.ReenableCertAuth, h.ReenablePasswdAuth
+		defer func() { h.ReenableCertAuth, h.ReenablePasswdAuth = oldCert, oldPasswd }()
+		h.ReenableCertAuth, h.ReenablePasswdAuth = true, true
+
+		before, err := m.GetAuthenticationSettings()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, issuer := range []string{"http://issuer.example", "https://user:password@issuer.example", "https://issuer.example?q=x", "https://issuer.example/#fragment"} {
+			form := url.Values{"csrf": {"console-test-token"}, "authentication-use-certificates": {"false"}, "authentication-allow-register": {"false"}, "authentication-use-oidc": {"true"}, "authentication-use-passwords": {"false"}, "authentication-oidc-provider": {"authelia"}, "authentication-oidc-server": {issuer}, "authentication-oidc-client-id": {"owned-client"}, "authentication-oidc-role": {"owned-role"}, "authentication-oidc-auto-create": {"false"}, "authentication-oidc-auto-approve": {"false"}}
+			rec := request("POST", "/admin/authentication", "application/x-www-form-urlencoded", []byte(form.Encode()))
+			if !strings.Contains(rec.Body.String(), "OIDC issuer must be an HTTPS URL") {
+				t.Fatal("unsafe issuer configuration was not rejected", rec.Code)
+			}
+			if !h.ReenableCertAuth || !h.ReenablePasswdAuth {
+				t.Fatal("invalid settings disabled emergency authentication overrides")
+			}
+
+			after, err := m.GetAuthenticationSettings()
+			if err != nil || after.OIDCIssuerURL != before.OIDCIssuerURL || after.UseOIDC != before.UseOIDC || after.OIDCClientID != before.OIDCClientID {
+				t.Fatal("invalid OIDC settings changed configuration", err)
+			}
+		}
+	})
 	exerciseConsolePermissions(t, h, e, ctx, tenant.ID, site.ID, profiles[0].ID)
 	exerciseWindowsConsole(t, h, e, ctx, tenant.ID, site.ID)
 	exerciseDesktopConsolePermissions(t, h, e, ctx, tenant.ID, site.ID)

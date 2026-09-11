@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -83,7 +84,7 @@ type Handler struct {
 	ReenableCertAuth     bool
 	ReenablePasswdAuth   bool
 	AuthLogger           *log.Logger
-	OIDCRedirectURI      string
+	oidcHTTPTransport    http.RoundTripper
 	CommonAppsJob        gocron.Job
 	EncryptionMasterKey  string
 }

@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/invopop/ctxi18n/i18n"
@@ -60,23 +61,25 @@ type ZitadelRolesResponse struct {
 }
 
 type OIDCSessionInfo struct {
-	ID            string
-	Name          string
-	Email         string
-	Phone         string
-	RefreshToken  string
-	AccessToken   string
-	TokenType     string
-	TokenExpiry   int
-	IDToken       string
-	EmailVerified bool
+	Issuer, Subject, Policy string
+	ID, Name, Email, Phone  string
+	EmailVerified           bool
 }
 
 func (h *Handler) OIDCLogIn(c echo.Context) error {
+	ctx, cancel := h.oidcContext(c.Request().Context())
+	defer cancel()
+	c.SetRequest(c.Request().WithContext(ctx))
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Referrer-Policy", "no-referrer")
 
 	settings, err := h.Model.GetAuthenticationSettings()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, i18n.T(c.Request().Context(), "authentication.could_not_get_settings"))
+	}
+
+	if !settings.UseOIDC {
+		return echo.NewHTTPError(http.StatusForbidden, "OpenID sign-in is disabled")
 	}
 
 	// if CloudFlare Turnstile is used, check response
@@ -97,10 +100,17 @@ func (h *Handler) OIDCLogIn(c echo.Context) error {
 		}
 	}
 
-	provider, err := oidc.NewProvider(context.Background(), settings.OIDCIssuerURL)
+	if !oidcIssuer(settings.OIDCIssuerURL) || settings.OIDCClientID == "" {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
+	}
+	provider, err := oidc.NewProvider(ctx, settings.OIDCIssuerURL)
 	if err != nil {
-		log.Printf("[ERROR]: we could not instantiate OIDC provider, reason: %v", err)
+		log.Print("[ERROR]: could not instantiate OIDC provider")
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not instantiate OIDC provider")
+	}
+
+	if !oidcHTTPS(provider.Endpoint().AuthURL) || !oidcHTTPS(provider.Endpoint().TokenURL) || !oidcHTTPS(provider.UserInfoEndpoint()) {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID provider endpoints must use HTTPS")
 	}
 
 	oauth2Config := oauth2.Config{
@@ -144,48 +154,59 @@ func (h *Handler) OIDCLogIn(c echo.Context) error {
 	codeChallenge := oauth2.S256ChallengeOption(verifier)
 	codeChallengeMethod := oauth2.SetAuthURLParam("code_challenge_method", "S256")
 
-	// Create encrypted cookies
-	if err := h.WriteOIDCCookie(c, "state", state, cookieEncryptionKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not generate OIDC state cookie")
+	nonce, err := randomBytestoHex(32)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not start OpenID sign-in")
 	}
-
-	if err := h.WriteOIDCCookie(c, "verifier", verifier, cookieEncryptionKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not generate OIDC verifier cookie")
+	flow := oidcFlow{Policy: oidcPolicy(settings), State: state, Verifier: verifier, Nonce: nonce, Issuer: settings.OIDCIssuerURL, ClientID: settings.OIDCClientID, Redirect: h.GetRedirectURI(c), Expires: time.Now().Add(10 * time.Minute).Unix()}
+	payload, err := json.Marshal(flow)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not start OpenID sign-in")
 	}
-
-	u := oauth2Config.AuthCodeURL(state, codeChallenge, codeChallengeMethod)
-
-	// TODO - debug
-	// log.Println("[INFO]: the OIDC auth code url is: ", u)
+	if err := h.WriteOIDCCookie(c, oidcFlowCookie, string(payload), cookieEncryptionKey); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not start OpenID sign-in")
+	}
+	u := oauth2Config.AuthCodeURL(state, codeChallenge, codeChallengeMethod, oidc.Nonce(nonce))
 
 	return c.Redirect(http.StatusFound, u)
 }
 
 func (h *Handler) OIDCCallback(c echo.Context) error {
+	ctx, cancel := h.oidcContext(c.Request().Context())
+	defer cancel()
+	c.SetRequest(c.Request().WithContext(ctx))
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Referrer-Policy", "no-referrer")
+
+	clearOIDCFlow(c)
 
 	settings, err := h.Model.GetAuthenticationSettings()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, i18n.T(c.Request().Context(), "authentication.could_not_get_settings"))
 	}
 
-	provider, err := oidc.NewProvider(context.Background(), settings.OIDCIssuerURL)
+	if !settings.UseOIDC {
+		return echo.NewHTTPError(http.StatusForbidden, "OpenID sign-in is disabled")
+	}
+	if !oidcIssuer(settings.OIDCIssuerURL) || settings.OIDCClientID == "" {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
+	}
+
+	if len(c.Request().URL.RawQuery) > 8192 {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid OpenID response")
+	}
+	query, err := url.ParseQuery(c.Request().URL.RawQuery)
 	if err != nil {
-		log.Printf("[ERROR]: we could not instantiate OIDC provider, reason: %v", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not instantiate OIDC provider")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid OpenID response")
 	}
-
-	errorDescription := c.QueryParam("error_description")
-
-	// Get code from request
-	code := c.QueryParam("code")
-	if code == "" {
-		return echo.NewHTTPError(http.StatusInternalServerError, errorDescription)
+	for _, key := range []string{"state", "code", "error", "iss"} {
+		if len(query[key]) > 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid OpenID response")
+		}
 	}
-
-	// Get state from request
-	state := c.QueryParam("state")
-	if state == "" {
-		return echo.NewHTTPError(http.StatusInternalServerError, errorDescription)
+	code, state := query.Get("code"), query.Get("state")
+	if query.Get("error") != "" || code == "" || len(code) > 4096 || len(state) != 64 || (query.Get("iss") != "" && query.Get("iss") != settings.OIDCIssuerURL) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid OpenID response; start sign-in again")
 	}
 
 	cookieEncryptionKey := settings.OIDCCookieEncriptionKey
@@ -204,58 +225,60 @@ func (h *Handler) OIDCCallback(c echo.Context) error {
 		}
 	}
 
-	// Get state from cookie
-	stateFromCookie, err := ReadOIDCCookie(c, "state", cookieEncryptionKey)
+	payload, err := ReadOIDCCookie(c, oidcFlowCookie, cookieEncryptionKey)
+	var flow oidcFlow
+	if err != nil || json.Unmarshal([]byte(payload), &flow) != nil || !flow.valid(settings, h.GetRedirectURI(c), state, time.Now()) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid OpenID sign-in; start again")
+	}
+
+	provider, err := oidc.NewProvider(ctx, settings.OIDCIssuerURL)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not read OIDC state from cookie")
+		log.Print("[ERROR]: could not instantiate OIDC provider")
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not instantiate OIDC provider")
 	}
 
-	// Check if states match
-	if stateFromCookie != state {
-		return echo.NewHTTPError(http.StatusInternalServerError, "OIDC state doesn't match")
+	if !oidcHTTPS(provider.Endpoint().AuthURL) || !oidcHTTPS(provider.Endpoint().TokenURL) || !oidcHTTPS(provider.UserInfoEndpoint()) {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID provider endpoints must use HTTPS")
 	}
-
-	// Get verifier from cookie
-	verifierFromCookie, err := ReadOIDCCookie(c, "verifier", cookieEncryptionKey)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not read OIDC verifier from cookie")
-	}
-
-	// TODO Verify code if possible, I've verifier and I've the code how I can check if the code is valid? Is this needed?
 
 	// Get access token in exchange of code
-	oAuth2TokenResponse, err := h.ExchangeCodeForAccessToken(c, code, verifierFromCookie, provider.Endpoint().TokenURL, settings.OIDCClientID)
+	oAuth2TokenResponse, err := h.ExchangeCodeForAccessToken(c, code, flow.Verifier, provider.Endpoint().TokenURL, settings.OIDCClientID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not exchange OIDC code for token")
+	}
+
+	idToken, err := verifyOIDCIdentity(ctx, provider, oAuth2TokenResponse, flow)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID identity verification failed")
 	}
 
 	authProvider := settings.OIDCProvider
 
 	// Get user account info from remote endpoint
-	u, err := GetUserInfo(oAuth2TokenResponse.AccessToken, provider.UserInfoEndpoint())
+	u, err := GetUserInfo(ctx, oAuth2TokenResponse.AccessToken, provider.UserInfoEndpoint())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not get user info from OIDC endpoint")
 	}
 
+	if u.Subject != idToken.Subject || u.PreferredUsername == "" || len(u.PreferredUsername) > 255 || strings.IndexFunc(u.PreferredUsername, unicode.IsControl) >= 0 {
+		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID identity verification failed")
+	}
+
 	// Get user information
 	oidcUser := OIDCSessionInfo{
+		Issuer: idToken.Issuer, Subject: idToken.Subject, Policy: flow.Policy,
 		ID:            u.PreferredUsername,
 		Name:          u.Name,
 		Email:         u.Email,
 		EmailVerified: u.EmailVerified,
 		Phone:         u.Phone,
-		RefreshToken:  oAuth2TokenResponse.RefreshToken,
-		AccessToken:   oAuth2TokenResponse.AccessToken,
-		TokenType:     oAuth2TokenResponse.TokenType,
-		TokenExpiry:   oAuth2TokenResponse.ExpiresIn,
-		IDToken:       oAuth2TokenResponse.IDToken,
 	}
 
 	// Check if user is member of specified group or role
 	if authProvider == auth.ZITADEL {
 		if settings.OIDCRole != "" {
 			// Get roles info from remote endpoint
-			data, err := h.ZitadelGetUserRoles(oAuth2TokenResponse.AccessToken, settings)
+			data, err := h.ZitadelGetUserRoles(ctx, oAuth2TokenResponse.AccessToken, settings)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "could not get roles from permissions endpoint")
 			}
@@ -291,16 +314,10 @@ func randomBytestoHex(count int) (string, error) {
 func (h *Handler) WriteOIDCCookie(c echo.Context, name string, value string, secretKey string) error {
 	expiry := time.Now().Add(10 * time.Minute)
 
-	domain := h.ServerName
-	if h.ReverseProxyServer != "" {
-		domain = h.ReverseProxyServer
-	}
-
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		Domain:   domain,
 		Secure:   true,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
@@ -349,11 +366,25 @@ func (h *Handler) WriteOIDCCookie(c echo.Context, name string, value string, sec
 func ReadOIDCCookie(c echo.Context, name string, secretKey string) (string, error) {
 	// Reference: https://www.alexedwards.net/blog/working-with-cookies-in-go#encrypted-cookies
 
+	count := 0
+	for _, cookie := range c.Request().Cookies() {
+		if cookie.Name == name {
+			count++
+		}
+	}
+	if count != 1 {
+		return "", errors.New("invalid OIDC cookie")
+	}
+
 	// Read the encrypted value from the cookie as normal.
 	cookie, err := c.Request().Cookie(name)
 	if err != nil {
 		log.Printf("[ERROR]: we could not read the cookie, reason: %v", err)
 		return "", err
+	}
+
+	if len(cookie.Value) > 4096 {
+		return "", errors.New("invalid OIDC cookie")
 	}
 
 	// Create a new AES cipher block from the secret key.
@@ -451,27 +482,17 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User) error {
 }
 
 func (h *Handler) GetRedirectURI(c echo.Context) string {
-	u := fmt.Sprintf("https://%s:%s/oidc/callback", h.ServerName, h.ConsolePort)
-	if h.ReverseProxyServer != "" {
-		referer, err := url.Parse(c.Request().Referer())
-		if err != nil {
-			return u
-		}
-		if referer.Port() == "" {
-			u = fmt.Sprintf("https://%s/oidc/callback", referer.Hostname())
-		} else {
-			u = fmt.Sprintf("https://%s:%s/oidc/callback", referer.Hostname(), referer.Port())
-		}
-	}
-
-	h.OIDCRedirectURI = u
-	return u
+	return h.consoleOrigin() + "/oidc/callback"
 }
 
 func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 	settings, err := h.Model.GetAuthenticationSettings()
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.could_not_get_settings", err.Error()), true))
+	}
+
+	if !settings.UseOIDC || u.Issuer != settings.OIDCIssuerURL || u.Subject == "" || u.Policy != oidcPolicy(settings) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID configuration changed; start sign-in again")
 	}
 
 	// Check if user exists
@@ -495,6 +516,10 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 	account, err := h.Model.GetUserById(u.ID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "cannot get user from database")
+	}
+
+	if !account.Openid || account.Register == nats.REGISTER_REVOKED {
+		return echo.NewHTTPError(http.StatusUnauthorized, "This account cannot use OpenID sign-in")
 	}
 
 	// If user has been approved by admin, auto approve is on or user already logged in (register completed)
@@ -539,123 +564,29 @@ func (h *Handler) ExchangeCodeForAccessToken(c echo.Context, code string, verifi
 	url := endpoint
 	v.Set("grant_type", "authorization_code")
 	v.Set("code", code)
-	v.Set("redirect_uri", h.OIDCRedirectURI)
+	v.Set("redirect_uri", h.GetRedirectURI(c))
 	v.Set("client_id", clientID)
 	v.Set("code_verifier", verifier)
 
-	resp, err := http.PostForm(url, v)
-	if err != nil {
-		log.Printf("[ERROR]: could not send request to token endpoint, reason: %v", err)
-		return nil, err
+	if err := oidcJSON(c.Request().Context(), http.MethodPost, url, "", v, &z); err != nil || z.Error != "" {
+		return nil, errOIDCResponse
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("[ERROR]: Error while reading the response bytes, reason: %v", err)
-	}
-
-	// Debug
-	// log.Println(string([]byte(body)))
-
-	if err := json.Unmarshal(body, &z); err != nil {
-		log.Printf("[ERROR]: could not decode response from token endpoint, reason: %v", err)
-		return nil, err
-	}
-
-	if z.Error != "" {
-		log.Printf("[ERROR]: found an error in the response from token endpoint, reason: %v", z.Error+" "+z.ErrorDescription)
-		return nil, errors.New(z.Error + " " + z.ErrorDescription)
-	}
-
 	return &z, nil
 }
 
-func GetUserInfo(accessToken string, endpoint string) (*UserInfoResponse, error) {
-	user := UserInfoResponse{}
-
-	// create request
-	req, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Printf("[ERROR]: could not prepare HTTP get for user info endpoint, reason: %v", err)
-		return nil, err
+func GetUserInfo(ctx context.Context, accessToken string, endpoint string) (*UserInfoResponse, error) {
+	var user UserInfoResponse
+	if err := oidcJSON(ctx, http.MethodGet, endpoint, accessToken, nil, &user); err != nil || user.Error != "" {
+		return nil, errOIDCResponse
 	}
-
-	// add access token
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-	// send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("[ERROR]: could not get HTTP response for user info endpoint, reason: %v", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("Error while reading the response bytes:", err)
-	}
-
-	// Debug
-	// log.Println(string([]byte(body)))
-
-	if err := json.Unmarshal(body, &user); err != nil {
-		log.Printf("[ERROR]: could not decode response from user info endpoint, reason: %v", err)
-		return nil, err
-	}
-
-	if user.Error != "" {
-		log.Printf("[ERROR]: could not get user info from endpoint, reason: %v", err)
-		return nil, errors.New(user.Error)
-	}
-
 	return &user, nil
 }
 
-func (h *Handler) ZitadelGetUserRoles(accessToken string, settings *ent.Authentication) (*ZitadelRolesResponse, error) {
-	u := fmt.Sprintf("%s/auth/v1/permissions/me/_search", settings.OIDCIssuerURL)
-	roles := ZitadelRolesResponse{}
-
-	// create request
-	req, err := http.NewRequest("POST", u, nil)
-	if err != nil {
-		log.Printf("[ERROR]: could not prepare HTTP get for permissions endpoint, reason: %v", err)
-		return nil, err
+func (h *Handler) ZitadelGetUserRoles(ctx context.Context, accessToken string, settings *ent.Authentication) (*ZitadelRolesResponse, error) {
+	var roles ZitadelRolesResponse
+	endpoint := strings.TrimRight(settings.OIDCIssuerURL, "/") + "/auth/v1/permissions/me/_search"
+	if err := oidcJSON(ctx, http.MethodPost, endpoint, accessToken, nil, &roles); err != nil || roles.Message != "" {
+		return nil, errOIDCResponse
 	}
-
-	// add access token
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	req.Header.Add("Accept", "application/json")
-
-	// send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("[ERROR]: could not get HTTP response from permissions endpoint, reason: %v", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("[ERROR]: could not read response bytes, reason: %v", err)
-		return nil, err
-	}
-
-	// DEBUG
-	// log.Println(string([]byte(body)))
-
-	if err := json.Unmarshal(body, &roles); err != nil {
-		log.Printf("[ERROR]: could not unmarshal response from permissions endpoint, reason: %v", err)
-		return nil, err
-	}
-
-	if roles.Message != "" {
-		log.Printf("[ERROR]: could not get roles from permissions endpoint, reason: %v", roles.Message)
-		return nil, errors.New(roles.Message)
-	}
-
 	return &roles, nil
 }

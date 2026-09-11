@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [OIDC protocol verification](oidc-sign-in.md) now binds the configured callback,
+  expiring encrypted flow, PKCE and nonce; verifies signed ID tokens and matching
+  UserInfo subjects; and bounds all provider requests to HTTPS, deadlines and
+  response limits. Changed policies, disabled sign-in, other account modes and
+  revoked accounts reject admission. Unsafe issuer settings preserve existing
+  authentication settings and emergency overrides. Owned TLS cryptographic
+  race tests pass in 2.439 seconds; disposable PostgreSQL tests pass through the
+  actual Linux ARM64 router, all four provider adapters and real session store.
+  The full Linux ARM64 console build passes. Immutable issuer/subject account
+  binding and explicit administrator migration remain open; this is partial
+  SSO/SEC-01 evidence, not completion or production provider acceptance.
+
 - [Scoped security inventory](desktop-security-inventory.md) now exposes
   antivirus/update reports and bounded update history, including delegated
   legacy update GETs for scoped readers. Missing records, stored boolean values,
