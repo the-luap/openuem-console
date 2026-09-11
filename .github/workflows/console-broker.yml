@@ -207,6 +207,22 @@ jobs:
             individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
             --maintenance-probe-image setup-reference-probe:check \
             --release-image reference-releases:check
+      - name: Reviewed reference installation and interrupted bootstrap recovery
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/setup/test_reference_installation.py
+          for scenario in fresh interrupted; do
+            options=()
+            if [ "$scenario" = interrupted ]; then options+=(--interrupt); fi
+            python3 scripts/check-reference-installation.py \
+              setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
+              setup-database-bootstrap:check database-private-pki:check setup-reference-probe:check \
+              private-console:check private-broker:check \
+              private-service-authorization:check private-service-commands:check \
+              individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" "${options[@]}"
+          done
       - name: Retained broker maintenance, interruption recovery and pending commands
         if: runner.os == 'Linux'
         shell: bash

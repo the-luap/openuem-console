@@ -18,6 +18,14 @@ class ProtectedMetadata(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = pathlib.Path(self.temporary.name)
 
+    def test_rendered_compose_values_preserve_literal_dollars_and_mapping_keys(self):
+        rendered = {"command": ["Reference $$Literal $$$$Budget $${HOME}"],
+                    "environment": {"UNCHANGED$$KEY": "$$VALUE"}, "read_only": True, "entrypoint": None}
+        expected = {"command": ["Reference $Literal $$Budget ${HOME}"],
+                    "environment": {"UNCHANGED$$KEY": "$VALUE"}, "read_only": True, "entrypoint": None}
+        self.assertEqual(maintenance.compose_model(rendered), expected)
+        self.assertEqual(rendered["command"], ["Reference $$Literal $$$$Budget $${HOME}"])
+
     def test_exact_private_creation_and_no_overwrite(self):
         path = self.root / "review.json"
         expected = {"version": 1, "hash": "a" * 64}

@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [reference installation controller](reference-installation.md) reviews exact
+  local image IDs, protected public TLS/release inputs, account/directory identity
+  and the seven-service definition before provisioning. Its private journal and
+  lease preserve setup jobs across controller interruption; retained keys and
+  completed artifacts are verified before resuming. It validates existing runtime
+  boundaries before starting services, waits for database/broker/service readiness,
+  and uses the read-only administrator gate to retire the initial-password mount
+  after the real password workflow. Controlled acceptance covers fresh CLI setup,
+  wrong-review rejection without writes, live controller termination after PKI,
+  stopped-database recovery, interrupted console replacement including an absent
+  replacement, literal-dollar preservation through Compose rendering and runtime
+  arguments, and completed retries without service recreation. These are owned
+  isolated containers with synthetic inputs; graphical setup, automatic public TLS,
+  signed release distribution, general upgrade/restore and external/device
+  acceptance remain open.
+- The [876d877 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34547939271)
+  passes on Linux amd64, Linux arm64 and Windows with the administrator completion
+  gate. Its [Native Apple workflow](https://github.com/the-luap/openuem-console/actions/runs/34547939306)
+  also passes.
 - The production reference probe now provides a read-only first-administrator
   completion gate for the guided installer. It verifies the retained installation
   ID and JWT/master proofs, original bootstrap account and markers, current global
@@ -75,7 +94,8 @@ the table's package summaries do not remove any detail from the roadmap.
   the real administrator password workflow, then retire the password mount and
   pass the remaining complete lifecycle. Local Linux arm64 integration, native
   readiness/CLI race tests, Windows build/vet, five-command image smoke and the
-  strict probe image audit pass. Full fresh-install orchestration remains open.
+  strict probe image audit pass. The reference installation controller now wires
+  this gate into fresh-install completion; broader setup/restore work remains open.
 - The [76bd587 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34546675423)
   passes on Linux amd64, Linux arm64 and Windows, including complete public claim
   and signed-bootstrap delivery. The broader

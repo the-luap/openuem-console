@@ -6,9 +6,11 @@ individual worker and PostgreSQL distribution images. It declares explicit
 networks and private bind mounts, a non-root runtime account, read-only root
 filesystems, dropped capabilities and bounded resources.
 
-This is integration work toward NET-01 and the reference installer. A complete
-guided production installer, external authority/provider setup, backup recovery
-and physical endpoint acceptance remain open.
+The [reference installation controller](reference-installation.md) reviews and
+initializes these services with retained setup jobs, interruption recovery and a
+verified first-administrator password transition. Graphical setup, automated public
+TLS/provider configuration, complete restore and physical endpoint acceptance
+remain open.
 
 ## Runtime boundaries
 
@@ -96,8 +98,9 @@ configuration publication and process restart. The
 [reference maintenance controller](reference-maintenance.md) now reviews and
 resumes that migration across all seven services, retains PostgreSQL and queued
 commands, recreates the broker from a frozen definition, and establishes readiness
-before publishing its completion receipt. General image upgrades and complete
-installation/restore orchestration remain separate work.
+before publishing its completion receipt. The fresh-install controller handles
+initial provisioning separately. General image upgrades and complete restore
+orchestration remain separate work.
 
 Database, JetStream and authentication-log storage are persistent private bind
 mounts. The console's temporary cache/PID directory uses a private tmpfs. Every

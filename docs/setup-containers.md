@@ -47,8 +47,10 @@ The images do not recursively create host parents, change existing ownership or
 repair permissions. A different `--user` requires matching ownership for that job's
 inputs and outputs. PostgreSQL's runtime account must be able to read its own
 private server key and initialization password. Do not broaden file permissions
-to work around different service UIDs. Full deployment ownership wiring is a
-separate remaining reference-installation step.
+to work around different service UIDs. The
+[reference installation controller](reference-installation.md) wires setup and all
+seven runtime services to the invoking non-root account and verifies their private
+mounts before startup. Creating a dedicated host account remains an operator step.
 The [reference database ownership fixture](reference-database-ownership.md)
 exercises the installation/database setup images and the official PostgreSQL
 entrypoint under one explicit non-root UID/GID, with private bind mounts and
@@ -112,6 +114,8 @@ an incomplete or skipped child fixture cannot pass CI.
 
 The [seven-container reference composition](reference-composition.md) also uses
 the protocol key distribution command. These checks use synthetic material.
-Guided installation, signed release publication and full fresh-install/restore
-acceptance remain open in the
+The reference installer now runs these commands with a retained review, exclusive
+lease and interruption recovery through the first-administrator password change.
+Graphical setup, automated public TLS, signed release publication and complete
+restore acceptance remain open in the
 [implementation ledger](implementation-status.md).

@@ -128,7 +128,7 @@ def main():
         probe("synthetic external inputs", "TestReferencePrepare", "none", mount(root, "/state", False))
         environment = {**os.environ, "OPENUEM_REFERENCE_STATE": str(root), "OPENUEM_RUNTIME_UID": str(uid),
                        "OPENUEM_RUNTIME_GID": str(gid), "OPENUEM_DOMAIN": "example.test",
-                       "OPENUEM_ORGANIZATION": "Reference", "OPENUEM_PUBLIC_HOST": "uem.example.test",
+                       "OPENUEM_ORGANIZATION": "Reference $Literal $$Budget ${HOME}", "OPENUEM_PUBLIC_HOST": "uem.example.test",
                        "OPENUEM_PUBLIC_ORIGIN": "https://uem.example.test:8443", "OPENUEM_ADMIN_NETWORKS": "127.0.0.1/32",
                        "OPENUEM_INSTALLATION_ID": public["installation"], "OPENUEM_BOOTSTRAP_ADMIN": "first-admin"}
         for name in ("console", "broker", "authorization", "commands", "worker", "gateway"):

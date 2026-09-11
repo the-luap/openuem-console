@@ -55,6 +55,22 @@ def decode(data):
     return json.loads(data, object_pairs_hook=pairs, parse_constant=lambda _: (_ for _ in ()).throw(MaintenanceError("invalid numeric metadata")))
 
 
+def compose_model(value):
+    """Convert Compose's escaped rendered values to actual container values.
+
+    `compose config` doubles literal dollars for reuse as a Compose input.
+    Docker inspect returns the resulting single dollars. Normalize only rendered
+    values here; retained JSON, image metadata and mapping keys are not inputs.
+    """
+    if isinstance(value, str):
+        return value.replace("$$", "$")
+    if isinstance(value, list):
+        return [compose_model(item) for item in value]
+    if isinstance(value, dict):
+        return {name: compose_model(item) for name, item in value.items()}
+    return value
+
+
 def private(path, directory=False):
     info = path.lstat()
     kind = stat.S_ISDIR if directory else stat.S_ISREG
@@ -172,7 +188,7 @@ class Maintenance:
             if not pathlib.Path(name).is_absolute():
                 raise MaintenanceError("Compose files must use explicit absolute paths")
             original += ["--file", name]
-        source = self.docker.objects("reference configuration rendering", *original, "config", "--format", "json")
+        source = compose_model(self.docker.objects("reference configuration rendering", *original, "config", "--format", "json"))
         if set(source.get("services", {})) != ROLES or source.get("name") != arguments.project_name:
             raise MaintenanceError("maintenance requires the complete seven-service reference definition")
         broker_files = {item["target"]: item for item in source["services"]["broker"].get("volumes", [])}
@@ -563,7 +579,7 @@ class Maintenance:
         invocation = ["docker", *self.base, "--env-file", "/dev/null", "--file", "-"]
         try:
             check = subprocess.run([*invocation, "config", "--format", "json"], input=data, text=True, capture_output=True, timeout=30, env=self.docker.environment)
-            if check.returncode or decode(check.stdout) != self.definition:
+            if check.returncode or compose_model(decode(check.stdout)) != self.definition:
                 raise MaintenanceError("the frozen Compose model did not round-trip unchanged")
             self.check_lease()
             result = subprocess.run([*invocation, "up", "--detach", "--no-deps", "--force-recreate", "broker"], input=data, text=True, capture_output=True, timeout=45, env=self.docker.environment)
