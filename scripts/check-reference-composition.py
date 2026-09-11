@@ -216,7 +216,28 @@ def main():
                            + ":" + str(item["State"]["ExitCode"]) for item in states]
                 raise RuntimeError("administrator gateway login failed: " + "; ".join(failures[:3] + summary))
 
+        def administrator_completion(expected):
+            if not args.maintenance_probe_image:
+                return
+            result = command("first administrator completion", "docker", "run", "--rm", "--network", data_network,
+                             *policy, *mount(root / "credentials/state/database.url", "/run/database.url"),
+                             *mount(root / "pki/state/trust/backend-ca.pem", "/run/database-ca.pem"),
+                             *mount(root / "installation/state/initial-password", "/run/initial-password"),
+                             *mount(root / "installation/state/jwt.key", "/run/jwt.key"),
+                             *mount(root / "installation/state/encryption.key", "/run/encryption.key"),
+                             args.maintenance_probe_image, "--mode", "administrator", "--database-url-file", "/run/database.url",
+                             "--installation-id", public["installation"], "--administrator", "first-admin",
+                             "--initial-password-file", "/run/initial-password", "--jwt-file", "/run/jwt.key",
+                             "--master-file", "/run/encryption.key", "--timeout", "2s", check=False)
+            if expected:
+                if result.returncode or json.loads(result.stdout) != {"ready": True}:
+                    raise RuntimeError("replacement password did not complete the bound administrator setup")
+            elif result.returncode != 1 or result.stdout or "reference service did not become ready before the probe deadline" not in result.stderr:
+                raise RuntimeError("initial password unexpectedly completed administrator setup")
+
+        administrator_completion(False)
         administrator()
+        administrator_completion(True)
         initial_console = compose("bootstrap console identity", "ps", "--quiet", "console").stdout.strip()
         password_digest = hashlib.sha256((root / "installation/state/initial-password").read_bytes()).digest()
         for role in ("gateway", "console"):

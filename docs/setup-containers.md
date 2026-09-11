@@ -21,7 +21,7 @@ requires explicit paths and configuration.
 | --- | --- | --- |
 | `installation-secrets` | Generate or verify the retained installation identifier, JWT/master keys and first password | One private output directory; no network |
 | `protocol-keys` | Generate or verify installation-bound Windows encryption and desktop bootstrap signing keys | Complete installation credentials read-only; separate private output directory; no network |
-| `reference-probe` | Verify bounded private service, broker grant or gateway discovery readiness | Explicit private network; only the selected public trust or worker key files read-only; no output directory |
+| `reference-probe` | Verify bounded service readiness or completed first-administrator setup | Explicit private network; only the selected trust/key files, or protected database URL and installation/password inputs for administrator mode, read-only; no output directory |
 | `database-credentials` | Generate or verify independent database passwords and a verify-full URL | Protected public metadata read-only; separate private output directory; no network |
 | `database-bootstrap` | Create or verify the bound PostgreSQL application role/database | Completed credentials, metadata and public CA read-only; separate journal writable; private database network |
 

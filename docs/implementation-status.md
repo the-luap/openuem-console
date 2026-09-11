@@ -61,6 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The production reference probe now provides a read-only first-administrator
+  completion gate for the guided installer. It verifies the retained installation
+  ID and JWT/master proofs, original bootstrap account and markers, current global
+  administrator grant, completed password registration and replacement of the
+  initial password. It uses a repeatable-read, read-only transaction and never
+  creates missing schema or repairs state. Protected, unambiguous verify-full
+  database inputs exclude inherited search paths, fallback hosts and client keys.
+  Actual PostgreSQL tests cover status-only bypass, missing markers/account/grants,
+  changed credentials, cancellation, write rejection and missing-schema retention;
+  stored Argon2 parameters are bounded before comparison. Fresh and interrupted
+  broker-maintenance reference fixtures run the actual image before and after
+  the real administrator password workflow, then retire the password mount and
+  pass the remaining complete lifecycle. Local Linux arm64 integration, native
+  readiness/CLI race tests, Windows build/vet, five-command image smoke and the
+  strict probe image audit pass. Full fresh-install orchestration remains open.
+- The [76bd587 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34546675423)
+  passes on Linux amd64, Linux arm64 and Windows, including complete public claim
+  and signed-bootstrap delivery. The broader
+  [db236a4 Native Apple workflow](https://github.com/the-luap/openuem-console/actions/runs/34544456740)
+  also passes, including the release-command protected database input tests.
 - Public reference enrollment now also verifies the production bootstrap key
   document, signed configuration and portal invitation download over the gateway.
   Bootstrap trust comes from the authorized HTTPS origin; release keys remain

@@ -9,6 +9,7 @@ COPY cmd/openuem-database-credentials ./cmd/openuem-database-credentials
 COPY cmd/openuem-database-bootstrap ./cmd/openuem-database-bootstrap
 COPY internal/setup/secrets ./internal/setup/secrets
 COPY internal/setup/readiness ./internal/setup/readiness
+COPY internal/setup/administrator ./internal/setup/administrator
 COPY internal/security/access ./internal/security/access
 ARG TARGETOS
 ARG TARGETARCH

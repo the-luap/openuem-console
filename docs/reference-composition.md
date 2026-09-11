@@ -158,6 +158,9 @@ The fixture checks:
   it forges the admitted source in forwarding headers.
 - Console recreation without the bootstrap password mount or environment setting,
   preserving the original recovery file and successful replacement-password login.
+- The production read-only administrator probe rejects incomplete setup before
+  password replacement and verifies the original bound administrator afterwards,
+  before the fixture retires the initial-password mount.
 - Public Apple unknown-enrollment rejection, desktop bootstrap-key discovery and
   Windows discovery through their actual private HTTPS listeners.
 - With the release image selected, actual private database admission and public

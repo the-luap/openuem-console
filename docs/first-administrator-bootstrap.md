@@ -56,10 +56,43 @@ manual account initialization behavior.
 This component consumes a protected provisioning input. The offline
 [installation secret provisioner](installation-secrets.md) now generates and
 retains that input together with the runtime signing/encryption keys. Secret
-distribution, the complete setup wizard, separate administrator PKI,
-container volume ownership and the full reference composition remain separate
-installation work. Existing JWT, encryption, listener, broker and database
-configuration is still required.
+distribution and the complete setup wizard remain installation work. The
+[reference composition](reference-composition.md) now wires the separate services,
+protected volume ownership and independent administrator CA. Existing JWT,
+encryption, listener, broker and database configuration is still required.
+
+## Read-only setup completion
+
+The `openuem-reference-probe` setup image can verify completion before an installer
+retires the initial-password mount:
+
+```sh
+openuem-reference-probe --mode administrator \
+  --database-url-file /run/database.url \
+  --installation-id "$OPENUEM_INSTALLATION_ID" --administrator first-admin \
+  --initial-password-file /run/initial-password \
+  --jwt-file /run/jwt.key --master-file /run/encryption.key --timeout 20s
+```
+
+Supply the generated application URL and its public database CA, plus only the
+selected installation files, read-only to this private database-network job.
+The reference URL must use an explicit host/port, user/password, database and
+exactly the generated `sslmode=verify-full` and absolute `sslrootcert` parameters.
+The probe uses the public schema and does not inherit environment-selected
+search paths, fallback hosts or client certificate identities.
+
+Success prints only `{"ready":true}`. A repeatable-read, read-only transaction
+checks the retained installation ID and both credential proofs, original bootstrap
+account, completion markers, global administrator grant and completed password
+registration. The stored Argon2id hash must be valid, bounded and differ from the
+initial password. Changing only the registration status cannot pass this check.
+Missing records or schema are rejected without creating or repairing anything.
+This is a point-in-time check; it neither signs in nor changes account access.
+
+After success, recreate the console without `compose.bootstrap.yaml`, preserving
+the original provisioning files for recovery. The reference fixture exercises the
+actual probe's rejection before password replacement and success after the real
+login/password-change workflow, then verifies login without the initial mount.
 
 ## Password replacement authorization
 

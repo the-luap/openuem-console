@@ -26,11 +26,13 @@ var ErrConfiguration = errors.New("reference probe requires valid explicit prote
 var ErrNotReady = errors.New("reference service did not become ready before the probe deadline")
 
 type Options struct {
-	Mode      string
-	Address   string
-	Origin    string
-	TrustFile string
-	KeyFile   string
+	Mode                                         string
+	Address                                      string
+	Origin                                       string
+	TrustFile                                    string
+	KeyFile                                      string
+	DatabaseURLFile, Installation, Administrator string
+	InitialPasswordFile, JWTFile, MasterFile     string
 }
 
 // Wait checks the actual listener and retries only until the caller's deadline.
@@ -38,6 +40,9 @@ type Options struct {
 // boundary; run them during maintenance before restarting public device traffic.
 func Wait(ctx context.Context, options Options) error {
 	if _, ok := ctx.Deadline(); !ok {
+		return ErrConfiguration
+	}
+	if options.Mode != "administrator" && (options.DatabaseURLFile != "" || options.Installation != "" || options.Administrator != "" || options.InitialPasswordFile != "" || options.JWTFile != "" || options.MasterFile != "") {
 		return ErrConfiguration
 	}
 	var check func() bool
@@ -50,6 +55,8 @@ func Wait(ctx context.Context, options Options) error {
 		check, close, err = healthCheck(ctx, options)
 	case "gateway":
 		check, close, err = gatewayCheck(ctx, options)
+	case "administrator":
+		check, close, err = administratorCheck(ctx, options)
 	default:
 		return ErrConfiguration
 	}

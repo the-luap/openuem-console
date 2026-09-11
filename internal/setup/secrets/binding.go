@@ -12,6 +12,28 @@ import (
 
 var ErrBinding = errors.New("installation credentials do not match the database binding or the account registry is not fresh")
 
+// VerifyBinding checks an already initialized installation within the caller's
+// transaction. Unlike CheckBinding, it creates no schema, marker or credential
+// binding. Setup completion checks must never initialize or repair the registry.
+func VerifyBinding(ctx context.Context, tx *sql.Tx, credentials Runtime) error {
+	if tx == nil || !validInstallation(credentials.Installation) || !validRuntime(credentials) {
+		return ErrBinding
+	}
+	var version int
+	var installation string
+	var recorded bool
+	var jwtProof, masterProof []byte
+	err := tx.QueryRowContext(ctx, `SELECT version,installation,jwt_proof,master_proof,
+	 EXISTS(SELECT 1 FROM uem_access_migrations WHERE name='installation-secrets')
+	 FROM uem_installation_secrets WHERE singleton`).Scan(&version, &installation, &jwtProof, &masterProof, &recorded)
+	if err != nil || !recorded || version != 1 || credentials.Installation != installation ||
+		!hmac.Equal(jwtProof, bindingProof(credentials.JWT, "jwt", installation)) ||
+		!hmac.Equal(masterProof, bindingProof(credentials.Master, "master", installation)) {
+		return ErrBinding
+	}
+	return nil
+}
+
 // CheckBinding runs before account initialization, field encryption or listener
 // startup. An installation ID opts a fresh registry into permanent key binding.
 // Once bound, omitting the ID cannot bypass verification. Existing unbound legacy

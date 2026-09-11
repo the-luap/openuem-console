@@ -17,6 +17,8 @@
 !internal/setup/
 !internal/setup/readiness/
 !internal/setup/readiness/*.go
+!internal/setup/administrator/
+!internal/setup/administrator/*.go
 !internal/setup/secrets/
 !internal/setup/secrets/*.go
 !internal/setup/containertest/
