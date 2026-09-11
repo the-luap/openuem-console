@@ -178,6 +178,22 @@ func drainMacInventory(t *testing.T, s *Store, d *Device) {
 	drainMacHardwareInventory(t, s, d, nil)
 }
 
+func seedLegacyMacProfileInventory(t *testing.T, s *Store, d *Device) {
+	t.Helper()
+	// Reservation migration fixtures need historical inventory, not a current
+	// Connect exchange that can query catalog columns introduced after the schema
+	// being prepared. Post-migration lifecycle checks still use actual Connect.
+	adeExec(t, s, `UPDATE mdm_apple_devices SET
+ inventory='{"ProductName":"Mac16,1","OSVersion":"15.0","IsSupervised":true,"IsAppleSilicon":true,"SoftwareUpdateDeviceID":"J313AP"}',
+ supervised=true,supervised_reported=true,apple_silicon=true,software_update_device_id='J313AP',
+ security_inventory='{"ManagementStatus":{"UserApprovedEnrollment":true,"IsUserEnrollment":false},"BootstrapTokenAllowedForAuthentication":"allowed","BootstrapTokenRequiredForSoftwareUpdate":true}',
+ inventory_at=clock_timestamp(),security_at=clock_timestamp(),profiles_at=clock_timestamp(),apps_at=clock_timestamp(),
+ next_inventory_at=clock_timestamp()+interval '6 hours' WHERE id=$1`, d.ID)
+	adeExec(t, s, `UPDATE mdm_apple_commands SET status='acknowledged',attempts=1,completed_at=clock_timestamp()
+ WHERE device_id=$1 AND status='queued' AND profile_id IS NULL
+ AND request_type IN ('DeviceInformation','SecurityInfo','DeclarativeManagement','ProfileList','InstalledApplicationList','AvailableOSUpdates')`, d.ID)
+}
+
 func drainMacHardwareInventory(t *testing.T, s *Store, d *Device, hardware map[string]any) {
 	t.Helper()
 	message := map[string]any{"UDID": d.UDID, "Status": "Idle"}

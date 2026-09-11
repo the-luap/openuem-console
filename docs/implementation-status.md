@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Agent commits `800f72d` and `7a27844` add a
+  [bounded exact Windows software observation helper](https://github.com/the-luap/openuem-agent/blob/7a27844821659ebb44955a366df45bd010d788f3/docs/windows-software-observation.md).
+  It reads one approved machine MSI product or the exact HKLM uninstall key/view,
+  preserves a different installed version as present, and treats inaccessible,
+  advertised, malformed or disappearing records as unknown. The same executable
+  dispatches the helper before service/identity initialization. Canonical bounded
+  pipe messages, redacted failures, joined cancellation and an independent helper
+  deadline preserve its process boundary. Portable race tests pass in 18.689
+  seconds; macOS/Linux/Windows builds and Windows vet pass. The final code passed
+  [all three native CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34571170520),
+  including ten mandatory Windows package/process checks, three of them new
+  observation fixtures using only owned machine registrations and an absent MSI
+  product. No package was installed or removed. The first native run identified
+  Windows normalization of a test's missing string terminator; the corrected
+  fixture retains embedded-terminator and malformed-surrogate rejection. The
+  helper is a local observation foundation; authenticated operation/result
+  binding, durable recovery and physical acceptance remain required.
+
 - The [shared Windows software catalog](windows-approved-software.md) adds immutable
   WinGet/MSI/EXE approvals alongside Mac PKG revisions. Source URLs and executable
   parameters are encrypted with organization/revision binding; readers see only
@@ -73,9 +91,14 @@ the table's package summaries do not remove any detail from the roadmap.
   passes, including all three approval types and scoped negative cases. Rendered
   view/race checks and all 174 browser cases pass; 27 new cases exercise Windows
   approval/detail/reader/withdrawn/search states at 390/768/1440 pixels. Linux and
-  Windows builds and focused vet pass. These are synthetic approvals, with no
+  Windows builds and focused vet pass. The first full CI run also exposed two
+  historical profile-migration fixtures calling current catalog queries before
+  their schema upgrade. They now seed historical inventory directly, retaining
+  the original migration/history assertions and real post-upgrade Connect checks.
+  The expanded catalog/Mac/ADE/all-migration race selection passes in 38.605 seconds.
+  These are synthetic approvals, with no
   package downloads or endpoint changes. WIN-01 and SW-01 remain in progress:
-  individual-agent delivery, immutable WinGet manifest resolution, independent
+  individual-agent delivery, immutable WinGet manifest resolution, operation-bound
   detection, restart/offline recovery and physical acceptance are still required.
 
 - Agent commits `81ed1be`, `62561fb` and `b87cbce` harden the existing Windows package execution path with

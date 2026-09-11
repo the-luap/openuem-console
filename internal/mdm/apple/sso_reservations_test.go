@@ -204,7 +204,7 @@ func TestSSORouteReservationMigrationRetainsDispatchedAndMissingHistory(t *testi
 	testSettings(t, s, 1)
 	scope := Scope{TenantID: 1, SiteID: 1}
 	d, _, _ := testEnrollPlatformWithKey(t, s, scope, "Legacy SSO reservations", "Mac16,1", "15.0")
-	drainMacInventory(t, s, d)
+	seedLegacyMacProfileInventory(t, s, d)
 	first := saveSSOReservationProfile(t, s, "com.example.sso.migrated", "https://old.example.test/", "System", "com.example.Provider.extension")
 	current, err := s.SaveProfile(t.Context(), 1, first.ID, 1, ssoReservationData(t, first.Identifier, "https://current.example.test/", "System", "com.example.Provider.extension"), "admin")
 	if err != nil {

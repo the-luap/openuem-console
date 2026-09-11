@@ -188,7 +188,7 @@ func TestSystemExtensionReservationMigrationPreservesUnknownHistory(t *testing.T
 	testSettings(t, s, 1)
 	scope := Scope{TenantID: 1, SiteID: 1}
 	d, _, _ := testEnrollPlatformWithKey(t, s, scope, "Legacy extension profiles", "Mac16,1", "15.0")
-	drainMacInventory(t, s, d)
+	seedLegacyMacProfileInventory(t, s, d)
 	first := saveSystemExtensionProfile(t, s, "com.example.extensions.legacy", "team", false)
 	current, err := s.SaveProfile(t.Context(), 1, first.ID, 1, systemExtensionData(t, first.Identifier, "listed", false), "admin")
 	if err != nil {

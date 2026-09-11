@@ -99,9 +99,16 @@ keyboard confirmation, exact argument preservation, filtered pagination and
 horizontal overflow. These are owned synthetic fixtures, with intercepted form
 submissions and no package downloads or endpoint changes.
 
+The agent now has a separate
+[exact machine observation helper](https://github.com/the-luap/openuem-agent/blob/7a27844821659ebb44955a366df45bd010d788f3/docs/windows-software-observation.md).
+It reads the declared MSI product or exact registry view/key in a bounded local
+process. Its [Linux/macOS/Windows CI](https://github.com/the-luap/openuem-agent/actions/runs/34571170520)
+passes, including three mandatory native Windows observation fixtures. This helper
+is not yet connected to a catalog operation or authenticated result report.
+
 WIN-01 remains in progress. Required next work includes immutable WinGet manifest
 resolution, approved artifact/signature verification, authenticated individual-agent
-assignment and dispatch, native installation/removal and independent detection,
+assignment and dispatch, native installation/removal and operation-bound detection,
 reboot evidence, durable offline results, restart recovery and real endpoint
 acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's
