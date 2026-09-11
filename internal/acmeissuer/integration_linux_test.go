@@ -99,6 +99,25 @@ func TestACMEContainerDNS01(t *testing.T) {
 	configPath := filepath.Join(base, "issuer.json")
 	encodedConfig, _ := json.Marshal(c)
 	writeFixture(t, configPath, encodedConfig)
+	// The actual command must permit installer review without registering an
+	// account, starting lego, acquiring leases or creating either state volume.
+	for _, flags := range [][]string{{"--check"}, {"--check", "--once"}} {
+		arguments := append([]string{"--config", configPath}, flags...)
+		output, err := exec.CommandContext(ctx, binaryPath, arguments...).CombinedOutput()
+		assertACMELogPrivacy(t, output)
+		if len(flags) == 1 {
+			if err != nil || string(output) != "{\"inputs_valid\":true}\n" {
+				t.Fatal("read-only issuer command did not validate its inputs", err)
+			}
+		} else if err == nil {
+			t.Fatal("issuer command accepted conflicting check and issuance modes")
+		}
+		for _, path := range []string{c.StateDirectory, c.PublicationDirectory} {
+			if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("read-only issuer command created retained state", err)
+			}
+		}
+	}
 	runOnce := func() error {
 		command := exec.CommandContext(ctx, binaryPath, "--config", configPath, "--once")
 		output, err := command.CombinedOutput()

@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The public DNS-01 issuer now provides `--check` for protected local input
+  validation before creating state, acquiring leases, executing lego or contacting
+  a provider. It returns a fixed public result and rejects conflicting issuance
+  flags; the normal issuer path shares this input validation. Explicit ACME trust
+  accepts complete certificate PEM blocks only, rejecting private keys, skipped
+  malformed blocks, extra data and excessive certificate counts. Native race tests
+  cover missing inputs, absent fresh state and unchanged state while an issuer owns
+  both leases. The actual-command fixture checks preflight before exercising DNS-01,
+  retained-account retry, ARI renewal, gateway reload and clean shutdown; the Linux
+  arm64 run passes in 18.53 seconds. The actual scratch runtime also passes offline
+  preflight with only its read-only configuration mount, plus the image boundary
+  audit. Native race tests and vet pass. Automatic reference-installer handoff and
+  real provider acceptance remain open.
 - The [reference installation controller](reference-installation.md) reviews exact
   local image IDs, protected public TLS/release inputs, account/directory identity
   and the seven-service definition before provisioning. Its private journal and

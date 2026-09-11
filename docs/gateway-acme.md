@@ -5,9 +5,11 @@ It uses the pinned lego v5.4.1 executable, retains one ACME account and publishe
 validated certificate generations atomically. The gateway reloads the published
 pair without restarting existing connections. The issuer opens no inbound port.
 
-This is the public TLS component of NET-01. The complete private backend,
-firewall and installer composition remains separate work. No public CA account,
-real DNS credentials or live device was used for the automated acceptance below.
+This is the public TLS component of NET-01. The
+[reference installer](reference-installation.md) initializes the private backends
+with supplied public TLS inputs; automatic issuer handoff and deployment firewall
+acceptance remain separate work. No public CA account, real DNS credentials or
+live device was used for the automated acceptance below.
 
 ## Image and configuration
 
@@ -88,6 +90,26 @@ addresses; configure working container DNS even when `dns_resolvers` is set.
 No HTTP-01 or TLS-ALPN-01 listener or port-80 mapping is needed.
 
 ## First issuance and gateway handoff
+
+Review the protected local inputs without contacting the provider or creating an
+account, publication directory or lease:
+
+```sh
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges --pids-limit 32 --memory 128m \
+  --mount type=bind,src="$OPENUEM_ACME_ROOT/config",dst=/run/openuem-acme,readonly \
+  openuem-acme:local --config /run/openuem-acme/issuer.json --check
+```
+
+The check requires only the configuration mount and returns
+`{"inputs_valid":true}`. It checks configuration constraints, accepted terms,
+protected provider input files, executable metadata and any explicitly supplied
+ACME trust file. Custom trust must contain complete certificate PEM blocks only;
+private keys, malformed blocks and extra data are rejected. No provider secret,
+account identifier or input file contents are printed. This validates local input
+shape and access; credential authorization, endpoint trust and retained account
+health require the actual issuance operation. `--check` and `--once` cannot be
+combined. The running issuer repeats input validation on its ordinary path.
 
 After preparing and reviewing the configuration on the deployment host:
 
@@ -171,11 +193,15 @@ reap orphaned descendants. Providers must remain inside that process group.
 
 The unit/race suite covers exclusive leases, concurrent calls, root replacement,
 ambiguous JSON, partial output, invalid keys, account loss, paired restore,
-unchanged output, bounded retention, cancellation and immediate child exit.
+unchanged output, bounded retention, cancellation and immediate child exit. Input
+preflight tests verify that fresh state remains absent, active issuer leases are
+not acquired or modified, lost protected inputs are rejected, and malformed or
+mixed custom trust cannot pass validation.
 
 The separate smoke image runs the actual issuer executable, pinned lego and
 pinned Pebble v2.10.1 against a synthetic DNS server on loopback. DNS validation
-remains enabled. It checks provider failure, successful DNS-01, TXT cleanup,
+remains enabled. It checks the actual read-only command and conflicting-mode
+rejection before any state is created, then provider failure, successful DNS-01, TXT cleanup,
 original account-key reuse, server-requested ARI renewal, gateway TLS reload and
 SIGTERM/restart. The image is read-only and unprivileged, with no external network:
 

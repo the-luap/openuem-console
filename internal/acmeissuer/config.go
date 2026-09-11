@@ -5,7 +5,9 @@ package acmeissuer
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
 	"net"
@@ -64,6 +66,18 @@ func ReadConfig(path string) (Config, error) {
 		return Config{}, ErrConfiguration
 	}
 	return config, nil
+}
+
+// CheckInputs validates local issuer inputs without opening state directories,
+// acquiring leases, executing lego or contacting a provider. Provider-specific
+// credential acceptance and retained account health require actual issuance.
+func (c Config) CheckInputs(binary string) error {
+	if c.Validate() != nil || !validExecutable(binary) {
+		return ErrConfiguration
+	}
+	environment, err := c.providerEnvironment()
+	clear(environment)
+	return err
 }
 
 func decodeJSON(data []byte, target any) error {
@@ -268,6 +282,9 @@ func (c Config) providerEnvironment() ([]string, error) {
 	}
 	if c.ACMERootsFile != "" {
 		roots, err := readProtected(c.ACMERootsFile, 1<<20, false)
+		if err == nil {
+			err = validateACMERoots(roots)
+		}
 		clear(roots)
 		if err != nil {
 			return nil, ErrConfiguration
@@ -275,6 +292,37 @@ func (c Config) providerEnvironment() ([]string, error) {
 		environment = append(environment, "LEGO_CA_CERTIFICATES="+c.ACMERootsFile)
 	}
 	return environment, nil
+}
+
+func validateACMERoots(data []byte) error {
+	certificates := 0
+	for len(bytes.TrimSpace(data)) != 0 {
+		data = bytes.TrimSpace(data)
+		if !bytes.HasPrefix(data, []byte("-----BEGIN CERTIFICATE-----")) || certificates == 128 {
+			return ErrConfiguration
+		}
+		ending := []byte("-----END CERTIFICATE-----")
+		end := bytes.Index(data, ending)
+		if end < 0 {
+			return ErrConfiguration
+		}
+		end += len(ending)
+		// Decode only the first complete block: pem.Decode may otherwise skip a
+		// malformed earlier block and accept a later certificate silently.
+		block, rest := pem.Decode(data[:end])
+		if block == nil || len(bytes.TrimSpace(rest)) != 0 || block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			return ErrConfiguration
+		}
+		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
+			return ErrConfiguration
+		}
+		certificates++
+		data = data[end:]
+	}
+	if certificates == 0 {
+		return ErrConfiguration
+	}
+	return nil
 }
 
 func reservedEnvironment(name string) bool {

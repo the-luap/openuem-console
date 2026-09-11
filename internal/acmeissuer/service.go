@@ -30,10 +30,7 @@ type Service struct {
 }
 
 func Open(config Config, binary string) (*Service, error) {
-	if config.Validate() != nil || !validExecutable(binary) {
-		return nil, ErrConfiguration
-	}
-	if _, err := config.providerEnvironment(); err != nil {
+	if err := config.CheckInputs(binary); err != nil {
 		return nil, err
 	}
 	config.Resolvers = append([]string(nil), config.Resolvers...)
