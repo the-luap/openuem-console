@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [WinGet source snapshots](windows-winget-resolution.md) now bind the exact
+  identifier/version, Microsoft community commit, canonical repository path and
+  original YAML digest. The bounded HTTPS client rejects redirects and mutable
+  fallback; parsing retains all behavior while rejecting ambiguous or excessive
+  input. Combined source/translation HTTPS/race checks pass in 1.742 seconds and parser fuzzing passes
+  530,700 inputs. A separate public-source read verifies the fixed Go manifest and
+  independently resolved source head without downloading an installer. A separate
+  machine MSI/WiX adapter now binds exact architecture, product/display version,
+  minimum OS and artifact hash to the existing install/remove plan. Inherited
+  switches and dependencies cannot disappear through partial or empty overrides;
+  unsupported behavior is rejected. Translation fuzzing passes 569,203 inputs;
+  focused vet and Windows compilation also pass. Other installer kinds, encrypted immutable
+  approval linkage and scoped console review remain open; these components alone
+  do not enable WinGet execution.
+
 - [Windows software reconciliation](windows-software-requests.md#read-only-reconciliation-after-uncertainty-or-a-required-restart)
   now joins the console, signed registry protocol, private worker RPC and protected
   Windows service. Independent capability negotiation enables only the read-only
@@ -81,6 +96,10 @@ the table's package summaries do not remove any detail from the roadmap.
   Apple model PostgreSQL/race suite passes in 447.710 seconds. Full scoped
   handler, rendered-view, Linux/Windows build and focused vet checks pass. All 270 browser
   cases pass, including 42 new reconciliation cases at 390/768/1440 pixels.
+  The [complete console CI](https://github.com/the-luap/openuem-console/actions/runs/34600864430)
+  and [reference installation CI](https://github.com/the-luap/openuem-console/actions/runs/34600864384)
+  pass for console commit `3834fa9`, including the coordinated registry/worker
+  migrations and actual resumable installation/maintenance on Linux amd64/arm64.
   These fixtures use synthetic boot evidence and do not reboot an endpoint.
   Immutable WinGet resolution and physical package, offline, restart and hibernate
   acceptance remain required; WIN-01/SW-01 and the full roadmap remain open.

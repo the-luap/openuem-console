@@ -31,6 +31,12 @@ WinGet approval records a source coordinate. It does not pin a resolved manifest
 or installer digest. Immutable source resolution and binary verification remain
 delivery prerequisites. Custom package hashes are supplied by the publisher;
 the console does not fetch those URLs or independently inspect their signatures.
+The [source snapshot reader](windows-winget-resolution.md) now retains a fixed
+Microsoft community commit and exact manifest bytes, with bounded HTTPS and
+strict binding checks. Exact machine MSI/WiX translation is implemented separately;
+immutable approval linkage and console review still need integration before a
+WinGet coordinate can execute. Other installer kinds remain unsupported by that
+new translation boundary.
 
 Arguments preserve spaces and punctuation without interpreting shell quoting.
 Line endings separate arguments; a final line ending terminates the last argument.

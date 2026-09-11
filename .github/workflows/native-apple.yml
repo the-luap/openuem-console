@@ -119,6 +119,12 @@ jobs:
         run: go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows immutable ring target fuzzing
         run: go test -run '^$' -fuzz='^FuzzUpdateRingTargets$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: WinGet source snapshots and bounded HTTPS protocol
+        run: go test -race -count=1 ./internal/software/winget
+      - name: WinGet snapshot parser fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSnapshot$' -fuzztime=15s -parallel=2 ./internal/software/winget
+      - name: WinGet MSI translation fuzzing
+        run: go test -run '^$' -fuzz='^FuzzMSIPlan$' -fuzztime=15s -parallel=2 ./internal/software/winget
       - run: go tool templ generate
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
