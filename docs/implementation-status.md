@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- OpenID sessions now retain local identity/revision/policy evidence and recheck
+  it before protected console requests. Disabled or replaced bindings, changed
+  configuration, missing legacy evidence and account mode/approval changes deny
+  access; re-enabling a binding cannot revive its old sessions. A five-second
+  validation deadline denies transient database failures without discarding a
+  valid session. Login confirmation cannot reactivate concurrent account
+  revocation. PostgreSQL account/session race tests pass in 2.704 seconds; local
+  protocol/view race tests, actual Linux ARM64 protected routes and full console
+  compilation pass. The route fixture covers lock cancellation/recovery and
+  revocation during admission. All 678 browser cases pass. Requests already past
+  validation may finish; this is request-time revalidation, not atomic
+  cancellation of operations already in progress.
+
 - OIDC session admission now clears prior authentication/recovery flags and
   renews the session for both account switches and same-account sign-in. The
   authenticated cookie follows successful owner association and confirmation;
@@ -69,7 +82,7 @@ the table's package summaries do not remove any detail from the roadmap.
   sessions after failed bookkeeping. The fixed real-route suite passes those
   cases plus old-token retirement, failed cleanup and failed session storage.
   OIDC protocol race tests pass in 2.321 seconds and the full Linux ARM64 build
-  passes. Binding revocation during already admitted/in-progress sessions and
+  passes. Subsequent request-time revocation evidence is recorded above;
   broader session-store lifecycle improvements remain open.
 
 - [Permanent OpenID account identities](oidc-sign-in.md) now replace username

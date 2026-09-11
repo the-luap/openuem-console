@@ -36,7 +36,7 @@ func exerciseOIDCAccountRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 		t.Fatal(err)
 	}
 	for _, uid := range []string{"binding-account", "binding-other", "binding-viewer", "binding-operator", "binding-orgadmin"} {
-		if err = h.Model.Client.User.Create().SetID(uid).SetName(uid).SetEmail(uid + "@example.test").SetOpenid(true).SetUse2fa(false).SetRegister(nats.REGISTER_APPROVED).Exec(ctx); err != nil {
+		if err = h.Model.Client.User.Create().SetID(uid).SetName(uid).SetEmail(uid + "@example.test").SetOpenid(uid == "binding-account" || uid == "binding-other").SetUse2fa(false).SetRegister(nats.REGISTER_APPROVED).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}

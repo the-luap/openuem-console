@@ -657,6 +657,11 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 		if err != nil {
 			return h.Login(c)
 		}
+		if user.Openid || h.SessionManager.Manager.Exists(c.Request().Context(), oidcSessionKey) {
+			if err = h.validateOIDCSession(c, username); err != nil {
+				return err
+			}
+		}
 
 		// if sessions includes forgot
 		forgot := h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot")

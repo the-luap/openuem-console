@@ -86,9 +86,10 @@ cannot disable their own identity; another server administrator must do so.
 Bindings for a different configured issuer remain dormant until that issuer is
 selected again. Review them before changing the provider back.
 
-Disabling a binding blocks future sign-ins; existing sessions must be reviewed
-and revoked separately under Active sessions. Remove the account's access grants
-when retiring it. Accounts with identity records cannot be deleted and recreated:
+Changing a binding invalidates this account's existing OpenID sessions on their
+next protected request. Disabling also blocks future sign-ins. Remove the
+account's access grants and review other sessions under Active sessions when
+retiring it. Accounts with identity records cannot be deleted and recreated:
 database foreign keys preserve the permanent association and its audit history.
 The UI explains this restriction instead of exposing a database error.
 
@@ -105,15 +106,29 @@ resolution. Administrator changes recheck current server permissions within the
 same transaction, serialize binding changes, compare the account revision and
 require committed audit evidence. Account creation, binding changes and revision
 increments roll back if auditing fails. The page shows the latest 25 changes;
-records are retained. Binding changes do not claim atomic revocation of an
-already admitted or in-progress session.
+records are retained.
+
+OpenID sessions carry the admitted local account, subject, binding revision and
+authentication policy, without provider tokens. Every protected console request
+checks the current binding, account mode/approval and configured policy within a
+five-second database deadline before second-factor or authorization processing.
+Missing legacy evidence, changed policy or binding revision, inactive identities,
+revoked/unapproved accounts and account-mode changes reject the request and clear
+its authenticated session state. Disabling then re-enabling a binding does not
+revive old sessions. Temporary database errors return service unavailable and
+leave the valid session available for a later retry. Requests that already passed
+this check may finish; this does not claim atomic cancellation of in-progress
+operations. Changes reverted to the same policy before a session is checked are
+not a permanent policy-revocation mechanism; change the identity binding to
+invalidate that account's existing OpenID sessions permanently.
 
 Every successful OIDC callback starts a fresh session, including a repeat login
 to the same account. Previous second-factor and password-recovery flags are
 cleared, and the previous session token is retired. Local second-factor checks
 must be completed again when required by the account. The authenticated cookie
 is written only after session-owner association and login confirmation succeed.
-On failure, authentication values are cleared before bounded session cleanup,
+Login confirmation also refuses to reactivate an account revoked after identity
+resolution. On failure, authentication values are cleared before bounded session cleanup,
 so a cleanup error or the session middleware's later save cannot issue the
 failed account's authenticated session. This is failure-safe admission, not a
 single transaction spanning the session store and all account operations.
@@ -142,3 +157,6 @@ Owned regression fixtures also reproduce and reject inherited 2FA/recovery flags
 and authenticated sessions after owner-association or confirmation failures.
 The fixed cases cover both account switching and reauthentication, old-token
 retirement, and injected session-store and cleanup failures.
+Protected-route tests cover live identity/policy changes, revocation and account
+mode/approval changes, missing legacy evidence, database lock cancellation and
+recovery, and an account revoked by a database trigger during admission.

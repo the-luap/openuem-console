@@ -451,7 +451,7 @@ func ReadOIDCCookie(c echo.Context, name string, secretKey string) (string, erro
 // CreateSession establishes a fresh OpenID session. Never inherit another
 // account's second-factor or recovery flags, even when reauthenticating the same
 // local account. Cookies are issued only after admission bookkeeping succeeds.
-func (h *Handler) CreateSession(c echo.Context, user *ent.User) (err error) {
+func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcaccounts.Session) (err error) {
 	ctx := c.Request().Context()
 	sm := h.SessionManager.Manager
 	defer func() {
@@ -479,6 +479,11 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User) (err error) {
 	sm.Put(ctx, "usepasswd", user.Passwd)
 	sm.Put(ctx, "email", user.Email)
 	sm.Put(ctx, "twofa", false)
+	identityJSON, err := json.Marshal(identity)
+	if err != nil {
+		return err
+	}
+	sm.Put(ctx, oidcSessionKey, string(identityJSON))
 	token, expiry, err := sm.Commit(ctx)
 	if err != nil {
 		return err
@@ -486,7 +491,7 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User) (err error) {
 	if err = h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
 		return err
 	}
-	if err = h.Model.ConfirmLogIn(user.ID); err != nil {
+	if err = h.Model.ConfirmOIDCLogIn(ctx, user.ID); err != nil {
 		return err
 	}
 	sm.WriteSessionCookie(ctx, c.Response().Writer, token, expiry)
@@ -530,7 +535,11 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 
 	// If user has been approved by admin, auto approve is on or user already logged in (register completed)
 	if account.Register == nats.REGISTER_APPROVED || settings.OIDCAutoApprove || account.Register == nats.REGISTER_COMPLETE {
-		if err := h.CreateSession(c, account); err != nil {
+		identity, err := h.OIDCAccounts.SessionFor(c.Request().Context(), oidcaccounts.PolicyFrom(settings), uid, u.Subject)
+		if err != nil {
+			return echo.NewHTTPError(401, "OpenID access changed; start sign-in again")
+		}
+		if err := h.CreateSession(c, account, identity); err != nil {
 			log.Printf("[ERROR]: could not create session, reason: %v", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
 		}

@@ -32,7 +32,7 @@ templ OIDCAccount(c echo.Context, info *partials.CommonInfo, page *oidcaccounts.
 					<h2 class="text-xl font-semibold break-all">{ page.Name+" · "+page.UserID }</h2>
 					<dl class="grid gap-2 break-all"><dt class="font-semibold">Configured issuer</dt><dd>{ page.Issuer }</dd><dt class="font-semibold">Client ID</dt><dd>{ page.ClientID }</dd></dl>
 					<p>Obtain the subject for this client from the identity provider through a trusted administrative channel. It is case-sensitive and may differ between clients. Linking retains this account's existing permissions.</p>
-					<p>Disabling a link blocks future sign-ins. Review active sessions separately. Linked accounts are retained to prevent identity reuse; revoke their access instead of deleting them.</p>
+					<p>Changing an identity link ends this account's existing OpenID sessions on their next protected request. Requests already in progress may finish. Disabling also blocks new sign-ins. Linked accounts are retained to prevent identity reuse; remove their access permissions instead of deleting them.</p>
 					if !page.Enabled {
 						<p role="status">OpenID sign-in is disabled. Configure the provider before linking an account.</p>
 					} else if !page.Eligible {

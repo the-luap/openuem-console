@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -247,6 +248,8 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 	e.GET("/oidc", h.OIDCLogIn)
 	e.GET("/oidc/callback", h.OIDCCallback)
 	e.GET("/fixture/session", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) })
+	e.GET("/myaccount", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) }, h.IsAuthenticated)
+	e.GET("/fixture/remove-identity", func(c echo.Context) error { sm.Remove(c.Request().Context(), oidcSessionKey); return c.NoContent(200) })
 	e.GET("/fixture/old-session", func(c echo.Context) error {
 		uid := "password-victim"
 		if c.QueryParam("same") == "yes" {
@@ -261,9 +264,14 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		return c.JSON(200, map[string]bool{"twofa": sm.GetBool(c.Request().Context(), "twofa"), "forgot": sm.GetBool(c.Request().Context(), "forgot")})
 	})
 	type browser map[string]*http.Cookie
-	request := func(b browser, path string) *httptest.ResponseRecorder {
+	request := func(b browser, path string, deadlines ...time.Duration) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest("GET", "https://console.test"+path, nil)
+		if len(deadlines) > 0 {
+			ctx, cancel := context.WithTimeout(t.Context(), deadlines[0])
+			defer cancel()
+			req = req.WithContext(ctx)
+		}
 		req.Header.Set("Referer", "https://untrusted.invalid/")
 		for _, cookie := range b {
 			req.AddCookie(cookie)
@@ -315,6 +323,9 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		rec := request(b, callback)
 		if rec.Code != 302 || request(b, "/fixture/session").Body.String() != "oidc-reader" || b[oidcFlowCookie] != nil {
 			t.Fatal("valid OIDC callback did not create and bind a session", kind, rec.Code)
+		}
+		if rec = request(b, "/myaccount"); rec.Code != 200 || rec.Body.String() != "oidc-reader" {
+			t.Fatal("valid OIDC session could not access a protected route", rec.Code)
 		}
 		replay := browser{oidcFlowCookie: &saved}
 		if rec = request(replay, callback); rec.Code < 400 || request(replay, "/fixture/session").Body.String() != "" {
@@ -508,4 +519,124 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 			}
 		})
 	}
+	for _, mode := range []string{"disabled", "reenabled", "role", "issuer", "provider disabled", "revoked account", "account review", "account mode", "legacy session"} {
+		t.Run("live session "+mode, func(t *testing.T) {
+			configure("authelia")
+			b := browser{}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("session setup failed", rec.Code)
+			}
+			switch mode {
+			case "disabled", "reenabled":
+				page, err := accounts.Page(t.Context(), "certificate-victim", "oidc-reader")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = accounts.Change(t.Context(), "certificate-victim", "oidc-reader", provider.server.URL, "owned-client", "subject-oidc-reader", "disable", page.Revision); err != nil {
+					t.Fatal(err)
+				}
+				if mode == "reenabled" {
+					if err = accounts.Change(t.Context(), "certificate-victim", "oidc-reader", provider.server.URL, "owned-client", "subject-oidc-reader", "enable", page.Revision+1); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					defer func() {
+						if err := accounts.Change(t.Context(), "certificate-victim", "oidc-reader", provider.server.URL, "owned-client", "subject-oidc-reader", "enable", page.Revision+1); err != nil {
+							t.Error(err)
+						}
+					}()
+				}
+			case "role":
+				if err := settings.Update().SetOIDCRole("new-role").Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			case "issuer":
+				if err := settings.Update().SetOIDCIssuerURL("https://other.example.test").Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			case "provider disabled":
+				if err := settings.Update().SetUseOIDC(false).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			case "revoked account", "account review":
+				status := nats.REGISTER_REVOKED
+				if mode == "account review" {
+					status = nats.REGISTER_IN_REVIEW
+				}
+				if err := m.Client.User.UpdateOneID("oidc-reader").SetRegister(status).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if err := m.Client.User.UpdateOneID("oidc-reader").SetRegister(nats.REGISTER_COMPLETE).Exec(t.Context()); err != nil {
+						t.Error(err)
+					}
+				}()
+			case "account mode":
+				if err := m.Client.User.UpdateOneID("oidc-reader").SetOpenid(false).SetPasswd(true).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if err := m.Client.User.UpdateOneID("oidc-reader").SetOpenid(true).SetPasswd(false).Exec(t.Context()); err != nil {
+						t.Error(err)
+					}
+				}()
+			case "legacy session":
+				request(b, "/fixture/remove-identity")
+			}
+			if rec := request(b, "/myaccount"); rec.Code != 401 {
+				t.Fatal("changed identity retained protected route access", mode, rec.Code)
+			}
+			if uid := request(b, "/fixture/session").Body.String(); uid != "" {
+				t.Fatal("denied identity retained session authentication", uid)
+			}
+		})
+	}
+	configure("authelia")
+	t.Run("temporary validation failure denies access without losing session", func(t *testing.T) {
+		b := browser{}
+		if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+			t.Fatal(rec.Code)
+		}
+		tx, err := m.DB.BeginTx(t.Context(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		if _, err = tx.ExecContext(t.Context(), `LOCK TABLE uem_oidc_bindings IN ACCESS EXCLUSIVE MODE`); err != nil {
+			t.Fatal(err)
+		}
+		if rec := request(b, "/myaccount", 30*time.Millisecond); rec.Code != 503 {
+			t.Fatal("database validation failure did not deny access", rec.Code)
+		}
+		if uid := request(b, "/fixture/session").Body.String(); uid != "oidc-reader" {
+			t.Fatal("temporary verification failure discarded session", uid)
+		}
+		if err = tx.Rollback(); err != nil {
+			t.Fatal(err)
+		}
+		if rec := request(b, "/myaccount"); rec.Code != 200 {
+			t.Fatal("valid session did not recover after database contention", rec.Code)
+		}
+	})
+	t.Run("revocation during admission stays revoked", func(t *testing.T) {
+		if _, err := m.DB.Exec(`CREATE FUNCTION revoke_during_oidc_admission() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN UPDATE users SET register='users.certificate_revoked' WHERE uid=NEW.user_sessions; RETURN NEW; END $$; CREATE TRIGGER revoke_during_oidc_admission AFTER UPDATE OF user_sessions ON sessions FOR EACH ROW EXECUTE FUNCTION revoke_during_oidc_admission()`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := m.DB.Exec(`DROP TRIGGER revoke_during_oidc_admission ON sessions;DROP FUNCTION revoke_during_oidc_admission()`); err != nil {
+				t.Error(err)
+			}
+		}()
+		b := browser{}
+		if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code < 400 {
+			t.Fatal("concurrent account revocation admitted a session", rec.Code)
+		}
+		user, err := m.GetUserById("oidc-reader")
+		if err != nil || user.Register != nats.REGISTER_REVOKED {
+			t.Fatal("login confirmation reactivated account", err)
+		}
+		if uid := request(b, "/fixture/session").Body.String(); uid != "" {
+			t.Fatal("revoked account received an authenticated session", uid)
+		}
+	})
 }
