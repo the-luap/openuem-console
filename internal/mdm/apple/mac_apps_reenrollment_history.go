@@ -17,7 +17,7 @@ func scanMacAppPriorAttempt(row scanner) (MacAppPriorAttempt, error) {
 	v := &a.Version
 	var r MacAppRecovery
 	var recorded sql.NullTime
-	err := row.Scan(&a.ID, &a.PreviousDeviceID, &a.PreviousName, &a.PreviousStatus, &a.Operation, &a.Status, &a.CreatedAt, &a.DispatchedAt, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt, &r.ID, &r.DeviceID, &r.Evidence, &r.Reason, &r.Actor, &recorded)
+	err := row.Scan(&a.ID, &a.PreviousDeviceID, &a.PreviousName, &a.PreviousStatus, &a.Operation, &a.Status, &a.CreatedAt, &a.DispatchedAt, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt, &v.Kind, &v.Windows, &r.ID, &r.DeviceID, &r.Evidence, &r.Reason, &r.Actor, &recorded)
 	if r.ID != "" {
 		r.CreatedAt = recorded.Time
 		a.Recovery = &r

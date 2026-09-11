@@ -10,17 +10,19 @@ import (
 	"time"
 )
 
-templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []apple.SoftwareVersion, next string, canManage bool) {
+templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []apple.SoftwareVersion, next string, canManage bool, searches ...SoftwareCatalogSearch) {
+	{{ search:=SoftwareCatalogSearch{};if len(searches)>0 {search=searches[0]} }}
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Approved software", Url: partials.GetNavigationUrl(info, "/software/catalog")}}, info)
 		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">Approved software</h1>
-				<p class="uk-text-muted mt-2">Versioned packages approved for your organization. Open a revision to install it on a compatible Mac.</p>
+				<p class="uk-text-muted mt-2">Versioned Mac and Windows packages approved for your organization. Open a revision to inspect its requirements and available actions.</p>
 				@Navigation(info)
 			</div>
 			if canManage {
+				<a class="uk-button uk-button-primary" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/windows/new"))}>Approve a Windows package</a>
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">Approve a Mac application package</h2><p>Approve the exact package source, SHA-256 and application bundle version. Verify the signed package and its contents before publishing.</p></div>
 					<div class="uk-card-body">
@@ -46,13 +48,18 @@ templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []appl
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Published revisions</h2><p>Existing approvals remain unchanged when a new revision is published.</p></div>
 				<div class="uk-card-body">
+					<form method="get" action={partials.GetNavigationUrl(info,"/software/catalog")} class="mb-4 software-fields">
+						<label>Find a package<input class="uk-input" name="q" value={search.Query} maxlength="128"/></label>
+						<label>Platform<select class="uk-select" name="platform"><option value="" selected?={search.Platform==""}>All platforms</option><option value="macos" selected?={search.Platform=="macos"}>macOS</option><option value="windows" selected?={search.Platform=="windows"}>Windows</option></select></label>
+						<button class="uk-button uk-button-default" type="submit">Search approved software</button>
+					</form>
 					if len(versions)==0 {
 						<p>No approved package revisions in this organization.</p>
 					}
 					for _,v:=range versions {
 						<article class="software-revision">
 							<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+v.ID)) }>{ v.Name } · { v.Version }</a></h3>
-							<p>{ v.Identifier } · { v.Platform } · { v.Architecture } · macOS { v.MinimumOS }+</p>
+							<p>{ v.Identifier } · { SoftwarePackageKind(v.Kind) } · { v.Architecture } · minimum OS { v.MinimumOS }</p>
 							if v.WithdrawnAt!=nil {
 								<p>Withdrawn · { When(v.WithdrawnAt) }</p>
 							} else {
@@ -61,7 +68,7 @@ templ SoftwareCatalog(c echo.Context, info *partials.CommonInfo, versions []appl
 						</article>
 					}
 					if next!="" {
-						<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog?before="+next)) }>Older revisions</a>
+						<a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog?before="+next+"&q="+url.QueryEscape(search.Query)+"&platform="+url.QueryEscape(search.Platform))) }>Older revisions</a>
 					}
 				</div>
 			</section>
@@ -81,7 +88,10 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-header"><h2 class="uk-card-title">Approved artifact</h2></div>
 				<div class="uk-card-body">
-					<dl class="uk-description-list"><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>Exact bundle version</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>macOS { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ v.SHA256 }</code></dd><dt>Approved</dt><dd>{ When(&v.ApprovedAt) } · { v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
+					<dl class="uk-description-list"><dt>Package type</dt><dd>{SoftwarePackageKind(v.Kind)}</dd><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>{SoftwareVersionLabel(v.Platform)}</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>{v.Platform} { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ Show(v.SHA256) }</code></dd><dt>Approved</dt><dd>{ When(&v.ApprovedAt) } · { v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
+					if v.Platform=="windows" {
+						@WindowsSoftwareRequirements(v)
+					}
 					if v.WithdrawnAt!=nil {
 						<p role="status" class="uk-alert uk-alert-warning mt-4">Withdrawn at { When(v.WithdrawnAt) }. This revision cannot be sent for another installation.</p>
 					}
@@ -98,7 +108,7 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 					}
 				</div>
 			</section>
-			if info.Can(access.AssignSoftware) && v.WithdrawnAt==nil {
+			if info.Can(access.AssignSoftware) && v.WithdrawnAt==nil && v.Platform=="macos" {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-header"><h2 class="uk-card-title">Install on a Mac</h2><p>The device must report the expected managed app version before the installation is verified.</p></div>
 					<div class="uk-card-body">

@@ -1,8 +1,45 @@
 package mdm_views
 
-import "github.com/open-uem/openuem-console/internal/mdm/apple"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+)
 
 type SoftwareDeviceSearch struct{ Query, Next string }
+type SoftwareCatalogSearch struct{ Query, Platform string }
+
+func SoftwareVersionLabel(platform string) string {
+	if platform == "macos" {
+		return "Exact bundle version"
+	}
+	return "Approved package version"
+}
+
+func SoftwarePackageKind(kind string) string {
+	switch kind {
+	case "windows-winget":
+		return "Windows · WinGet"
+	case "windows-msi":
+		return "Windows · MSI"
+	case "windows-exe":
+		return "Windows · EXE"
+	default:
+		return "macOS · PKG"
+	}
+}
+
+func SoftwareExitCodes(codes []uint32) string {
+	values := make([]string, 0, len(codes))
+	for _, code := range codes {
+		values = append(values, strconv.FormatUint(uint64(code), 10))
+	}
+	if len(values) == 0 {
+		return "None"
+	}
+	return strings.Join(values, ", ")
+}
 
 func MacAppPriorState(a apple.MacAppPriorAttempt) string {
 	if a.Recovery != nil {

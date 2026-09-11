@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 147 cases:
+headless Chrome session. The runner covers 174 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -10,6 +10,7 @@ headless Chrome session. The runner covers 147 cases:
 | IKEv2 certificate VPN | System/User × machine/EAP-TLS × existing/copied trust × three widths; reader at each width | 27 |
 | Desktop inventory | Complete/incomplete reports × three widths; viewer/operator × six refresh states × three widths | 42 |
 | Desktop software | Viewer/operator × first/next/empty/long reports × three widths | 24 |
+| Approved Windows software | WinGet/MSI/EXE approval and detail, reader, withdrawn and filtered catalog × three widths | 27 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard

@@ -32,8 +32,11 @@ installer or remove an installed app.
 Catalog approval/withdrawal requires organization-wide software management rights.
 Assignment rights permit operators to select approved revisions within their
 device scope. The store rechecks authorization in each transaction and commits
-the corresponding audit event atomically. The first adapter is native macOS;
-the common catalog still needs its Windows, Homebrew and Apps & Books adapters.
+the corresponding audit event atomically. Native macOS delivery shares its catalog
+with [Windows WinGet/MSI/EXE approvals](windows-approved-software.md). Windows
+delivery, Homebrew and Apps & Books adapters remain work. Shared catalog pages
+filter by platform and literal name/identifier search; current read authority and
+the read audit commit together before catalog data is returned.
 
 ## Native lifecycle
 

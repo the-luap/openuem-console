@@ -13,6 +13,7 @@ import (
 
 func exerciseAppleApplications(t *testing.T, h *Handler, ctx context.Context, tenant, site, sibling int, request func(string, string, string, url.Values) *httptest.ResponseRecorder) {
 	t.Helper()
+	exerciseWindowsSoftwareCatalog(t, h, ctx, tenant, site, request)
 	org := fmt.Sprintf("/tenant/%d/software/catalog", tenant)
 	scoped := fmt.Sprintf("/tenant/%d/site/%d", tenant, site)
 	device := uuid.NewString()

@@ -30,6 +30,8 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g := e.Group(prefix, h.IsAuthenticated, h.AppleCSRF)
 		g.GET("/software/catalog", h.SoftwareCatalog)
 		g.POST("/software/catalog", h.PublishMacAppPackage)
+		g.GET("/software/catalog/windows/new", h.WindowsSoftwareApproval)
+		g.POST("/software/catalog/windows", h.PublishWindowsSoftware)
 		g.GET("/software/catalog/:version", h.SoftwareVersion)
 		g.POST("/software/catalog/:version/withdraw", h.WithdrawSoftwareVersion)
 		g.POST("/software/catalog/:version/install", h.InstallMacApp)
@@ -109,6 +111,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/software/catalog/windows":
+				limit = 128 << 10
 			case "/ios/:id/setup/platform-sso/correct", "/ios/:id/setup/platform-sso/repair", "/ios/configurations/:id/revisions/:revision/restore", "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/software/catalog", "/software/catalog/:version/withdraw", "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action", "/ios/:id/mac-admin", "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/:id/setup/retry":
 				// CSRF reads the form before the endpoint. Apply its bound here
 				// as well so a cached PostForm cannot bypass the endpoint limit.

@@ -94,7 +94,7 @@ func scanMacApp(row scanner) (*MacAppAssignment, error) {
 	var a MacAppAssignment
 	var options []byte
 	v := &a.Version
-	err := row.Scan(&a.TenantID, &a.ID, &a.AttemptID, &a.DeviceID, &a.Status, &a.Operation, &options, &a.ManagedState, &a.InstalledState, &a.InstalledVersion, &a.Error, &a.CreatedAt, &a.DispatchedAt, &a.AcceptedAt, &a.ManagedAt, &a.InstalledAt, &a.RequestedBy, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
+	err := row.Scan(&a.TenantID, &a.ID, &a.AttemptID, &a.DeviceID, &a.Status, &a.Operation, &options, &a.ManagedState, &a.InstalledState, &a.InstalledVersion, &a.Error, &a.CreatedAt, &a.DispatchedAt, &a.AcceptedAt, &a.ManagedAt, &a.InstalledAt, &a.RequestedBy, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt, &v.Kind, &v.Windows)
 	if err != nil {
 		return nil, notFound(err)
 	}

@@ -28,6 +28,7 @@ const fixtures = new Set([
   "ikev2-reader",
   "desktop-inventory",
   "desktop-inventory-partial",
+	...["approve-winget","approve-msi","approve-exe","detail-winget","detail-msi","detail-exe","reader","withdrawn","catalog"].map(state=>"windows-software-"+state),
   ...["viewer", "operator"].flatMap(role =>
     ["first", "next", "empty", "long"].map(state => "desktop-software-" + state + "-" + role),
   ),

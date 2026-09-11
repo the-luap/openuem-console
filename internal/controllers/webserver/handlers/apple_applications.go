@@ -15,6 +15,8 @@ import (
 
 func softwareFailure(err error) error {
 	switch {
+	case errors.Is(err, apple.ErrWindowsSoftware):
+		return echo.NewHTTPError(400, "Check the Windows package type, exact version, architecture, detection rule, HTTPS sources, SHA-256 values and argument formats")
 	case errors.Is(err, apple.ErrMacAppPriorEnrollment):
 		return echo.NewHTTPError(409, "An earlier enrollment has an unresolved application operation or an active duplicate identity. Review previous enrollments on the Mac's managed applications page before requesting another mutation.")
 	case errors.Is(err, access.ErrDenied):
@@ -55,14 +57,15 @@ func (h *Handler) SoftwareCatalog(c echo.Context) error {
 	if err = h.appleReady(); err != nil {
 		return err
 	}
-	items, next, err := h.Apple.SoftwareVersions(c.Request().Context(), scope, c.QueryParam("before"))
+	query, platform := c.QueryParam("q"), c.QueryParam("platform")
+	if len(strings.TrimSpace(query)) > 128 || (platform != "" && platform != "macos" && platform != "windows") {
+		return echo.NewHTTPError(http.StatusBadRequest, "Choose a listed platform and use at most 128 bytes for the package search")
+	}
+	items, next, err := h.Apple.ReadSoftwareCatalog(c.Request().Context(), scope, c.QueryParam("before"), query, platform, h.appleActor(c), h.Access)
 	if err != nil {
 		return softwareFailure(err)
 	}
-	if err = h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "software.catalog.read", "catalog"); err != nil {
-		return softwareFailure(err)
-	}
-	return RenderView(c, mdm_views.SoftwareCatalog(c, info, items, next, scope.SiteID == 0 && info.Can(access.ManageSoftware)))
+	return RenderView(c, mdm_views.SoftwareCatalog(c, info, items, next, scope.SiteID == 0 && info.Can(access.ManageSoftware), mdm_views.SoftwareCatalogSearch{Query: query, Platform: platform}))
 }
 
 func (h *Handler) SoftwareVersion(c echo.Context) error {
@@ -78,7 +81,7 @@ func (h *Handler) SoftwareVersion(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	v, err := h.Apple.SoftwareVersion(c.Request().Context(), scope, id)
+	v, err := h.Apple.ReadSoftwareVersion(c.Request().Context(), scope, id, h.appleActor(c), h.Access)
 	if err != nil {
 		return softwareFailure(err)
 	}
@@ -87,14 +90,11 @@ func (h *Handler) SoftwareVersion(c echo.Context) error {
 	if len(query) > 128 {
 		return echo.NewHTTPError(http.StatusBadRequest, "Use at most 128 bytes for the device search")
 	}
-	if info.Can(access.AssignSoftware) && v.WithdrawnAt == nil {
+	if info.Can(access.AssignSoftware) && v.WithdrawnAt == nil && v.Platform == "macos" {
 		eligible, next, err = h.Apple.MacAppDevices(c.Request().Context(), scope, *v, query, c.QueryParam("after"))
 		if err != nil {
 			return softwareFailure(err)
 		}
-	}
-	if err = h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "software.catalog.read", id); err != nil {
-		return softwareFailure(err)
 	}
 	return RenderView(c, mdm_views.SoftwareVersion(c, info, *v, eligible, scope.SiteID == 0 && info.Can(access.ManageSoftware), mdm_views.SoftwareDeviceSearch{Query: query, Next: next}))
 }

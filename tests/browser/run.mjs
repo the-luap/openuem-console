@@ -8,6 +8,7 @@ import ad from "./ad-certificates.mjs";
 import vpn from "./vpn-ikev2.mjs";
 import inventory from "./desktop-inventory.mjs";
 import software from "./desktop-software.mjs";
+import windowsSoftware from "./windows-software-catalog.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -41,6 +42,7 @@ try {
         [vpn, 27],
         [inventory, 42],
         [software, 24],
+        [windowsSoftware, 27],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

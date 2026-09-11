@@ -274,6 +274,29 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}
 	ssoRepairs := []apple.ADEPlatformSSORepair{{ID: "a0000000-0000-4000-8000-000000000033", ProfileRevisionID: profileRevision.ID, Actor: "Operator <A>", Reason: "Repair <profile> delivery", CreatedAt: now}}
 	ssoRevisions := []apple.ADEPlatformSSORevision{{ID: ssoRequirement.BindingRevisionID, PreviousID: "a0000000-0000-4000-8000-000000000034", ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileRevision: 2, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: "43.0", Actor: "Operator <A>", Reason: "Reviewed <correction>", CreatedAt: now}, {ID: "a0000000-0000-4000-8000-000000000034", ProfileRevisionID: profileRevision.ID, ProfileName: profileRevision.Name, ProfileRevision: 1, ApplicationVersionID: appVersion.ID, ApplicationName: appVersion.Name, ApplicationVersion: "42.0", Actor: "Original reviewer", Reason: "Original provider review", CreatedAt: now}}
+	winSoftware := func(kind string) apple.SoftwareVersion {
+		v := appVersion
+		v.ID = "90000000-0000-4000-8000-000000000030"
+		v.Platform, v.Kind, v.Architecture, v.MinimumOS = "windows", kind, "x86_64", "10.0.26100"
+		v.Name, v.Identifier = "Windows <Editor>", strings.Repeat("LongPackage", 20)
+		v.Windows = apple.WindowsSoftwareMetadata{Kind: kind, Detection: apple.WindowsSoftwareDetection{Kind: "msi-product", ProductCode: "{AABBCCDD-0000-4000-8000-000000000001}", Version: "42.0"}, SuccessCodes: []uint32{0}}
+		if kind == "windows-winget" {
+			v.SHA256 = ""
+		}
+		if kind == "windows-msi" {
+			v.Windows.MSIPropertyNames = []string{"LICENSEKEY"}
+			v.Windows.RebootCodes = []uint32{3010}
+		}
+		if kind == "windows-exe" {
+			v.Windows.InstallArgumentCount = 2
+			v.Windows.UninstallArgumentCount = 2
+			v.Windows.UninstallSHA256 = strings.Repeat("b", 64)
+			v.Windows.RebootCodes = []uint32{3010}
+		}
+		return v
+	}
+	winWithdrawn := winSoftware("windows-msi")
+	winWithdrawn.WithdrawnAt = &now
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -311,6 +334,15 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"ade-app-reader", DeviceDetails(c, &reader, adeAppState("queued", true)), []string{"Required setup applications", "Required revision history"}},
 		{"ade-app-history", ADEApplicationHistory(c, &reader, &appDevice, adeAppState("queued", true).ADEApplications[0], adeAppChanges, adeAppChanges[0].ID), []string{"Required application history", "Original enrollment requirement", "Operator &lt;A&gt;", "Correct &lt;version&gt; for setup", "Older revision changes"}},
 
+		{"windows-software-approve-winget", WindowsSoftwareApproval(c, info, "windows-winget", "90000000-0000-4000-8000-000000000031"), []string{"Approve Windows revision", "name=\"request_id\"", "Installed-state detection"}},
+		{"windows-software-detail-winget", SoftwareVersion(c, info, winSoftware("windows-winget"), nil, true, SoftwareDeviceSearch{}), []string{"Windows &lt;Editor&gt;", "Windows approval recorded", "Detection rule"}},
+		{"windows-software-approve-msi", WindowsSoftwareApproval(c, info, "windows-msi", "90000000-0000-4000-8000-000000000031"), []string{"Approve Windows revision", "name=\"request_id\"", "Installed-state detection"}},
+		{"windows-software-detail-msi", SoftwareVersion(c, info, winSoftware("windows-msi"), nil, true, SoftwareDeviceSearch{}), []string{"Windows &lt;Editor&gt;", "Windows approval recorded", "Detection rule"}},
+		{"windows-software-approve-exe", WindowsSoftwareApproval(c, info, "windows-exe", "90000000-0000-4000-8000-000000000031"), []string{"Approve Windows revision", "name=\"request_id\"", "Installed-state detection"}},
+		{"windows-software-detail-exe", SoftwareVersion(c, info, winSoftware("windows-exe"), nil, true, SoftwareDeviceSearch{}), []string{"Windows &lt;Editor&gt;", "Windows approval recorded", "Detection rule"}},
+		{"windows-software-reader", SoftwareVersion(c, &reader, winSoftware("windows-msi"), nil, false, SoftwareDeviceSearch{}), []string{"Windows approval recorded", "LICENSEKEY"}},
+		{"windows-software-withdrawn", SoftwareVersion(c, info, winWithdrawn, nil, true, SoftwareDeviceSearch{}), []string{"Withdrawn at", "Windows approval recorded"}},
+		{"windows-software-catalog", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{winSoftware("windows-msi")}, winSoftware("windows-msi").ID, false, SoftwareCatalogSearch{Query: "%_&", Platform: "windows"}), []string{"Windows &lt;Editor&gt;", "Search approved software", "Older revisions"}},
 		{"software-catalog", SoftwareCatalog(c, info, []apple.SoftwareVersion{appVersion, withdrawnVersion}, appVersion.ID, true), []string{"Approve a Mac application package", "Editor &lt;Suite&gt;", "Older revisions", "Withdrawn", `name="sha256"`, `name="source_url"`}},
 		{"software-catalog-reader", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{appVersion}, "", false), []string{"Published revisions", "Editor &lt;Suite&gt;"}},
 		{"software-version", SoftwareVersion(c, info, appVersion, []apple.Device{appDevice}, true, SoftwareDeviceSearch{Next: appDevice.ID}), []string{"Request installation", "Withdraw approval", "Exact bundle version", "Search Macs", "More matching Macs", strings.Repeat("a", 64)}},

@@ -61,7 +61,7 @@ const adeApplicationFrom = ` FROM mdm_apple_ade_device_apps r JOIN uem_software_
 func scanADEApplication(row scanner) (*ADEApplication, error) {
 	var a ADEApplication
 	v := &a.Version
-	err := row.Scan(&a.ID, &a.OriginalVersionID, &a.Error, &a.PlatformSSO, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
+	err := row.Scan(&a.ID, &a.OriginalVersionID, &a.Error, &a.PlatformSSO, &v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt, &v.Kind, &v.Windows)
 	return &a, notFound(err)
 }
 

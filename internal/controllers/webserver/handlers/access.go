@@ -43,6 +43,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/software/catalog/windows/new":
+			return access.ManageSoftware, true
 		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
@@ -59,7 +61,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/ios/:id/applications/previous/:attempt/resolve", "/ios/:id/setup/applications/:requirement/replace", "/ios/:id/setup/platform-sso/repair", "/ios/:id/setup/platform-sso/correct":
 			return access.ManageCertificates, true
-		case "/software/catalog", "/software/catalog/:version/withdraw":
+		case "/software/catalog", "/software/catalog/windows", "/software/catalog/:version/withdraw":
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action":
 			return access.AssignSoftware, true

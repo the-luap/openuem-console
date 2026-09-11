@@ -19,9 +19,11 @@ type SoftwareVersion struct {
 	SingleApp                                          bool
 	ApprovedAt                                         time.Time
 	WithdrawnAt                                        *time.Time
+	Kind                                               string
+	Windows                                            WindowsSoftwareMetadata
 }
 
-const softwareVersionColumns = `v.id,v.package_id,p.platform,v.name,p.identifier,v.version,v.architecture,v.minimum_os,v.artifact_sha256,v.single_app,v.approved_by,v.approved_at,v.withdrawn_at`
+const softwareVersionColumns = `v.id,v.package_id,p.platform,v.name,p.identifier,v.version,v.architecture,v.minimum_os,COALESCE(v.artifact_sha256,''),v.single_app,v.approved_by,v.approved_at,v.withdrawn_at,v.kind,v.windows_metadata`
 const softwareVersionFrom = ` FROM uem_software_versions v JOIN uem_software_packages p ON p.id=v.package_id AND p.tenant_id=v.tenant_id `
 
 func (s *Store) SoftwareVersion(ctx context.Context, scope Scope, id string) (*SoftwareVersion, error) {
@@ -33,7 +35,7 @@ func (s *Store) SoftwareVersion(ctx context.Context, scope Scope, id string) (*S
 
 func scanSoftwareVersion(row scanner) (*SoftwareVersion, error) {
 	var v SoftwareVersion
-	err := row.Scan(&v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt)
+	err := row.Scan(&v.ID, &v.PackageID, &v.Platform, &v.Name, &v.Identifier, &v.Version, &v.Architecture, &v.MinimumOS, &v.SHA256, &v.SingleApp, &v.ApprovedBy, &v.ApprovedAt, &v.WithdrawnAt, &v.Kind, &v.Windows)
 	return &v, notFound(err)
 }
 
@@ -50,11 +52,20 @@ func (s *Store) SearchApprovedMacApplications(ctx context.Context, scope Scope, 
 }
 
 func (s *Store) softwareVersions(ctx context.Context, scope Scope, before, query string, approvedOnly bool, packageID string) ([]SoftwareVersion, string, error) {
+	return querySoftwareVersions(ctx, s.db, scope, before, query, approvedOnly, packageID, "")
+}
+
+type softwareQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func querySoftwareVersions(ctx context.Context, db softwareQuerier, scope Scope, before, query string, approvedOnly bool, packageID, platform string) ([]SoftwareVersion, string, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, "", err
 	}
 	query = strings.TrimSpace(query)
-	if len(query) > 128 {
+	if len(query) > 128 || (platform != "" && platform != "macos" && platform != "windows") {
 		return nil, "", ErrMacApp
 	}
 	var pkg any
@@ -73,13 +84,13 @@ func (s *Store) softwareVersions(ctx context.Context, scope Scope, before, query
 			return nil, "", ErrMacApp
 		}
 		var at time.Time
-		if err = s.db.QueryRowContext(ctx, `SELECT approved_at FROM uem_software_versions WHERE tenant_id=$1 AND id=$2`, scope.TenantID, before).Scan(&at); err != nil {
+		if err = db.QueryRowContext(ctx, `SELECT approved_at FROM uem_software_versions WHERE tenant_id=$1 AND id=$2`, scope.TenantID, before).Scan(&at); err != nil {
 			return nil, "", notFound(err)
 		}
 		stamp, cursor = at, before
 	}
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query) + "%"
-	rows, err := s.db.QueryContext(ctx, `SELECT `+softwareVersionColumns+softwareVersionFrom+`WHERE v.tenant_id=$1 AND ($2::timestamptz IS NULL OR (v.approved_at,v.id)<($2,$3::uuid)) AND (v.name ILIKE $4 OR p.identifier ILIKE $4) AND (NOT $5::boolean OR (v.withdrawn_at IS NULL AND p.platform='macos' AND v.kind='macos-pkg')) AND ($6::uuid IS NULL OR v.package_id=$6) ORDER BY v.approved_at DESC,v.id DESC LIMIT 101`, scope.TenantID, stamp, cursor, pattern, approvedOnly, pkg)
+	rows, err := db.QueryContext(ctx, `SELECT `+softwareVersionColumns+softwareVersionFrom+`WHERE v.tenant_id=$1 AND ($2::timestamptz IS NULL OR (v.approved_at,v.id)<($2,$3::uuid)) AND (v.name ILIKE $4 OR p.identifier ILIKE $4) AND (NOT $5::boolean OR (v.withdrawn_at IS NULL AND p.platform='macos' AND v.kind='macos-pkg')) AND ($6::uuid IS NULL OR v.package_id=$6) AND ($7='' OR p.platform=$7) ORDER BY v.approved_at DESC,v.id DESC LIMIT 101`, scope.TenantID, stamp, cursor, pattern, approvedOnly, pkg, platform)
 	if err != nil {
 		return nil, "", err
 	}
@@ -172,7 +183,8 @@ func (s *Store) WithdrawSoftwareVersion(ctx context.Context, scope Scope, id, ac
 		return err
 	}
 	var withdrawn *time.Time
-	if err = tx.QueryRowContext(ctx, `SELECT withdrawn_at FROM uem_software_versions WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, scope.TenantID, id).Scan(&withdrawn); err != nil {
+	var kind string
+	if err = tx.QueryRowContext(ctx, `SELECT withdrawn_at,kind FROM uem_software_versions WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, scope.TenantID, id).Scan(&withdrawn, &kind); err != nil {
 		return notFound(err)
 	}
 	if withdrawn != nil {
@@ -181,7 +193,11 @@ func (s *Store) WithdrawSoftwareVersion(ctx context.Context, scope Scope, id, ac
 	if _, err = tx.ExecContext(ctx, `UPDATE uem_software_versions SET withdrawn_at=clock_timestamp() WHERE id=$1`, id); err != nil {
 		return err
 	}
-	if err = audit(ctx, tx, scope.TenantID, actor, "apple.software.version.withdraw", id); err != nil {
+	action := "apple.software.version.withdraw"
+	if strings.HasPrefix(kind, "windows-") {
+		action = "software.windows.version.withdraw"
+	}
+	if err = audit(ctx, tx, scope.TenantID, actor, action, id); err != nil {
 		return err
 	}
 	return tx.Commit()
