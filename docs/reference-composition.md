@@ -12,6 +12,12 @@ verified first-administrator password transition. Graphical setup, automated pub
 TLS/provider configuration, complete restore and physical endpoint acceptance
 remain open.
 
+The [public TLS composition](reference-public-tls.md) adds a separate DNS-01
+issuer project and a gateway overlay for its atomic publication directory. It
+keeps issuer account/provider inputs outside the seven runtime services and
+supports public-chain selection by the maintenance readiness probe. The reviewed
+fresh-install controller's automatic issuer handoff remains separate work.
+
 ## Runtime boundaries
 
 | Network | Services |

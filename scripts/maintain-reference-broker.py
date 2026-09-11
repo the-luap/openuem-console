@@ -71,6 +71,34 @@ def compose_model(value):
     return value
 
 
+def gateway_trust(root, service):
+    """Select only public trust from the direct or atomic-publication layout."""
+    private(root / "public", True)
+    arguments = service.get("command", [])
+    selected = []
+    for name in ("--tls-cert", "--tls-key"):
+        if arguments.count(name) != 1 or arguments.index(name) + 1 == len(arguments):
+            raise MaintenanceError("reference gateway TLS inputs are ambiguous")
+        selected.append(arguments[arguments.index(name) + 1])
+    if selected == ["/run/public/server.pem", "/run/public/server.key"]:
+        certificate = root / "public/server.pem"
+    elif selected == ["/run/public/current/fullchain.pem", "/run/public/current/private.pem"]:
+        publication = root / "public"
+        private(publication, True)
+        generation = os.readlink(publication / "current")
+        if not re.fullmatch(r"generation-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", generation):
+            raise MaintenanceError("reference public TLS selection is not a retained generation")
+        directory = publication / generation
+        private(directory, True)
+        certificate = directory / "fullchain.pem"
+    else:
+        raise MaintenanceError("reference gateway TLS paths do not match a supported layout")
+    info = certificate.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid not in (0, os.geteuid()) or info.st_mode & 0o022:
+        raise MaintenanceError("reference gateway public trust is not a protected regular certificate file")
+    return certificate
+
+
 def private(path, directory=False):
     info = path.lstat()
     kind = stat.S_ISDIR if directory else stat.S_ISREG
@@ -493,7 +521,7 @@ class Maintenance:
         self.inspect()
         endpoint = self.roles["gateway"]["NetworkSettings"]["Networks"][self.args.project_name + "_edge"]["IPAddress"]
         origin = self.definition["services"]["console"]["environment"]["OPENUEM_PUBLIC_ORIGIN"]
-        self.ready(self.args.project_name + "_edge", mount(self.root / "public/server.pem", "/gateway.pem"),
+        self.ready(self.args.project_name + "_edge", mount(gateway_trust(self.root, self.definition["services"]["gateway"]), "/gateway.pem"),
                    ["--mode", "gateway", "--address", endpoint + ":8443", "--origin", origin, "--trust-file", "/gateway.pem"])
         self.inspect()
         self.validate()

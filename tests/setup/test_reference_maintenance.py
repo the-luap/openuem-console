@@ -26,6 +26,37 @@ class ProtectedMetadata(unittest.TestCase):
         self.assertEqual(maintenance.compose_model(rendered), expected)
         self.assertEqual(rendered["command"], ["Reference $$Literal $$$$Budget $${HOME}"])
 
+    def test_gateway_probe_selects_only_public_files_in_the_active_generation(self):
+        public = self.root / "public"
+        public.mkdir(mode=0o700)
+        name = "generation-11111111-1111-4111-8111-111111111111"
+        generation = public / name
+        generation.mkdir(mode=0o700)
+        certificate = generation / "fullchain.pem"
+        maintenance.write_record(certificate, {"fixture": "public certificate only"})
+        current = public / "current"
+        current.symlink_to(name)
+        service = {"command": ["--tls-cert", "/run/public/current/fullchain.pem", "--tls-key", "/run/public/current/private.pem"]}
+        self.assertEqual(maintenance.gateway_trust(self.root, service), certificate)
+        certificate.chmod(0o644)
+        self.assertEqual(maintenance.gateway_trust(self.root, service), certificate)
+        for invalid in ("../unrelated", str(generation), name + "/nested"):
+            current.unlink()
+            current.symlink_to(invalid)
+            with self.assertRaises(maintenance.MaintenanceError):
+                maintenance.gateway_trust(self.root, service)
+        current.unlink()
+        current.symlink_to(name)
+        original = generation / "original.pem"
+        certificate.rename(original)
+        certificate.symlink_to(original.name)
+        with self.assertRaises(maintenance.MaintenanceError):
+            maintenance.gateway_trust(self.root, service)
+        for arguments in (["--tls-cert", "/run/public/server.pem", "--tls-key", "/run/public/current/private.pem"],
+                          service["command"] + ["--tls-cert", "/run/public/server.pem"]):
+            with self.assertRaises(maintenance.MaintenanceError):
+                maintenance.gateway_trust(self.root, {"command": arguments})
+
     def test_exact_private_creation_and_no_overwrite(self):
         path = self.root / "review.json"
         expected = {"version": 1, "hash": "a" * 64}

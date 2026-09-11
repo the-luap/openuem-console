@@ -11,6 +11,7 @@ import json
 import os
 import pathlib
 import re
+import ssl
 import subprocess
 import tempfile
 import time
@@ -49,9 +50,12 @@ def main():
     parser.add_argument("--legacy-broker-image")
     parser.add_argument("--maintenance-probe-image")
     parser.add_argument("--release-image")
+    parser.add_argument("--acme-publication", action="store_true")
     args = parser.parse_args()
     if args.legacy_broker_image and not args.maintenance_probe_image:
         raise RuntimeError("legacy maintenance acceptance requires a readiness image")
+    if args.acme_publication and not args.maintenance_probe_image:
+        raise RuntimeError("public TLS publication acceptance requires the runtime readiness image")
     if os.name != "posix" or os.getuid() == 0 or not args.test_binary.is_file():
         raise RuntimeError("reference composition requires a non-root POSIX account and its Linux probe")
     repository = pathlib.Path(__file__).resolve().parent.parent
@@ -125,7 +129,23 @@ def main():
                 failures = re.findall(r"(?:container|public_claim)_linux_test.go:\d+: ([^\n]+)", result.stdout)
                 raise RuntimeError(stage + " failed" + (": " + "; ".join(failures[:3]) if failures else ""))
 
-        probe("synthetic external inputs", "TestReferencePrepare", "none", mount(root, "/state", False))
+        probe("synthetic external inputs", "TestReferencePrepare", "none", mount(root, "/state", False),
+              [("OPENUEM_REFERENCE_TLS_RENEWAL", "1")] if args.acme_publication else ())
+        if args.acme_publication:
+            def generation(certificate, key):
+                leaf = certificate.read_text()
+                fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(leaf)).hexdigest()
+                name = "generation-" + str(uuid.uuid4())
+                directory = root / "public" / name
+                directory.mkdir(mode=0o700)
+                protected(directory / "fullchain.pem", leaf + (root / "public-ca.pem").read_text())
+                key.rename(directory / "private.pem")
+                certificate.unlink()
+                return name, fingerprint
+            initial_generation, initial_tls = generation(root / "public/server.pem", root / "public/server.key")
+            renewed_generation, renewed_tls = generation(root / "ready/renewed.pem", root / "ready/renewed.key")
+            (root / "public/current").symlink_to(initial_generation)
+            probe("prepared public TLS pair", "TestReferencePublishedTLSFiles", "none", mount(root / "public" / renewed_generation, "/publication"))
         environment = {**os.environ, "OPENUEM_REFERENCE_STATE": str(root), "OPENUEM_RUNTIME_UID": str(uid),
                        "OPENUEM_RUNTIME_GID": str(gid), "OPENUEM_DOMAIN": "example.test",
                        "OPENUEM_ORGANIZATION": "Reference $Literal $$Budget ${HOME}", "OPENUEM_PUBLIC_HOST": "uem.example.test",
@@ -137,6 +157,10 @@ def main():
         protected(override, json.dumps({"networks": {"edge": {"internal": True}, "egress": {"internal": True}}}))
         base = ["docker", "compose", "--project-name", project, "--project-directory", str(root),
                 "--env-file", "/dev/null", "--file", str(repository / "deploy/reference/compose.yaml")]
+        direct_base = list(base)
+        if args.acme_publication:
+            base += ["--file", str(repository / "deploy/reference/compose.acme.yaml")]
+            environment["OPENUEM_PUBLIC_TLS_RELOAD_INTERVAL"] = "1s"
         invocation = [*base, "--file", str(override)]
 
         def compose(stage, *arguments, check=True, timeout=60, bootstrap=False):
@@ -148,6 +172,14 @@ def main():
                              "authorization": {"data", "messaging"}, "commands": {"data", "messaging"},
                              "worker": {"data", "messaging"}, "gateway": {"edge", "console_backend", "broker_backend"}}
         rendered = json.loads(compose("reference render", "config", "--format", "json").stdout)
+        if args.acme_publication:
+            direct = json.loads(command("direct TLS reference render", *direct_base, "config", "--format", "json", environment=environment).stdout)["services"]["gateway"]
+            expected = direct["command"]
+            expected[expected.index("--tls-cert") + 1] = "/run/public/current/fullchain.pem"
+            expected[expected.index("--tls-key") + 1] = "/run/public/current/private.pem"
+            index = expected.index("--gateway-cert")
+            expected[index:index] = ["--tls-reload-interval", "1s"]
+            assert rendered["services"]["gateway"] == direct
         assert set(rendered["services"]) == set(expected_networks)
         for name, service in rendered["services"].items():
             assert not service.get("ports") and set(service["networks"]) == expected_networks[name]
@@ -330,10 +362,36 @@ def main():
             maintenance_args = ["--project-name", project, "--project-directory", str(root),
                                 "--file", str(repository / "deploy/reference/compose.yaml"), "--file", str(override),
                                 "--setup-image", args.pki_image, "--probe-image", args.maintenance_probe_image]
+            if args.acme_publication:
+                maintenance_args += ["--file", str(repository / "deploy/reference/compose.acme.yaml")]
             def runtime_identity():
                 identities = compose("maintenance identities", "ps", "--all", "--quiet").stdout.split()
                 values = json.loads(command("maintenance runtime", "docker", "inspect", *identities).stdout)
                 return {item["Config"]["Labels"]["com.docker.compose.service"]: (item["Id"], item["State"]["StartedAt"]) for item in values}
+        if args.acme_publication:
+            before = runtime_identity()
+            active_gateway = json.loads(command("gateway TLS runtime configuration", "docker", "inspect", before["gateway"][0]).stdout)[0]
+            expected_gateway = list(rendered["services"]["gateway"]["command"])
+            expected_gateway[expected_gateway.index("--admin-networks") + 1] = administrator_ip + "/32"
+            assert active_gateway["Config"]["Cmd"] == expected_gateway
+            probe("initial public TLS selection", "TestReferenceGatewayTLS", edge, trust, [("OPENUEM_REFERENCE_TLS_SHA256", initial_tls)])
+            # The actual issuer publishes from Linux. A host-side symlink
+            # replacement can be translated differently by Docker Desktop's
+            # file sharing, so perform this operation in its real environment.
+            probe("atomic public TLS publication", "TestReferenceSelectPublicTLS", "none", mount(root / "public", "/publication", False),
+                  [("OPENUEM_REFERENCE_TLS_GENERATION", renewed_generation)])
+            probe("selected public TLS pair", "TestReferencePublishedTLSFiles", "none", mount(root / "public", "/publication"),
+                  [("OPENUEM_REFERENCE_TLS_GENERATION", renewed_generation)])
+            try:
+                probe("renewed public TLS selection", "TestReferenceGatewayTLS", edge, trust, [("OPENUEM_REFERENCE_TLS_SHA256", renewed_tls)])
+            except RuntimeError:
+                logs = command("gateway TLS reload state", "docker", "logs", "--tail", "30", before["gateway"][0])
+                states = re.findall(r"public TLS (?:certificate files validated and active|reload rejected; retaining the previously loaded pair within its validity: [^\n]+)", logs.stdout + logs.stderr)
+                raise RuntimeError("gateway public TLS generation did not change: " + "; ".join(states)) from None
+            if initial_tls == renewed_tls or runtime_identity() != before:
+                raise RuntimeError("public TLS renewal restarted a reference service or retained the old certificate")
+            administrator(True)
+            print("reference public TLS: atomic generation selection and retained-service gateway reload passed", flush=True)
         if args.legacy_broker_image:
             probe("pre-upgrade device WSS admission", "TestReferenceDevice", edge, device, [("OPENUEM_REFERENCE_ACTION", "connect")])
             pending = [*mount(root / "broker/state/console-user.seed", "/run/console.seed"),

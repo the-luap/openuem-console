@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"testing"
@@ -104,6 +105,20 @@ func TestReferencePrepare(t *testing.T) {
 	write(t, "/state/public/server.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 	write(t, "/state/public/server.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private}))
 	write(t, "/state/public-ca.pem", caPEM)
+	if os.Getenv("OPENUEM_REFERENCE_TLS_RENEWAL") == "1" {
+		nextKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal("cannot prepare the next synthetic public TLS key")
+		}
+		leaf.SerialNumber = big.NewInt(3)
+		nextDER, err := x509.CreateCertificate(rand.Reader, leaf, ca, &nextKey.PublicKey, caKey)
+		if err != nil {
+			t.Fatal("cannot prepare the next synthetic public TLS certificate")
+		}
+		nextPrivate, _ := x509.MarshalPKCS8PrivateKey(nextKey)
+		write(t, "/state/ready/renewed.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: nextDER}))
+		write(t, "/state/ready/renewed.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: nextPrivate}))
+	}
 	release, signing, _ := ed25519.GenerateKey(rand.Reader)
 	defer clear(signing)
 	encoded, _ := x509.MarshalPKIXPublicKey(release)
@@ -227,6 +242,78 @@ func client(t *testing.T) *http.Client {
 	jar, _ := cookiejar.New(nil)
 	return &http.Client{Transport: transport, Jar: jar, Timeout: 2 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+func TestReferenceGatewayTLS(t *testing.T) {
+	fixture(t)
+	expected := os.Getenv("OPENUEM_REFERENCE_TLS_SHA256")
+	if value, err := hex.DecodeString(expected); err != nil || len(value) != sha256.Size {
+		t.Fatal("expected public TLS fingerprint is unavailable")
+	}
+	client := client(t)
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		response, err := client.Get("https://uem.example.test:8443/enroll/unknown")
+		if err == nil {
+			_ = response.Body.Close()
+			if response.TLS != nil && len(response.TLS.PeerCertificates) != 0 {
+				digest := sha256.Sum256(response.TLS.PeerCertificates[0].Raw)
+				if hex.EncodeToString(digest[:]) == expected {
+					return
+				}
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatal("gateway did not present the selected public TLS generation")
+}
+
+func TestReferencePublishedTLSFiles(t *testing.T) {
+	fixture(t)
+	directory := "/publication"
+	if selected := os.Getenv("OPENUEM_REFERENCE_TLS_GENERATION"); selected != "" {
+		target, err := os.Readlink("/publication/current")
+		if err != nil || target != selected {
+			t.Fatal("Linux publication link does not match the selected generation")
+		}
+		directory += "/current"
+	}
+	for _, path := range []string{directory + "/fullchain.pem", directory + "/private.pem"} {
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) == 0 {
+			t.Fatal("published TLS fixture input is not readable", path)
+		}
+	}
+	if _, err := tls.LoadX509KeyPair(directory+"/fullchain.pem", directory+"/private.pem"); err != nil {
+		t.Fatal("published TLS fixture certificate and private key do not match")
+	}
+}
+
+func TestReferenceSelectPublicTLS(t *testing.T) {
+	fixture(t)
+	selected := os.Getenv("OPENUEM_REFERENCE_TLS_GENERATION")
+	if !regexp.MustCompile(`^generation-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`).MatchString(selected) {
+		t.Fatal("next fixture publication generation is invalid")
+	}
+	publication, err := os.OpenRoot("/publication")
+	if err != nil {
+		t.Fatal("fixture publication is unavailable")
+	}
+	defer publication.Close()
+	if err := publication.Symlink(selected, "next"); err != nil {
+		t.Fatal("fixture publication selection could not be staged")
+	}
+	if err := publication.Rename("next", "current"); err != nil {
+		t.Fatal("fixture publication selection could not be committed")
+	}
+	directory, err := publication.Open(".")
+	if err != nil {
+		t.Fatal("fixture publication directory is unavailable")
+	}
+	defer directory.Close()
+	if err := directory.Sync(); err != nil {
+		t.Fatal("fixture publication selection could not be synced")
+	}
 }
 
 func request(t *testing.T, client *http.Client, path string, form url.Values) (int, string, string) {

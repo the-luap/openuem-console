@@ -1,0 +1,36 @@
+# Run under a separate Compose project from the seven reference services.
+# Only public/ is shared with the gateway; no private backend network is joined.
+services:
+  acme:
+    image: ${OPENUEM_ACME_IMAGE:?Set the local or approved DNS-01 issuer image}
+    user: "${OPENUEM_RUNTIME_UID:?}:${OPENUEM_RUNTIME_GID:?}"
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    pull_policy: never
+    restart: unless-stopped
+    stop_grace_period: 15s
+    command: [--config, /run/openuem-acme/issuer.json]
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=0700,uid=${OPENUEM_RUNTIME_UID},gid=${OPENUEM_RUNTIME_GID}
+    volumes:
+      - type: bind
+        source: ${OPENUEM_REFERENCE_STATE:?}/acme/config
+        target: /run/openuem-acme
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${OPENUEM_REFERENCE_STATE}/acme/state
+        target: /var/lib/openuem-acme
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${OPENUEM_REFERENCE_STATE}/public
+        target: /var/lib/openuem-public-tls
+        bind: {create_host_path: false}
+    networks: [public_tls]
+
+networks:
+  public_tls: {}

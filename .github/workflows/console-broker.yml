@@ -206,7 +206,14 @@ jobs:
             private-service-authorization:check private-service-commands:check \
             individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
             --maintenance-probe-image setup-reference-probe:check \
-            --release-image reference-releases:check
+            --release-image reference-releases:check --acme-publication
+      - name: Separate reference issuer account, publication and input preflight
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.acme --target runtime -t reference-acme:check .
+          python3 scripts/check-reference-public-tls.py reference-acme:check
       - name: Reviewed reference installation and interrupted bootstrap recovery
         if: runner.os == 'Linux'
         shell: bash
@@ -239,4 +246,4 @@ jobs:
             individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
             --legacy-broker-image legacy-broker-initializer:check \
             --maintenance-probe-image setup-reference-probe:check \
-            --release-image reference-releases:check
+            --release-image reference-releases:check --acme-publication

@@ -7,9 +7,11 @@ pair without restarting existing connections. The issuer opens no inbound port.
 
 This is the public TLS component of NET-01. The
 [reference installer](reference-installation.md) initializes the private backends
-with supplied public TLS inputs; automatic issuer handoff and deployment firewall
-acceptance remain separate work. No public CA account, real DNS credentials or
-live device was used for the automated acceptance below.
+with supplied public TLS inputs. The [reference public TLS composition](reference-public-tls.md)
+provides the separate issuer project and gateway publication overlay; automatic
+installer handoff and deployment firewall acceptance remain separate work. No
+public CA account, real DNS credentials or live device was used for the automated
+acceptance below.
 
 ## Image and configuration
 

@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [reference public TLS composition](reference-public-tls.md) adds a separate
+  issuer project with the explicit runtime account, isolated account/configuration
+  mounts and its own outbound network. Its actual input preflight passes with
+  empty account/publication volumes and unchanged protected inputs on an isolated
+  test network. The gateway overlay selects the atomic `current` publication
+  through its existing read-only directory mount; maintenance readiness selects
+  only the public chain and rejects escaping or aliased selections. Full Linux arm64
+  reference acceptance passes fresh and old-grant maintenance with synthetic TLS
+  renewal published from Linux, matching the actual issuer environment. It retains
+  container identities across reload, then passes restart and live WSS revocation.
+  The protected Python checks, syntax checks and Linux reference vet pass. These fixtures
+  complement the independent real DNS-01 issuer test; automatic fresh-installer
+  handoff, real-provider and hardware acceptance remain open.
+- The [2bb1a82 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34551946528)
+  passes on Linux amd64, Linux arm64 and Windows with the resumable installer and
+  administrator completion checks. Its [ACME workflow](https://github.com/the-luap/openuem-console/actions/runs/34551946548)
+  passes on both native Linux architectures with the read-only issuer preflight.
 - The public DNS-01 issuer now provides `--check` for protected local input
   validation before creating state, acquiring leases, executing lego or contacting
   a provider. It returns a fixed public result and rejects conflicting issuance
