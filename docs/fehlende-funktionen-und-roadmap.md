@@ -534,7 +534,10 @@ this path. [WinGet source review](windows-winget-resolution.md) now retains an
 encrypted manifest at an exact Microsoft community commit and explicitly approves
 a compatible machine MSI as a separate catalog revision. Scoped immutable history,
 concurrent confirmation, audit rollback, expiry and exact encrypted install/remove
-dispatch have PostgreSQL/race, route and browser evidence. Further WinGet installer
+dispatch have PostgreSQL/race, route and browser evidence. A separate Burn source
+adapter and bounded native bundle-layout reader now provide translation and
+read-only format foundations; embedded registration proof and Burn delivery
+integration remain open. Further WinGet installer
 formats and physical installation, removal, offline, restart and hibernate
 acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.

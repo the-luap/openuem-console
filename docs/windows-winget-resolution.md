@@ -173,6 +173,25 @@ even when its payload targets the native architecture. Source-derived Burn
 approval/history, native package proof, complete execution/recovery tests and
 physical acceptance remain open.
 
+The agent's separate
+[Burn layout reader](https://github.com/the-luap/openuem-agent/blob/10ce65d7aacee6265cf17625cb571691a9cd5cab/docs/windows-burn-inspection.md)
+now locates a version-2 `.wixburn` bundle code and bounded UX cabinet without
+extracting or executing its contents. At most seven reads and 4,512 requested
+bytes inspect standard x86/AMD64/ARM64 PE layouts, overlapping/truncated section
+and certificate ranges, exact cabinet length and bounded container declarations.
+The bootstrapper architecture is metadata, not authorization to use emulation.
+WiX's 48-byte virtual prefix and appended raw container table are preserved.
+The corrected reader passes its local race suite in 1.415 seconds and 151,135
+fuzz inputs in 16.610 seconds, following the initial 5,276,614-input fuzz run.
+The existing Windows software race suite, focused vet, full Linux ARM64 build
+and tagged Windows test compilation pass. A separate Windows CI fixture builds
+owned bundles with WiX/Bal `4.0.6` and independently extracts their manifests to
+compare the header code with the version-specific `Registration/@Id` field.
+All three native architecture fixtures pass at agent commit
+`383c6fd1d1e31564ede725eac00317d94423959f`. Neither generated bundles nor payloads are executed. CAB member decoding and
+registration/scope/version/view verification remain required before integrating
+this reader into native preflight or source-derived Burn delivery.
+
 The combined source/MSI/Burn race suite passes in 1.799 seconds. The final Burn
 and MSI fuzz runs pass 242,390 and 233,586 inputs respectively. Tests cover both
 operations, both native architectures, both explicitly reviewed registry views,

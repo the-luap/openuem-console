@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The agent's [bounded Burn layout reader](windows-winget-resolution.md#burn-exe-translation-foundation)
+  now locates the section-declared bundle code and UX cabinet with at most seven
+  reads and 4,512 requested bytes. It rejects ambiguous, overlapping, truncated
+  and excessive layouts, while retaining WiX's 48-byte virtual prefix and raw
+  container table. Corrected local race/fuzz checks pass in 1.415/16.610 seconds
+  (151,135 final fuzz inputs; 5,276,614 in the initial run). The existing Windows
+  software race suite, Linux ARM64 build, tagged Windows compilation and vet
+  also pass. A separate native CI fixture builds owned x86/AMD64/ARM64 bundles
+  with pinned WiX/Bal and compares their independently extracted registration
+  identifiers without executing a bundle or payload. All three generated native
+  architecture cases pass at agent commit `383c6fd1d1e31564ede725eac00317d94423959f`.
+  Embedded CAB/registration
+  proof and native delivery integration remain open; this reader enables no
+  additional installer execution. The full roadmap remains in progress.
+
 - A separate [Burn source adapter](windows-winget-resolution.md#burn-exe-translation-foundation)
   now binds source-declared installation/removal to the same exact EXE, native
   target, bundle identifier and reviewed machine uninstall-registry view. Shared
