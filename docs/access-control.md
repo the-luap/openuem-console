@@ -123,6 +123,11 @@ a committed `inventory.peripherals.read` audit. Delegated GET monitor/printer
 aliases select the corresponding report kind. Reported ports remain inert text;
 device actions are not added to this read capability.
 
+[Reported memory modules](desktop-memory-inventory.md) adds a bounded projection
+of slot, capacity/type, serial/part number, speed and manufacturer. Literal
+search and continuation share current authorization, exact membership and the
+committed `inventory.memory.read` audit. It grants no mutation permission.
+
 [Account display language](account-language.md) is a self-service preference.
 Its protected form always derives the account from the authenticated session;
 a language selection does not change roles or device permissions.

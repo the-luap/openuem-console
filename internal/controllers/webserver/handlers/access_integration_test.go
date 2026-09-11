@@ -111,6 +111,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("scoped desktop peripherals", func(t *testing.T) {
 		exerciseDesktopPeripheralsRoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})
+	t.Run("scoped desktop memory", func(t *testing.T) {
+		exerciseDesktopMemoryRoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
+	})
 	t.Run("Mac invitation rights require explicit security permission", func(t *testing.T) {
 		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})

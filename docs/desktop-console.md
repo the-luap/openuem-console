@@ -41,6 +41,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Read and search reported network adapters | Viewer in the selected organization or site |
 | Read and search reported physical/logical disks | Viewer in the selected organization or site |
 | Read and search reported monitors/printers | Viewer in the selected organization or site |
+| Read and search reported memory modules | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -119,6 +120,11 @@ The **Reported peripherals** tab provides [scoped monitor and printer reports](d
 with bounded literal search, audited reads and distinct missing/false/true
 printer flags. The page reports stored configuration without testing a port or
 asserting that a peripheral is connected or working.
+
+The **Reported memory modules** tab provides [scoped module reports](desktop-memory-inventory.md)
+with literal search, bounded continuation and a committed read audit. Reported
+capacity and speed retain their original units; missing module information does
+not become a zero capacity or a claim of complete hardware coverage.
 
 The shared inventory navigation identifies the current page through a highlighted,
 underlined link and `aria-current="page"`. The physical/logical storage selector

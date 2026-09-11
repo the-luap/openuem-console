@@ -30,6 +30,10 @@ func networkURL(info *partials.CommonInfo, id, search string, after int64) strin
 	return inventoryReportURL(info, id, "network", search, after)
 }
 
+func memoryURL(info *partials.CommonInfo, id, search string, after int64) string {
+	return inventoryReportURL(info, id, "memory", search, after)
+}
+
 func storageURL(info *partials.CommonInfo, id string, kind inventory.StorageKind, search string, after int64) string {
 	path := inventoryReportURL(info, id, "storage", search, after)
 	separator := "?"

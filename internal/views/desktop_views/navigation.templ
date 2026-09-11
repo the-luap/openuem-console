@@ -15,5 +15,6 @@ templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
 		<a class={ inventoryLinkClass(active,"network") } href={ networkURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"network") }>{ i18n.T(ctx,"inventory_navigation.network") }</a>
 		<a class={ inventoryLinkClass(active,"storage") } href={ storageURL(info,id,inventory.PhysicalStorage,"",0) } aria-current={ inventoryCurrent(active,"storage") }>{ i18n.T(ctx,"storage_inventory.reported") }</a>
 		<a class={ inventoryLinkClass(active,"peripherals") } href={ peripheralsURL(info,id,inventory.MonitorReports,"",0) } aria-current={ inventoryCurrent(active,"peripherals") }>{ i18n.T(ctx,"peripherals_inventory.reported") }</a>
+		<a class={ inventoryLinkClass(active,"memory") } href={ memoryURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"memory") }>{ i18n.T(ctx,"memory_inventory.reported") }</a>
 	</nav>
 }
