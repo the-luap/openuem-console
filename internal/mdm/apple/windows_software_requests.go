@@ -10,16 +10,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 // A preparation records operator intent only. It carries no execution payload,
-// broker command or observed state, and expires without becoming deliverable.
+// and expires without becoming deliverable. Dispatch, when present, is verified
+// history of the separately authorized registry task, never automatic promotion.
 type WindowsSoftwareRequest struct {
 	ID, AgentID, VersionID, Operation, Actor, Status string
 	TenantID, SiteID                                 int
 	CreatedAt, ExpiresAt                             time.Time
 	CompletedAt                                      *time.Time
+	Dispatch                                         *registry.SoftwareTaskStatus
 }
 
 type WindowsSoftwareTarget struct {
@@ -316,6 +319,28 @@ func (s *Store) ReadWindowsSoftwareRequests(ctx context.Context, scope Scope, ve
 	if len(page.Requests) > 50 {
 		page.NextRequest = page.Requests[49].ID
 		page.Requests = page.Requests[:50]
+	}
+	channel, _ := registry.NewAccessStore(s.db)
+	for index := range page.Requests {
+		r := &page.Requests[index]
+		if r.Status != "dispatched" {
+			continue
+		}
+		bound := Scope{TenantID: r.TenantID, SiteID: r.SiteID}
+		if err = windowsSoftwarePermissions(ctx, tx, permissions, actor, bound, false); err != nil {
+			return nil, err
+		}
+		var task string
+		if err = tx.QueryRowContext(ctx, `SELECT id FROM uem_windows_software_dispatches WHERE preparation_id=$1 AND tenant_id=$2 AND site_id=$3 AND version_id=$4`, r.ID, r.TenantID, r.SiteID, r.VersionID).Scan(&task); err != nil {
+			return nil, err
+		}
+		r.Dispatch, err = channel.ReadSoftwareTaskInTransaction(ctx, tx, registry.Scope{TenantID: r.TenantID, SiteID: r.SiteID}, task)
+		if err != nil {
+			return nil, err
+		}
+		if r.Dispatch.PreparationID != r.ID || r.Dispatch.RevisionID != r.VersionID || r.Dispatch.AgentID != r.AgentID || r.Dispatch.Operation != r.Operation {
+			return nil, ErrConflict
+		}
 	}
 	var ready bool
 	if err = tx.QueryRowContext(ctx, `SELECT to_regclass('uem_agent_identities') IS NOT NULL AND to_regclass('agents') IS NOT NULL AND to_regclass('site_agents') IS NOT NULL`).Scan(&ready); err != nil {

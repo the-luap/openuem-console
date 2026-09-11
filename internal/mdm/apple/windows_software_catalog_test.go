@@ -89,7 +89,12 @@ func TestWindowsSoftwareDefinitionAndCredentialProjection(t *testing.T) {
 
 func windowsSoftwareStore(t *testing.T) (*Store, *access.Store) {
 	t.Helper()
-	s := testStore(t)
+	return windowsSoftwareStoreBeforeMigration(t, "")
+}
+
+func windowsSoftwareStoreBeforeMigration(t *testing.T, before string) (*Store, *access.Store) {
+	t.Helper()
+	s := testStoreBeforeMigration(t, before)
 	if _, err := s.db.Exec(`CREATE TABLE users(uid TEXT PRIMARY KEY);INSERT INTO users VALUES('admin'),('reader'),('operator'),('second-admin')`); err != nil {
 		t.Fatal(err)
 	}

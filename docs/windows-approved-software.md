@@ -9,7 +9,8 @@ catalog and inspect safe metadata from their authorized organization/site.
 
 This milestone records approval intent. [Windows device requests](windows-software-requests.md)
 can now be prepared with an immutable revision, scoped individual identity and a
-short deadline. Explicit console dispatch is not implemented yet. Approval does not verify
+short deadline. Supported MSI/EXE requests now have a separate, explicit review
+and dispatch step with fresh authorization and verified result history. Approval does not verify
 an installer, install software or establish an observed device state. The existing
 upstream WinGet deployment workflow remains separate.
 
@@ -96,7 +97,7 @@ applications and ADE/Platform SSO prerequisite regressions use the expanded
 catalog projection. Handler tests exercise real scoped routes, role restrictions,
 strict forms, CSRF, redacted details, filtering and withdrawal.
 
-The browser suite includes 27 Windows catalog cases within 174 total cases at
+The browser suite includes 27 Windows catalog cases within 228 total cases at
 390/768/1440 pixels: all three approval/detail forms, reader and withdrawn states,
 keyboard confirmation, exact argument preservation, filtered pagination and
 horizontal overflow. These are owned synthetic fixtures, with intercepted form
@@ -115,13 +116,12 @@ process ownership and signed durable outcomes. An approved exit requires exact
 native state; restart-required and uncertain outcomes do not become completion.
 
 Device preparation is a separate, audited intent record with explicit cancellation
-and expiry. It does not invoke this helper or send a package command; the new
-schema contains no deliverable state. Existing preparations expire without
-automatic execution.
+and expiry. It does not invoke this helper or send a package command. A separate
+confirmed dispatch creates an authenticated task and closes its preparation in
+the same audited transaction. Existing preparations never execute automatically.
 
 WIN-01 remains in progress. Required next work includes immutable WinGet manifest
-resolution, explicit console dispatch with fresh authorization, cancellation and
-result history, uncertainty reconciliation, completed reboot evidence and real endpoint
+resolution, uncertainty reconciliation, completed reboot evidence and real endpoint
 acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's
 [bounded Windows execution implementation](https://github.com/the-luap/openuem-agent/blob/b87cbce5c5ff6990f9db98ad808b5a8fcc122eae/docs/windows-package-execution.md)

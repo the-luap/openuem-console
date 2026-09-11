@@ -2,7 +2,7 @@ export default async function run(browser,record) {
  const {visit,evaluate,check,enter,capture}=browser;
  for(const state of ["prepared","reader","cancelled","expired","withdrawn","empty"]) for(const width of [390,768,1440]) {
   await visit("windows-requests-"+state,width);
-  check(await evaluate("document.querySelector('main').textContent.includes('These preparations expire without automatic execution')"),"Preparation implied automatic installation");
+  check(await evaluate("document.querySelector('main').textContent.includes('preparations never execute automatically')"),"Preparation implied automatic installation");
   check(await evaluate("!document.querySelector('main img, main iframe')"),"Device or actor data injected markup");
   if(state==="reader") check(await evaluate("!document.querySelector('main form')"),"Reader received mutation or device selection controls");
   if(["cancelled","expired","empty"].includes(state)) check(await evaluate("!document.querySelector('main form[action$=cancel]')"),"Terminal or missing request could be cancelled");

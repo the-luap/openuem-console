@@ -25,7 +25,9 @@ import (
 // Ent schema used by TestNativeAppleConsoleRoutesWithPostgres.
 func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, tenantID, siteID int) {
 	t.Helper()
-	store, err := desktop.NewStore(h.Model.DB, strings.Repeat("d", 32))
+	// Production initializes the catalog and individual registry with the same
+	// console master key; dispatch signs using that registry's encrypted CA.
+	store, err := desktop.NewStore(h.Model.DB, strings.Repeat("k", 32))
 	if err != nil {
 		t.Fatal(err)
 	}

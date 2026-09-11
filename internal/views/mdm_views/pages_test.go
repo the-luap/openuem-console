@@ -15,6 +15,8 @@ import (
 	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
+	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -316,6 +318,36 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		}
 		return p
 	}
+	winReview := func(operation string) apple.WindowsSoftwareDispatchReview {
+		p := winRequestPage("prepared")
+		p.Requests[0].Operation = operation
+		return apple.WindowsSoftwareDispatchReview{Request: p.Requests[0], Version: p.Version, TargetName: p.Targets[0].Name, ReviewHash: strings.Repeat("a", 64), ExpiresAt: now.Add(time.Hour)}
+	}
+	winDispatchPage := func(state string) apple.WindowsSoftwareRequestsPage {
+		p := winRequestPage("prepared")
+		p.Requests[0].Status = "dispatched"
+		task := &registry.SoftwareTaskStatus{ID: "90000000-0000-4000-8000-000000000039", Actor: "Dispatcher <B>", Status: state, Operation: "install", CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+		if state != "pending" && state != "cancelled" && state != "expired" {
+			task.DeliveredAt = &now
+		}
+		if state == "observed" || state == "restart_required" || state == "uncertain" || state == "failed" || state == "not_started" {
+			code := uint32(0)
+			task.Status = "reported"
+			task.CompletedAt = &now
+			task.Outcome = &enrollment.SoftwareOutcome{State: state, Before: enrollment.SoftwareObservation{State: "absent"}, After: enrollment.SoftwareObservation{State: "present", Version: "42.0"}, ExitCode: &code}
+			if state == "restart_required" {
+				code = 3010
+				task.Status = state
+			}
+			if state == "uncertain" {
+				task.Status = state
+				task.Outcome.After = enrollment.SoftwareObservation{State: "unknown"}
+				task.Outcome.Error = "interrupted"
+			}
+		}
+		p.Requests[0].Dispatch = task
+		return p
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -362,8 +394,20 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"windows-software-reader", SoftwareVersion(c, &reader, winSoftware("windows-msi"), nil, false, SoftwareDeviceSearch{}), []string{"Windows approval recorded", "LICENSEKEY"}},
 		{"windows-software-withdrawn", SoftwareVersion(c, info, winWithdrawn, nil, true, SoftwareDeviceSearch{}), []string{"Withdrawn at", "Windows approval recorded"}},
 		{"windows-software-catalog", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{winSoftware("windows-msi")}, winSoftware("windows-msi").ID, false, SoftwareCatalogSearch{Query: "%_&", Platform: "windows"}), []string{"Windows &lt;Editor&gt;", "Search approved software", "Older revisions"}},
-		{"windows-requests-prepared", WindowsSoftwareRequests(c, info, winRequestPage("prepared"), "%_&", "90000000-0000-4000-8000-000000000037", "90000000-0000-4000-8000-000000000038", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; agent delivery unavailable", "Prepare request", "Cancel preparation", "Older requests"}},
-		{"windows-requests-reader", WindowsSoftwareRequests(c, &reader, winRequestPage("prepared"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; agent delivery unavailable", "Operator &lt;A&gt;"}},
+		{"windows-dispatch-install", WindowsSoftwareDispatch(c, info, winReview("install"), "90000000-0000-4000-8000-000000000039"), []string{"Review Windows execution", "Dispatch to this device", "Windows &lt;Device&gt;", "name=\"review_hash\""}},
+		{"windows-dispatch-remove", WindowsSoftwareDispatch(c, info, winReview("remove"), "90000000-0000-4000-8000-000000000039"), []string{"Application data may be affected", "Dispatch to this device"}},
+		{"windows-dispatch-pending", WindowsSoftwareRequests(c, info, winDispatchPage("pending"), "", "", "", ""), []string{"Queued; waiting for the agent", "Cancel queued operation", "Dispatcher &lt;B&gt;"}},
+		{"windows-dispatch-delivered", WindowsSoftwareRequests(c, info, winDispatchPage("delivered"), "", "", "", ""), []string{"Delivered; execution result pending"}},
+		{"windows-dispatch-observed", WindowsSoftwareRequests(c, info, winDispatchPage("observed"), "", "", "", ""), []string{"Exact approved version observed on the device", "present 42.0"}},
+		{"windows-dispatch-restart", WindowsSoftwareRequests(c, info, winDispatchPage("restart_required"), "", "", "", ""), []string{"completion is not established", "3010"}},
+		{"windows-dispatch-uncertain", WindowsSoftwareRequests(c, info, winDispatchPage("uncertain"), "", "", "", ""), []string{"Outcome uncertain", "Execution was interrupted"}},
+		{"windows-dispatch-reader", WindowsSoftwareRequests(c, &reader, winDispatchPage("pending"), "", "", "", ""), []string{"Queued; waiting for the agent", "Dispatcher &lt;B&gt;"}},
+		{"windows-dispatch-cancelled", WindowsSoftwareRequests(c, info, winDispatchPage("cancelled"), "", "", "", ""), []string{"Cancelled before delivery"}},
+		{"windows-dispatch-expired", WindowsSoftwareRequests(c, info, winDispatchPage("expired"), "", "", "", ""), []string{"Expired before delivery"}},
+		{"windows-dispatch-failed", WindowsSoftwareRequests(c, info, winDispatchPage("failed"), "", "", "", ""), []string{"Installer failed"}},
+		{"windows-dispatch-not-started", WindowsSoftwareRequests(c, info, winDispatchPage("not_started"), "", "", "", ""), []string{"Not started; device checks rejected execution"}},
+		{"windows-requests-prepared", WindowsSoftwareRequests(c, info, winRequestPage("prepared"), "%_&", "90000000-0000-4000-8000-000000000037", "90000000-0000-4000-8000-000000000038", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; explicit review and dispatch required", "Prepare request", "Cancel preparation", "Older requests"}},
+		{"windows-requests-reader", WindowsSoftwareRequests(c, &reader, winRequestPage("prepared"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; explicit review and dispatch required", "Operator &lt;A&gt;"}},
 		{"windows-requests-cancelled", WindowsSoftwareRequests(c, info, winRequestPage("cancelled"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Cancelled before delivery"}},
 		{"windows-requests-expired", WindowsSoftwareRequests(c, info, winRequestPage("expired"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Expired without delivery"}},
 		{"windows-requests-withdrawn", WindowsSoftwareRequests(c, info, winRequestPage("withdrawn"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"This approval is withdrawn", "Cancel preparation"}},

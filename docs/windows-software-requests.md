@@ -1,18 +1,18 @@
-# Windows software request preparation
+# Windows software requests and explicit dispatch
 
 Open an approved Windows revision and select **Windows device requests**. An
 operator can select an individually enrolled Windows endpoint, choose installation
 or removal, and explicitly confirm the exact revision and operation. Readers can
-inspect the scoped history. Every page states that agent delivery is unavailable:
-preparation does not download an artifact, run an installer, remove an application
-or establish installed state.
+inspect the scoped history. Preparation does not download an artifact, run an
+installer, remove an application or establish installed state. For an approved
+AMD64/ARM64 MSI or EXE, select **Review execution**, inspect the exact device,
+revision, operation and deadline, then confirm **Dispatch to this device**.
 
-This is the durable assignment-intent part of WIN-01. The schema deliberately
-contains only `prepared`, `cancelled` and `expired` states. No worker, agent RPC,
-legacy deployment subject or device command consumes these rows. They must not
-be automatically promoted to executable work by a later delivery implementation.
-That implementation requires a separate, explicit dispatch review and fresh
-authorization, artifact and native compatibility checks.
+Preparations remain inert, including rows created before the dispatch migration.
+Only the separate review and confirmed POST can atomically create a signed,
+encrypted individual-agent task and mark its preparation `dispatched`. The worker
+never consumes preparation rows. WinGet coordinates still require immutable
+installer resolution; x86 delivery remains unavailable.
 
 ## Admission and lifetime
 
@@ -31,7 +31,7 @@ agent architecture. The current individual enrollment supports AMD64 and ARM64;
 catalog x86 approvals therefore have no eligible individual endpoint yet. The
 selector does not claim that an inventory report establishes the required Windows
 build or installed product. Those need operation-bound native checks before
-eventual execution.
+execution.
 
 Only one preparation can remain open on an endpoint across all catalog packages.
 This conservative reservation also covers two catalog identifiers referring to
@@ -49,15 +49,59 @@ Preparing new work closes and audits expired reservations in the same transactio
 Cancellation requires current rights in the original site and works for an
 unsent preparation even if the device was subsequently revoked or moved.
 Terminal history and assignment intent cannot be updated, deleted or truncated.
+A dispatched preparation retains its immutable link to exactly one registry task.
+
+## Dispatch admission and outcomes
+
+Review requires current software/device read and assignment rights. It locks the
+current identity and registered software recipient, enabled inventory and its
+sole site, preparation, and approved revision in the worker's lock order. The
+original certificate generation must still match. The review hash binds the
+actor, original scope, device, preparation, immutable revision, operation,
+certificate/recipient generation, decrypted canonical plan and original deadline.
+The POST repeats every check; changing rights, inventory, approval, recipient or
+identity invalidates admission. A GET only records a read audit.
+
+MSI removal uses only the approved product/detection rule. EXE removal uses its
+separately approved HTTPS artifact, digest and literal arguments. Private values
+are decrypted only inside the trusted transaction and sealed for the endpoint's
+registered recipient. Public and encrypted revision metadata must agree.
+
+The signed task, immutable dispatch link, preparation transition and both audit
+records commit together. Audit failure or identity/deadline expiry rolls back
+admission. Deferred database constraints reject a link without its preparation
+transition. Concurrent confirmations admit one task; exact retries by the same
+actor return its existing state without resending, extending the deadline or
+re-admitting a changed identity. Current original-scope permissions still apply
+to historical retries.
+
+The agent validates the envelope, stages and verifies its artifact, checks native
+compatibility and exact before/after software state, and journals its signed
+result. **Queued** and **Delivered** do not establish installation or removal.
+History displays verified outcome observations, normalized failure reasons and
+exit codes. An observed target is distinct from a rejected start, installer
+failure, restart requirement or uncertainty. Restart and uncertain work keep the
+device reservation; automatic retries cannot assume the installer stopped.
+
+**Cancel queued operation** works only before delivery. It locks the original
+identity before the task, so cancellation and worker delivery cannot both win.
+It still works after inventory moves or identity revocation, with current rights
+in the original site. Delivered work cannot be cancelled or restored to an unsent
+preparation. Repeating a completed cancellation does not duplicate its audit.
+History remains in the original scope and verifies retained task/receipt
+signatures, including their certificate chain, without exposing private payloads.
 
 ## Forms, privacy and history
 
-All three routes are registered under the existing administrator,
+All routes are registered under the existing administrator,
 organization and site console prefixes:
 
 - `GET /software/catalog/:version/windows-requests`
 - `POST /software/catalog/:version/windows-requests`
 - `POST /software/catalog/:version/windows-requests/:request/cancel`
+- `GET /software/catalog/:version/windows-requests/:request/dispatch`
+- `POST /software/catalog/:version/windows-requests/:request/dispatch`
+- `POST /software/catalog/:version/windows-requests/:request/dispatch/cancel`
 
 POST bodies are limited to 8 KiB before CSRF parsing. They accept only unambiguous
 body fields, the CSRF token and explicit confirmation. Query parameters cannot
@@ -83,13 +127,17 @@ concurrent exact/different requests, native-identity aliases, scope and platform
 changes, inventory ambiguity, withdrawal, revoked rights, audit rollback,
 certificate expiry after audit, expired reservations, immutable history and
 pagination. Console tests use the real Ent schema, scoped router, sessions and
-CSRF middleware. Browser checks cover six states at 390/768/1440 pixels, including
-keyboard review/cancellation, exact device and revision fields, paging, reader
-restrictions and overflow. No package is downloaded or executed in these tests.
+CSRF middleware. Browser checks cover six preparation states and twelve review/result states at
+390/768/1440 pixels, including keyboard review/cancellation, exact device and
+revision fields, paging, reader restrictions and overflow. Dispatch tests cover
+four MSI/EXE install/remove plans, actual recipient registration, encrypted task
+decryption, signed outcomes, concurrent retries, stale reviews, atomic audit
+rollback, historical migration and cancellation. No package is downloaded or
+executed in these console tests.
 
-WIN-01 remains in progress. Immutable WinGet manifest resolution, custom artifact
-and signature verification, authenticated dispatch, operation-bound native
-installation/removal and observation, durable result receipts, restart/reboot
-recovery and actual endpoint acceptance remain required. See
+WIN-01 remains in progress. Immutable WinGet manifest resolution, uncertainty
+reconciliation, completed reboot evidence and actual endpoint acceptance remain
+required. Native staging, installation/removal and durable agent receipts have
+separate agent tests, including owned synthetic Windows MSI execution. See
 [approved Windows software](windows-approved-software.md) and the unchanged
 [full roadmap](fehlende-funktionen-und-roadmap.md).

@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["install","remove","pending","delivered","observed","restart","uncertain","reader","cancelled","expired","failed","not-started"].map(state=>"windows-dispatch-"+state),
   "profiles",
   "wifi-eap-profiles",
   "wifi-eap-reader",

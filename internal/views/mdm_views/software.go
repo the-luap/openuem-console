@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 )
 
@@ -20,7 +21,9 @@ func WindowsSoftwareOperation(operation string) string {
 func WindowsSoftwareRequestState(status string) string {
 	switch status {
 	case "prepared":
-		return "Prepared; agent delivery unavailable"
+		return "Prepared; explicit review and dispatch required"
+	case "dispatched":
+		return "Dispatched; see delivery and observed outcome below"
 	case "cancelled":
 		return "Cancelled before delivery"
 	case "expired":
@@ -28,6 +31,51 @@ func WindowsSoftwareRequestState(status string) string {
 	default:
 		return "Request state unavailable"
 	}
+}
+
+func WindowsSoftwareDispatchSupported(v apple.SoftwareVersion) bool {
+	return (v.Kind == "windows-msi" || v.Kind == "windows-exe") && (v.Architecture == "x86_64" || v.Architecture == "arm64")
+}
+
+func WindowsSoftwareDispatchState(task registry.SoftwareTaskStatus) string {
+	if task.Outcome != nil {
+		switch task.Outcome.State {
+		case "observed":
+			if task.Operation == "remove" {
+				return "Removal observed on the device"
+			}
+			return "Exact approved version observed on the device"
+		case "not_started":
+			return "Not started; device checks rejected execution"
+		case "failed":
+			return "Installer failed; review the reported observations"
+		case "restart_required":
+			return "Restart required; completion is not established and another operation is blocked"
+		case "uncertain":
+			return "Outcome uncertain; another operation is blocked"
+		}
+	}
+	switch task.Status {
+	case "pending":
+		return "Queued; waiting for the agent"
+	case "delivered":
+		return "Delivered; execution result pending"
+	case "cancelled":
+		return "Cancelled before delivery"
+	case "expired":
+		return "Expired before delivery"
+	case "uncertain":
+		return "Delivery expired; execution is uncertain and another operation is blocked"
+	}
+	return "Outcome unavailable"
+}
+
+func WindowsSoftwareOutcomeReason(reason string) string {
+	labels := map[string]string{"incompatible": "Device architecture or Windows version is incompatible", "version_conflict": "A different version was observed", "preflight": "Installer metadata could not be verified", "download": "Approved download could not be completed", "signature": "Native installer signature could not be verified", "changed_file": "The staged file changed", "execution": "Installer process did not complete successfully", "detection": "Exact software state could not be established", "interrupted": "Execution was interrupted", "journal": "Protected result history is unavailable", "unavailable": "Execution is currently unavailable"}
+	if label, ok := labels[reason]; ok {
+		return label
+	}
+	return "No additional reason reported"
 }
 
 func SoftwareVersionLabel(platform string) string {

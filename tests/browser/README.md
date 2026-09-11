@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 192 cases:
+headless Chrome session. The runner covers 228 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -12,6 +12,7 @@ headless Chrome session. The runner covers 192 cases:
 | Desktop software | Viewer/operator × first/next/empty/long reports × three widths | 24 |
 | Approved Windows software | WinGet/MSI/EXE approval and detail, reader, withdrawn and filtered catalog × three widths | 27 |
 | Windows device requests | Prepared, reader, cancelled, expired, withdrawn and empty × three widths | 18 |
+| Windows dispatch | Install/remove review, pending, delivered, observed, restart, uncertain, reader, cancelled, expired, failed and rejected start × three widths | 36 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard

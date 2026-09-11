@@ -75,3 +75,81 @@ func (h *Handler) CancelWindowsSoftwarePreparation(c echo.Context) error {
 	}
 	return appleRedirect(c, info, "/software/catalog/"+version+"/windows-requests")
 }
+
+func (h *Handler) ReviewWindowsSoftwareDispatch(c echo.Context) error {
+	adeHeaders(c)
+	info, scope, err := h.appleInfo(c)
+	if err != nil {
+		return err
+	}
+	if err = h.appleReady(); err != nil {
+		return err
+	}
+	version, err := softwareID(c.Param("version"))
+	if err != nil {
+		return err
+	}
+	id, err := softwareID(c.Param("request"))
+	if err != nil {
+		return err
+	}
+	review, err := h.Apple.ReviewWindowsSoftwareDispatch(c.Request().Context(), scope, version, id, h.appleActor(c), h.Access)
+	if err != nil {
+		return softwareFailure(err)
+	}
+	return RenderView(c, mdm_views.WindowsSoftwareDispatch(c, info, *review, uuid.NewString()))
+}
+
+func (h *Handler) DispatchWindowsSoftware(c echo.Context) error {
+	adeHeaders(c)
+	info, scope, err := h.appleInfo(c)
+	if err != nil {
+		return err
+	}
+	if err = h.appleReady(); err != nil {
+		return err
+	}
+	version, err := softwareID(c.Param("version"))
+	if err != nil {
+		return err
+	}
+	id, err := softwareID(c.Param("request"))
+	if err != nil {
+		return err
+	}
+	form, err := adeEnrollmentForm(c, "dispatch_id", "review_hash")
+	if err != nil {
+		return err
+	}
+	_, err = h.Apple.DispatchWindowsSoftware(c.Request().Context(), scope, version, id, form.Get("dispatch_id"), form.Get("review_hash"), h.appleActor(c), h.Access)
+	if err != nil {
+		return softwareFailure(err)
+	}
+	return appleRedirect(c, info, "/software/catalog/"+version+"/windows-requests")
+}
+
+func (h *Handler) CancelWindowsSoftwareDispatch(c echo.Context) error {
+	adeHeaders(c)
+	info, scope, err := h.appleInfo(c)
+	if err != nil {
+		return err
+	}
+	if err = h.appleReady(); err != nil {
+		return err
+	}
+	version, err := softwareID(c.Param("version"))
+	if err != nil {
+		return err
+	}
+	id, err := softwareID(c.Param("request"))
+	if err != nil {
+		return err
+	}
+	if _, err = adeEnrollmentForm(c); err != nil {
+		return err
+	}
+	if err = h.Apple.CancelWindowsSoftwareDispatch(c.Request().Context(), scope, version, id, h.appleActor(c), h.Access); err != nil {
+		return softwareFailure(err)
+	}
+	return appleRedirect(c, info, "/software/catalog/"+version+"/windows-requests")
+}

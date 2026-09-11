@@ -17,7 +17,7 @@ import (
 
 func exerciseWindowsSoftwareRequests(t *testing.T, h *Handler, ctx context.Context, tenant, site int, version string, request func(string, string, string, url.Values) *httptest.ResponseRecorder) {
 	t.Helper()
-	r, err := registry.NewStore(h.Model.DB, strings.Repeat("d", 32))
+	r, err := registry.NewStore(h.Model.DB, strings.Repeat("k", 32))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func exerciseWindowsSoftwareRequests(t *testing.T, h *Handler, ctx context.Conte
 	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin"} {
 		rec := request(user, "GET", path, nil)
 		body := rec.Body.String()
-		if rec.Code != 200 || !strings.Contains(body, "Agent delivery is not available yet") || strings.Contains(body, "route-secret") || strings.Contains(body, "route-license") || rec.Header().Get("Cache-Control") != "no-store" {
+		if rec.Code != 200 || !strings.Contains(body, "preparations never execute automatically") || strings.Contains(body, "route-secret") || strings.Contains(body, "route-license") || rec.Header().Get("Cache-Control") != "no-store" {
 			t.Fatal("unsafe preparation page", user, rec.Code, body)
 		}
 		if strings.Contains(body, "Prepare request") != (user != "scoped-viewer") {
@@ -111,4 +111,5 @@ func exerciseWindowsSoftwareRequests(t *testing.T, h *Handler, ctx context.Conte
 	if rec := request("scoped-viewer", "GET", path, nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "Cancelled before delivery") || strings.Contains(rec.Body.String(), "Cancel preparation") {
 		t.Fatal("history missing or reader mutation", rec.Code)
 	}
+	exerciseWindowsSoftwareDispatch(t, h, ctx, identity, keys, path, form(), request)
 }

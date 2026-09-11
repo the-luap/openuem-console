@@ -47,6 +47,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/windows-requests":
 			return access.ReadSoftware, true
+		case "/software/catalog/:version/windows-requests/:request/dispatch":
+			return access.AssignSoftware, true
 		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
@@ -67,7 +69,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/install", "/ios/:id/applications/:assignment/action":
 			return access.AssignSoftware, true
-		case "/software/catalog/:version/windows-requests", "/software/catalog/:version/windows-requests/:request/cancel":
+		case "/software/catalog/:version/windows-requests", "/software/catalog/:version/windows-requests/:request/cancel", "/software/catalog/:version/windows-requests/:request/dispatch", "/software/catalog/:version/windows-requests/:request/dispatch/cancel":
 			return access.AssignSoftware, true
 		case "/ios/ade/servers", "/ios/ade/servers/:id/token", "/ios/ade/servers/:id/action", "/ios/ade/servers/:id/profiles", "/ios/ade/servers/:id/profiles/:profile/action", "/ios/ade/servers/:id/targets", "/ios/ade/servers/:id/targets/:serial/rearm", "/ios/setup", "/ios/setup/requests", "/ios/setup/requests/:id/revoke", "/ios/setup/requests/:id/certificate", "/ios/setup/requests/:id/vendor":
 			return access.ManageCertificates, true

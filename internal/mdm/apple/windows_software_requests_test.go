@@ -15,7 +15,18 @@ import (
 
 func windowsRequestFixture(t *testing.T) (*Store, *access.Store, *SoftwareVersion, string) {
 	t.Helper()
-	s, permissions := windowsSoftwareStore(t)
+	s, p, v, issued, _ := windowsRequestFixtureWithKeys(t)
+	return s, p, v, issued.DeviceID
+}
+
+func windowsRequestFixtureWithKeys(t *testing.T) (*Store, *access.Store, *SoftwareVersion, *enrollment.Response, *enrollment.Keys) {
+	t.Helper()
+	return windowsRequestFixtureBeforeMigration(t, "")
+}
+
+func windowsRequestFixtureBeforeMigration(t *testing.T, before string) (*Store, *access.Store, *SoftwareVersion, *enrollment.Response, *enrollment.Keys) {
+	t.Helper()
+	s, permissions := windowsSoftwareStoreBeforeMigration(t, before)
 	r, err := registry.NewStore(s.db, "integration-test-master-key-32-bytes-minimum")
 	if err != nil {
 		t.Fatal(err)
@@ -23,6 +34,7 @@ func windowsRequestFixture(t *testing.T) (*Store, *access.Store, *SoftwareVersio
 	if err = r.Migrate(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	s.agentRegistry = r
 	if _, err = r.EnsureAuthority(t.Context(), 1, "Owned Windows preparation", "https://uem.example.test", "admin", nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +68,7 @@ func windowsRequestFixture(t *testing.T) (*Store, *access.Store, *SoftwareVersio
 	if err != nil {
 		t.Fatal(err)
 	}
-	return s, permissions, version, issued.DeviceID
+	return s, permissions, version, issued, keys
 }
 
 func TestWindowsSoftwareRequestConcurrentIntentAndCancellation(t *testing.T) {

@@ -10,6 +10,7 @@ import inventory from "./desktop-inventory.mjs";
 import software from "./desktop-software.mjs";
 import windowsSoftware from "./windows-software-catalog.mjs";
 import windowsRequests from "./windows-software-requests.mjs";
+import windowsDispatch from "./windows-software-dispatch.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -45,6 +46,7 @@ try {
         [software, 24],
         [windowsSoftware, 27],
         [windowsRequests, 18],
+        [windowsDispatch, 36],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

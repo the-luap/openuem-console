@@ -14,7 +14,7 @@ templ WindowsSoftwareApproval(c echo.Context, info *partials.CommonInfo, kind, r
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:"Approve Windows package",Url:partials.GetNavigationUrl(info,"/software/catalog/windows/new")}},info)
 		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Approve a Windows package</h1><p class="uk-text-muted mt-2">Record the exact package and how its installed state must be verified. Device requests can be prepared after approval; agent delivery is not available yet.</p>@Navigation(info)</div>
+			<div><h1 class="text-2xl font-semibold">Approve a Windows package</h1><p class="uk-text-muted mt-2">Record the exact package and how its installed state must be verified. After approval, prepare a device request and explicitly review supported MSI/EXE execution.</p>@Navigation(info)</div>
 			<form method="get" action={partials.GetNavigationUrl(info,"/software/catalog/windows/new")}>
 				<label>Package type<select class="uk-select" name="kind"><option value="windows-winget" selected?={kind=="windows-winget"}>WinGet standard package</option><option value="windows-msi" selected?={kind=="windows-msi"}>Custom MSI package</option><option value="windows-exe" selected?={kind=="windows-exe"}>Custom EXE package</option></select></label>
 				<button class="uk-button uk-button-default mt-4" type="submit">Choose package type</button>
@@ -86,7 +86,7 @@ templ WindowsSoftwareApproval(c echo.Context, info *partials.CommonInfo, kind, r
 }
 
 templ WindowsSoftwareRequirements(v apple.SoftwareVersion) {
-	<p role="status" class="uk-alert mt-4">Windows approval recorded. Device requests can be prepared. Delivery through the individual agent is not available yet.</p>
+	<p role="status" class="uk-alert mt-4">Windows approval recorded. Prepare a device request, then review and explicitly dispatch supported MSI/EXE execution to an eligible individual agent.</p>
 	<dl class="uk-description-list mt-4">
 		<dt>Detection rule</dt><dd>{v.Windows.Detection.Kind} · exact version {v.Windows.Detection.Version}</dd>
 			if v.Windows.Detection.Kind=="msi-product" {
