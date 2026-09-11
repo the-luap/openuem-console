@@ -60,7 +60,7 @@ func (h *Handler) Auth(c echo.Context) error {
 		}
 		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
 
-		if err := h.Model.AddUserToSession(token, uid, h.EncryptionMasterKey); err != nil {
+		if err := h.Model.AddUserToSession(c.Request().Context(), token, uid, h.EncryptionMasterKey); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 

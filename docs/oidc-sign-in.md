@@ -160,3 +160,5 @@ retirement, and injected session-store and cleanup failures.
 Protected-route tests cover live identity/policy changes, revocation and account
 mode/approval changes, missing legacy evidence, database lock cancellation and
 recovery, and an account revoked by a database trigger during admission.
+This matrix also runs with encrypted database token IDs; shared storage behavior
+and remaining lifecycle limits are documented in [session storage](session-storage.md).

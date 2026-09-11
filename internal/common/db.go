@@ -12,6 +12,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/utils"
 	"golang.org/x/mod/semver"
 )
@@ -513,7 +514,7 @@ func (w *Worker) EncryptSessionsTokens() error {
 
 	for _, t := range tokens {
 		if t.ID != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(t.ID, w.EncryptionMasterKey)
+			_, isEncrypted, err := sessiontokens.Decode(t.ID, w.EncryptionMasterKey)
 			if err != nil {
 				return err
 			}

@@ -160,6 +160,16 @@ func (p *ownedOIDCProvider) grant(t *testing.T, location, mode, username string,
 }
 
 func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
+	for _, encrypted := range []bool{false, true} {
+		name := "plaintext tokens"
+		if encrypted {
+			name = "encrypted tokens"
+		}
+		t.Run(name, func(t *testing.T) { runOIDCConsoleWithOwnedProvider(t, encrypted) })
+	}
+}
+
+func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for OIDC integration")
@@ -241,9 +251,13 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 	}
 	defer pool.Close()
 	sm := scs.New()
-	sm.Store = sessions.NewWithConfig(pool, sessions.Config{})
+	masterKey := ""
+	if encrypted {
+		masterKey = strings.Repeat("k", 32)
+	}
+	sm.Store = sessions.NewWithConfig(pool, sessions.Config{EncryptionMasterKey: masterKey})
 	sm.Cookie.Secure = true
-	h := &Handler{Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport}
+	h := &Handler{Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport, EncryptionMasterKey: masterKey}
 	e := router.New(h.SessionManager, "console.test", "443", "1M")
 	e.GET("/oidc", h.OIDCLogIn)
 	e.GET("/oidc/callback", h.OIDCCallback)

@@ -61,7 +61,7 @@ func (h *Handler) createPasswordReplacementSession(c echo.Context, user *ent.Use
 		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be stored.")
 	}
 	sm.WriteSessionCookie(ctx, c.Response().Writer, token, expiry)
-	if err = h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
+	if err = h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be associated.")
 	}
 	return nil

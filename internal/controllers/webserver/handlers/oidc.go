@@ -488,7 +488,7 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcac
 	if err != nil {
 		return err
 	}
-	if err = h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
+	if err = h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
 		return err
 	}
 	if err = h.Model.ConfirmOIDCLogIn(ctx, user.ID); err != nil {

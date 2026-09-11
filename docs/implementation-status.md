@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Session token storage](session-storage.md) now serializes encrypted token
+  resolution/writes and performs primary-key migration in one statement.
+  Deletion removes every representation, ambiguous legacy credentials retire
+  for fresh sign-in, storage errors propagate, and bounded legacy decoding
+  handles short hex/plaintext records without panics. Owner association requires
+  an exact unique record and honors request cancellation. Owned PostgreSQL race
+  fixtures first reproduced twelve concurrent rows and usable sessions after
+  deletion; the fixed suite passes concurrency, migration, mixed-record and
+  single-connection cases. The token decoder passes race tests and 1,371,911
+  fuzz executions in 15 seconds. Actual Linux ARM64 startup migration and full
+  console routes pass; the complete owned OIDC matrix now covers both plaintext
+  and encrypted token storage. Auth-server/router race suites and the full Linux
+  ARM64 build pass. Indexed lookup, durable token revocation against later writes
+  from in-flight requests and production-scale acceptance remain open.
+
 - OpenID sessions now retain local identity/revision/policy evidence and recheck
   it before protected console requests. Disabled or replaced bindings, changed
   configuration, missing legacy evidence and account mode/approval changes deny

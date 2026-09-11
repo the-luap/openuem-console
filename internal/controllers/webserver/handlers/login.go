@@ -333,7 +333,7 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 	}
 	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
 
-	if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
+	if err := h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
@@ -531,7 +531,7 @@ func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
 	}
 	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
 
-	if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
+	if err := h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
