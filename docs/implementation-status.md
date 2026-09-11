@@ -61,6 +61,30 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [authenticated Windows software protocol](https://github.com/the-luap/openuem-nats/blob/b932b7b4316170dea4c7c5c74327ac0371494aa6/enrollment/windows-software.md)
+  now signs encrypted MSI/EXE task envelopes with a task-bound command certificate
+  under the independently pinned enrollment CA. Private plans bind exact scope,
+  certificate generation, approval/preparation, recipient, deadline and detection
+  expectations. The [agent journal/client](https://github.com/the-luap/openuem-agent/blob/da964472c33eddb31194010ec029a797c25ef1e8/docs/windows-software-delivery.md)
+  has exclusive immutable execution admission, generation-specific recipient keys,
+  durable signed outcomes and current-certificate submission proofs for historical
+  receipts. The [worker RPC](https://github.com/the-luap/openuem-worker/blob/a9886d2135f6b00c294fc8014650fcfb596463d2/docs/windows-software-delivery.md)
+  holds current identity, inventory status/site and result/audit in one transaction.
+  An agent awaiting admission or disabled agent cannot receive new work; a disabled
+  agent can report previously delivered work in its unchanged authorized scope.
+  Delivered expiry and interrupted execution remain reserved as uncertain.
+  Local verification passes: the full shared protocol/race suite, the complete
+  PostgreSQL registry/race suite (69.905 seconds), 567,381 software-wire fuzz inputs,
+  complete agent Store/runtime race suites (52.416/11.959 seconds), isolated native
+  Keychain inventory/lock tests, Windows cross-compilation and real worker
+  PostgreSQL/WSS tests, including result-audit rollback and scope/status lock waits.
+  New native CI is pending for these commits. The agent client is not yet wired to
+  service startup or native MSI/EXE staging/execution, and the console has no
+  explicit dispatch/reconciliation UI. No installer was downloaded or executed.
+  Existing preparations remain non-executable; WinGet artifact resolution and
+  physical endpoint acceptance remain open. WIN-01/SW-01 and the full roadmap
+  scope remain in progress.
+
 - [Windows device request preparation](windows-software-requests.md) connects an
   immutable catalog revision to a current individual Windows identity and its
   sole inventory site. Transactional rights, identity/approval locks, generation
@@ -77,6 +101,9 @@ the table's package summaries do not remove any detail from the roadmap.
   The complete handler suite, rendered-view race checks and all 192 browser
   cases pass; 18 new cases cover preparation/history states. Linux/Windows
   builds and focused vet pass. No package was downloaded or executed.
+  All six CI runs for preparation commit `811776e` passed, including the Native
+  Apple management [pull-request run](https://github.com/the-luap/openuem-console/actions/runs/34575448340)
+  and [push run](https://github.com/the-luap/openuem-console/actions/runs/34575445134).
   WIN-01 and SW-01 remain in progress; every broader roadmap requirement remains
   unchanged.
 
