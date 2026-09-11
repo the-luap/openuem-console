@@ -67,7 +67,10 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	if created, err := Initialize(ctx, m.DB, config); err != nil || !created {
 		t.Fatal("bootstrap failed", created, err)
 	}
-	sm := sessions.New(m.databaseURL, 30, key)
+	sm, err := sessions.New(m.databaseURL, 30, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer sm.Close()
 	permissions, _ := access.NewStore(m.DB)
 	h := &handlers.Handler{Model: m.Model, Access: permissions, SessionManager: sm, EncryptionMasterKey: key, PublicOrigin: "https://uem.example.test", AuthLogger: log.New(io.Discard, "", 0)}

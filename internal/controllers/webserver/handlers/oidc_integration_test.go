@@ -255,7 +255,11 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	if encrypted {
 		masterKey = strings.Repeat("k", 32)
 	}
-	sm.Store = sessions.NewWithConfig(pool, sessions.Config{EncryptionMasterKey: masterKey})
+	store := sessions.NewWithConfig(pool, sessions.Config{EncryptionMasterKey: masterKey})
+	if err = store.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	sm.Store = store
 	sm.Cookie.Secure = true
 	h := &Handler{Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport, EncryptionMasterKey: masterKey}
 	e := router.New(h.SessionManager, "console.test", "443", "1M")

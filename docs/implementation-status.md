@@ -61,15 +61,32 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Session storage](session-storage.md) now uses unique indexed logical-token
+  lookup and permanent transactional revocation receipts. Completed logout,
+  administrator/bulk deletion, truncation and expiry cleanup cannot be undone by
+  a previously loaded request or a restarted console. Per-token locks recheck
+  revocation after row-lock waits, with explicit Read Committed isolation;
+  unrelated token writes proceed independently. Additive startup migration binds
+  the encryption configuration, preserves unique legacy records, retires every
+  duplicate and rejects old unindexed writers. The six-case baseline reproduced
+  usable sessions returning after deletion. PostgreSQL race tests pass in 8.716
+  seconds, including rollback/fault injection, idle cleanup, eight concurrent
+  starts, 1,002 duplicates across migration batches, key mismatch and changed
+  schema search paths. A 2,000-row query plan uses the lookup index. Actual Linux
+  ARM64 console routes, production startup migration, protected administrator
+  password lifecycle and full console compilation pass. Upgrades require stopped
+  old writers; receipt retention, key/mode rotation and production-scale storage
+  acceptance remain open. This does not cancel already admitted application work.
+
 - Session expiry cleanup now uses cancellable, thirty-second database attempts,
   idempotent joined shutdown and worker-before-pool closure. PostgreSQL race
   tests pass in 3.806 seconds, including twelve simultaneous stop calls and
   manager closure while cleanup waits on a held table lock. The full Linux
-  ARM64 console build passes. This addresses worker lifecycle; indexed token
-  lookup and durable session revocation remain separate work below.
+  ARM64 console build passes. Worker lifecycle and storage revocation are now
+  covered; production-scale operational acceptance remains open.
 
-- [Session token storage](session-storage.md) now serializes encrypted token
-  resolution/writes and performs primary-key migration in one statement.
+- The first [session token storage](session-storage.md) correction serialized
+  encrypted token resolution/writes and made primary-key migration atomic.
   Deletion removes every representation, ambiguous legacy credentials retire
   for fresh sign-in, storage errors propagate, and bounded legacy decoding
   handles short hex/plaintext records without panics. Owner association requires
@@ -80,8 +97,8 @@ the table's package summaries do not remove any detail from the roadmap.
   fuzz executions in 15 seconds. Actual Linux ARM64 startup migration and full
   console routes pass; the complete owned OIDC matrix now covers both plaintext
   and encrypted token storage. Auth-server/router race suites and the full Linux
-  ARM64 build pass. Indexed lookup, durable token revocation against later writes
-  from in-flight requests and production-scale acceptance remain open.
+  ARM64 build passed. The indexed lookup and durable revocation follow-up is
+  described above; production-scale acceptance remains open.
 
 - OpenID sessions now retain local identity/revision/policy evidence and recheck
   it before protected console requests. Disabled or replaced bindings, changed

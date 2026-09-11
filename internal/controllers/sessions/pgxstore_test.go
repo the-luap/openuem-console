@@ -27,6 +27,10 @@ type sessionFixture struct {
 
 func blockedCleanup(t *testing.T, f sessionFixture) *sessions.PostgresStore {
 	t.Helper()
+	store := sessions.NewWithConfig(f.pool, sessions.Config{CleanUpInterval: time.Millisecond, EncryptionMasterKey: f.key})
+	if err := store.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	tx, err := f.model.DB.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +39,6 @@ func blockedCleanup(t *testing.T, f sessionFixture) *sessions.PostgresStore {
 	if _, err = tx.ExecContext(t.Context(), `LOCK TABLE sessions IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
-	store := sessions.NewWithConfig(f.pool, sessions.Config{CleanUpInterval: time.Millisecond})
 	deadline := time.Now().Add(2 * time.Second)
 	for f.pool.Stat().AcquiredConns() == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
@@ -97,6 +100,15 @@ func TestSessionManagerCloseJoinsCleanupBeforePoolClose(t *testing.T) {
 
 func newSessionFixture(t *testing.T, encrypted bool, connections ...int32) sessionFixture {
 	t.Helper()
+	f := newLegacySessionFixture(t, encrypted, connections...)
+	if err := f.store.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func newLegacySessionFixture(t *testing.T, encrypted bool, connections ...int32) sessionFixture {
+	t.Helper()
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for session storage integration")
@@ -125,6 +137,10 @@ func newSessionFixture(t *testing.T, encrypted bool, connections ...int32) sessi
 	if err != nil {
 		t.Fatal(err)
 	}
+	config.ConnConfig.RuntimeParams["application_name"] = schema
+	// Store transactions must explicitly select the isolation they need, rather
+	// than inherit a deployment's stronger default and its older read snapshot.
+	config.ConnConfig.RuntimeParams["default_transaction_isolation"] = "repeatable read"
 	if len(connections) > 0 {
 		config.MaxConns = connections[0]
 	}
@@ -148,8 +164,7 @@ func newSessionFixture(t *testing.T, encrypted bool, connections ...int32) sessi
 }
 
 func TestEncryptedLegacyDuplicateDeletionAndSingleConnection(t *testing.T) {
-	f := newSessionFixture(t, true, 1)
-	ctx := t.Context()
+	f := newLegacySessionFixture(t, true, 1)
 	token := strings.Repeat("a", 43)
 	for i := range 3 {
 		record, err := utils.EncryptSensitiveField(token, f.key)
@@ -164,30 +179,31 @@ func TestEncryptedLegacyDuplicateDeletionAndSingleConnection(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := f.store.CommitCtx(ctx, token, []byte("replacement"), time.Now().Add(time.Hour)); err == nil {
-		t.Fatal("ambiguous session was updated")
-	}
-	if _, err := f.store.AllCtx(ctx); err == nil {
-		t.Fatal("session enumeration hid duplicate identity")
-	}
-	if _, found, err := f.store.FindCtx(ctx, token); err != nil || found {
-		t.Fatal("ambiguous old session was not retired for fresh sign-in", found, err)
-	}
-	var count int
-	if err := f.model.DB.QueryRow(`SELECT count(*) FROM sessions`).Scan(&count); err != nil || count != 0 {
-		t.Fatal("expired duplicate remained after deletion", count, err)
-	}
-	if err := f.store.DeleteCtx(ctx, token); err != nil {
-		t.Fatal("repeated deletion failed", err)
-	}
 	if _, err := f.model.DB.Exec(`INSERT INTO sessions(token,data,expiry) VALUES('00',$1,$2)`, []byte("malformed legacy"), time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	deadline, cancel := context.WithTimeout(ctx, 3*time.Second)
+	if err := f.store.Migrate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.store.CommitCtx(t.Context(), token, []byte("replacement"), time.Now().Add(time.Hour)); err == nil {
+		t.Fatal("retired duplicate credential was recreated")
+	}
+	if _, found, err := f.store.FindCtx(t.Context(), token); err != nil || found {
+		t.Fatal("ambiguous old session survived migration", found, err)
+	}
+	var count int
+	if err := f.model.DB.QueryRow(`SELECT count(*) FROM sessions`).Scan(&count); err != nil || count != 1 {
+		t.Fatal("expired duplicate remained after migration", count, err)
+	}
+	if err := f.store.DeleteCtx(t.Context(), token); err != nil {
+		t.Fatal(err)
+	}
+	token = strings.Repeat("b", 43)
+	deadline, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	for range 2 {
 		if err := f.store.CommitCtx(deadline, token, []byte("current"), time.Now().Add(time.Hour)); err != nil {
-			t.Fatal("single-connection update did not release its cursor", err)
+			t.Fatal("single-connection update failed", err)
 		}
 	}
 	if data, found, err := f.store.FindCtx(deadline, token); err != nil || !found || string(data) != "current" {
@@ -199,7 +215,7 @@ func TestEncryptedLegacyDuplicateDeletionAndSingleConnection(t *testing.T) {
 }
 
 func TestSessionTokenMigrationPreservesOneOwnedRecord(t *testing.T) {
-	f := newSessionFixture(t, true)
+	f := newLegacySessionFixture(t, true)
 	ctx := t.Context()
 	token := strings.Repeat("z", 43)
 	if err := f.model.Client.User.Create().SetID("owner").SetName("Owned user").Exec(ctx); err != nil {
@@ -233,6 +249,9 @@ func TestSessionTokenMigrationPreservesOneOwnedRecord(t *testing.T) {
 	}
 	if success != 1 {
 		t.Fatal("concurrent migrations did not select one replacement", success)
+	}
+	if err := f.store.Migrate(ctx); err != nil {
+		t.Fatal(err)
 	}
 	if err := f.store.CommitCtx(ctx, token, []byte("new"), time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
@@ -307,7 +326,7 @@ func TestEncryptedSessionReportsStorageErrors(t *testing.T) {
 }
 
 func TestMixedSessionOwnerAssociation(t *testing.T) {
-	f := newSessionFixture(t, true)
+	f := newLegacySessionFixture(t, true)
 	ctx := t.Context()
 	if err := f.model.Client.User.Create().SetID("session-user").SetName("Owned user").Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -322,6 +341,9 @@ func TestMixedSessionOwnerAssociation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = f.model.Client.Sessions.Create().SetID(encrypted).SetData([]byte("owned")).SetExpiry(time.Now().Add(time.Hour)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.model.AddUserToSession(t.Context(), token, "session-user", f.key); err != nil {

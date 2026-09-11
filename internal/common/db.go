@@ -12,7 +12,6 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/controllers/webserver"
 	"github.com/open-uem/openuem-console/internal/models"
-	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/utils"
 	"golang.org/x/mod/semver"
 )
@@ -236,7 +235,10 @@ func (w *Worker) StartConsoleService() error {
 		sessionLifetimeInMinutes = 1440
 	}
 
-	w.SessionManager = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	w.SessionManager, err = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	if err != nil {
+		return err
+	}
 
 	// HTTPS web server
 	w.WebServer = webserver.New(w.Model, w.NATSServers, w.SessionManager, w.TaskScheduler, w.JWTKey, w.ConsoleCertPath, w.ConsolePrivateKeyPath, w.SFTPPrivateKeyPath, w.CACertPath, serverName, consolePort, authPort, w.DownloadDir, w.Domain, w.OrgName, w.OrgProvince, w.OrgLocality, w.OrgAddress, w.Country, w.ReverseProxyAuthPort, w.ReverseProxyServer, w.ServerReleasesFolder, w.CommonSoftwareDBFolder, w.Version, w.EncryptionMasterKey, w.ReenableCertAuth, w.ReenablePasswdAuth, w.ResetOpenUEMUser, w.AuthLogger)
@@ -298,10 +300,8 @@ func (w *Worker) EncryptSensitiveFields() error {
 		return err
 	}
 
-	// 7. Encrypt Sessions tokens if needed
-	if err := w.EncryptSessionsTokens(); err != nil {
-		return err
-	}
+	// Session tokens migrate with their durable lookup/revocation schema before
+	// either HTTP server starts. That migration also verifies the configured key.
 
 	return nil
 }
@@ -497,37 +497,6 @@ func (w *Worker) EncryptSentitiveTaskInformation() error {
 
 				if err := w.Model.UpdateLocalUserPassword(t.ID, encryptedKey); err != nil {
 					log.Printf("[ERROR]: could not encrypt Local User Password, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptSessionsTokens() error {
-	tokens, err := w.Model.GetSessionsTokens()
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tokens {
-		if t.ID != "" {
-			_, isEncrypted, err := sessiontokens.Decode(t.ID, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedToken, err := utils.EncryptSensitiveField(t.ID, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateSessionToken(t.ID, encryptedToken); err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
 					continue
 				}
 			}

@@ -2,8 +2,9 @@ package models
 
 import (
 	"context"
-	"entgo.io/ent/dialect/sql"
 	"errors"
+
+	"entgo.io/ent/dialect/sql"
 
 	ent "github.com/open-uem/ent"
 	"github.com/open-uem/ent/sessions"
@@ -80,33 +81,20 @@ func (m *Model) UpdateSessionToken(tokenID string, newTokenID string) error {
 	return nil
 }
 
+// AddUserToSession resolves one indexed record and verifies its configured token
+// representation. The final UPDATE cannot recreate a concurrently deleted row.
 func (m *Model) AddUserToSession(ctx context.Context, token string, userID string, encryptionMasterKey string) error {
-	if encryptionMasterKey == "" {
-		return m.Client.Sessions.UpdateOneID(token).SetOwnerID(userID).Exec(ctx)
-	}
-	records, err := m.Client.Sessions.Query().Select(sessions.FieldID).All(ctx)
+	var record string
+	err := m.DB.QueryRowContext(ctx, `SELECT token FROM sessions s WHERE s.token_lookup=$1 AND NOT EXISTS(SELECT 1 FROM sessions_revocations r WHERE r.token_lookup=s.token_lookup)`, sessiontokens.Lookup(token)).Scan(&record)
 	if err != nil {
 		return err
 	}
-	matched := ""
-	for _, record := range records {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		plain, encrypted, err := sessiontokens.Decode(record.ID, encryptionMasterKey)
-		if err != nil {
-			return err
-		}
-		if !encrypted || plain != token {
-			continue
-		}
-		if matched != "" {
-			return errors.New("multiple records represent one session token")
-		}
-		matched = record.ID
+	plain, encrypted, err := sessiontokens.Decode(record, encryptionMasterKey)
+	if err != nil {
+		return err
 	}
-	if matched == "" {
-		return errors.New("encrypted session token not found")
+	if plain != token || (encryptionMasterKey != "" && !encrypted) {
+		return errors.New("session token record does not match its encryption configuration")
 	}
-	return m.Client.Sessions.UpdateOneID(matched).SetOwnerID(userID).Exec(ctx)
+	return m.Client.Sessions.UpdateOneID(record).SetOwnerID(userID).Exec(ctx)
 }

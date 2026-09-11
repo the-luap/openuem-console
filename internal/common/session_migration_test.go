@@ -4,15 +4,16 @@ package common_test
 
 import (
 	"database/sql"
-	"github.com/google/uuid"
-	"github.com/open-uem/openuem-console/internal/common"
-	"github.com/open-uem/openuem-console/internal/models"
-	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/controllers/sessions"
+	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 )
 
 func TestStartupSessionEncryptionPreservesLegacyRecords(t *testing.T) {
@@ -56,12 +57,14 @@ func TestStartupSessionEncryptionPreservesLegacyRecords(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	w := &common.Worker{Model: m, EncryptionMasterKey: strings.Repeat("k", 32)}
+	key := strings.Repeat("k", 32)
 	var original map[string]bool
 	for range 2 {
-		if err = w.EncryptSessionsTokens(); err != nil {
+		manager, err := sessions.New(u.String(), 30, key)
+		if err != nil {
 			t.Fatal(err)
 		}
+		manager.Close()
 		records, err := m.Client.Sessions.Query().WithOwner().All(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -71,7 +74,7 @@ func TestStartupSessionEncryptionPreservesLegacyRecords(t *testing.T) {
 		}
 		keys := map[string]bool{}
 		for _, record := range records {
-			plain, encrypted, err := sessiontokens.Decode(record.ID, w.EncryptionMasterKey)
+			plain, encrypted, err := sessiontokens.Decode(record.ID, key)
 			if err != nil || !encrypted || (plain != "00" && plain != strings.Repeat("a", 43)) || string(record.Data) != "owned data" || !record.Expiry.Equal(expiry) || record.Edges.Owner == nil || record.Edges.Owner.ID != "owned-user" {
 				t.Fatal("startup migration lost data, expiry or ownership", err)
 			}

@@ -1,11 +1,14 @@
 package sessions
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -14,8 +17,8 @@ import (
 	"github.com/open-uem/utils"
 )
 
-// This code is cherry-picked from https://github.com/alexedwards/scs/blob/209de6e426de9259665975ce16b91331d228f052/pgxstore/pgxstore.go#L11
-// so we can support token encryption/decryption
+// Originally adapted from the SCS pgxstore, then extended with encrypted token
+// records, indexed lookup, durable revocation and joined cleanup.
 
 // PostgresStore represents the session store.
 type PostgresStore struct {
@@ -24,6 +27,11 @@ type PostgresStore struct {
 	cleanupDone         chan struct{}
 	tableName           string
 	encryptionMasterKey string
+	revocationsName     string
+	configName          string
+	indexName           string
+	revokeFunction      string
+	ready               atomic.Bool
 }
 
 type Config struct {
@@ -61,13 +69,15 @@ func NewWithCleanupInterval(pool *pgxpool.Pool, cleanupInterval time.Duration) *
 // NewWithConfig returns a new PostgresStore instance with the given configuration.
 // If the TableName field is empty, it will be set to "sessions".
 // If the CleanUpInterval field is 0, the cleanup goroutine will not be started.
+// Call Migrate before use; requests and cleanup cannot access an uninitialized store.
 func NewWithConfig(pool *pgxpool.Pool, config Config) *PostgresStore {
 	if config.TableName == "" {
 		config.TableName = "sessions"
 	}
-	config.TableName = pgx.Identifier(strings.Split(config.TableName, ".")).Sanitize()
-
-	p := &PostgresStore{pool: pool, tableName: config.TableName, encryptionMasterKey: config.EncryptionMasterKey}
+	parts := strings.Split(config.TableName, ".")
+	p := &PostgresStore{pool: pool, tableName: pgx.Identifier(parts).Sanitize(), encryptionMasterKey: config.EncryptionMasterKey,
+		revocationsName: sessionRelation(parts, "_revocations"), configName: sessionRelation(parts, "_config"),
+		indexName: sessionRelation(parts[len(parts)-1:], "_lookup_idx"), revokeFunction: sessionRelation(parts, "_revoke")}
 	if config.CleanUpInterval > 0 {
 		var ctx context.Context
 		ctx, p.stopCleanup = context.WithCancel(context.Background())
@@ -77,72 +87,36 @@ func NewWithConfig(pool *pgxpool.Pool, config Config) *PostgresStore {
 	return p
 }
 
-// FindCtx returns the data for a given session token from the PostgresStore instance.
-// If the session token is not found or is expired, the returned exists flag will
-// be set to false.
-var errAmbiguousSession = errors.New("multiple records represent one session token")
-
+// FindCtx uses the unique logical-token index. Verify the actual record as well:
+// an encrypted database ID or an incompatible encryption key is never a bearer.
 func (p *PostgresStore) FindCtx(ctx context.Context, token string) ([]byte, bool, error) {
-	if p.encryptionMasterKey == "" {
-		var data []byte
-		err := p.pool.QueryRow(ctx, fmt.Sprintf("SELECT data FROM %s WHERE token=$1 AND current_timestamp<expiry", p.tableName), token).Scan(&data)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, false, nil
-		}
-		return data, err == nil, err
+	if !p.ready.Load() {
+		return nil, false, ErrNotInitialized
 	}
-	rows, err := p.pool.Query(ctx, fmt.Sprintf("SELECT token,data FROM %s WHERE current_timestamp<expiry", p.tableName))
+	var data []byte
+	var record string
+	err := p.pool.QueryRow(ctx, fmt.Sprintf(`SELECT token,data FROM %s s WHERE s.token_lookup=$1 AND current_timestamp<s.expiry AND NOT EXISTS(SELECT 1 FROM %s r WHERE r.token_lookup=s.token_lookup)`, p.tableName, p.revocationsName), sessiontokens.Lookup(token)).Scan(&record, &data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
 	if err != nil {
 		return nil, false, err
 	}
-	defer rows.Close()
-	var result []byte
-	found := false
-	for rows.Next() {
-		if err = ctx.Err(); err != nil {
-			return nil, false, err
-		}
-		var record string
-		var data []byte
-		if err = rows.Scan(&record, &data); err != nil {
-			return nil, false, err
-		}
-		plain, encrypted, err := sessiontokens.Decode(record, p.encryptionMasterKey)
-		if err != nil {
-			return nil, false, err
-		}
-		// Plaintext rows await the existing startup migration; they must not make a
-		// ciphertext database value usable as a browser credential under another key.
-		if encrypted && plain == token {
-			if found {
-				// Retire ambiguous legacy credentials and let the browser start
-				// a new session. Release the cursor before opening a transaction.
-				rows.Close()
-				return nil, false, p.DeleteCtx(ctx, token)
-			}
-			result = append([]byte(nil), data...)
-			found = true
-		}
-	}
-	if err = rows.Err(); err != nil {
+	if err = p.verifyRecord(record, token); err != nil {
 		return nil, false, err
 	}
-	return result, found, nil
+	return data, true, nil
 }
 
-// Encrypted updates hold a table write lock while resolving randomized legacy
-// ciphertext keys. This also serializes ordinary SQL token migration/deletion.
-// Readers retain PostgreSQL's statement snapshot and do not need this lock.
-func (p *PostgresStore) tokenTransaction(ctx context.Context) (pgx.Tx, error) {
-	tx, err := p.pool.Begin(ctx)
+func (p *PostgresStore) verifyRecord(record, token string) error {
+	plain, encrypted, err := sessiontokens.Decode(record, p.encryptionMasterKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if _, err = tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %s IN SHARE ROW EXCLUSIVE MODE", p.tableName)); err != nil {
-		rollbackSession(ctx, tx)
-		return nil, err
+	if plain != token || (p.encryptionMasterKey != "" && !encrypted) {
+		return errors.New("session token record does not match its encryption configuration")
 	}
-	return tx, nil
+	return nil
 }
 
 func rollbackSession(parent context.Context, tx pgx.Tx) {
@@ -151,96 +125,92 @@ func rollbackSession(parent context.Context, tx pgx.Tx) {
 	_ = tx.Rollback(ctx)
 }
 
-func (p *PostgresStore) matchingRecords(ctx context.Context, tx pgx.Tx, token string) ([]string, error) {
-	rows, err := tx.Query(ctx, fmt.Sprintf("SELECT token FROM %s", p.tableName))
+// Same-token writers take the advisory lock before the row lock. Ordinary SQL
+// deletions take only the row lock and record revocation in that transaction.
+// Reading revocation AFTER acquiring the row lock is essential: a delete may
+// have completed while the writer was waiting for the row.
+func (p *PostgresStore) tokenTransaction(ctx context.Context, lookup []byte) (pgx.Tx, error) {
+	if !p.ready.Load() {
+		return nil, ErrNotInitialized
+	}
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var found []string
-	for rows.Next() {
-		if err = ctx.Err(); err != nil {
-			return nil, err
-		}
-		var record string
-		if err = rows.Scan(&record); err != nil {
-			return nil, err
-		}
-		plain, _, err := sessiontokens.Decode(record, p.encryptionMasterKey)
-		if err != nil {
-			return nil, err
-		}
-		if plain == token {
-			found = append(found, record)
-		}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, int64(binary.BigEndian.Uint64(lookup[:8]))); err != nil {
+		rollbackSession(ctx, tx)
+		return nil, err
 	}
-	return found, rows.Err()
+	return tx, nil
 }
 
 func (p *PostgresStore) CommitCtx(ctx context.Context, token string, data []byte, expiry time.Time) error {
-	if p.encryptionMasterKey == "" {
-		_, err := p.pool.Exec(ctx, fmt.Sprintf("INSERT INTO %s(token,data,expiry) VALUES($1,$2,$3) ON CONFLICT(token) DO UPDATE SET data=EXCLUDED.data,expiry=EXCLUDED.expiry", p.tableName), token, data, expiry)
-		return err
-	}
-	tx, err := p.tokenTransaction(ctx)
+	lookup := sessiontokens.Lookup(token)
+	tx, err := p.tokenTransaction(ctx, lookup)
 	if err != nil {
 		return err
 	}
 	defer rollbackSession(ctx, tx)
-	found, err := p.matchingRecords(ctx, tx, token)
-	if err != nil {
+	var record string
+	err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT token FROM %s WHERE token_lookup=$1 FOR UPDATE`, p.tableName), lookup).Scan(&record)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	if len(found) > 1 {
-		return errAmbiguousSession
-	}
-	record := ""
-	if len(found) == 1 {
-		record = found[0]
-	}
-	if record == "" || record == token {
-		encrypted, err := utils.EncryptSensitiveField(token, p.encryptionMasterKey)
-		if err != nil {
+	if record != "" {
+		if err = p.verifyRecord(record, token); err != nil {
 			return err
 		}
-		if record != "" {
-			if _, err = tx.Exec(ctx, fmt.Sprintf("UPDATE %s SET token=$2 WHERE token=$1", p.tableName), record, encrypted); err != nil {
+	}
+	var revoked bool
+	if err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %s WHERE token_lookup=$1)`, p.revocationsName), lookup).Scan(&revoked); err != nil {
+		return err
+	}
+	if revoked {
+		return ErrRevoked
+	}
+	if record == "" {
+		record = token
+		if p.encryptionMasterKey != "" {
+			if record, err = utils.EncryptSensitiveField(token, p.encryptionMasterKey); err != nil {
 				return err
 			}
 		}
-		record = encrypted
 	}
-	if _, err = tx.Exec(ctx, fmt.Sprintf("INSERT INTO %s(token,data,expiry) VALUES($1,$2,$3) ON CONFLICT(token) DO UPDATE SET data=EXCLUDED.data,expiry=EXCLUDED.expiry", p.tableName), record, data, expiry); err != nil {
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s(token,token_lookup,data,expiry) VALUES($1,$2,$3,$4) ON CONFLICT(token_lookup) DO UPDATE SET data=EXCLUDED.data,expiry=EXCLUDED.expiry`, p.tableName), record, lookup, data, expiry); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
 }
 
 func (p *PostgresStore) DeleteCtx(ctx context.Context, token string) error {
-	if p.encryptionMasterKey == "" {
-		_, err := p.pool.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE token=$1", p.tableName), token)
-		return err
+	if !p.ready.Load() {
+		return ErrNotInitialized
 	}
-	tx, err := p.tokenTransaction(ctx)
+	// SCS destroys an empty, never-committed session without a token.
+	if token == "" {
+		return nil
+	}
+	lookup := sessiontokens.Lookup(token)
+	tx, err := p.tokenTransaction(ctx, lookup)
 	if err != nil {
 		return err
 	}
 	defer rollbackSession(ctx, tx)
-	records, err := p.matchingRecords(ctx, tx, token)
-	if err != nil {
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`DELETE FROM %s WHERE token_lookup=$1`, p.tableName), lookup); err != nil {
 		return err
 	}
-	// Remove every old physical representation, including expired duplicates.
-	if len(records) > 0 {
-		if _, err = tx.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE token=ANY($1::text[])", p.tableName), records); err != nil {
-			return err
-		}
+	// Also fence a generated token whose first commit is still outstanding.
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s(token_lookup) VALUES($1) ON CONFLICT DO NOTHING`, p.revocationsName), lookup); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }
 
 func (p *PostgresStore) AllCtx(ctx context.Context) (map[string][]byte, error) {
-	rows, err := p.pool.Query(ctx, fmt.Sprintf("SELECT token,data FROM %s WHERE current_timestamp<expiry", p.tableName))
+	if !p.ready.Load() {
+		return nil, ErrNotInitialized
+	}
+	rows, err := p.pool.Query(ctx, fmt.Sprintf(`SELECT token,token_lookup,data FROM %s s WHERE current_timestamp<s.expiry AND NOT EXISTS(SELECT 1 FROM %s r WHERE r.token_lookup=s.token_lookup)`, p.tableName, p.revocationsName))
 	if err != nil {
 		return nil, err
 	}
@@ -251,16 +221,19 @@ func (p *PostgresStore) AllCtx(ctx context.Context) (map[string][]byte, error) {
 			return nil, err
 		}
 		var record string
-		var data []byte
-		if err = rows.Scan(&record, &data); err != nil {
+		var lookup, data []byte
+		if err = rows.Scan(&record, &lookup, &data); err != nil {
 			return nil, err
 		}
 		token, _, err := sessiontokens.Decode(record, p.encryptionMasterKey)
 		if err != nil {
 			return nil, err
 		}
-		if _, duplicate := result[token]; duplicate {
-			return nil, errAmbiguousSession
+		if !bytes.Equal(lookup, sessiontokens.Lookup(token)) {
+			return nil, errors.New("session token index does not match its record")
+		}
+		if err = p.verifyRecord(record, token); err != nil {
+			return nil, err
 		}
 		result[token] = data
 	}
@@ -274,6 +247,9 @@ func (p *PostgresStore) startCleanup(ctx context.Context, interval time.Duration
 	for {
 		select {
 		case <-ticker.C:
+			if !p.ready.Load() {
+				continue
+			}
 			attempt, cancel := context.WithTimeout(ctx, 30*time.Second)
 			err := p.deleteExpired(attempt)
 			cancel()
