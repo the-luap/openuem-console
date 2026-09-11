@@ -9,13 +9,13 @@ import (
 	"testing"
 )
 
-func TestDesktopSoftwareFilterRejectsAmbiguousQuery(t *testing.T) {
+func TestDesktopReportFilterRejectsAmbiguousQuery(t *testing.T) {
 	for _, raw := range []string{"q=a&q=b", "q=%ff", "q=%00", "q=%zz", "q=" + strings.Repeat("x", 257), "q=" + strings.Repeat("%20", 1500), "after=", "after=0", "after=-1", "after=01", "after=+1", "after=1&after=2", "after=9223372036854775808", "tenant=1", "q=a;after=2"} {
-		if _, err := desktopSoftwareFilter(raw); err == nil {
-			t.Error("ambiguous software filter accepted", raw)
+		if _, err := desktopReportFilter(raw); err == nil {
+			t.Error("ambiguous report filter accepted", raw)
 		}
 	}
-	if got, err := desktopSoftwareFilter("q=%25_%26&after=42"); err != nil || got.Search != "%_&" || got.After != 42 {
+	if got, err := desktopReportFilter("q=%25_%26&after=42"); err != nil || got.Search != "%_&" || got.After != 42 {
 		t.Fatal("literal search or cursor changed", got, err)
 	}
 }

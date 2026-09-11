@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+  ...["viewer", "operator"].flatMap(role => ["first", "next", "empty", "long"].map(state => "desktop-network-scoped-" + state + "-" + role)),
  ...["ordinary","injected","long","empty"].map(state=>"desktop-network-"+state),
  ...["empty","pending","other-owner","reader","site","expired","withdrawn","approved","focused","paged","review","burn-review","incompatible","review-expired","review-withdrawn","review-approved","derived"].map(state=>"windows-source-"+state),
  ...["install","remove","empty","pending","delivered","observed","drifted","unknown","waiting","unavailable","cancelled","expired","reader","paged"].map(state=>"windows-check-"+state),

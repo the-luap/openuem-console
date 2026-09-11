@@ -38,6 +38,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Read public CA metadata, invitations and individual identities | Viewer in the selected organization or site |
 | Read the scoped computer overview | Viewer in the selected organization or site |
 | Search reported computer software | Viewer in the selected organization or site |
+| Read and search reported network adapters | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -97,6 +98,11 @@ acceptance from a report actually being received from the device.
 The **Reported software** inventory tab provides [scoped search and pagination](desktop-software-inventory.md).
 It reads only report metadata and records access before responding. Stored
 software reports are distinct from verified deployment outcomes.
+
+The **Reported network** tab provides [scoped adapter reports](desktop-network-inventory.md)
+with literal name/MAC/IP search, bounded pagination and a committed read audit.
+Missing flags and empty reports retain their uncertainty; stored configuration
+does not verify current connectivity.
 
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA

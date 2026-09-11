@@ -13,6 +13,7 @@ templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
  <nav aria-label="Computer inventory" class="flex flex-wrap gap-2 mt-4">
   <a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/inventory") } aria-current={ inventoryCurrent(active, "overview") }>Overview</a>
   <a class="uk-button uk-button-default" href={ softwareURL(info, id, "", 0) } aria-current={ inventoryCurrent(active, "software") }>Reported software</a>
+  <a class="uk-button uk-button-default" href={ networkURL(info, id, "", 0) } aria-current={ inventoryCurrent(active, "network") }>Reported network</a>
  </nav>
 }
 

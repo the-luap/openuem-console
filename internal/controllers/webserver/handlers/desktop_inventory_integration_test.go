@@ -128,7 +128,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 		}
 	}
 	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin"} {
-		for _, endpoint := range []struct{ method, suffix string }{{"POST", "/overview"}, {"DELETE", ""}, {"GET", "/notes"}, {"GET", "/remote-assistance"}, {"GET", "/power"}, {"POST", "/software"}, {"GET", "/hardware"}} {
+		for _, endpoint := range []struct{ method, suffix string }{{"POST", "/overview"}, {"DELETE", ""}, {"GET", "/notes"}, {"GET", "/remote-assistance"}, {"GET", "/power"}, {"POST", "/software"}, {"POST", "/network-adapters"}, {"POST", "/inventory/network"}, {"GET", "/hardware"}} {
 			if rec := request(user, endpoint.method, base+"/computers/windows-fixture"+endpoint.suffix, url.Values{"endpoint-description": {"unauthorized-change"}, "tenant": {fmt.Sprint(otherTenant)}, "site": {fmt.Sprint(otherSite)}}); rec.Code != 403 {
 				t.Errorf("legacy action %s %s for %s returned %d", endpoint.method, endpoint.suffix, user, rec.Code)
 			}

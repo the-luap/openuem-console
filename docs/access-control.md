@@ -99,6 +99,12 @@ with literal name/publisher search and 25-entry continuation. Its projection and
 `inventory.software.read` audit share current transaction authorization. Delegated
 roles can also use the existing GET software aliases; POST remains restricted.
 
+[Reported network](desktop-network-inventory.md) uses the same scoped read
+boundary for adapter configuration, literal name/MAC/IP search and 25-entry
+continuation. Current transaction authorization and `inventory.network.read`
+audit are required before returning data. Delegated roles can also use the
+existing GET network-adapter aliases; mutations remain restricted.
+
 ## Concurrent changes and audit
 
 Every permission form contains the revision it displays. If another administrator

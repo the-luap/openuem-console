@@ -12,29 +12,29 @@ import (
 	"github.com/open-uem/openuem-console/internal/views/desktop_views"
 )
 
-func desktopSoftwareFilter(raw string) (inventory.SoftwareFilter, error) {
-	var filter inventory.SoftwareFilter
+func desktopReportFilter(raw string) (inventory.ReportFilter, error) {
+	var filter inventory.ReportFilter
 	if len(raw) > 4096 {
-		return filter, inventory.ErrSoftwareFilter
+		return filter, inventory.ErrReportFilter
 	}
 	query, err := url.ParseQuery(raw)
 	if err != nil {
-		return filter, inventory.ErrSoftwareFilter
+		return filter, inventory.ErrReportFilter
 	}
 	for key, values := range query {
 		if len(values) != 1 || key != "q" && key != "after" {
-			return filter, inventory.ErrSoftwareFilter
+			return filter, inventory.ErrReportFilter
 		}
 	}
 	filter.Search = query.Get("q")
 	if cursor, present := query["after"]; present {
 		filter.After, err = strconv.ParseInt(cursor[0], 10, 64)
 		if err != nil || filter.After <= 0 || strconv.FormatInt(filter.After, 10) != cursor[0] {
-			return filter, inventory.ErrSoftwareFilter
+			return filter, inventory.ErrReportFilter
 		}
 	}
 	if !filter.Valid() {
-		return filter, inventory.ErrSoftwareFilter
+		return filter, inventory.ErrReportFilter
 	}
 	return filter, nil
 }
@@ -47,7 +47,7 @@ func (h *Handler) DesktopSoftware(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	filter, err := desktopSoftwareFilter(c.Request().URL.RawQuery)
+	filter, err := desktopReportFilter(c.Request().URL.RawQuery)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid software search or page. Open the first page and try again.")
 	}

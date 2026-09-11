@@ -15,6 +15,14 @@ func inventoryCurrent(active, tab string) string {
 }
 
 func softwareURL(info *partials.CommonInfo, id, search string, after int64) string {
+	return inventoryReportURL(info, id, "software", search, after)
+}
+
+func networkURL(info *partials.CommonInfo, id, search string, after int64) string {
+	return inventoryReportURL(info, id, "network", search, after)
+}
+
+func inventoryReportURL(info *partials.CommonInfo, id, report, search string, after int64) string {
 	query := url.Values{}
 	if search != "" {
 		query.Set("q", search)
@@ -22,7 +30,7 @@ func softwareURL(info *partials.CommonInfo, id, search string, after int64) stri
 	if after > 0 {
 		query.Set("after", strconv.FormatInt(after, 10))
 	}
-	path := "/computers/" + url.PathEscape(id) + "/inventory/software"
+	path := "/computers/" + url.PathEscape(id) + "/inventory/" + report
 	if len(query) != 0 {
 		path += "?" + query.Encode()
 	}
