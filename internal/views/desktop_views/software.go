@@ -39,6 +39,15 @@ func storageURL(info *partials.CommonInfo, id string, kind inventory.StorageKind
 	return path + separator + "kind=" + url.QueryEscape(string(kind))
 }
 
+func peripheralsURL(info *partials.CommonInfo, id string, kind inventory.PeripheralsKind, search string, after int64) string {
+	path := inventoryReportURL(info, id, "peripherals", search, after)
+	separator := "?"
+	if search != "" || after > 0 {
+		separator = "&"
+	}
+	return path + separator + "kind=" + url.QueryEscape(string(kind))
+}
+
 func inventoryReportURL(info *partials.CommonInfo, id, report, search string, after int64) string {
 	query := url.Values{}
 	if search != "" {

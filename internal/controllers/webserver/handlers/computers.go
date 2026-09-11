@@ -316,7 +316,13 @@ func (h *Handler) NetworkAdapters(c echo.Context) error {
 }
 
 func (h *Handler) Printers(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopPeripherals(c, inventory.PrinterReports)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -483,7 +489,13 @@ func (h *Handler) Shares(c echo.Context) error {
 }
 
 func (h *Handler) Monitors(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopPeripherals(c, inventory.MonitorReports)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {

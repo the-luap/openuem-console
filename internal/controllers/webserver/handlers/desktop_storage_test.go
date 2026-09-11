@@ -75,7 +75,7 @@ func exerciseDesktopStorageRoutes(t *testing.T, h *Handler, ctx context.Context,
 					}
 					// Follow the actual server-generated continuation, preserving kind
 					// and scope rather than assuming either table's sequence values.
-					nextURL := storageNextURL(t, body)
+					nextURL := inventoryNextURL(t, body)
 					next := request(user, "GET", nextURL, nil)
 					if next.Code != 200 || !strings.Contains(next.Body.String(), "Scoped "+kind+" 26") || strings.Contains(next.Body.String(), "Scoped "+kind+" 00") {
 						t.Fatal("storage continuation failed", nextURL, next.Code)
@@ -114,7 +114,7 @@ func exerciseDesktopStorageRoutes(t *testing.T, h *Handler, ctx context.Context,
 	}
 }
 
-func storageNextURL(t *testing.T, body string) string {
+func inventoryNextURL(t *testing.T, body string) string {
 	t.Helper()
 	tokens := html.NewTokenizer(strings.NewReader(body))
 	for tokens.Next() != html.ErrorToken {
@@ -135,6 +135,6 @@ func storageNextURL(t *testing.T, body string) string {
 			return href
 		}
 	}
-	t.Fatal("storage continuation missing")
+	t.Fatal("inventory continuation missing")
 	return ""
 }

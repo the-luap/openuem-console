@@ -12,6 +12,7 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	s := testStore(t, false)
 	if _, err := s.db.Exec(`INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id,created_at) VALUES
  (1,11,'reader','inventory.desktop.read','legacy-old',clock_timestamp()-interval '45 days'),
+ (1,11,'reader','inventory.peripherals.read','peripherals-old',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.storage.read','storage-old',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.network.read','network-old',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.software.read','software-old',clock_timestamp()-interval '45 days'),
@@ -25,10 +26,10 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var events []Event
-	if err = json.Unmarshal(data, &events); err != nil || len(events) != 4 {
+	if err = json.Unmarshal(data, &events); err != nil || len(events) != 5 {
 		t.Fatal("inventory export lost historical scope", string(data), err)
 	}
-	want := map[string]string{"storage-old": "inventory.storage.read", "legacy-old": "inventory.desktop.read", "network-old": "inventory.network.read", "software-old": "inventory.software.read"}
+	want := map[string]string{"peripherals-old": "inventory.peripherals.read", "storage-old": "inventory.storage.read", "legacy-old": "inventory.desktop.read", "network-old": "inventory.network.read", "software-old": "inventory.software.read"}
 	for _, event := range events {
 		if event.SiteID != 11 || want[event.Resource] != event.Action {
 			t.Fatal("inventory export lost source action or scope", event)
@@ -40,7 +41,7 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	}
 	scope := access.Scope{TenantID: 1}
 	preview, err := s.PreviewRetention(t.Context(), "organization-admin", scope, 30)
-	if err != nil || preview.Counts["inventory"] != 4 {
+	if err != nil || preview.Counts["inventory"] != 5 {
 		t.Fatal("inventory retention preview is not scoped", preview, err)
 	}
 	if err = s.ApplyRetention(t.Context(), "organization-admin", scope, preview.ID, preview.Token); err != nil {
@@ -53,10 +54,10 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id IN ('legacy-recent','legacy-foreign')`).Scan(&remaining); err != nil || remaining != 2 {
 		t.Fatal("retention erased foreign or recent inventory evidence", remaining, err)
 	}
-	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id IN ('storage-old','legacy-old','network-old','software-old')`).Scan(&remaining); err != nil || remaining != 0 {
+	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id IN ('peripherals-old','storage-old','legacy-old','network-old','software-old')`).Scan(&remaining); err != nil || remaining != 0 {
 		t.Fatal("confirmed inventory retention was not applied", remaining, err)
 	}
-	if err = s.db.QueryRow(`SELECT sum(event_count) FROM uem_audit_retention_history WHERE tenant_id=1 AND source='inventory'`).Scan(&history); err != nil || history != 4 {
+	if err = s.db.QueryRow(`SELECT sum(event_count) FROM uem_audit_retention_history WHERE tenant_id=1 AND source='inventory'`).Scan(&history); err != nil || history != 5 {
 		t.Fatal("inventory erasure receipt missing", history, err)
 	}
 }

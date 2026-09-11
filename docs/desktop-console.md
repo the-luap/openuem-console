@@ -40,6 +40,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Search reported computer software | Viewer in the selected organization or site |
 | Read and search reported network adapters | Viewer in the selected organization or site |
 | Read and search reported physical/logical disks | Viewer in the selected organization or site |
+| Read and search reported monitors/printers | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -113,6 +114,11 @@ does not verify current connectivity.
 The **Reported storage** tab provides [scoped physical and logical disk reports](desktop-storage-inventory.md),
 with literal search, bounded pages and audited reads. Stored usage defaults and
 BitLocker strings remain reported evidence; current encryption is not verified.
+
+The **Reported peripherals** tab provides [scoped monitor and printer reports](desktop-peripherals-inventory.md),
+with bounded literal search, audited reads and distinct missing/false/true
+printer flags. The page reports stored configuration without testing a port or
+asserting that a peripheral is connected or working.
 
 The shared inventory navigation identifies the current page through a highlighted,
 underlined link and `aria-current="page"`. The physical/logical storage selector

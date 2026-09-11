@@ -117,6 +117,12 @@ boundary. Current authorization, exact membership and a committed
 `inventory.storage.read` audit precede data return. Delegated GET disk aliases
 open these reports; file browsing, download and mutation permissions do not expand.
 
+[Reported peripherals](desktop-peripherals-inventory.md) provides scoped monitor
+and printer projections with nullable flags, literal search, 25-entry pages and
+a committed `inventory.peripherals.read` audit. Delegated GET monitor/printer
+aliases select the corresponding report kind. Reported ports remain inert text;
+device actions are not added to this read capability.
+
 [Account display language](account-language.md) is a self-service preference.
 Its protected form always derives the account from the authenticated session;
 a language selection does not change roles or device permissions.

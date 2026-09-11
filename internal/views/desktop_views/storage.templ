@@ -10,14 +10,6 @@ import (
 	"strconv"
 )
 
-templ storageValue(value string) {
-	if value == "" {
-		{ i18n.T(ctx,"storage_inventory.not_reported") }
-	} else {
-		{ value }
-	}
-}
-
 templ Storage(c echo.Context, info *partials.CommonInfo, page *inventory.StoragePage, filter inventory.StorageFilter) {
 	@layout.Base("devices", info) {
 		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "storage_inventory.devices"), Url: partials.GetNavigationUrl(info, "/devices")}, {Title: page.DeviceName}}, info)
@@ -59,22 +51,22 @@ templ Storage(c echo.Context, info *partials.CommonInfo, page *inventory.Storage
 						<div aria-label={ i18n.T(ctx, "storage_inventory.entries") } style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem;">
 							for _, entry := range page.Entries {
 								<article class="border-t border-border mt-4 pt-4 min-w-0">
-									<h3 class="font-semibold break-all">@storageValue(entry.Name)
+									<h3 class="font-semibold break-all">@reportedValue(entry.Name)
 </h3>
 									<dl class="uk-description-list break-all">
 										if filter.Kind == inventory.PhysicalStorage {
 											<dt>{ i18n.T(ctx,"storage_inventory.model") }</dt>
-											<dd>@storageValue(entry.Model)
+											<dd>@reportedValue(entry.Model)
 </dd>
 											<dt>{ i18n.T(ctx,"storage_inventory.serial") }</dt>
-											<dd>@storageValue(entry.Serial)
+											<dd>@reportedValue(entry.Serial)
 </dd>
 										} else {
 											<dt>{ i18n.T(ctx,"storage_inventory.volume") }</dt>
-											<dd>@storageValue(entry.Volume)
+											<dd>@reportedValue(entry.Volume)
 </dd>
 											<dt>{ i18n.T(ctx,"storage_inventory.filesystem") }</dt>
-											<dd>@storageValue(entry.Filesystem)
+											<dd>@reportedValue(entry.Filesystem)
 </dd>
 											<dt>{ i18n.T(ctx,"storage_inventory.usage") }</dt>
 											<dd>
@@ -87,14 +79,14 @@ templ Storage(c echo.Context, info *partials.CommonInfo, page *inventory.Storage
 												}
 											</dd>
 											<dt>{ i18n.T(ctx,"storage_inventory.remaining") }</dt>
-											<dd>@storageValue(entry.Remaining)
+											<dd>@reportedValue(entry.Remaining)
 </dd>
 											<dt>{ i18n.T(ctx,"storage_inventory.bitlocker") }</dt>
-											<dd>@storageValue(entry.BitLocker)
+											<dd>@reportedValue(entry.BitLocker)
 </dd>
 										}
 										<dt>{ i18n.T(ctx,"storage_inventory.size") }</dt>
-										<dd>@storageValue(entry.Size)
+										<dd>@reportedValue(entry.Size)
 </dd>
 									</dl>
 								</article>

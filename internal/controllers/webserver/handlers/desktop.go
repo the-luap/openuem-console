@@ -19,7 +19,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os":
+		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os", "/computers/:uuid/inventory/peripherals", "/computers/:uuid/monitors", "/computers/:uuid/printers":
 			return access.ReadDevices, true
 		}
 	}
@@ -47,6 +47,7 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 		g.GET("/computers/:uuid/inventory/software", h.DesktopSoftware)
 		g.GET("/computers/:uuid/inventory/network", h.DesktopNetwork)
 		g.GET("/computers/:uuid/inventory/storage", h.DesktopStorage)
+		g.GET("/computers/:uuid/inventory/peripherals", h.DesktopPeripherals)
 		g.POST("/computers/:uuid/refresh", h.DesktopRefresh)
 		g.GET("/desktop/enrollment", h.DesktopEnrollment)
 		g.POST("/desktop/setup", h.DesktopAuthority)

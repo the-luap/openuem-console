@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["monitors","printers"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-peripherals-${kind}-${state}-${role}`))),
  ...["physical","logical"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-storage-${kind}-${state}-${role}`))),
  ...["valid","renewal_due","expires_soon","expired","retired","empty"].map(state=>"windows-health-"+state),
  ...["pending","sent","uncertain","verified","removed"].map(state=>"windows-update-"+state),
