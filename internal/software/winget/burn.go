@@ -26,7 +26,7 @@ var burnBundleID = regexp.MustCompile(`^\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0
 func BurnPlan(snapshot Snapshot, index int, target BurnTarget, operation string) (enrollment.SoftwarePlan, error) {
 	var empty enrollment.SoftwarePlan
 	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[target.Architecture]
-	if architecture == "" || !target.Detection.Valid() || target.Detection.Kind != "uninstall-key" || !burnBundleID.MatchString(target.Detection.UninstallKey) || (operation != "install" && operation != "remove") {
+	if architecture == "" || !target.Detection.Valid() || target.Detection.Kind != "uninstall-key" || target.Detection.RegistryView != "64" || !burnBundleID.MatchString(target.Detection.UninstallKey) || (operation != "install" && operation != "remove") {
 		return empty, ErrInstaller
 	}
 	manifest, err := snapshot.Inspect()
@@ -81,7 +81,7 @@ func BurnPlan(snapshot Snapshot, index int, target BurnTarget, operation string)
 	if operation == "remove" {
 		args = append([]string{"/uninstall"}, args...)
 	}
-	plan := enrollment.SoftwarePlan{Kind: "windows-exe", Operation: operation, Identifier: snapshot.Coordinate.Identifier, Version: snapshot.Coordinate.Version, Architecture: target.Architecture, MinimumOS: minimum, Artifact: artifact, Arguments: args, Detection: target.Detection, SuccessCodes: []uint32{0}, RebootCodes: []uint32{3010}}
+	plan := enrollment.SoftwarePlan{Kind: "windows-burn", Operation: operation, Identifier: snapshot.Coordinate.Identifier, Version: snapshot.Coordinate.Version, Architecture: target.Architecture, MinimumOS: minimum, Artifact: artifact, Arguments: args, Detection: target.Detection, SuccessCodes: []uint32{0}, RebootCodes: []uint32{3010}}
 	if !plan.Valid() {
 		return empty, ErrInstaller
 	}

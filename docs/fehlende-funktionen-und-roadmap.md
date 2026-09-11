@@ -537,9 +537,10 @@ concurrent confirmation, audit rollback, expiry and exact encrypted install/remo
 dispatch have PostgreSQL/race, route and browser evidence. A separate Burn source
 adapter and bounded native metadata readers now provide translation and embedded
 registration proof, including CAB/XML, header identity, fixed scope, version and
-registry view. Native generated-bundle/race and portable fuzz checks pass. Requiring
-that proof in the preflight subprocess, capability negotiation and Burn delivery
-integration remains open. Further WinGet installer
+registry view. Native generated-bundle/race and portable fuzz checks pass. Explicit
+signed Burn plans now require the bounded preflight proof and a device-signed
+recipient capability; its new native helper CI also passes. Agent capability
+advertisement, native execution/recovery and source approval/dispatch remain open. Further WinGet installer
 formats and physical installation, removal, offline, restart and hibernate
 acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.

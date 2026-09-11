@@ -32,6 +32,12 @@ func TestBurnPlanPinsSameBundleForBothOperationsAndExactRegistration(t *testing.
 				}
 				snapshot := fixtureSnapshot(strings.ReplaceAll(string(burnSnapshot().Content), ".exe", ".exe?token=private-burn"))
 				plan, err := BurnPlan(snapshot, index, target, operation)
+				if view == "32" {
+					if err == nil {
+						t.Fatal("emulated Burn registration view admitted")
+					}
+					continue
+				}
 				if err != nil || !plan.Valid() {
 					t.Fatal("exact Burn plan", err)
 				}
@@ -39,7 +45,7 @@ func TestBurnPlanPinsSameBundleForBothOperationsAndExactRegistration(t *testing.
 				if operation == "remove" {
 					args = append([]string{"/uninstall"}, args...)
 				}
-				if plan.Kind != "windows-exe" || plan.Operation != operation || plan.Architecture != architecture || plan.Detection != target.Detection || plan.Identifier != snapshot.Coordinate.Identifier || plan.Version != snapshot.Coordinate.Version || plan.MinimumOS != target.MinimumOS || !slices.Equal(plan.Arguments, args) || len(plan.MSIProperties) != 0 || plan.Artifact.Format != "exe" || !strings.Contains(plan.Artifact.URL, "private-burn") || !slices.Equal(plan.SuccessCodes, []uint32{0}) || !slices.Equal(plan.RebootCodes, []uint32{3010}) {
+				if plan.Kind != "windows-burn" || plan.Operation != operation || plan.Architecture != architecture || plan.Detection != target.Detection || plan.Identifier != snapshot.Coordinate.Identifier || plan.Version != snapshot.Coordinate.Version || plan.MinimumOS != target.MinimumOS || !slices.Equal(plan.Arguments, args) || len(plan.MSIProperties) != 0 || plan.Artifact.Format != "exe" || !strings.Contains(plan.Artifact.URL, "private-burn") || !slices.Equal(plan.SuccessCodes, []uint32{0}) || !slices.Equal(plan.RebootCodes, []uint32{3010}) {
 					t.Fatal("Burn plan changed source or reviewed requirements")
 				}
 				other, err := BurnPlan(snapshot, index, target, map[string]string{"install": "remove", "remove": "install"}[operation])
@@ -219,7 +225,7 @@ func FuzzBurnPlan(f *testing.F) {
 	f.Fuzz(func(t *testing.T, content string, index int) {
 		for _, operation := range []string{"install", "remove"} {
 			plan, err := BurnPlan(fixtureSnapshot(content), index, burnTarget(), operation)
-			if err == nil && (!plan.Valid() || plan.Operation != operation || plan.Kind != "windows-exe" || plan.Detection.Kind != "uninstall-key" || plan.Artifact.Format != "exe") {
+			if err == nil && (!plan.Valid() || plan.Operation != operation || plan.Kind != "windows-burn" || plan.Detection.Kind != "uninstall-key" || plan.Detection.RegistryView != "64" || plan.Artifact.Format != "exe") {
 				t.Fatal("parser emitted an invalid or differently scoped Burn plan")
 			}
 		}

@@ -149,8 +149,9 @@ hibernate acceptance remain open. WIN-01 and the complete roadmap remain in prog
 
 The separate `BurnPlan` adapter validates source-declared machine Burn bundles
 against an explicitly reviewed AMD64/ARM64 target, exact braced bundle identifier,
-machine uninstall-registry view and displayed version. It emits installation and
-removal plans using the same HTTPS EXE digest. Detection remains `uninstall-key`;
+64-bit machine uninstall-registry view and displayed version. It emits explicit
+`windows-burn` installation and removal plans using the same HTTPS EXE digest.
+Their signed kind cannot be substituted with generic EXE intent. Detection remains `uninstall-key`;
 the bundle identifier is never substituted for an MSI product code. Removal uses
 the pinned executable's uninstall action, without reading or invoking a mutable
 machine `UninstallString`.
@@ -170,11 +171,11 @@ matches its reviewed registration, in addition to the existing hash, Authenticod
 and PE architecture checks. Those existing checks alone do not establish bundle
 identity. The agent also currently rejects an emulated bootstrapper executable,
 even when its payload targets the native architecture. Source-derived Burn
-approval/history, required native proof during execution, complete recovery tests and
-physical acceptance remain open.
+approval/history, capability advertisement, native execution/recovery and physical
+acceptance remain open.
 
 The agent's separate
-[Burn metadata readers](https://github.com/the-luap/openuem-agent/blob/190228a5ca7b8744368aa7b52e4f2f12a68510eb/docs/windows-burn-inspection.md)
+[Burn metadata readers and preflight](https://github.com/the-luap/openuem-agent/blob/767bf1a9ec62456807bc783c2cd60db9dbc6f30e/docs/windows-burn-inspection.md)
 locate a version-2 `.wixburn` bundle code and bounded UX cabinet without
 extracting or executing its contents. At most seven reads and 4,512 requested
 bytes inspect standard x86/AMD64/ARM64 PE layouts, overlapping/truncated section
@@ -208,8 +209,31 @@ and the complete reader passes all three generated architectures and changed
 header checks in 15.10 seconds. All agent CI jobs pass at
 `bf1f80adf9960387f82e414d60263b7054816c23`. These native runtime tests use an AMD64
 Windows process; ARM64 process and physical endpoint acceptance remain open.
-Integration must require this proof inside the bounded preflight subprocess and
-negotiate the capability before source-derived Burn approval/dispatch is enabled.
+The bounded preflight subprocess now requires this proof for explicit Burn plans,
+comparing exact machine identity, displayed version and native 64-bit registry
+view. The retained stage and its approved digest are verified before and after
+inspection; parent cancellation and a child exit timer bound FDI work to ten
+seconds. Generic EXE inspection cannot silently select this path. The native
+helper fixture passes at `767bf1a9ec62456807bc783c2cd60db9dbc6f30e`, including machine
+and user scope, foreign architecture, x86, wrong identity/version/digest and closure.
+The remaining agent CI jobs are still running.
+
+The shared protocol at `a4fe1e816a3b7feb051817728536fcd857c97aa1` requires Burn
+support in the device-signed recipient registration before sealing a task. A
+challenge alone grants no capability. Migration `014` preserves old recipients
+at zero, and their JSON wire encoding remains unchanged. Capability changes issue
+a new recipient ID, cancel pending old work and preserve delivered uncertainty;
+audit failures roll back the complete transition. Full local module/registry race
+tests and 814,083 wire-fuzz inputs pass. Agent admission still advertises no Burn
+capability and rejects new Burn work before recording an attempt; its process
+builder cannot fall through to MSI. Source approval/dispatch stays disabled while
+native execution and recovery evidence are completed.
+
+The updated source adapter race suite passes in 1.781 seconds and another 368,767
+fuzz inputs pass in 21.498 seconds. It rejects 32-bit registry views for both native
+architectures. The existing catalog/source/dispatch and migration race suite
+passes against isolated PostgreSQL in 95.106 seconds. Existing MSI source approval
+and dispatch retain their separate immutable revision contract.
 
 The combined source/MSI/Burn race suite passes in 1.799 seconds. The final Burn
 and MSI fuzz runs pass 242,390 and 233,586 inputs respectively. Tests cover both

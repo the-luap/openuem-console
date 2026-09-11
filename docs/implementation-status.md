@@ -61,12 +61,30 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Explicit `windows-burn` plans now bind the required metadata proof into signed
+  intent. The shared protocol requires the capability in a new device-signed
+  recipient registration before task sealing. Legacy wire encodings and retained
+  history survive migration `014`; upgrade/downgrade and audit rollback have real
+  PostgreSQL/race evidence. Full protocol/registry tests pass, along with 814,083
+  wire-fuzz inputs. The agent's bounded helper now compares embedded machine
+  identity, version and native registry view against the exact retained stage.
+  Its pinned portable race suites, Windows cross-compilation/vet and new native
+  helper CI pass. Existing console catalog/source/dispatch/migration race tests
+  pass against PostgreSQL in 95.106 seconds; source-adapter race and 368,767 fuzz
+  inputs also pass. Capability advertisement, native execution
+  lifecycle and source approval/dispatch remain open. See the
+  [Burn integration evidence](windows-winget-resolution.md#burn-exe-translation-foundation).
+
 - Recovery CI now serializes package tests that create and drop whole databases
   on the shared PostgreSQL instance. This addresses a database-cleanup deadline
   failure without weakening timeouts or identity assertions. A fresh, isolated
   PostgreSQL 17 instance passes the encrypted bundle, CLI restore and Apple,
   Windows and desktop continuity tests sequentially; all temporary databases
-  are removed afterward. CI retains race detection for these checks.
+  are removed afterward. The corresponding CI recovery step also passes at
+  `0abc6cc3e54171f56c7fbee6aab44d9171876db0`. A later, separate CSP fuzz step ended
+  with a coordinator deadline and no failing corpus input. That step now uses
+  10,000 inputs and a separate two-minute hard timeout; the exact input budget
+  passes locally in 6.885 seconds. CI retains race detection for recovery checks.
 
 - The agent's [embedded Burn registration reader](windows-winget-resolution.md#burn-exe-translation-foundation)
   now validates the complete bounded CAB directory and decodes only the manifest
@@ -79,8 +97,8 @@ the table's package summaries do not remove any detail from the roadmap.
   pass complete registration/tampered-header checks in 15.10 seconds. All agent
   CI jobs pass at `bf1f80adf9960387f82e414d60263b7054816c23`. These native runs use
   an AMD64 Windows process; native ARM64 process acceptance remains open. The
-  bounded preflight subprocess, authenticated capability negotiation and source
-  approval/dispatch must require this proof before Burn delivery is enabled.
+  preflight subprocess and signed capability contract are recorded above. Native
+  execution and source approval/dispatch remain required before delivery is enabled.
 
 - The agent's [bounded Burn layout reader](windows-winget-resolution.md#burn-exe-translation-foundation)
   now locates the section-declared bundle code and UX cabinet with at most seven

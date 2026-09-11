@@ -115,7 +115,8 @@ jobs:
       - name: Windows CSP compiler fuzzing
         run: go test -run '^$' -fuzz='^FuzzCSPCompiler$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows CSP result transition fuzzing
-        run: go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+        # A fixed input budget lets workers finish before the outer hard timeout.
+        run: go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=10000x -fuzzminimizetime=1s -timeout=2m -parallel=2 ./internal/mdm/windows
       - name: Windows typed update policy fuzzing
         run: go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows immutable ring target fuzzing
