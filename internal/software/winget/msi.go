@@ -65,79 +65,9 @@ func msiPlan(snapshot Snapshot, manifest *Manifest, index int, target MSITarget,
 	if index < 0 || index >= len(manifest.Installers) || architecture == "" || !target.Detection.Valid() || target.Detection.Kind != "msi-product" || (operation != "install" && operation != "remove") {
 		return empty, ErrInstaller
 	}
-	root, selected := mapping(manifest.Root), mapping(manifest.Installers[index])
-	fields := map[string]*yaml.Node{}
-	for name, value := range root {
-		if msiMetadata(name) {
-			continue
-		}
-		if !msiField(name) || name == "Architecture" || name == "InstallerUrl" || name == "InstallerSha256" {
-			return empty, ErrInstaller
-		}
-		fields[name] = value
-	}
-	for name, value := range selected {
-		if !msiField(name) {
-			return empty, ErrInstaller
-		}
-		fields[name] = value
-	}
-	// WinGet merges switch keys rather than replacing the entire map. Empty
-	// installer dependency/return-code declarations also cannot erase retained
-	// root behavior. Never lose requirements while constructing an effective view.
-	for _, defaults := range []map[string]*yaml.Node{root, selected} {
-		if node := defaults["Dependencies"]; node != nil && (node.Kind != yaml.MappingNode || len(node.Content) != 0) {
-			return empty, ErrInstaller
-		}
-		for _, name := range []string{"InstallerSuccessCodes", "ExpectedReturnCodes"} {
-			if node := defaults[name]; node != nil && (node.Kind != yaml.SequenceNode || len(node.Content) != 0) {
-				return empty, ErrInstaller
-			}
-		}
-	}
-	var validSwitches bool
-	fields["InstallerSwitches"], validSwitches = mergedSwitches(root["InstallerSwitches"], selected["InstallerSwitches"])
-	if !validSwitches {
-		return empty, ErrInstaller
-	}
-	if scalar(fields["Architecture"]) != architecture || scalar(fields["Scope"]) != "machine" || !slices.Contains([]string{"msi", "wix"}, scalar(fields["InstallerType"])) {
-		return empty, ErrInstaller
-	}
-	if !optionalEnum(fields["UpgradeBehavior"], "install") || !optionalEnum(fields["ElevationRequirement"], "elevatesSelf", "elevationRequired") {
-		return empty, ErrInstaller
-	}
-	for _, name := range []string{"InstallerAbortsTerminal", "InstallLocationRequired", "RequireExplicitUpgrade", "DownloadCommandProhibited", "DisplayInstallWarnings"} {
-		if node := fields[name]; node != nil && (node.Kind != yaml.ScalarNode || node.Tag != "!!bool" || node.Value != "false") {
-			return empty, ErrInstaller
-		}
-	}
-	if node := fields["Platform"]; node != nil {
-		values, valid := scalarList(node)
-		if !valid || len(values) != 1 || values[0] != "Windows.Desktop" {
-			return empty, ErrInstaller
-		}
-	}
-	if node := fields["InstallModes"]; node != nil {
-		values, valid := scalarList(node)
-		if !valid || !slices.Contains(values, "silent") {
-			return empty, ErrInstaller
-		}
-		for _, value := range values {
-			if !slices.Contains([]string{"silent", "silentWithProgress", "interactive"}, value) {
-				return empty, ErrInstaller
-			}
-		}
-	}
-	if node := fields["UnsupportedOSArchitectures"]; node != nil {
-		values, valid := scalarList(node)
-		if !valid || slices.Contains(values, architecture) {
-			return empty, ErrInstaller
-		}
-		for _, value := range values {
-			if !slices.Contains([]string{"x86", "x64", "arm", "arm64"}, value) {
-				return empty, ErrInstaller
-			}
-		}
+	fields, err := installerFields(manifest, index, architecture, "msi", "wix")
+	if err != nil {
+		return empty, err
 	}
 	if !msiSwitches(fields["InstallerSwitches"]) {
 		return empty, ErrInstaller
@@ -187,13 +117,13 @@ func msiPlan(snapshot Snapshot, manifest *Manifest, index int, target MSITarget,
 	return plan, nil
 }
 
-func msiMetadata(name string) bool {
+func installerMetadata(name string) bool {
 	// Agreement acceptance and market restrictions need a separate workflow; do
 	// not classify them as ignorable descriptions. Complete source bytes survive.
 	return slices.Contains([]string{"PackageIdentifier", "PackageVersion", "ManifestType", "ManifestVersion", "Installers", "PackageLocale", "DefaultLocale", "Publisher", "PublisherUrl", "PublisherSupportUrl", "PrivacyUrl", "Author", "PackageName", "PackageUrl", "License", "LicenseUrl", "Copyright", "CopyrightUrl", "ShortDescription", "Description", "Moniker", "Tags", "ReleaseNotes", "ReleaseNotesUrl", "Documentations", "Icons"}, name)
 }
 
-func msiField(name string) bool {
+func installerField(name string) bool {
 	return slices.Contains([]string{"Architecture", "InstallerType", "Scope", "MinimumOSVersion", "InstallerUrl", "InstallerSha256", "ProductCode", "AppsAndFeaturesEntries", "UpgradeBehavior", "ElevationRequirement", "Platform", "InstallModes", "InstallerSwitches", "UnsupportedOSArchitectures", "InstallerAbortsTerminal", "InstallLocationRequired", "RequireExplicitUpgrade", "DownloadCommandProhibited", "DisplayInstallWarnings", "Dependencies", "InstallerSuccessCodes", "ExpectedReturnCodes", "Commands", "Protocols", "FileExtensions", "ReleaseDate", "InstallationMetadata", "UnsupportedArguments"}, name)
 }
 
@@ -253,8 +183,8 @@ func msiSwitches(node *yaml.Node) bool {
 		switch name {
 		case "Silent":
 			quiet := false
-			for _, arg := range strings.Fields(value.Value) {
-				arg = strings.ToLower(arg)
+			for _, arg := range installerSwitchWords(value.Value) {
+				arg = lowerInstallerSwitch(arg)
 				if !slices.Contains([]string{"/q", "/qn", "/quiet", "/norestart"}, arg) {
 					return false
 				}
@@ -264,7 +194,7 @@ func msiSwitches(node *yaml.Node) bool {
 				return false
 			}
 		case "Custom":
-			if text := strings.TrimSpace(value.Value); text != "" && text != "ALLUSERS=1" {
+			if text := strings.Trim(value.Value, " \t"); text != "" && text != "ALLUSERS=1" {
 				return false
 			}
 		case "Upgrade":

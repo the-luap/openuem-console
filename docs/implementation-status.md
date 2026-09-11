@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- A separate [Burn source adapter](windows-winget-resolution.md#burn-exe-translation-foundation)
+  now binds source-declared installation/removal to the same exact EXE, native
+  target, bundle identifier and reviewed machine uninstall-registry view. Shared
+  parsing preserves inherited requirements; MSI and Burn reject non-ASCII switch
+  folding and non-Windows argument separators. This foundation does not enable
+  Burn in the console. Embedded binary bundle-identity proof, appropriate native
+  delivery negotiation, explicit source approval/provenance and physical acceptance
+  remain required before source-derived Burn execution.
+  Combined source/MSI/Burn race tests pass in 1.799 seconds; final Burn and MSI
+  fuzz runs pass 242,390 and 233,586 inputs. Source/catalog PostgreSQL race tests
+  pass in 17.265 seconds, with full handler, focused vet and Windows compilation
+  checks also passing. These tests execute no Burn package.
+
 - [WinGet source review and MSI approval](windows-winget-resolution.md) now connect
   exact source snapshots to the catalog and existing individual-agent dispatch.
   Organization software managers explicitly capture an encrypted manifest at a

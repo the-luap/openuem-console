@@ -145,6 +145,50 @@ These synthetic tests do not download or execute a public installer. Further
 WinGet installer formats and physical install/remove, offline, restart and
 hibernate acceptance remain open. WIN-01 and the complete roadmap remain in progress.
 
+## Burn EXE translation foundation
+
+The separate `BurnPlan` adapter validates source-declared machine Burn bundles
+against an explicitly reviewed AMD64/ARM64 target, exact braced bundle identifier,
+machine uninstall-registry view and displayed version. It emits installation and
+removal plans using the same HTTPS EXE digest. Detection remains `uninstall-key`;
+the bundle identifier is never substituted for an MSI product code. Removal uses
+the pinned executable's uninstall action, without reading or invoking a mutable
+machine `UninstallString`.
+
+The shared installer checks retain root requirements and per-key switch
+inheritance. Burn accepts its known quiet/no-restart defaults and only matching
+overrides; custom actions, properties, dependencies, multiple or nested MSI ARP
+identities, manifest `uninstallPrevious` transitions and unknown behavior are rejected.
+Both MSI and Burn require literal ASCII switches with space/tab separators.
+Unicode case folding, Unicode whitespace and embedded line breaks cannot turn
+an unsupported manifest token into an accepted quiet flag.
+
+This is source metadata translation, not enabled Burn delivery. Console source
+review and immutable approval currently admit only MSI/WiX. Before integrating
+Burn, the native contract must verify that the binary's embedded bundle identity
+matches its reviewed registration, in addition to the existing hash, Authenticode
+and PE architecture checks. Those existing checks alone do not establish bundle
+identity. The agent also currently rejects an emulated bootstrapper executable,
+even when its payload targets the native architecture. Source-derived Burn
+approval/history, native package proof, complete execution/recovery tests and
+physical acceptance remain open.
+
+The combined source/MSI/Burn race suite passes in 1.799 seconds. The final Burn
+and MSI fuzz runs pass 242,390 and 233,586 inputs respectively. Tests cover both
+operations, both native architectures, both explicitly reviewed registry views,
+same-artifact removal, display-version/OS requirements, inherited switches and
+unsupported actions, identities and separators. The existing source/catalog
+PostgreSQL race suite passes in 17.265 seconds after extracting shared checks;
+full handler tests, focused vet and Windows compilation also pass. No Burn
+installer is downloaded or executed by these tests.
+
+The source-level contract follows the pinned
+[WinGet known-switch implementation](https://github.com/microsoft/winget-cli/blob/c17eadbcacf2f5244b13de0d563d921c33ac4af6/src/AppInstallerCommonCore/Manifest/ManifestCommon.cpp),
+the pinned [Burn action parser](https://github.com/wixtoolset/wix/blob/77aa9818ad37637f961afe143be88bdc38a3f350/src/burn/engine/core.cpp)
+and Microsoft's [.NET installer operation documentation](https://learn.microsoft.com/en-us/dotnet/core/install/windows#command-line-options).
+The latter documents same-version uninstall and success/restart-required results;
+it does not make every EXE a Burn bundle or authorize removing related versions.
+
 The implementation follows Microsoft's [manifest overview](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest),
 the [installer schema documentation](https://github.com/microsoft/winget-pkgs/blob/5630670fa24b40b74bc32038abd26e677ad4b71c/doc/manifest/schema/1.12.0/installer.md)
 and GitHub's [exact reference API](https://docs.github.com/en/rest/git/refs#get-a-reference).
