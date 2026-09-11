@@ -19,6 +19,7 @@ import windowsTimestamps from "./windows-timestamps.mjs";
 import windowsEvidenceTimes from "./windows-evidence-times.mjs";
 import network from "./desktop-network.mjs";
 import scopedNetwork from "./desktop-network-scoped.mjs";
+import storage from "./desktop-storage.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -59,6 +60,7 @@ try {
         [windowsSources, 51],
         [network, 12],
         [scopedNetwork, 24],
+        [storage, 48],
         [accountLanguage,30],
         [timestamps,21],
         [windowsTimestamps,21],

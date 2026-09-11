@@ -105,6 +105,12 @@ continuation. Current transaction authorization and `inventory.network.read`
 audit are required before returning data. Delegated roles can also use the
 existing GET network-adapter aliases; mutations remain restricted.
 
+[Reported storage](desktop-storage-inventory.md) adds physical and logical disk
+reports, literal search and 25-entry continuation under the same scoped read
+boundary. Current authorization, exact membership and a committed
+`inventory.storage.read` audit precede data return. Delegated GET disk aliases
+open these reports; file browsing, download and mutation permissions do not expand.
+
 [Account display language](account-language.md) is a self-service preference.
 Its protected form always derives the account from the authenticated session;
 a language selection does not change roles or device permissions.

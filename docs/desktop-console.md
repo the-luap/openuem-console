@@ -39,6 +39,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Read the scoped computer overview | Viewer in the selected organization or site |
 | Search reported computer software | Viewer in the selected organization or site |
 | Read and search reported network adapters | Viewer in the selected organization or site |
+| Read and search reported physical/logical disks | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -103,6 +104,10 @@ The **Reported network** tab provides [scoped adapter reports](desktop-network-i
 with literal name/MAC/IP search, bounded pagination and a committed read audit.
 Missing flags and empty reports retain their uncertainty; stored configuration
 does not verify current connectivity.
+
+The **Reported storage** tab provides [scoped physical and logical disk reports](desktop-storage-inventory.md),
+with literal search, bounded pages and audited reads. Stored usage defaults and
+BitLocker strings remain reported evidence; current encryption is not verified.
 
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA

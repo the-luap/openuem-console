@@ -25,6 +25,7 @@ import (
 	"github.com/open-uem/ent/task"
 	openuem_nats "github.com/open-uem/nats"
 	ansiblecfg "github.com/open-uem/openuem-ansible-config/ansible"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/computers_views"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -346,7 +347,13 @@ func (h *Handler) Printers(c echo.Context) error {
 }
 
 func (h *Handler) LogicalDisks(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopStorage(c, inventory.LogicalStorage)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -383,7 +390,13 @@ func (h *Handler) LogicalDisks(c echo.Context) error {
 }
 
 func (h *Handler) PhysicalDisks(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopStorage(c, inventory.PhysicalStorage)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {

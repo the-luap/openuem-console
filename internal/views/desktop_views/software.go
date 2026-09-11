@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
@@ -20,6 +21,15 @@ func softwareURL(info *partials.CommonInfo, id, search string, after int64) stri
 
 func networkURL(info *partials.CommonInfo, id, search string, after int64) string {
 	return inventoryReportURL(info, id, "network", search, after)
+}
+
+func storageURL(info *partials.CommonInfo, id string, kind inventory.StorageKind, search string, after int64) string {
+	path := inventoryReportURL(info, id, "storage", search, after)
+	separator := "?"
+	if search != "" || after > 0 {
+		separator = "&"
+	}
+	return path + separator + "kind=" + url.QueryEscape(string(kind))
 }
 
 func inventoryReportURL(info *partials.CommonInfo, id, report, search string, after int64) string {
