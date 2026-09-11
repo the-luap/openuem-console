@@ -91,6 +91,13 @@ templ SoftwareVersion(c echo.Context, info *partials.CommonInfo, v apple.Softwar
 					<dl class="uk-description-list"><dt>Package type</dt><dd>{SoftwarePackageKind(v.Kind)}</dd><dt>Application identifier</dt><dd>{ v.Identifier }</dd><dt>{SoftwareVersionLabel(v.Platform)}</dt><dd>{ v.Version }</dd><dt>Compatibility</dt><dd>{v.Platform} { v.MinimumOS }+ · { v.Architecture }</dd><dt>SHA-256</dt><dd><code>{ Show(v.SHA256) }</code></dd><dt>Approved</dt><dd>{ When(&v.ApprovedAt) } · { v.ApprovedBy }</dd><dt>Revision</dt><dd>{ v.ID }</dd></dl>
 					if v.Platform=="windows" {
 						@WindowsSoftwareRequirements(v)
+						if v.Kind=="windows-winget" {
+							<a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+v.ID+"/sources")}>WinGet installers</a>
+						}
+						if v.WinGetSource!=nil {
+							<p class="mt-4">This MSI revision was approved from a saved Microsoft community WinGet manifest.</p>
+							<a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+v.WinGetSource.SourceVersionID+"/sources/"+v.WinGetSource.ID)}>View WinGet source evidence</a>
+						}
 						if info.Can(access.ReadDevices) {
 							<a class="uk-button uk-button-default mt-4" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/"+v.ID+"/windows-requests"))}>Windows device requests</a>
 						}

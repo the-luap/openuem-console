@@ -27,16 +27,18 @@ installed version can differ, so both are recorded explicitly.
 | MSI | HTTPS `.msi` URL, lowercase SHA-256 and bounded public `NAME=value` properties; machine scope, quiet operation and suppressed automatic restart are reserved for the adapter | Exact uppercase braced MSI product code |
 | EXE | HTTPS `.exe` URL, lowercase SHA-256 and one literal installer argument per line | Separate HTTPS `.exe` URL, lowercase SHA-256 and one literal removal argument per line |
 
-WinGet approval records a source coordinate. It does not pin a resolved manifest
-or installer digest. Immutable source resolution and binary verification remain
-delivery prerequisites. Custom package hashes are supplied by the publisher;
-the console does not fetch those URLs or independently inspect their signatures.
-The [source snapshot reader](windows-winget-resolution.md) now retains a fixed
-Microsoft community commit and exact manifest bytes, with bounded HTTPS and
-strict binding checks. Exact machine MSI/WiX translation is implemented separately;
-immutable approval linkage and console review still need integration before a
-WinGet coordinate can execute. Other installer kinds remain unsupported by that
-new translation boundary.
+Initial WinGet approval records a source coordinate. Select **WinGet installers**
+to save its exact Microsoft community manifest at a fixed commit, then review
+and approve a compatible machine MSI/WiX installer as a separate MSI revision.
+The [source review workflow](windows-winget-resolution.md) retains encrypted
+immutable evidence and a scoped history link from the derived revision. It
+preserves the original coordinate, exact architecture and detection requirements;
+each choice binds the artifact digest and a 15-minute approval deadline. The
+derived MSI uses the existing explicit device preparation and dispatch path.
+Other installer kinds remain unsupported by this translation boundary.
+Custom package hashes are supplied by the publisher; the console does not fetch
+those URLs or independently inspect their signatures. Native staging must verify
+the artifact digest and trust before execution for both custom and derived MSI.
 
 Arguments preserve spaces and punctuation without interpreting shell quoting.
 Line endings separate arguments; a final line ending terminates the last argument.
@@ -133,8 +135,8 @@ reservation while preserving its original outcome. Unknown state, missing eviden
 or the same boot cannot release it. This path has separate review, cancellation,
 verified history, protected native receipt recovery and current-certificate proof.
 
-WIN-01 remains in progress. Required next work includes immutable WinGet manifest
-resolution and physical install/remove, offline, restart and hibernate acceptance.
+WIN-01 remains in progress. Required next work includes further WinGet installer
+formats and physical install/remove, offline, restart and hibernate acceptance.
 Synthetic boot evidence is not physical acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's
 [bounded Windows execution implementation](https://github.com/the-luap/openuem-agent/blob/b87cbce5c5ff6990f9db98ad808b5a8fcc122eae/docs/windows-package-execution.md)

@@ -113,6 +113,6 @@ templ WindowsSoftwareRequirements(v apple.SoftwareVersion) {
 		<dt>Successful exit codes</dt><dd>{SoftwareExitCodes(v.Windows.SuccessCodes)}</dd><dt>Restart-required exit codes</dt><dd>{SoftwareExitCodes(v.Windows.RebootCodes)}</dd>
 	</dl>
 		if v.Kind=="windows-winget" {
-			<p class="mt-4">Package source: winget. This revision approves the package coordinate rather than a custom binary digest.</p>
+			<p class="mt-4">Package source: Microsoft community WinGet repository. Review its installers to approve a compatible machine MSI with an exact binary digest as a separate revision.</p>
 		}
 }

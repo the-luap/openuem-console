@@ -24,9 +24,11 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
+	"github.com/open-uem/openuem-console/internal/software/winget"
 )
 
 type Handler struct {
+	winGetSource           func(context.Context, winget.Coordinate) (*winget.Snapshot, error)
 	IndividualAgentService *openuem_nats.ServiceConnection
 	IndividualBroker       *consolebroker.Broker
 	Access                 *access.Store

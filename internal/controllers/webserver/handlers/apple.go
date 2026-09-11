@@ -33,6 +33,11 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/software/catalog/windows/new", h.WindowsSoftwareApproval)
 		g.POST("/software/catalog/windows", h.PublishWindowsSoftware)
 		g.GET("/software/catalog/:version", h.SoftwareVersion)
+		g.GET("/software/catalog/:version/sources", h.WindowsSoftwareSources)
+		g.POST("/software/catalog/:version/sources", h.ResolveWindowsSoftwareSource)
+		g.GET("/software/catalog/:version/sources/:source", h.WindowsSoftwareSource)
+		g.GET("/software/catalog/:version/sources/:source/review", h.ReviewWindowsSoftwareSource)
+		g.POST("/software/catalog/:version/sources/:source/approve", h.ApproveWindowsSoftwareSource)
 		g.GET("/software/catalog/:version/windows-requests", h.WindowsSoftwareRequests)
 		g.POST("/software/catalog/:version/windows-requests", h.PrepareWindowsSoftware)
 		g.POST("/software/catalog/:version/windows-requests/:request/cancel", h.CancelWindowsSoftwarePreparation)
@@ -121,6 +126,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
+				limit = 8192
 			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
 				limit = 8192
 			case "/software/catalog/:version/windows-requests", "/software/catalog/:version/windows-requests/:request/cancel", "/software/catalog/:version/windows-requests/:request/dispatch", "/software/catalog/:version/windows-requests/:request/dispatch/cancel":

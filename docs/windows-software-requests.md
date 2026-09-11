@@ -11,8 +11,10 @@ revision, operation and deadline, then confirm **Dispatch to this device**.
 Preparations remain inert, including rows created before the dispatch migration.
 Only the separate review and confirmed POST can atomically create a signed,
 encrypted individual-agent task and mark its preparation `dispatched`. The worker
-never consumes preparation rows. WinGet coordinates still require immutable
-installer resolution; x86 delivery remains unavailable.
+never consumes preparation rows. For WinGet, first use the separate
+[source review](windows-winget-resolution.md) to approve a compatible machine MSI
+as a derived revision, then prepare that MSI revision. Unresolved coordinates
+and x86 delivery remain unavailable.
 
 ## Admission and lifetime
 
@@ -191,7 +193,7 @@ certificates, immutable original receipts, cancellation and bounded history. Rou
 tests exercise the complete review/queue/report/history path and strict form/CSRF
 boundaries. The browser suite passes all 270 cases, including the 42 check cases.
 
-WIN-01 remains in progress. Immutable WinGet manifest resolution and physical
+WIN-01 remains in progress. Further WinGet installer formats and physical
 install/remove, offline, restart and hibernate acceptance remain required. The
 reconciliation tests use synthetic boot evidence; they do not reboot a physical
 endpoint. Native staging, installation/removal and durable agent receipts have

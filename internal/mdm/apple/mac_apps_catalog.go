@@ -14,6 +14,7 @@ import (
 // SoftwareVersion is safe to use in inventory and catalog pages. Download URLs
 // are purpose-bound encrypted values available only while issuing a command.
 type SoftwareVersion struct {
+	WinGetSource                                       *WindowsSoftwareSource `json:"winget_source,omitempty"`
 	ID, PackageID, Platform, Name, Identifier, Version string
 	Architecture, MinimumOS, SHA256, ApprovedBy        string
 	SingleApp                                          bool

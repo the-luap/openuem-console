@@ -1,0 +1,150 @@
+package mdm_views
+
+import (
+ "fmt"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/mdm/apple"
+ "github.com/open-uem/openuem-console/internal/views/layout"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+func WindowsSoftwareSourcesTitle(focused bool) string {
+ if focused { return "WinGet source evidence" }
+ return "WinGet installers"
+}
+
+templ WindowsSoftwareSourceIdentity(source apple.WindowsSoftwareSource) {
+ <dl class="uk-description-list mt-4">
+  <dt>Saved source</dt><dd>{source.ID}</dd>
+  <dt>Microsoft community repository commit</dt><dd><code>{source.Commit}</code></dd>
+  <dt>Manifest SHA-256</dt><dd><code>{source.ManifestSHA256}</code></dd>
+  <dt>Manifest path</dt><dd>{source.ManifestPath}</dd>
+  <dt>Saved</dt><dd>{When(&source.CreatedAt)} · {source.Actor}</dd>
+  <dt>Approval deadline</dt><dd>{When(&source.ExpiresAt)}</dd>
+ </dl>
+}
+
+templ WindowsSoftwareSourceRequirements(v apple.SoftwareVersion) {
+ <dl class="uk-description-list mt-4">
+  <dt>Approved package</dt><dd>{v.Name} · {v.Identifier} · {v.Version}</dd>
+  <dt>Target architecture</dt><dd>{v.Architecture}</dd>
+  <dt>Minimum Windows version</dt><dd>{v.MinimumOS}</dd>
+  <dt>Detection rule</dt><dd>{v.Windows.Detection.Kind} · exact version {v.Windows.Detection.Version}</dd>
+  if v.Windows.Detection.Kind=="msi-product" {
+   <dt>MSI product code</dt><dd>{v.Windows.Detection.ProductCode}</dd>
+  }
+ </dl>
+}
+
+templ WindowsSoftwareSources(c echo.Context,info *partials.CommonInfo,page apple.WindowsSoftwareSourcesPage,requestID,actor string,canManage bool) {
+ @layout.Base("devices",info) {
+  <link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+  @partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:page.Version.Name,Url:partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID)},{Title:WindowsSoftwareSourcesTitle(page.Focused),Url:""}},info)
+  <main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div><h1 class="text-2xl font-semibold">{WindowsSoftwareSourcesTitle(page.Focused)}</h1>@Navigation(info)</div>
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">Exact package requirements</h2></div>
+    <div class="uk-card-body">
+     @WindowsSoftwareSourceRequirements(*page.Version)
+     if page.Version.WithdrawnAt!=nil {
+      <p role="status" class="uk-alert mt-4">This package approval was withdrawn. Its saved sources and MSI approvals remain in history.</p>
+     } else if !page.Focused && canManage {
+      <p class="mt-4">Save the manifest for this exact package version from the Microsoft community repository. Review a compatible machine MSI installer and approve its digest in a separate step.</p>
+      <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources")}>
+       @CSRF(info)
+       <input type="hidden" name="request_id" value={requestID}/>
+       <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Save this exact package source for my review. This does not install software on a device.</label>
+       <button class="uk-button uk-button-primary mt-4" type="submit">Save installer source</button>
+      </form>
+     }
+     <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID)}>Back to approved package</a>
+     if page.Focused {
+      <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources")}>All saved sources</a>
+     }
+    </div>
+   </section>
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">Saved source history</h2><p>Each source is retained at its exact repository commit. An MSI approval records the selected installer and creates a separate catalog revision.</p></div>
+    <div class="uk-card-body">
+     if len(page.Sources)==0 {
+      <p>No installer sources saved for this package revision.</p>
+     }
+     for _,source:=range page.Sources {
+      <article class="software-row">
+       if source.Approval!=nil {
+        <h3 class="font-semibold">MSI revision approved</h3>
+       } else if source.Expired {
+        <h3 class="font-semibold">Source review expired</h3>
+       } else {
+        <h3 class="font-semibold">Awaiting installer review</h3>
+       }
+       @WindowsSoftwareSourceIdentity(source)
+       if source.Approval!=nil {
+        <dl class="uk-description-list mt-4"><dt>Selected installer</dt><dd>{fmt.Sprint(source.Approval.InstallerIndex+1)}</dd><dt>MSI revision approved</dt><dd>{When(&source.Approval.ApprovedAt)} · {source.Approval.Actor}</dd></dl>
+        if source.Approval.WithdrawnAt!=nil {
+         <p role="status" class="mt-4">The derived MSI approval was withdrawn at {When(source.Approval.WithdrawnAt)}.</p>
+        }
+        <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+source.Approval.VersionID)}>View MSI revision</a>
+       } else if !source.Expired && page.Version.WithdrawnAt==nil && canManage && source.Actor==actor {
+        <a class="uk-button uk-button-primary mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources/"+source.ID+"/review")}>Review installer choices</a>
+       }
+       if !page.Focused {
+        <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources/"+source.ID)}>View source evidence</a>
+       }
+      </article>
+     }
+     if page.Next!="" {
+      <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/sources?before="+page.Next)}>Older saved sources</a>
+     }
+    </div>
+   </section>
+  </main>
+ }
+}
+
+templ WindowsSoftwareSourceReview(c echo.Context,info *partials.CommonInfo,review apple.WindowsSoftwareSourceReview,approvalID string) {
+ @layout.Base("devices",info) {
+  <link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+  @partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:review.Version.Name,Url:partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID)},{Title:"Review WinGet installer",Url:""}},info)
+  <main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div><h1 class="text-2xl font-semibold">Review WinGet installer</h1>@Navigation(info)</div>
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">Saved source and package requirements</h2></div>
+    <div class="uk-card-body">
+     @WindowsSoftwareSourceRequirements(*review.Version)
+     @WindowsSoftwareSourceIdentity(review.Source)
+     <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID+"/sources")}>Back to saved sources</a>
+    </div>
+   </section>
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">Compatible machine MSI installers</h2></div>
+    <div class="uk-card-body">
+     if review.Source.Approval!=nil {
+      <p role="status">An MSI revision was already approved from this source.</p>
+      <a class="uk-button uk-button-default mt-4" href={partials.GetNavigationUrl(info,"/software/catalog/"+review.Source.Approval.VersionID)}>View MSI revision</a>
+     } else if review.Version.WithdrawnAt!=nil {
+      <p role="status">The original package approval was withdrawn. Further MSI approval from this source is unavailable.</p>
+     } else if review.Expired {
+      <p role="status">The approval deadline has passed. Save a new source to review this package again.</p>
+     } else if len(review.Options)==0 {
+      <p role="status">None of the {fmt.Sprint(review.InstallerCount)} manifest installers meet the supported machine MSI rules and this revision's exact architecture, detection and version requirements.</p>
+     } else {
+      <p>Choose one installer. Approval creates a separate MSI revision with its exact binary digest and detection rule. Preparing and dispatching a device request requires later confirmation.</p>
+      for _,option:=range review.Options {
+       <article class="software-row">
+        <h3 class="font-semibold">Installer {fmt.Sprint(option.Index+1)} · {review.Version.Architecture}</h3>
+        <dl class="uk-description-list mt-4"><dt>Download host</dt><dd>{option.DownloadHost}</dd><dt>MSI SHA-256</dt><dd><code>{option.SHA256}</code></dd><dt>Minimum Windows version</dt><dd>{option.MinimumOS}</dd><dt>Required MSI product code</dt><dd>{review.Version.Windows.Detection.ProductCode}</dd><dt>Exact installed version</dt><dd>{review.Version.Windows.Detection.Version}</dd></dl>
+        <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID+"/sources/"+review.Source.ID+"/approve")}>
+         @CSRF(info)
+         <input type="hidden" name="approval_id" value={approvalID}/><input type="hidden" name="installer_index" value={fmt.Sprint(option.Index)}/><input type="hidden" name="review_hash" value={option.ReviewHash}/>
+         <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Approve this exact MSI installer as a new catalog revision.</label>
+         <button class="uk-button uk-button-primary mt-4" type="submit">Approve this MSI revision</button>
+        </form>
+       </article>
+      }
+     }
+    </div>
+   </section>
+  </main>
+ }
+}

@@ -1,12 +1,66 @@
 package winget
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/open-uem/nats/enrollment"
 )
+
+func TestMSIOptionsRetainExactIndexesDigestsAndOnlySafeHosts(t *testing.T) {
+	snapshot := fixtureSnapshot(strings.ReplaceAll(string(msiSnapshot().Content), "editor.msi", "private-download.msi?token=private-source"))
+	options, err := MSIOptions(snapshot, msiTarget())
+	if err != nil || len(options) != 1 || options[0].Index != 0 || options[0].DownloadHost != "example.invalid" {
+		t.Fatal("compatible options", err)
+	}
+	plan, err := MSIPlan(snapshot, options[0].Index, msiTarget(), "install")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, _ := plan.Digest()
+	if options[0].PlanDigest != digest || options[0].SHA256 != plan.Artifact.SHA256 || options[0].MinimumOS != plan.MinimumOS {
+		t.Fatal("option changed exact executable plan")
+	}
+	public, _ := json.Marshal(options)
+	if strings.Contains(string(public), "private-") || strings.Contains(string(public), "https://") {
+		t.Fatal("option exposed download path or token")
+	}
+	target := msiTarget()
+	target.Architecture = "arm64"
+	target.Detection.ProductCode = "{90000000-0000-4000-8000-000000000002}"
+	options, err = MSIOptions(snapshot, target)
+	if err != nil || len(options) != 1 || options[0].Index != 1 {
+		t.Fatal("native ARM64 option index", err)
+	}
+	target.Detection.ProductCode = msiTarget().Detection.ProductCode
+	options, err = MSIOptions(snapshot, target)
+	if err != nil || len(options) != 0 {
+		t.Fatal("other architecture product accepted", err)
+	}
+	// The maximum accepted manifest remains a bounded list with stable indexes.
+	content := string(msiSnapshot().Content)
+	start := strings.Index(content, "- Architecture: x64")
+	end := strings.Index(content, "- Architecture: arm64")
+	tail := strings.Index(content, "ManifestType:")
+	if start < 0 || end < start || tail < end {
+		t.Fatal("invalid owned manifest fixture")
+	}
+	entry := content[start:end]
+	for _, count := range []int{256, 257} {
+		options, err = MSIOptions(fixtureSnapshot(content[:start]+strings.Repeat(entry, count)+content[tail:]), msiTarget())
+		if count == 257 {
+			if err == nil {
+				t.Fatal("unbounded option list accepted")
+			}
+			continue
+		}
+		if err != nil || len(options) != count || options[count-1].Index != count-1 {
+			t.Fatal("bounded maximum option list", err)
+		}
+	}
+}
 
 func msiSnapshot() Snapshot {
 	content := strings.Replace(fixtureManifest, "UnknownFutureBehavior:\n  MustRemainVisible: true\n", "", 1)

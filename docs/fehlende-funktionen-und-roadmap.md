@@ -530,8 +530,13 @@ admission evidence, a later native kernel boot and a signed definite observation
 can release the original reservation while retaining its original outcome.
 Unknown, unavailable or same-boot evidence cannot release it. PostgreSQL, private
 WSS, native Windows journal/helper and 390/768/1440-pixel browser fixtures cover
-this path. Immutable WinGet resolution and physical installation, removal, offline,
-restart and hibernate acceptance remain open. Synthetic boot fixtures do not
+this path. [WinGet source review](windows-winget-resolution.md) now retains an
+encrypted manifest at an exact Microsoft community commit and explicitly approves
+a compatible machine MSI as a separate catalog revision. Scoped immutable history,
+concurrent confirmation, audit rollback, expiry and exact encrypted install/remove
+dispatch have PostgreSQL/race, route and browser evidence. Further WinGet installer
+formats and physical installation, removal, offline, restart and hibernate
+acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.
 
 **Repositories:** this fork is the console. Complete distribution changes must

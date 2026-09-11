@@ -2,6 +2,7 @@ package winget
 
 import (
 	"errors"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,6 +19,34 @@ type MSITarget struct {
 	Detection    enrollment.SoftwareDetection
 }
 
+// MSIOption is a safe review projection, with no artifact path, query or switches.
+type MSIOption struct {
+	Index                                       int
+	MinimumOS, SHA256, DownloadHost, PlanDigest string
+}
+
+// MSIOptions inspects a snapshot once and lists only exact compatible choices.
+func MSIOptions(snapshot Snapshot, target MSITarget) ([]MSIOption, error) {
+	manifest, err := snapshot.Inspect()
+	if err != nil {
+		return nil, err
+	}
+	var options []MSIOption
+	for index := range manifest.Installers {
+		plan, err := msiPlan(snapshot, manifest, index, target, "install")
+		if err != nil {
+			continue
+		}
+		artifact, _ := url.Parse(plan.Artifact.URL)
+		digest, err := plan.Digest()
+		if err != nil {
+			return nil, ErrInstaller
+		}
+		options = append(options, MSIOption{Index: index, MinimumOS: plan.MinimumOS, SHA256: plan.Artifact.SHA256, DownloadHost: artifact.Hostname(), PlanDigest: digest})
+	}
+	return options, nil
+}
+
 // MSIPlan translates only an explicitly selected machine MSI/WiX entry. Target
 // requirements come from separately reviewed approval intent. A returned plan
 // still needs current authorization, immutable approval and signed dispatch.
@@ -27,6 +56,11 @@ func MSIPlan(snapshot Snapshot, index int, target MSITarget, operation string) (
 	if err != nil {
 		return empty, err
 	}
+	return msiPlan(snapshot, manifest, index, target, operation)
+}
+
+func msiPlan(snapshot Snapshot, manifest *Manifest, index int, target MSITarget, operation string) (enrollment.SoftwarePlan, error) {
+	var empty enrollment.SoftwarePlan
 	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[target.Architecture]
 	if index < 0 || index >= len(manifest.Installers) || architecture == "" || !target.Detection.Valid() || target.Detection.Kind != "msi-product" || (operation != "install" && operation != "remove") {
 		return empty, ErrInstaller

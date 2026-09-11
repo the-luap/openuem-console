@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 270 cases:
+headless Chrome session. The runner covers 318 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -14,6 +14,7 @@ headless Chrome session. The runner covers 270 cases:
 | Windows device requests | Prepared, reader, cancelled, expired, withdrawn and empty × three widths | 18 |
 | Windows dispatch | Install/remove review, pending, delivered, observed, restart, uncertain, reader, cancelled, expired, failed and rejected start × three widths | 36 |
 | Windows software checks | Install/remove review, empty, pending, delivered, observed, drifted, unknown, waiting, unavailable, cancelled, expired, reader and paged × three widths | 42 |
+| WinGet sources | Empty, pending, other owner, reader, site, expired, withdrawn, approved, focused, paged, compatible/incompatible review, expired/withdrawn/approved review and derived revision × three widths | 48 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard
@@ -25,6 +26,9 @@ report completion, and check the refresh form's scope, CSRF token and request ID
 Software check cases preserve the original execution outcome after a verified
 reservation release, validate exact review and cancellation fields, and check
 scoped pagination and reader controls. They run no installer or endpoint query.
+WinGet source cases preserve the exact original revision, selected installer and
+approval hash, enforce separate keyboard confirmation, restrict controls by
+ownership/deadline/scope and retain the derived revision's source evidence link.
 
 ## Run locally
 

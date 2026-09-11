@@ -34,7 +34,17 @@ func (s *Store) PublishWindowsSoftware(ctx context.Context, scope Scope, request
 	if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageSoftware, access.Scope{TenantID: scope.TenantID}); err != nil {
 		return nil, err
 	}
-	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "software-approval:"+strconv.Itoa(scope.TenantID)+":"+requestID); err != nil {
+	v, err := s.publishWindowsSoftwareTx(ctx, tx, scope, requestID, input, actor)
+	if err != nil {
+		return nil, err
+	}
+	return v, tx.Commit()
+}
+
+// The caller validates intent and holds current organization ManageSoftware
+// authority. Source-derived approvals can add their provenance before one commit.
+func (s *Store) publishWindowsSoftwareTx(ctx context.Context, tx *sql.Tx, scope Scope, requestID string, input WindowsSoftwareInput, actor string) (*SoftwareVersion, error) {
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "software-approval:"+strconv.Itoa(scope.TenantID)+":"+requestID); err != nil {
 		return nil, err
 	}
 	canonical, err := input.canonical()
@@ -56,7 +66,7 @@ func (s *Store) PublishWindowsSoftware(ctx context.Context, scope Scope, request
 		if err != nil {
 			return nil, err
 		}
-		return v, tx.Commit()
+		return v, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -86,7 +96,7 @@ func (s *Store) PublishWindowsSoftware(ctx context.Context, scope Scope, request
 	if err != nil {
 		return nil, err
 	}
-	return v, tx.Commit()
+	return v, nil
 }
 
 func softwareVersionTx(ctx context.Context, tx *sql.Tx, scope Scope, id string) (*SoftwareVersion, error) {

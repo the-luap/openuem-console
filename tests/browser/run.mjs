@@ -12,6 +12,7 @@ import windowsSoftware from "./windows-software-catalog.mjs";
 import windowsRequests from "./windows-software-requests.mjs";
 import windowsDispatch from "./windows-software-dispatch.mjs";
 import windowsChecks from "./windows-software-reconciliation.mjs";
+import windowsSources from "./windows-software-sources.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -49,6 +50,7 @@ try {
         [windowsRequests, 18],
         [windowsDispatch, 36],
         [windowsChecks, 42],
+        [windowsSources, 48],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

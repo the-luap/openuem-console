@@ -20,6 +20,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/software/winget"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -392,11 +393,65 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		p.Request.Operation = operation
 		return apple.WindowsSoftwareReconciliationReview{Request: p.Request, Version: p.Version, Original: p.Original, TargetName: "Windows <Device>", ReviewHash: strings.Repeat("a", 64), ExpiresAt: now.Add(15 * time.Minute).Truncate(time.Second), Expectation: enrollment.SoftwareExpectation{Operation: operation, Detection: enrollment.SoftwareDetection{Version: "42.0"}}}
 	}
+	winSourcePage := func(state string) apple.WindowsSoftwareSourcesPage {
+		v := winSoftware("windows-winget")
+		source := apple.WindowsSoftwareSource{ID: "90000000-0000-4000-8000-000000000042", SourceVersionID: v.ID, PackageID: v.PackageID, Actor: "preview-admin", Commit: strings.Repeat("a", 40), ManifestSHA256: strings.Repeat("b", 64), ManifestPath: "manifests/v/Vendor/" + strings.Repeat("LongPackage", 20) + "/42.0/Vendor.Editor.installer.yaml", CreatedAt: now, ExpiresAt: now.Add(15 * time.Minute)}
+		page := apple.WindowsSoftwareSourcesPage{Version: &v, Sources: []apple.WindowsSoftwareSource{source}}
+		if state == "empty" {
+			page.Sources = nil
+		}
+		if state == "other-owner" {
+			page.Sources[0].Actor = "Reviewer <img src=x>"
+		}
+		if state == "expired" || state == "review-expired" {
+			page.Sources[0].Expired = true
+		}
+		if state == "withdrawn" || state == "review-withdrawn" {
+			v.WithdrawnAt = &now
+		}
+		if state == "approved" || state == "review-approved" || state == "derived" {
+			page.Sources[0].Approval = &apple.WindowsSoftwareSourceApproval{ID: "90000000-0000-4000-8000-000000000043", VersionID: "90000000-0000-4000-8000-000000000044", Actor: source.Actor, InstallerIndex: 0, ApprovedAt: now}
+		}
+		page.Focused = state == "focused"
+		if state == "paged" {
+			page.Next = "90000000-0000-4000-8000-000000000045"
+		}
+		return page
+	}
+	winSourceReview := func(state string) apple.WindowsSoftwareSourceReview {
+		p := winSourcePage(state)
+		r := apple.WindowsSoftwareSourceReview{Version: p.Version, Source: p.Sources[0], Expired: p.Sources[0].Expired, InstallerCount: 2}
+		if state == "review" {
+			r.Options = []apple.WindowsSoftwareSourceOption{{MSIOption: winget.MSIOption{Index: 0, MinimumOS: p.Version.MinimumOS, SHA256: strings.Repeat("c", 64), DownloadHost: "downloads.example.test"}, ReviewHash: strings.Repeat("d", 64)}}
+		}
+		return r
+	}
+	winDerived := winSoftware("windows-msi")
+	derivedSource := winSourcePage("derived").Sources[0]
+	winDerived.ID, winDerived.WinGetSource = derivedSource.Approval.VersionID, &derivedSource
+	sourceSite := *info
+	sourceSite.SiteID = "1"
 	cases := []struct {
 		name      string
 		component templ.Component
 		required  []string
 	}{
+		{"windows-source-empty", WindowsSoftwareSources(c, info, winSourcePage("empty"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"No installer sources saved", "Save installer source"}},
+		{"windows-source-pending", WindowsSoftwareSources(c, info, winSourcePage("pending"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Awaiting installer review", "Review installer choices"}},
+		{"windows-source-other-owner", WindowsSoftwareSources(c, info, winSourcePage("other-owner"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Reviewer &lt;img src=x&gt;"}},
+		{"windows-source-reader", WindowsSoftwareSources(c, &reader, winSourcePage("pending"), "", "preview-reader", false), []string{"View source evidence"}},
+		{"windows-source-site", WindowsSoftwareSources(c, &sourceSite, winSourcePage("pending"), "", "preview-admin", false), []string{"View source evidence"}},
+		{"windows-source-expired", WindowsSoftwareSources(c, info, winSourcePage("expired"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Source review expired"}},
+		{"windows-source-withdrawn", WindowsSoftwareSources(c, info, winSourcePage("withdrawn"), "", "preview-admin", true), []string{"package approval was withdrawn"}},
+		{"windows-source-approved", WindowsSoftwareSources(c, info, winSourcePage("approved"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"MSI revision approved", "View MSI revision"}},
+		{"windows-source-focused", WindowsSoftwareSources(c, &reader, winSourcePage("focused"), "", "preview-reader", false), []string{"WinGet source evidence", "All saved sources"}},
+		{"windows-source-paged", WindowsSoftwareSources(c, info, winSourcePage("paged"), "90000000-0000-4000-8000-000000000042", "preview-admin", true), []string{"Older saved sources"}},
+		{"windows-source-review", WindowsSoftwareSourceReview(c, info, winSourceReview("review"), "90000000-0000-4000-8000-000000000043"), []string{"Approve this MSI revision", "downloads.example.test", "name=\"review_hash\""}},
+		{"windows-source-incompatible", WindowsSoftwareSourceReview(c, info, winSourceReview("incompatible"), ""), []string{"None of the 2 manifest installers"}},
+		{"windows-source-review-expired", WindowsSoftwareSourceReview(c, info, winSourceReview("review-expired"), ""), []string{"approval deadline has passed"}},
+		{"windows-source-review-withdrawn", WindowsSoftwareSourceReview(c, info, winSourceReview("review-withdrawn"), ""), []string{"Further MSI approval from this source is unavailable"}},
+		{"windows-source-review-approved", WindowsSoftwareSourceReview(c, info, winSourceReview("review-approved"), ""), []string{"MSI revision was already approved"}},
+		{"windows-source-derived", SoftwareVersion(c, &reader, winDerived, nil, false, SoftwareDeviceSearch{}), []string{"View WinGet source evidence"}},
 		{"wifi-eap-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an enterprise Wi-Fi profile (EAP-TLS)", "Device &lt;identity&gt;", `value="70000000-0000-4000-8000-000000000001/7"`, `value="70000000-0000-4000-8000-000000000004/2"`, `data-scope="User"`, `name="trust_revision" required`, `value="existing" selected`, "Source updates and deletion do not change the saved copy.", "32 UTF-8 bytes", "iOS/iPadOS 17 or macOS 14", "/assets/js/apple-wifi-eap.js"}},
 		{"wifi-eap-reader", Profiles(c, &reader, wifiCertificates, []apple.Device{*d}), []string{"Device &lt;identity&gt;"}},
 		{"ikev2-profiles", Profiles(c, info, wifiCertificates, []apple.Device{*d}), []string{"Create an IKEv2 certificate VPN profile", `value="70000000-0000-4000-8000-000000000001/7"`, `data-identity-kind="com.apple.security.scep"`, `name="certificate_type" required`, `name="server_issuer"`, "Source updates and deletion do not change the saved copy.", "/assets/js/apple-vpn-ikev2.js"}},
