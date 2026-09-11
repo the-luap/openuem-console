@@ -44,7 +44,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping; per-user enrollment, separate encrypted push/command/profile state, capability-gated user profiles, renewal staging, pause/resume and scoped console controls | Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
 | MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; staged FileVault profiles, per-device encrypted recovery escrow/history, authenticated agent validation, journaled rotation, explicit uncertainty resolution and audited retrieval; opt-in native Recovery Lock with encrypted password history and conservative result reconciliation; PostgreSQL/HTTP/browser tests | Physical FileVault rotation/recovery acceptance, escrow certificate rotation, complete Mac security workflows and hardware update/reboot acceptance |
 | IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; group/ring UX and verified results |
-| WIN-01 | Upstream deployment/model tests; direct exact WinGet arguments, bounded native process jobs and output, preserved exit codes, context-aware Windows callbacks/profile execution, device-bound request decoding and corrected deployment results; typed profile input checks; portable race tests and native Windows process/shutdown/owner-crash fixtures; shared immutable WinGet/MSI/EXE approvals with encrypted execution intent, scoped search, audited reads and confirmed publication/withdrawal | Immutable WinGet source resolution, individual-agent catalog assignment/delivery, artifact verification, detection/reboot/retry results, transactional offline outbox and restart recovery, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
+| WIN-01 | Upstream deployment/model tests; direct exact WinGet arguments, bounded native process jobs and output, preserved exit codes, context-aware Windows callbacks/profile execution, device-bound request decoding and corrected deployment results; typed profile input checks; portable race tests and native Windows process/shutdown/owner-crash fixtures; shared immutable WinGet/MSI/EXE approvals with encrypted execution intent, scoped search, audited reads and confirmed publication/withdrawal; scoped individual-device preparation with identity-generation binding, one-hour expiry, cancellation and immutable history | Immutable WinGet source resolution, explicit individual-agent dispatch admission/delivery, artifact verification, detection/reboot/retry results, transactional offline outbox and restart recovery, actual install/remove/offline/restart tests; update rings/policies and supported-OS matrix |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession; audited native Windows certificate health with current/pending identity separation and CA issuance warnings; persistent Windows certificate/CA reminders with live recipient checks, protected outboxes and scoped delivery history; encrypted database backups with separately encrypted recovery keys/configuration, confirmed isolated restore and synthetic Apple/Windows/desktop identity continuity; shared desktop renewal preparation/confirmation with permanent key ownership, immutable generations and atomic FileVault key-processing acknowledgements; bound HTTPS renewal client and exact gateway/console routes with proof, retry, concurrency, audit rollback and recovery-coordination tests; native protected candidate/decision/activation journals, automatic installed-service scheduling, joined handoff/reconnect, stoppable startup recovery, authoritative cancellation and historical FileVault reconciliation with immutable receipt continuity | Physical-device renewal/disaster-recovery acceptance; production desktop release integration; CA/master-key rotation and cross-platform expiry health |
 | OPS-01 | Console CI builds and gateway/service CLIs; minimal unprivileged gateway image with pinned build inputs and isolated native process checks; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, released-distribution and restore runbooks |
 | APP-02 | Organization-scoped ADE server certificates and encrypted verified token renewal; atomic full/delta Apple assignment synchronization, preserved history/backoff; administrative UI and PostgreSQL race CI; profile publication with durable uncertain outcomes, desired/observed assignment reconciliation, pinned-issuer signed activation, SCEP/check-in admission binding, immutable removal rights, re-arming and observed MDM setup release; managed ADE administrator provisioning, bound account inventory, protected password history, manual/scheduled rotation and pause/resume; synthetic persistence/protocol and initial CI/browser checks | Managed administrator physical acceptance; groups/rings, directory associations, provider-specific Platform SSO acceptance, certificate rotation and Apple/hardware acceptance |
@@ -60,6 +60,25 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Windows device request preparation](windows-software-requests.md) connects an
+  immutable catalog revision to a current individual Windows identity and its
+  sole inventory site. Transactional rights, identity/approval locks, generation
+  binding, a one-hour/certificate-capped deadline, exact retry handling and one
+  reservation per device protect the recorded install/remove intent. Cancellation
+  and expiry preserve immutable, scoped history; target and history pages require
+  committed read audits. The confirmed 8 KiB forms and six browser states expose
+  the current boundary explicitly: delivery is unavailable, no agent or worker
+  consumes these preparations, and they expire without automatic execution.
+  The full Apple PostgreSQL/race suite passes in 409.591 seconds. After the final
+  disabled-endpoint admission restriction, the focused selection passes in 45.850
+  seconds, including catalog, Mac application, ADE/Platform SSO and migration
+  regressions.
+  The complete handler suite, rendered-view race checks and all 192 browser
+  cases pass; 18 new cases cover preparation/history states. Linux/Windows
+  builds and focused vet pass. No package was downloaded or executed.
+  WIN-01 and SW-01 remain in progress; every broader roadmap requirement remains
+  unchanged.
 
 - Agent commits `800f72d` and `7a27844` add a
   [bounded exact Windows software observation helper](https://github.com/the-luap/openuem-agent/blob/7a27844821659ebb44955a366df45bd010d788f3/docs/windows-software-observation.md).
@@ -96,6 +115,9 @@ the table's package summaries do not remove any detail from the roadmap.
   their schema upgrade. They now seed historical inventory directly, retaining
   the original migration/history assertions and real post-upgrade Connect checks.
   The expanded catalog/Mac/ADE/all-migration race selection passes in 38.605 seconds.
+  All six console workflows for `a596d27` passed, including both complete Native
+  Apple runs ([PR evidence](https://github.com/the-luap/openuem-console/actions/runs/34572509965),
+  [push evidence](https://github.com/the-luap/openuem-console/actions/runs/34572503726)).
   These are synthetic approvals, with no
   package downloads or endpoint changes. WIN-01 and SW-01 remain in progress:
   individual-agent delivery, immutable WinGet manifest resolution, operation-bound

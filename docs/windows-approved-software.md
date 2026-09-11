@@ -7,8 +7,9 @@ enter its exact requirements and confirm the approval. Organization software
 managers can publish or permanently withdraw revisions. Readers can search the
 catalog and inspect safe metadata from their authorized organization/site.
 
-This milestone records approval intent. Windows assignment and delivery through
-the individually enrolled agent are not implemented yet. Approval does not verify
+This milestone records approval intent. [Windows device requests](windows-software-requests.md)
+can now be prepared with an immutable revision, scoped individual identity and a
+short deadline. Agent delivery is not implemented yet. Approval does not verify
 an installer, install software or establish an observed device state. The existing
 upstream WinGet deployment workflow remains separate.
 
@@ -106,9 +107,14 @@ process. Its [Linux/macOS/Windows CI](https://github.com/the-luap/openuem-agent/
 passes, including three mandatory native Windows observation fixtures. This helper
 is not yet connected to a catalog operation or authenticated result report.
 
+Device preparation is a separate, audited intent record with explicit cancellation
+and expiry. It does not invoke this helper or send a package command; the new
+schema contains no deliverable state. Existing preparations expire without
+automatic execution.
+
 WIN-01 remains in progress. Required next work includes immutable WinGet manifest
 resolution, approved artifact/signature verification, authenticated individual-agent
-assignment and dispatch, native installation/removal and operation-bound detection,
+dispatch admission, native installation/removal and operation-bound detection,
 reboot evidence, durable offline results, restart recovery and real endpoint
 acceptance. The legacy package subjects must not be enabled for individual agents
 as a shortcut. See the agent's

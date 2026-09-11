@@ -297,6 +297,25 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	}
 	winWithdrawn := winSoftware("windows-msi")
 	winWithdrawn.WithdrawnAt = &now
+	winRequestPage := func(state string) apple.WindowsSoftwareRequestsPage {
+		v := winSoftware("windows-msi")
+		p := apple.WindowsSoftwareRequestsPage{Version: &v, NextTarget: "90000000-0000-4000-8000-000000000035", NextRequest: "90000000-0000-4000-8000-000000000036"}
+		p.Targets = []apple.WindowsSoftwareTarget{{ID: "90000000-0000-4000-8000-000000000032", Name: "Windows <Device> " + strings.Repeat("LongHostname", 20), Architecture: "amd64", SiteID: 1}}
+		p.Requests = []apple.WindowsSoftwareRequest{{ID: "90000000-0000-4000-8000-000000000033", AgentID: p.Targets[0].ID, VersionID: v.ID, Operation: "install", Actor: "Operator <A>", Status: "prepared", SiteID: 1, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}}
+		if state == "cancelled" || state == "expired" {
+			p.Requests[0].Status = state
+		}
+		if state == "withdrawn" {
+			v.WithdrawnAt = &now
+		}
+		if state == "empty" {
+			p.Requests = nil
+			p.Targets = nil
+			p.NextTarget = ""
+			p.NextRequest = ""
+		}
+		return p
+	}
 	cases := []struct {
 		name      string
 		component templ.Component
@@ -343,6 +362,12 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"windows-software-reader", SoftwareVersion(c, &reader, winSoftware("windows-msi"), nil, false, SoftwareDeviceSearch{}), []string{"Windows approval recorded", "LICENSEKEY"}},
 		{"windows-software-withdrawn", SoftwareVersion(c, info, winWithdrawn, nil, true, SoftwareDeviceSearch{}), []string{"Withdrawn at", "Windows approval recorded"}},
 		{"windows-software-catalog", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{winSoftware("windows-msi")}, winSoftware("windows-msi").ID, false, SoftwareCatalogSearch{Query: "%_&", Platform: "windows"}), []string{"Windows &lt;Editor&gt;", "Search approved software", "Older revisions"}},
+		{"windows-requests-prepared", WindowsSoftwareRequests(c, info, winRequestPage("prepared"), "%_&", "90000000-0000-4000-8000-000000000037", "90000000-0000-4000-8000-000000000038", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; agent delivery unavailable", "Prepare request", "Cancel preparation", "Older requests"}},
+		{"windows-requests-reader", WindowsSoftwareRequests(c, &reader, winRequestPage("prepared"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Prepared; agent delivery unavailable", "Operator &lt;A&gt;"}},
+		{"windows-requests-cancelled", WindowsSoftwareRequests(c, info, winRequestPage("cancelled"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Cancelled before delivery"}},
+		{"windows-requests-expired", WindowsSoftwareRequests(c, info, winRequestPage("expired"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"Expired without delivery"}},
+		{"windows-requests-withdrawn", WindowsSoftwareRequests(c, info, winRequestPage("withdrawn"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"This approval is withdrawn", "Cancel preparation"}},
+		{"windows-requests-empty", WindowsSoftwareRequests(c, info, winRequestPage("empty"), "", "", "", "90000000-0000-4000-8000-000000000031"), []string{"No matching individual Windows devices", "No device requests"}},
 		{"software-catalog", SoftwareCatalog(c, info, []apple.SoftwareVersion{appVersion, withdrawnVersion}, appVersion.ID, true), []string{"Approve a Mac application package", "Editor &lt;Suite&gt;", "Older revisions", "Withdrawn", `name="sha256"`, `name="source_url"`}},
 		{"software-catalog-reader", SoftwareCatalog(c, &reader, []apple.SoftwareVersion{appVersion}, "", false), []string{"Published revisions", "Editor &lt;Suite&gt;"}},
 		{"software-version", SoftwareVersion(c, info, appVersion, []apple.Device{appDevice}, true, SoftwareDeviceSearch{Next: appDevice.ID}), []string{"Request installation", "Withdraw approval", "Exact bundle version", "Search Macs", "More matching Macs", strings.Repeat("a", 64)}},

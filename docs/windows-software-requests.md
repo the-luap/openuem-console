@@ -1,0 +1,95 @@
+# Windows software request preparation
+
+Open an approved Windows revision and select **Windows device requests**. An
+operator can select an individually enrolled Windows endpoint, choose installation
+or removal, and explicitly confirm the exact revision and operation. Readers can
+inspect the scoped history. Every page states that agent delivery is unavailable:
+preparation does not download an artifact, run an installer, remove an application
+or establish installed state.
+
+This is the durable assignment-intent part of WIN-01. The schema deliberately
+contains only `prepared`, `cancelled` and `expired` states. No worker, agent RPC,
+legacy deployment subject or device command consumes these rows. They must not
+be automatically promoted to executable work by a later delivery implementation.
+That implementation requires a separate, explicit dispatch review and fresh
+authorization, artifact and native compatibility checks.
+
+## Admission and lifetime
+
+Preparation requires current `ReadSoftware`, `ReadDevices` and `AssignSoftware`
+rights in the requested scope and in the target's actual site. The transaction
+locks the active individual Windows identity and site ownership, then its
+inventory record and all inventory site edges. The endpoint must have exactly
+one inventory site, matching its enrollment scope, and must have passed initial
+admission and remain enabled (including an enabled endpoint with no recent
+contact). Disabled endpoints cannot receive a preparation. It also locks the approved catalog revision against withdrawal.
+
+The saved intent includes the immutable revision, installation/removal operation,
+individual agent UUID, certificate-generation digest, original organization/site,
+actor, request UUID and deadline. Native architecture must match the enrolled
+agent architecture. The current individual enrollment supports AMD64 and ARM64;
+catalog x86 approvals therefore have no eligible individual endpoint yet. The
+selector does not claim that an inventory report establishes the required Windows
+build or installed product. Those need operation-bound native checks before
+eventual execution.
+
+Only one preparation can remain open on an endpoint across all catalog packages.
+This conservative reservation also covers two catalog identifiers referring to
+the same MSI product or uninstall registration. Concurrent different requests
+produce one winner. Concurrent exact retries by the original actor return the
+original request, without extending its lifetime or duplicating its audit.
+Changed intent or another actor conflicts. Replays require current permissions;
+they return historical cancelled/expired intent without restoring it or rebinding
+it to a renewed certificate.
+
+A preparation lasts at most one hour, capped by the current certificate expiry.
+The transaction rechecks time after audit insertion. Read pages derive expiry
+from the saved deadline, including when no service ran across that deadline.
+Preparing new work closes and audits expired reservations in the same transaction.
+Cancellation requires current rights in the original site and works for an
+unsent preparation even if the device was subsequently revoked or moved.
+Terminal history and assignment intent cannot be updated, deleted or truncated.
+
+## Forms, privacy and history
+
+All three routes are registered under the existing administrator,
+organization and site console prefixes:
+
+- `GET /software/catalog/:version/windows-requests`
+- `POST /software/catalog/:version/windows-requests`
+- `POST /software/catalog/:version/windows-requests/:request/cancel`
+
+POST bodies are limited to 8 KiB before CSRF parsing. They accept only unambiguous
+body fields, the CSRF token and explicit confirmation. Query parameters cannot
+alter mutation intent. The middleware rejects an oversized body before admission.
+
+Source URLs, installer arguments and property values remain in the encrypted
+immutable catalog revision. Preparation stores no plaintext copy or broker
+payload. Pages expose neither certificate digests nor execution parameters.
+Read audits must commit before target or history data is returned. Mutation,
+expiry and read events retain their original scope in the existing shared
+catalog audit source.
+
+Targets and request history each use a 50-row page, backed by bounded 51-row
+queries. Device search treats percent signs, underscores and backslashes
+literally. Independent cursors preserve the search and other section's page.
+Request history remains in its original site after a device moves; a foreign
+site cursor cannot reveal that history.
+
+## Verification and remaining work
+
+Owned PostgreSQL fixtures exercise real individual certificate enrollment,
+concurrent exact/different requests, native-identity aliases, scope and platform
+changes, inventory ambiguity, withdrawal, revoked rights, audit rollback,
+certificate expiry after audit, expired reservations, immutable history and
+pagination. Console tests use the real Ent schema, scoped router, sessions and
+CSRF middleware. Browser checks cover six states at 390/768/1440 pixels, including
+keyboard review/cancellation, exact device and revision fields, paging, reader
+restrictions and overflow. No package is downloaded or executed in these tests.
+
+WIN-01 remains in progress. Immutable WinGet manifest resolution, custom artifact
+and signature verification, authenticated dispatch, operation-bound native
+installation/removal and observation, durable result receipts, restart/reboot
+recovery and actual endpoint acceptance remain required. See
+[approved Windows software](windows-approved-software.md) and the unchanged
+[full roadmap](fehlende-funktionen-und-roadmap.md).

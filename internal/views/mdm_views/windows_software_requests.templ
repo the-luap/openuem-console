@@ -1,0 +1,82 @@
+package mdm_views
+
+import (
+ "fmt"
+ "net/url"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/mdm/apple"
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/layout"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ WindowsSoftwareRequests(c echo.Context,info *partials.CommonInfo,page apple.WindowsSoftwareRequestsPage,query,after,before,requestID string) {
+ @layout.Base("devices",info) {
+  <link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+  @partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:page.Version.Name,Url:partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID)},{Title:"Windows device requests",Url:partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests")}},info)
+  <main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div><h1 class="text-2xl font-semibold">Windows device requests</h1><p class="mt-2">{page.Version.Name} · {page.Version.Version} · {page.Version.Architecture}</p>@Navigation(info)</div>
+   <p role="status" class="uk-alert">Agent delivery is not available yet. Preparing a request records your intent for up to one hour. It does not download, install or remove software. These preparations expire without automatic execution.</p>
+   if page.Version.WithdrawnAt!=nil {
+    <p class="uk-alert uk-alert-warning">This approval is withdrawn. Existing history remains available; new requests cannot be prepared.</p>
+   }
+   if info.Can(access.AssignSoftware) && page.Version.WithdrawnAt==nil {
+    <section class="uk-card uk-card-default">
+     <div class="uk-card-header"><h2 class="uk-card-title">Prepare a device request</h2><p>Only individually enrolled Windows devices with a current identity, a matching architecture and one authorized inventory site are listed. Windows build compatibility and actual installed state require later native verification.</p></div>
+     <div class="uk-card-body">
+      <form method="get" action={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests")}>
+       <label>Find a Windows device<input class="uk-input" name="q" value={query} maxlength="128"/></label>
+       <button class="uk-button uk-button-default mt-4" type="submit">Search devices</button>
+      </form>
+      if len(page.Targets)==0 {
+       <p class="mt-4">No matching individual Windows devices in this scope.</p>
+      } else {
+       <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests")}>
+        @CSRF(info)
+        <input type="hidden" name="request_id" value={requestID}/>
+        <label>Target device<select class="uk-select" name="device" required>
+         <option value="">Choose a device</option>
+         for _,target:=range page.Targets {
+          <option value={target.ID}>{target.Name} · {target.ID} · {fmt.Sprintf("site %d",target.SiteID)}</option>
+         }
+        </select></label>
+        <label class="block mt-4">Requested operation<select class="uk-select" name="operation"><option value="install">Install the approved revision</option><option value="remove">Remove the approved revision</option></select></label>
+        <p class="mt-4">One open preparation per device is allowed across all packages. Cancel it before preparing another operation. Source URLs and approved arguments are kept in encrypted catalog storage.</p>
+        <label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>I confirm this device, exact revision and operation. I understand that agent delivery is not available.</label>
+        <button class="uk-button uk-button-primary mt-4" type="submit">Prepare request</button>
+       </form>
+      }
+      if page.NextTarget!="" {
+       <a class="uk-button uk-button-default mt-4" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests?q="+url.QueryEscape(query)+"&after="+page.NextTarget+"&before="+before))}>More matching Windows devices</a>
+      }
+     </div>
+    </section>
+   }
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">Request history</h2><p>History retains the original site and identity binding. Cancellation only closes an unsent preparation; it does not establish application state.</p></div>
+    <div class="uk-card-body">
+     if len(page.Requests)==0 {
+      <p>No device requests for this revision in this scope.</p>
+     }
+     for _,r:=range page.Requests {
+      <article class="software-row">
+       <h3 class="font-semibold">{WindowsSoftwareOperation(r.Operation)} · {r.AgentID}</h3>
+       <p role="status">{WindowsSoftwareRequestState(r.Status)}</p>
+       <dl class="uk-description-list mt-4"><dt>Request</dt><dd>{r.ID}</dd><dt>Original site</dt><dd>{fmt.Sprint(r.SiteID)}</dd><dt>Prepared</dt><dd>{When(&r.CreatedAt)} · {r.Actor}</dd><dt>Deadline</dt><dd>{When(&r.ExpiresAt)}</dd></dl>
+       if info.Can(access.AssignSoftware) && r.Status=="prepared" {
+        <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests/"+r.ID+"/cancel")}>
+         @CSRF(info)
+         <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>Cancel this unsent preparation.</label>
+         <button class="uk-button uk-button-default mt-4" type="submit">Cancel preparation</button>
+        </form>
+       }
+      </article>
+     }
+     if page.NextRequest!="" {
+      <a class="uk-button uk-button-default mt-4" href={templ.URL(partials.GetNavigationUrl(info,"/software/catalog/"+page.Version.ID+"/windows-requests?q="+url.QueryEscape(query)+"&after="+after+"&before="+page.NextRequest))}>Older requests</a>
+     }
+    </div>
+   </section>
+  </main>
+ }
+}

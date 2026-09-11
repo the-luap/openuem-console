@@ -29,6 +29,7 @@ const fixtures = new Set([
   "desktop-inventory",
   "desktop-inventory-partial",
 	...["approve-winget","approve-msi","approve-exe","detail-winget","detail-msi","detail-exe","reader","withdrawn","catalog"].map(state=>"windows-software-"+state),
+ ...["prepared","reader","cancelled","expired","withdrawn","empty"].map(state=>"windows-requests-"+state),
   ...["viewer", "operator"].flatMap(role =>
     ["first", "next", "empty", "long"].map(state => "desktop-software-" + state + "-" + role),
   ),

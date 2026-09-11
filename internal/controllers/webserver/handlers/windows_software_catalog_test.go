@@ -70,6 +70,9 @@ func exerciseWindowsSoftwareCatalog(t *testing.T, h *Handler, ctx context.Contex
 		if rec = request("organization-admin", "POST", org+"/windows", f); rec.Code != 409 {
 			t.Fatal("approval request rebound", rec.Code)
 		}
+		if kind == "windows-msi" {
+			exerciseWindowsSoftwareRequests(t, h, ctx, tenant, site, version, request)
+		}
 		if rec = request("organization-admin", "POST", org+"/"+version+"/withdraw", url.Values{"confirmed": {"yes"}}); rec.Code != 303 {
 			t.Fatal("Windows withdrawal failed", rec.Code)
 		}

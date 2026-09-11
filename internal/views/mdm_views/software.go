@@ -10,6 +10,26 @@ import (
 type SoftwareDeviceSearch struct{ Query, Next string }
 type SoftwareCatalogSearch struct{ Query, Platform string }
 
+func WindowsSoftwareOperation(operation string) string {
+	if operation == "remove" {
+		return "Removal request"
+	}
+	return "Installation request"
+}
+
+func WindowsSoftwareRequestState(status string) string {
+	switch status {
+	case "prepared":
+		return "Prepared; agent delivery unavailable"
+	case "cancelled":
+		return "Cancelled before delivery"
+	case "expired":
+		return "Expired without delivery"
+	default:
+		return "Request state unavailable"
+	}
+}
+
 func SoftwareVersionLabel(platform string) string {
 	if platform == "macos" {
 		return "Exact bundle version"
