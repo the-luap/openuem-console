@@ -12,6 +12,7 @@ import (
 )
 
 func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
+	e.Use(h.UserLocale)
 	h.RegisterApple(e)
 	h.RegisterDesktop(e)
 	h.RegisterWindows(e)
@@ -630,6 +631,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/login/new", h.LoginNewUser)
 
 	e.GET("/myaccount", h.MyAccount, h.IsAuthenticated)
+	e.POST("/myaccount/language", h.UpdateLanguage, h.IsAuthenticated, h.AppleCSRF)
 	e.POST("/myaccount/info", h.UpdatePersonalInfo, h.IsAuthenticated)
 	e.POST("/myaccount/password", h.MyAccountPassword, h.IsAuthenticated)
 	e.POST("/myaccount/enable2fa", h.Enable2FA, h.IsAuthenticated)

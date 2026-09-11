@@ -22,6 +22,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/software/winget"
@@ -32,6 +33,7 @@ type Handler struct {
 	IndividualAgentService *openuem_nats.ServiceConnection
 	IndividualBroker       *consolebroker.Broker
 	Access                 *access.Store
+	Preferences            *preferences.Store
 	Audit                  *audit.Store
 	InventoryRefresh       *inventory.RefreshStore
 	inventoryPublisher     inventoryPublisher

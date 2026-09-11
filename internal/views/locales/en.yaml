@@ -1,4 +1,14 @@
 en:
+  account_language:
+    title: "Display language"
+    label: "Language"
+    help: "Choose a language for your account, or follow the browser on each device. Some newer pages and untranslated text remain in English."
+    browser: "Follow browser language"
+    save: "Save language"
+    saved: "Your display language has been saved."
+    invalid: "Choose one of the available languages and try again."
+    unavailable: "Your language preference is unavailable. Try again later."
+    account_unavailable: "This account is no longer available."
   Agents: "Agents"
   Actions: "Actions"
   Add: "Add"

@@ -13,6 +13,7 @@ import windowsRequests from "./windows-software-requests.mjs";
 import windowsDispatch from "./windows-software-dispatch.mjs";
 import windowsChecks from "./windows-software-reconciliation.mjs";
 import windowsSources from "./windows-software-sources.mjs";
+import accountLanguage from "./account-language.mjs";
 import network from "./desktop-network.mjs";
 import scopedNetwork from "./desktop-network-scoped.mjs";
 
@@ -55,6 +56,7 @@ try {
         [windowsSources, 51],
         [network, 12],
         [scopedNetwork, 24],
+        [accountLanguage,30],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

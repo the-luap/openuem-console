@@ -104,6 +104,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("scoped desktop network", func(t *testing.T) {
 		exerciseDesktopNetworkRoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})
+	t.Run("account language with real session and CSRF middleware", func(t *testing.T) { exerciseAccountLanguageRoutes(t, h) })
 	t.Run("Mac invitation rights require explicit security permission", func(t *testing.T) {
 		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})

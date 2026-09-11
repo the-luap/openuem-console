@@ -41,7 +41,7 @@ func CSRF() echo.MiddlewareFunc {
 				// the HTMX header and retain the configured global upload limit.
 				limit := int64(4 << 20)
 				route := strings.TrimPrefix(strings.TrimPrefix(c.Path(), "/tenant/:tenant/site/:site"), "/tenant/:tenant")
-				if route == "/windows" || strings.HasPrefix(route, "/windows/") {
+				if route == "/myaccount/language" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
 					limit = 8192
 				}
 				request.Body = http.MaxBytesReader(c.Response(), request.Body, limit)

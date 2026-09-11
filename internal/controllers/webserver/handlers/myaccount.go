@@ -18,6 +18,7 @@ import (
 )
 
 func (h *Handler) MyAccount(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -39,7 +40,7 @@ func (h *Handler) MyAccount(c echo.Context) error {
 		return err
 	}
 
-	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, ""), commonInfo))
+	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, h.languageSaved(c), h.accountLanguage(c)), commonInfo))
 }
 
 func (h *Handler) UpdatePersonalInfo(c echo.Context) error {
@@ -69,7 +70,7 @@ func (h *Handler) UpdatePersonalInfo(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_find_user"), true))
 	}
 
-	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, i18n.T(c.Request().Context(), "login.personal_info_updated")), commonInfo))
+	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, i18n.T(c.Request().Context(), "login.personal_info_updated"), h.accountLanguage(c)), commonInfo))
 }
 
 func (h *Handler) MyAccountPassword(c echo.Context) error {
@@ -319,4 +320,11 @@ func ValidatePasswordComplexity(password string) error {
 	}
 
 	return nil
+}
+
+func (h *Handler) languageSaved(c echo.Context) string {
+	if h.SessionManager.Manager.PopBool(c.Request().Context(), "language_saved") {
+		return i18n.T(c.Request().Context(), "account_language.saved")
+	}
+	return ""
 }

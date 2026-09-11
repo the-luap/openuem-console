@@ -17,6 +17,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/desktop"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
@@ -105,6 +106,13 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	w.Handler.Access = permissions
+	w.Handler.Preferences, err = preferences.NewStore(w.Handler.Model.DB)
+	if err != nil {
+		return err
+	}
+	if err = w.Handler.Preferences.Migrate(ctx); err != nil {
+		return err
+	}
 	w.Handler.Audit, err = audit.NewStore(w.Handler.Model.DB, permissions)
 	if err != nil {
 		return err

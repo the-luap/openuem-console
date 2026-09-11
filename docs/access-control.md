@@ -105,6 +105,10 @@ continuation. Current transaction authorization and `inventory.network.read`
 audit are required before returning data. Delegated roles can also use the
 existing GET network-adapter aliases; mutations remain restricted.
 
+[Account display language](account-language.md) is a self-service preference.
+Its protected form always derives the account from the authenticated session;
+a language selection does not change roles or device permissions.
+
 ## Concurrent changes and audit
 
 Every permission form contains the revision it displays. If another administrator
