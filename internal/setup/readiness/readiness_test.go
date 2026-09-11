@@ -188,7 +188,13 @@ func TestReferenceReadinessBrokerGrantBoundary(t *testing.T) {
 	for _, grant := range []string{"current", "missing", "broad"} {
 		t.Run(grant, func(t *testing.T) {
 			options := brokerFixture(t, grant)
-			err := Wait(deadline(t, 400*time.Millisecond), options)
+			budget := 400 * time.Millisecond
+			if grant == "current" {
+				// Native Windows TLS/key-file setup and the broker flushes can
+				// exceed 400 ms on shared CI runners. Cancellation is tested below.
+				budget = 5 * time.Second
+			}
+			err := Wait(deadline(t, budget), options)
 			if grant == "current" && err != nil || grant != "current" && !errors.Is(err, ErrNotReady) {
 				t.Fatal("incorrect broker readiness decision", err)
 			}
