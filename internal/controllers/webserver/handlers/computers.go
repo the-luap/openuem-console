@@ -489,7 +489,13 @@ func (h *Handler) Monitors(c echo.Context) error {
 }
 
 func (h *Handler) Apps(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopSoftware(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {

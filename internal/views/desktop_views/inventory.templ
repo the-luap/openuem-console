@@ -21,6 +21,7 @@ templ InventoryWithRefresh(c echo.Context, info *partials.CommonInfo, device *in
 				<h1 class="text-2xl font-semibold break-words">{ mdm_views.Show(device.Name) }</h1>
 				<p class="uk-text-muted mt-2">Computer inventory</p>
 				@mdm_views.Navigation(info)
+				@InventoryNavigation(info, device.ID, "overview")
 			</div>
 			if refresh.Available || refresh.Request != nil {
 				@InventoryRefresh(info, device, refresh)

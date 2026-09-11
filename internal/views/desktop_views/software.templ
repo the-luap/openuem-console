@@ -1,0 +1,71 @@
+package desktop_views
+
+import (
+ "net/url"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/layout"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
+ <nav aria-label="Computer inventory" class="flex flex-wrap gap-2 mt-4">
+  <a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/inventory") } aria-current={ inventoryCurrent(active, "overview") }>Overview</a>
+  <a class="uk-button uk-button-default" href={ softwareURL(info, id, "", 0) } aria-current={ inventoryCurrent(active, "software") }>Reported software</a>
+ </nav>
+}
+
+templ Software(c echo.Context, info *partials.CommonInfo, page *inventory.SoftwarePage, filter inventory.SoftwareFilter) {
+ @layout.Base("devices", info) {
+  @partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: page.DeviceName}}, info)
+  <main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div class="min-w-0">
+    <h1 class="text-2xl font-semibold break-words">{ page.DeviceName }</h1>
+    <p class="uk-text-muted mt-2">Reported software</p>
+    @mdm_views.Navigation(info)
+    @InventoryNavigation(info, page.DeviceID, "software")
+   </div>
+   <section class="uk-card uk-card-default min-w-0">
+    <div class="uk-card-header"><h2 class="uk-card-title">Software inventory</h2></div>
+    <div class="uk-card-body min-w-0">
+     <p class="break-words">{ page.Organization } / { page.Site }</p>
+     <p class="uk-text-muted mt-2">Last agent report: { mdm_views.When(page.LastContact) }</p>
+     <p class="uk-text-muted mt-2">These are stored agent reports. They do not verify a software deployment or the device's current state. A new report can change entries while you browse.</p>
+     <form method="get" action={ softwareURL(info, page.DeviceID, "", 0) } class="mt-4">
+      <label for="software-search">Search by name or publisher</label>
+      <input class="uk-input mt-2" id="software-search" name="q" value={ filter.Search } maxlength="256" type="search"/>
+      <div class="flex flex-wrap gap-2 mt-2">
+       <button type="submit" class="uk-button uk-button-primary">Search</button>
+       <a class="uk-button uk-button-default" href={ softwareURL(info, page.DeviceID, "", 0) }>Clear search</a>
+      </div>
+     </form>
+     if len(page.Entries) == 0 {
+      <p role="status" class="mt-4">No reported software entries on this page. Try the first page or change your search; an empty report does not prove that no software is installed.</p>
+     } else {
+      <p class="uk-text-muted mt-4">Scroll the table to see all columns on smaller screens.</p>
+      <div class="overflow-x-auto mt-4" role="region" aria-label="Reported software entries" tabindex="0">
+       <table class="uk-table uk-table-divider uk-table-small" style="min-width: 48rem; table-layout: fixed;">
+        <caption class="uk-text-muted" style="text-align: left;">Up to 25 entries in report order</caption>
+        <thead><tr><th scope="col" style="width: 35%;">Name</th><th scope="col" style="width: 20%;">Version</th><th scope="col" style="width: 25%;">Publisher</th><th scope="col" style="width: 20%;">Installation date reported by agent</th></tr></thead>
+        <tbody>
+         for _, entry := range page.Entries {
+          <tr><th scope="row" class="break-all">{ mdm_views.Show(entry.Name) }</th><td class="break-all">{ mdm_views.Show(entry.Version) }</td><td class="break-all">{ mdm_views.Show(entry.Publisher) }</td><td class="break-all">{ mdm_views.Show(entry.InstallDate) }</td></tr>
+         }
+        </tbody>
+       </table>
+      </div>
+     }
+     <nav aria-label="Software pages" class="flex flex-wrap gap-2 mt-4">
+      if filter.After > 0 {
+       <a class="uk-button uk-button-default" href={ softwareURL(info, page.DeviceID, filter.Search, 0) }>First page</a>
+      }
+      if page.Next > 0 {
+       <a class="uk-button uk-button-default" rel="next" href={ softwareURL(info, page.DeviceID, filter.Search, page.Next) }>Next page</a>
+      }
+     </nav>
+    </div>
+   </section>
+  </main>
+ }
+}

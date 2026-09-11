@@ -37,6 +37,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | --- | --- |
 | Read public CA metadata, invitations and individual identities | Viewer in the selected organization or site |
 | Read the scoped computer overview | Viewer in the selected organization or site |
+| Search reported computer software | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -80,7 +81,7 @@ workflow. Protected endpoint storage, durable claim recovery and native installe
 service activation have synthetic tests; finished signed Windows/Mac installer
 distribution and physical endpoint acceptance remain open.
 
-The unified device list and linked Mac page open a read-only computer overview for
+The unified device list and linked Mac page open a scoped computer overview for
 scoped roles. It includes hardware, operating system version and report metadata,
 with explicit empty states for missing reports. It does not depend on enrollment
 being configured. Its reads recheck permissions and commit an inventory audit
@@ -92,6 +93,10 @@ Operators can use [Request fresh inventory](desktop-inventory-refresh.md) from
 the dedicated computer inventory page. The request is persisted, audited and
 checked again before delivery. The displayed state distinguishes delivery
 acceptance from a report actually being received from the device.
+
+The **Reported software** inventory tab provides [scoped search and pagination](desktop-software-inventory.md).
+It reads only report metadata and records access before responding. Stored
+software reports are distinct from verified deployment outcomes.
 
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA

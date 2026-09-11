@@ -7,10 +7,11 @@ import wifi from "./wifi-eap.mjs";
 import ad from "./ad-certificates.mjs";
 import vpn from "./vpn-ikev2.mjs";
 import inventory from "./desktop-inventory.mjs";
+import software from "./desktop-software.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
-  "Set APPLE_MDM_UI_ARTIFACTS to the directory rendered by the mdm_views tests",
+  "Set APPLE_MDM_UI_ARTIFACTS to the directory rendered by the mdm_views and desktop_views tests",
 );
 const artifactRoot = process.env.BROWSER_TEST_ARTIFACTS
   ? resolve(process.env.BROWSER_TEST_ARTIFACTS)
@@ -39,6 +40,7 @@ try {
         [ad, 15],
         [vpn, 27],
         [inventory, 42],
+        [software, 24],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

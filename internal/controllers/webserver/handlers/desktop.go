@@ -19,7 +19,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
-		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory":
+		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software":
 			return access.ReadDevices, true
 		}
 	}
@@ -44,6 +44,7 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 		g := e.Group(prefix, h.IsAuthenticated, h.AppleCSRF)
 		g.GET("/computers/:uuid/inventory", h.DesktopInventory)
+		g.GET("/computers/:uuid/inventory/software", h.DesktopSoftware)
 		g.POST("/computers/:uuid/refresh", h.DesktopRefresh)
 		g.GET("/desktop/enrollment", h.DesktopEnrollment)
 		g.POST("/desktop/setup", h.DesktopAuthority)

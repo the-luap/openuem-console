@@ -63,7 +63,7 @@ metadata reads, operator invitation revocation, and organization-administrator
 authority setup and identity revocation. Its action routes are explicitly mapped
 to capabilities and verify the selected scope before using the registry.
 
-The unified inventory links desktop rows to a scoped, read-only overview for
+The unified inventory links desktop rows to a scoped overview for
 viewers, operators and organization administrators. Both `/computers/:uuid` and
 `/computers/:uuid/overview` accept the organization/site URL prefixes. Linked Mac
 devices also offer **Open agent inventory**. The overview includes device identity,
@@ -82,8 +82,8 @@ assignments to repair their membership.
 This view also works when individual desktop enrollment is disabled.
 
 Server administrators retain the existing desktop overview. Its edits, other
-legacy detail routes, software deployment and remote actions still require a
-server administrator. Those individual desktop action permissions remain roadmap
+legacy detail routes beyond the scoped projections, software deployment and
+remote actions still require a server administrator. Those individual desktop action permissions remain roadmap
 work. A new route is not implicitly enabled for a scoped role because it shares a
 URL prefix or uses GET.
 
@@ -93,6 +93,11 @@ dedicated inventory page provides a protected form and durable delivery status.
 Both the new refresh endpoint and legacy force-report aliases recheck current
 authority and exact device assignment before each broker handoff. Viewers retain
 read-only access; broker acceptance does not imply a completed device report.
+
+[Reported software](desktop-software-inventory.md) adds a scoped read-only page
+with literal name/publisher search and 25-entry continuation. Its projection and
+`inventory.software.read` audit share current transaction authorization. Delegated
+roles can also use the existing GET software aliases; POST remains restricted.
 
 ## Concurrent changes and audit
 

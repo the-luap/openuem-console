@@ -29,6 +29,9 @@ const fixtures = new Set([
   "desktop-inventory",
   "desktop-inventory-partial",
   ...["viewer", "operator"].flatMap(role =>
+    ["first", "next", "empty", "long"].map(state => "desktop-software-" + state + "-" + role),
+  ),
+  ...["viewer", "operator"].flatMap(role =>
     ["new", "queued", "pending", "accepted", "stopped", "unconfirmed"].map(
       state => "desktop-refresh-" + state + "-" + role,
     ),
