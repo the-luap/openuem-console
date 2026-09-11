@@ -22,6 +22,7 @@ import scopedNetwork from "./desktop-network-scoped.mjs";
 import storage from "./desktop-storage.mjs";
 import peripherals from "./desktop-peripherals.mjs";
 import memory from "./desktop-memory.mjs";
+import managementNavigation from "./management-navigation.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -65,6 +66,7 @@ try {
         [storage, 48],
         [peripherals, 48],
         [memory, 24],
+        [managementNavigation,12],
         [accountLanguage,30],
         [timestamps,21],
         [windowsTimestamps,21],

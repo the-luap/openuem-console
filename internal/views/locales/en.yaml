@@ -1,4 +1,15 @@
 en:
+  management_navigation:
+    title: "Management pages"
+    software: "Approved software"
+    devices: "All devices"
+    windows_deployment: "Windows software deployment"
+    windows_profiles: "Windows profiles"
+    apple_profiles: "Apple profiles"
+    apple_enrollment: "Apple setup and enrollment"
+    ade: "Automated Device Enrollment"
+    desktop_enrollment: "Desktop enrollment"
+    windows_management: "Native Windows management"
   memory_inventory:
     reported: "Reported memory modules"
     title: "Memory module inventory"

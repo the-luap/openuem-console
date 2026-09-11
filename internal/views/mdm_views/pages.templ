@@ -9,30 +9,6 @@ import (
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
-templ Navigation(info *partials.CommonInfo) {
-	<div class="flex flex-wrap gap-4 my-4">
-		if info.Can(access.ReadSoftware) {
-			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog")) }>Approved software</a>
-		}
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/devices")) }>All devices</a>
-		if info.Principal.IsAdministrator() {
-			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/deploy")) }>Windows software deployment</a>
-		}
-		if info.Principal.IsAdministrator() {
-			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) }>Windows profiles</a>
-		}
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations")) }>Apple profiles</a>
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/setup")) }>Apple setup & enrollment</a>
-		if info.Can(access.ManageCertificates) {
-			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>Automated Device Enrollment</a>
-		}
-		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/desktop/enrollment")) }>Desktop enrollment</a>
-		if info.Can(access.ReadDevices) {
-			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a>
-		}
-	</div>
-}
-
 templ CSRF(info *partials.CommonInfo) {
 	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
 }

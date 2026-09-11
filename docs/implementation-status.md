@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Shared management links now use a native **Management pages** disclosure,
+  initially closed, while current inventory tabs remain visible. Existing scope
+  targets and role-specific links are retained. All view race suites pass,
+  including seven-locale navigation rendering; the full Linux ARM64 console
+  build passes. Twelve new browser cases check four roles, Enter/Tab/Space,
+  visible focus, compact closed layout and expanded link wrapping at
+  390/768/1440 pixels. The complete 600-case browser matrix passes.
+
 - [Scoped memory-module inventory](desktop-memory-inventory.md) now exposes
   slot, capacity/type, serial/part number, speed and manufacturer as reported
   strings, with literal search, 25-entry continuation and committed read audits.

@@ -12,6 +12,10 @@ still contain English copy; the preference does not claim full translation
 coverage. Shared application, login and registration documents now identify the
 active catalog through their HTML `lang` attribute.
 
+Shared inventory and management navigation labels also use the catalog. The
+management disclosure's English fallback and existing role-specific links are
+rendered against all seven bundled locales.
+
 The preference is persisted in `uem_user_preferences`, separate from authentication
 and device permissions. Console startup applies its additive migration under a
 transaction-scoped advisory lock. Existing accounts require no backfill. Deleting

@@ -132,6 +132,14 @@ uses the same presentation. Shared navigation labels use the existing language
 catalog with English fallback. Scoped targets and first-page recovery remain
 unchanged; browser checks verify computed styling and narrow-screen wrapping.
 
+Shared management destinations are grouped under **Management pages**, a native
+disclosure that starts closed. It keeps report content nearer the top of small
+screens while the inventory tabs remain directly visible. Enter opens the
+focused summary, Tab enters its links, and Space closes it with focus retained.
+The disclosure needs no additional JavaScript. Link targets and existing role
+checks are unchanged; server-only destinations and ADE remain permission-aware.
+The labels use the existing language catalog with English fallback.
+
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA
 storage, redacted import errors, token-free metadata, confirmation/CSRF rejection

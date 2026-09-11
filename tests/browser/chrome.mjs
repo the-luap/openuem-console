@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["viewer","operator","organization_admin","administrator"].map(role=>`management-navigation-${role}`),
  ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-memory-${state}-${role}`)),
  ...["monitors","printers"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-peripherals-${kind}-${state}-${role}`))),
  ...["physical","logical"].flatMap(kind=>["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-storage-${kind}-${state}-${role}`))),
@@ -323,6 +324,7 @@ export async function withChrome({ fixtureRoot, artifactRoot }, run) {
       capture,
       check: assert,
       enter: () => press("Enter", "Enter", 13, "\r"),
+      tab: () => press("Tab", "Tab", 9),
       space: () => press(" ", "Space", 32, " "),
       version: await send("Browser.getVersion"),
       assertHealthy: () =>
