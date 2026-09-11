@@ -87,6 +87,13 @@ server administrator. Those individual desktop action permissions remain roadmap
 work. A new route is not implicitly enabled for a scoped role because it shares a
 URL prefix or uses GET.
 
+The [inventory refresh workflow](desktop-inventory-refresh.md) is available to
+operators and administrators with `devices.refresh` in the selected scope. The
+dedicated inventory page provides a protected form and durable delivery status.
+Both the new refresh endpoint and legacy force-report aliases recheck current
+authority and exact device assignment before each broker handoff. Viewers retain
+read-only access; broker acceptance does not imply a completed device report.
+
 ## Concurrent changes and audit
 
 Every permission form contains the revision it displays. If another administrator

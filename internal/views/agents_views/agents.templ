@@ -495,12 +495,10 @@ templ AddActionsButton(agent *ent.Agent, index int, sftpDisabled bool, commonInf
 			if agent.AgentStatus == "Enabled" {
 				<li>
 					<a
-						hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/agents/%s/forcereport", agent.ID)))) }
-						hx-target="#main"
-						hx-swap="outerHTML"
+						href={ partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s/inventory#inventory-refresh", agent.ID)) }
 					>
 						<uk-icon hx-history="false" icon="circle-play" custom-class="h-6 w-6 pr-2" uk-cloack></uk-icon>
-						{ i18n.T(ctx, "agents.force_run") }
+						Request inventory
 					</a>
 				</li>
 			}

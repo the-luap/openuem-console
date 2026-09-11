@@ -1,19 +1,22 @@
-# Certificate and network form browser regression
+# Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 81 cases:
+headless Chrome session. The runner covers 123 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
 | Enterprise Wi-Fi | System/User × existing/copied trust × three TLS ranges × three widths; reader at each width | 39 |
 | Active Directory certificates | System/User × omitted/explicit options × three widths; reader at each width | 15 |
 | IKEv2 certificate VPN | System/User × machine/EAP-TLS × existing/copied trust × three widths; reader at each width | 27 |
+| Desktop inventory | Complete/incomplete reports × three widths; viewer/operator × six refresh states × three widths | 42 |
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard
 confirmation/submission, repeated JavaScript initialization, reset, reader access
 and horizontal overflow. Each suite captures a narrow screenshot. Assertions use
 actual browser state; they do not replace the production scripts or mock the DOM.
+Inventory checks also preserve read-only views, distinguish broker acceptance from
+report completion, and check the refresh form's scope, CSRF token and request ID.
 
 ## Run locally
 
@@ -26,7 +29,7 @@ From the repository root, render the synthetic states using the existing Go test
 
 ```sh
 go tool templ generate
-APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui go test -count=1 ./internal/views/mdm_views
+APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui go test -count=1 ./internal/views/mdm_views ./internal/views/desktop_views
 APPLE_MDM_UI_ARTIFACTS=/tmp/openuem-ui node tests/browser/run.mjs
 ```
 

@@ -37,6 +37,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | --- | --- |
 | Read public CA metadata, invitations and individual identities | Viewer in the selected organization or site |
 | Read the scoped computer overview | Viewer in the selected organization or site |
+| Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
 | Set up the organization authority | Organization administrator for the entire organization |
@@ -86,6 +87,11 @@ being configured. Its reads recheck permissions and commit an inventory audit
 event before responding. See [access control](access-control.md) for the exact
 scope and field boundaries. Other legacy desktop details and actions retain
 their server-administrator boundary.
+
+Operators can use [Request fresh inventory](desktop-inventory-refresh.md) from
+the dedicated computer inventory page. The request is persisted, audited and
+checked again before delivery. The displayed state distinguishes delivery
+acceptance from a report actually being received from the device.
 
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA

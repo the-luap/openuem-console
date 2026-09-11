@@ -6,6 +6,7 @@ import { withChrome } from "./chrome.mjs";
 import wifi from "./wifi-eap.mjs";
 import ad from "./ad-certificates.mjs";
 import vpn from "./vpn-ikev2.mjs";
+import inventory from "./desktop-inventory.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
@@ -37,6 +38,7 @@ try {
         [wifi, 39],
         [ad, 15],
         [vpn, 27],
+        [inventory, 42],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

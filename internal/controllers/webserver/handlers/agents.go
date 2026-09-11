@@ -580,21 +580,7 @@ func (h *Handler) AgentAdmit(c echo.Context) error {
 }
 
 func (h *Handler) AgentForceRun(c echo.Context) error {
-	agentId := c.Param("uuid")
-
-	go func() {
-		if h.NATSConnection == nil || !h.NATSConnection.IsConnected() {
-			log.Printf("[ERROR]: %s", i18n.T(c.Request().Context(), "nats.not_connected"))
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if _, err := h.JetStream.Publish(ctx, "agent.report."+agentId, nil); err != nil {
-			log.Printf("[ERROR]: %v", err)
-		}
-	}()
-
-	return h.ListAgents(c, i18n.T(c.Request().Context(), "agents.force_run_success"), "", true)
+	return h.DesktopRefresh(c)
 }
 
 func (h *Handler) AgentConfirmDisable(c echo.Context) error {

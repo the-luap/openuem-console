@@ -1,0 +1,49 @@
+package desktop_views
+
+import (
+ "net/url"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ InventoryRefresh(info *partials.CommonInfo, device *inventory.Desktop, data RefreshData) {
+ <section class="uk-card uk-card-default min-w-0" id="inventory-refresh" style="scroll-margin-top: 10rem;">
+  <div class="uk-card-header"><h2 class="uk-card-title">Request inventory</h2></div>
+  <div class="uk-card-body min-w-0">
+   <p>Ask this agent to collect a fresh report. An offline agent can receive the request when it reconnects.</p>
+   <p class="uk-text-muted mt-2">Acceptance confirms that the command service received the request. The device must still collect and send its report; the latest report may also come from its regular schedule.</p>
+   if data.Request != nil {
+    <dl class="uk-description-list break-words mt-4">
+     <dt>Latest request</dt><dd role="status">{ refreshState(data.Request) }</dd>
+     <dt>Requested</dt><dd>{ mdm_views.When(&data.Request.RequestedAt) }</dd>
+     if data.Request.Status == "accepted" {
+      <dt>Delivery accepted</dt><dd>{ mdm_views.When(data.Request.FinishedAt) }</dd>
+     }
+     <dt>Request ID</dt><dd class="break-all">{ data.Request.ID }</dd>
+    </dl>
+    if data.Request.Status == "queued" && data.Request.Attempts > 0 {
+     <p class="uk-text-muted mt-4">The previous handoff was not confirmed. Delivery will retry automatically within ten minutes of the request. Collecting the report more than once is possible.</p>
+    }
+    if data.Request.Status == "unconfirmed" {
+     <p role="status" class="uk-text-muted mt-4">Automatic delivery has stopped without confirmation. Check the latest device report before requesting another refresh.</p>
+    }
+    if data.Request.Status == "stopped" {
+     <p role="status" class="uk-text-muted mt-4">The request expired or its permissions, device assignment or command channel changed before delivery.</p>
+    }
+   }
+   if info.Can(access.RefreshDevices) {
+    if !data.Available {
+     <p role="status" class="uk-text-muted mt-4">Inventory refresh is not available for this agent.</p>
+    } else if data.Request == nil || data.Request.Status != "queued" {
+     <form method="post" action={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(device.ID)+"/refresh") } class="mt-4">
+      @mdm_views.CSRF(info)
+      <input type="hidden" name="request_id" value={ data.NewID }/>
+      <button class="uk-button uk-button-primary" type="submit">Request fresh inventory</button>
+     </form>
+    }
+   }
+  </div>
+ </section>
+}

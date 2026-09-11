@@ -26,6 +26,13 @@ const fixtures = new Set([
   "wifi-eap-reader",
   "ikev2-profiles",
   "ikev2-reader",
+  "desktop-inventory",
+  "desktop-inventory-partial",
+  ...["viewer", "operator"].flatMap(role =>
+    ["new", "queued", "pending", "accepted", "stopped", "unconfirmed"].map(
+      state => "desktop-refresh-" + state + "-" + role,
+    ),
+  ),
 ]);
 const types = {
   ".html": "text/html; charset=utf-8",

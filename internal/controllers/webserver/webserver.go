@@ -23,22 +23,25 @@ import (
 )
 
 type WebServer struct {
-	Router         *echo.Echo
-	Handler        *handlers.Handler
-	Server         *http.Server
-	SessionManager *sessions.SessionManager
-	AppleServer    *http.Server
-	AppleCancel    context.CancelFunc
-	DesktopServer  *http.Server
-	desktopPublic  *desktop.PublicHandler
-	reminderMu     sync.Mutex
-	reminderCancel context.CancelFunc
-	reminderDone   chan struct{}
-	auditMu        sync.Mutex
-	auditCancel    context.CancelFunc
-	auditDone      chan struct{}
-	windowsMu      sync.Mutex
-	windowsRuntime *windowsRuntime
+	Router          *echo.Echo
+	Handler         *handlers.Handler
+	Server          *http.Server
+	SessionManager  *sessions.SessionManager
+	AppleServer     *http.Server
+	AppleCancel     context.CancelFunc
+	DesktopServer   *http.Server
+	desktopPublic   *desktop.PublicHandler
+	reminderMu      sync.Mutex
+	reminderCancel  context.CancelFunc
+	reminderDone    chan struct{}
+	auditMu         sync.Mutex
+	auditCancel     context.CancelFunc
+	auditDone       chan struct{}
+	inventoryMu     sync.Mutex
+	inventoryCancel context.CancelFunc
+	inventoryDone   chan struct{}
+	windowsMu       sync.Mutex
+	windowsRuntime  *windowsRuntime
 }
 
 func New(m *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth, reOpenUEMUser bool, authLogger *log.Logger) *WebServer {
@@ -109,6 +112,10 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	if err = w.Handler.Audit.Migrate(ctx); err != nil {
 		return err
 	}
+	if err = w.startInventoryRefresh(ctx); err != nil {
+		return err
+	}
+	defer w.stopInventoryRefresh()
 	w.startAuditRetention()
 	defer w.stopAuditRetention()
 	w.startAppleReminders()
@@ -143,6 +150,7 @@ func (w *WebServer) Close() error {
 		defer w.Handler.IndividualBroker.Close()
 	}
 
+	w.stopInventoryRefresh()
 	w.stopWindows()
 	w.stopAuditRetention()
 	w.stopAppleReminders()

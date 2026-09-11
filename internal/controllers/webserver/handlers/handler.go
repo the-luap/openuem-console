@@ -18,6 +18,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/desktop"
 	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/models"
@@ -30,6 +31,8 @@ type Handler struct {
 	IndividualBroker       *consolebroker.Broker
 	Access                 *access.Store
 	Audit                  *audit.Store
+	InventoryRefresh       *inventory.RefreshStore
+	inventoryPublisher     inventoryPublisher
 	PublicOrigin           string
 	Model                  *models.Model
 	Apple                  *apple.Store
@@ -136,6 +139,7 @@ func (h *Handler) StartNATSConnectJob() error {
 		}
 		h.IndividualBroker = broker
 		h.NATSConnection, h.JetStream = broker.Connection, broker.JetStream
+		h.setInventoryPublisher(broker.JetStream)
 		return nil
 	}
 
@@ -146,6 +150,7 @@ func (h *Handler) StartNATSConnectJob() error {
 	if err == nil {
 		h.JetStream, err = jetstream.New(h.NATSConnection)
 		if err == nil {
+			h.setInventoryPublisher(h.JetStream)
 			ctx, h.JetStreamCancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
 
 			agentStreamConfig := jetstream.StreamConfig{
@@ -220,6 +225,7 @@ func (h *Handler) StartNATSConnectJob() error {
 					log.Println("[ERROR]: JetStream could not be instantiated")
 					return
 				}
+				h.setInventoryPublisher(h.JetStream)
 
 				ctx, h.JetStreamCancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
 

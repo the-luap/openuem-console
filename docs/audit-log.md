@@ -45,6 +45,7 @@ The tests verify encoded fields, not every spreadsheet application's behavior.
 | Apple | `mdm_apple_audit` | Original organization; new device/command events capture site at write time and explicit results |
 | Agent | `uem_agent_audit` | Organization and stored site; legacy result is `recorded` |
 | Inventory | `uem_inventory_audit` | Scoped desktop overview reads with the actual organization/site and legacy agent ID, result `recorded`; available independently of desktop enrollment |
+| Inventory refresh | `uem_inventory_refresh_audit` | Scoped request admission, committed handoff attempts, retries and delivery outcomes; no report contents or broker error text |
 | Access | `uem_access_audit` | Server-wide; permission change metadata, result `recorded` |
 | Release | `uem_desktop_release_audit` | Server-wide; approved desktop release metadata, result `recorded` |
 | Activity | `uem_audit_activity` | Audit page/export access in the requested scope |
@@ -59,6 +60,11 @@ device placement. Site searches cannot show events without a stored matching sit
 `recorded` means no explicit outcome was stored, not that an action succeeded.
 Apple command acknowledgement, failure and deferral now record their corresponding
 results without copying device error text into audit metadata.
+
+Inventory refresh attempt evidence remains protected while its request is queued.
+Retention previews and deletion both exclude those active records. Once the request
+is terminal, normal organization retention applies. This preserves retry limits
+and uncertainty after a lost acknowledgement or failed completion commit.
 
 Successful page reads and completed export generation are audited with actor,
 scope, a SHA-256 digest of the filters and event count, committed before data is

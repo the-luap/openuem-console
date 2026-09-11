@@ -10,6 +10,10 @@ import (
 )
 
 templ Inventory(c echo.Context, info *partials.CommonInfo, device *inventory.Desktop) {
+	@InventoryWithRefresh(c, info, device, RefreshData{})
+}
+
+templ InventoryWithRefresh(c echo.Context, info *partials.CommonInfo, device *inventory.Desktop, refresh RefreshData) {
 	@layout.Base("devices", info) {
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: device.Name}}, info)
 		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
@@ -18,6 +22,9 @@ templ Inventory(c echo.Context, info *partials.CommonInfo, device *inventory.Des
 				<p class="uk-text-muted mt-2">Computer inventory</p>
 				@mdm_views.Navigation(info)
 			</div>
+			if refresh.Available || refresh.Request != nil {
+				@InventoryRefresh(info, device, refresh)
+			}
 			<section class="uk-card uk-card-default min-w-0">
 				<div class="uk-card-header"><h2 class="uk-card-title">Device overview</h2></div>
 				<div class="uk-card-body min-w-0">

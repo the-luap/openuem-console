@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -28,6 +29,15 @@ func (h *Handler) DesktopInventory(c echo.Context) error {
 	case err != nil:
 		return echo.NewHTTPError(http.StatusServiceUnavailable, "Computer inventory is unavailable. Try again later.")
 	}
+	refresh := desktop_views.RefreshData{}
+	if h.InventoryRefresh != nil {
+		refresh.Request, err = h.InventoryRefresh.Latest(c.Request().Context(), info.Principal.UserID, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, d.ID)
+		if err != nil {
+			return desktopRefreshFailure(err)
+		}
+		refresh.NewID = uuid.NewString()
+		refresh.Available = inventory.ValidReportDeviceID(d.ID) && (d.Status == "Enabled" || d.Status == "No contact")
+	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return renderApple(c, desktop_views.Inventory(c, info, d))
+	return renderApple(c, desktop_views.InventoryWithRefresh(c, info, d, refresh))
 }

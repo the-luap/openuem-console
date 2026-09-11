@@ -140,7 +140,7 @@ jobs:
           package-manager-cache: false
       - name: Chrome startup lifecycle and diagnostics
         run: node --test tests/browser/chrome-startup.test.mjs
-      - name: Certificate and network forms in Chrome
+      - name: Certificate, network and inventory forms in Chrome
         timeout-minutes: 5
         run: node tests/browser/run.mjs
         env:
@@ -163,7 +163,7 @@ jobs:
       - name: Protocol, persistence and TLS
         run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver
       - name: Gateway identity, route isolation, certificate login and CSRF
-        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/audit ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/audit ./internal/inventory ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/...
       - name: Existing Windows deployment and SMTP settings models
         run: go test -count=1 -run 'TestDeploymentTestSuite|TestSMTPTestSuite' ./internal/models
       - name: Individual agent authorization and command service lifecycles

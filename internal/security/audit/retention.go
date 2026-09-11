@@ -125,10 +125,18 @@ func retentionSources(ctx context.Context, tx *sql.Tx, tenant int, windowsEnable
 			continue
 		}
 		predicate := `tenant_id=$1 AND created_at<$2`
+		query := source.query
+		if source.name == "inventory-refresh" {
+			// Attempt evidence drives bounded retry and uncertainty after a
+			// process/commit failure. Retain it until that request is terminal.
+			eligible := `NOT EXISTS(SELECT 1 FROM uem_inventory_refresh r WHERE r.id=uem_inventory_refresh_audit.request_id AND r.status='queued')`
+			predicate += ` AND ` + eligible
+			query += ` WHERE ` + eligible
+		}
 		if global {
 			predicate = `$1::bigint=0 AND created_at<$2`
 		}
-		result = append(result, retentionSource{name: source.name, table: source.table, predicate: predicate, query: source.query})
+		result = append(result, retentionSource{name: source.name, table: source.table, predicate: predicate, query: query})
 	}
 	return result, nil
 }

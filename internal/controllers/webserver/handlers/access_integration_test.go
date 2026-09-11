@@ -95,6 +95,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("scoped desktop inventory", func(t *testing.T) {
 		exerciseDesktopInventoryPermissions(t, h, ctx, tenantID, siteID, sibling.ID, otherTenant.ID, otherSite.ID, request)
 	})
+	t.Run("scoped desktop refresh", func(t *testing.T) {
+		exerciseDesktopRefreshRoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
+	})
 	t.Run("Mac invitation rights require explicit security permission", func(t *testing.T) {
 		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})
