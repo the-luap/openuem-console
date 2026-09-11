@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Public reference enrollment now also verifies the production bootstrap key
+  document, signed configuration and portal invitation download over the gateway.
+  Bootstrap trust comes from the authorized HTTPS origin; release keys remain
+  independently provisioned. The verified configuration binds scope, invitation,
+  target and synthetic package/agent bytes, rejecting swapped key roles and a
+  different architecture. Repeated file GET/HEAD requests preserve the single
+  invitation use. The same bootstrap public identity survives complete restart
+  and interrupted broker maintenance; release withdrawal denies the portal's
+  enrollment files and configuration while public key discovery remains usable.
+  Both complete fixture modes pass locally on Linux arm64, along with Linux amd64
+  cross-compilation, affected vet and runner syntax checks. These files are tested
+  with explicitly non-executable payloads; native signing, installation and
+  activation remain separate acceptance requirements. Setup documentation now
+  also accurately describes the first-password mount's temporary bootstrap use.
 - The reference release mode now claims its synthetic device through the actual
   public HTTPS gateway using the shared endpoint client. A trusted setup probe
   creates the release-bound invitation; the edge client receives only public trust

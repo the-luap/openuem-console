@@ -172,6 +172,15 @@ The fixture checks:
   immediately and after the complete restart, while different keys are denied.
   Metadata retains the signed release, exact download target and organization/site.
   Withdrawal denies metadata and claim recovery before device revocation is tested.
+- The production bootstrap key is discovered over verified public HTTPS and used
+  to validate the signed configuration, alongside independently provisioned
+  release keys. The configuration binds the invitation, scope, architecture and
+  synthetic package/agent hashes. Swapped trust roles and a different architecture
+  are rejected. The portal offers its invitation/configuration downloads, with
+  scanner-safe GET/HEAD, private caching headers and exact attachment names. The
+  key document stays identical after restart, and withdrawal denies these files
+  while leaving public key discovery available. The agent hash covers an explicit
+  non-executable fixture, not a signed or installed native agent.
 - A synthetic scoped identity, the real command provisioner's durable consumer
   reconciliation, and a WSS request through gateway, broker authorization and
   the individual worker that changes only that identity's inventory settings.

@@ -300,7 +300,7 @@ def main():
             probe("public release-bound HTTPS claim", "TestReferencePublicClaim", edge, public_claim)
             probe("admitted identity inventory preparation", "TestReferenceRegistry", data_network, private,
                   [("OPENUEM_REFERENCE_ACTION", "inventory")])
-            print("reference enrollment: public metadata, invalid proof denial, HTTPS claim and same-key recovery passed", flush=True)
+            print("reference enrollment: signed bootstrap files, public metadata, invalid proof denial, HTTPS claim and same-key recovery passed", flush=True)
         else:
             probe("synthetic registry admission", "TestReferenceRegistry", data_network, private,
                   [("OPENUEM_REFERENCE_ACTION", "enroll")])
@@ -476,7 +476,7 @@ def main():
                   [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
             probe("withdrawn public claim and metadata denial", "TestReferencePublicClaim", edge, public_claim,
                   [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
-            print("reference releases: retained restart approval and exact download, metadata and claim withdrawal denial passed", flush=True)
+            print("reference releases: retained bootstrap identity and approval, withdrawn downloads, enrollment files, metadata and claims passed", flush=True)
 
         held = command("live device probe", "docker", "run", "--detach", "--network", edge, *probe_base, *device,
                        *mount(root / "ready", "/ready", False), "--env", "OPENUEM_REFERENCE_ACTION=hold",

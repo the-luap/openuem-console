@@ -70,9 +70,11 @@ and generated administrator password, and run the database bootstrap job. Mount
 its metadata, completed credentials and public CA read-only, and mount only its
 separate journal writable. Give that job access to the private database network;
 it needs no published host port. Start the console only after bootstrap succeeds,
-with its application URL and installation keys mounted read-only. The bootstrap
-administrator password, private CA key and provisioning journals are not console
-mounts.
+with its application URL and installation keys mounted read-only. For the first
+administrator login, the [reference bootstrap overlay](reference-composition.md)
+also supplies the generated password read-only. After the mandatory password
+replacement, recreate the console without that overlay to retire the password
+mount. Private CA keys and provisioning journals are never console mounts.
 
 ## Verification
 

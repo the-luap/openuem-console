@@ -18,6 +18,7 @@ import (
 
 	"github.com/open-uem/nats/enrollment"
 	"github.com/open-uem/nats/enrollment/artifacts"
+	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/nats/enrollment/servicecredentials"
 	"github.com/open-uem/openuem-console/internal/desktop"
@@ -134,6 +135,105 @@ func referenceMetadata(t *testing.T, record invitationRecord, uses int) {
 	}
 }
 
+// The gateway authenticates the origin's bootstrap public keys. Release trust
+// comes from the fixture's separate release pipeline, never from that response.
+func referenceBootstrapDelivery(t *testing.T, transport *enrollment.HTTPClient, invitation invitationRecord, action string) {
+	t.Helper()
+	document, err := transport.BootstrapKeys(t.Context())
+	if err != nil {
+		t.Fatal("public bootstrap key discovery failed")
+	}
+	keys, err := bootstrap.ParseOriginKeys(document, referenceOrigin)
+	if err != nil {
+		t.Fatal("public bootstrap keys did not bind the authorized origin")
+	}
+	if action == "" {
+		write(t, "/device/bootstrap-keys.json", document)
+	} else {
+		retained, err := os.ReadFile("/device/bootstrap-keys.json")
+		if err != nil || !bytes.Equal(retained, document) {
+			t.Fatal("service restart changed the retained bootstrap signing identity")
+		}
+	}
+	configuration, err := transport.Configuration(t.Context(), invitation.Token)
+	if action == "withdrawn" {
+		if !errors.Is(err, enrollment.ErrEnrollmentUnavailable) {
+			t.Fatal("withdrawn release still supplied a signed configuration")
+		}
+	} else {
+		if err != nil {
+			t.Fatal("public signed configuration download failed")
+		}
+		releaseKeys, err := desktop.LoadReleaseKeys("/run/release-keys.pem")
+		if err != nil {
+			t.Fatal("independent release trust is unavailable")
+		}
+		trust := bootstrap.Trust{Origin: referenceOrigin, BootstrapKeys: keys, ReleaseKeys: releaseKeys,
+			Platform: "windows", Architecture: "amd64"}
+		verified, err := bootstrap.Verify(configuration, trust, time.Now())
+		if err != nil {
+			t.Fatal("delivered bootstrap and release signatures did not verify independently")
+		}
+		config := verified.Config()
+		if config.Invitation != invitation.Token || config.TenantID != invitation.TenantID || config.SiteID != invitation.SiteID || config.ReleaseDigest != invitation.ReleaseDigest || verified.DownloadURL() != referenceOrigin+protocol.DownloadPath(invitation.ReleaseDigest, "windows", "amd64") {
+			t.Fatal("signed configuration changed the invitation scope or approved release")
+		}
+		if verified.VerifyPackage(strings.NewReader(referencePackage)) != nil || verified.VerifyAgent(strings.NewReader(referenceAgent)) != nil {
+			t.Fatal("signed configuration does not bind the synthetic package and agent bytes")
+		}
+		wrong := trust
+		wrong.Architecture = "arm64"
+		if _, err = bootstrap.Verify(configuration, wrong, time.Now()); !errors.Is(err, bootstrap.ErrTarget) {
+			t.Fatal("signed configuration authorized a different endpoint architecture")
+		}
+		wrong = trust
+		wrong.ReleaseKeys, wrong.BootstrapKeys = trust.BootstrapKeys, trust.ReleaseKeys
+		if _, err = bootstrap.Verify(configuration, wrong, time.Now()); err == nil {
+			t.Fatal("public bootstrap trust substituted for independent release trust")
+		}
+	}
+	client := client(t)
+	base := "/enroll/desktop/" + invitation.Token
+	for _, path := range []string{base, base + "/invitation", base + "/configuration"} {
+		for _, method := range []string{http.MethodHead, http.MethodGet} {
+			r, err := http.NewRequestWithContext(t.Context(), method, referenceOrigin+path, nil)
+			if err != nil {
+				t.Fatal("cannot prepare public enrollment file request")
+			}
+			response, err := client.Do(r)
+			if err != nil {
+				t.Fatal("public enrollment file request failed")
+			}
+			body, err := io.ReadAll(io.LimitReader(response.Body, 96<<10))
+			response.Body.Close()
+			status := http.StatusOK
+			if action == "withdrawn" {
+				status = http.StatusNotFound
+			}
+			if err != nil || response.StatusCode != status || response.Header.Get("Cache-Control") != "no-store" || response.Header.Get("X-Content-Type-Options") != "nosniff" || method == http.MethodHead && len(body) != 0 {
+				t.Fatal("public enrollment files lost status, privacy or HEAD semantics")
+			}
+			if action == "withdrawn" || method == http.MethodHead {
+				continue
+			}
+			switch path {
+			case base:
+				if !bytes.Contains(body, []byte(`href="`+base+`/invitation"`)) || !bytes.Contains(body, []byte(`href="`+base+`/configuration"`)) {
+					t.Fatal("compatible enrollment portal omitted its native enrollment files")
+				}
+			case base + "/invitation":
+				if string(body) != invitation.Token+"\n" || response.Header.Get("Content-Disposition") != `attachment; filename="openuem-invitation.txt"` {
+					t.Fatal("public invitation download changed its limited token or attachment name")
+				}
+			case base + "/configuration":
+				if response.Header.Get("Content-Disposition") != `attachment; filename="openuem-enrollment.json"` {
+					t.Fatal("public signed configuration lost its attachment name")
+				}
+			}
+		}
+	}
+}
+
 func TestReferencePublicClaim(t *testing.T) {
 	fixture(t)
 	var invitation invitationRecord
@@ -147,6 +247,7 @@ func TestReferencePublicClaim(t *testing.T) {
 	}
 	defer transport.CloseIdleConnections()
 	action := os.Getenv("OPENUEM_REFERENCE_ACTION")
+	referenceBootstrapDelivery(t, transport, invitation, action)
 	if action == "retry" || action == "withdrawn" {
 		var claim enrollment.Request
 		data, err := os.ReadFile("/device/claim.json")

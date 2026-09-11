@@ -49,6 +49,7 @@ import (
 )
 
 const referencePackage = "Non-executable reference installer integrity fixture.\n"
+const referenceAgent = "Non-executable reference agent binding fixture.\n"
 
 func fixture(t *testing.T) {
 	t.Helper()
@@ -108,9 +109,11 @@ func TestReferencePrepare(t *testing.T) {
 	encoded, _ := x509.MarshalPKIXPublicKey(release)
 	write(t, "/state/release-keys.pem", pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: encoded}))
 	digest := sha256.Sum256([]byte(referencePackage))
+	agentDigest := sha256.Sum256([]byte(referenceAgent))
 	now := time.Now().UTC()
 	manifest := artifacts.Manifest{Schema: artifacts.Schema, Sequence: 1, Version: "0.12.0", PublishedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
-		Artifacts: []artifacts.Artifact{{Platform: "windows", Architecture: "amd64", Format: "msi", Filename: "openuem-agent-0.12.0-windows-amd64.msi", Size: int64(len(referencePackage)), SHA256: hex.EncodeToString(digest[:])}}}
+		Artifacts: []artifacts.Artifact{{Platform: "windows", Architecture: "amd64", Format: "msi", Filename: "openuem-agent-0.12.0-windows-amd64.msi",
+			Size: int64(len(referencePackage)), SHA256: hex.EncodeToString(digest[:]), AgentSize: int64(len(referenceAgent)), AgentSHA256: hex.EncodeToString(agentDigest[:])}}}
 	envelope, err := artifacts.Sign(manifest, signing, now)
 	if err != nil {
 		t.Fatal("cannot sign synthetic release metadata")
