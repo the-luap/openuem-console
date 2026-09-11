@@ -32,5 +32,15 @@ func New(dbUrl string, sessionLifetimeInMinutes int, encryptionMasterKey string)
 }
 
 func (s *SessionManager) Close() {
-	s.Pool.Close()
+	if s == nil {
+		return
+	}
+	if s.Manager != nil {
+		if store, ok := s.Manager.Store.(*PostgresStore); ok {
+			store.StopCleanup()
+		}
+	}
+	if s.Pool != nil {
+		s.Pool.Close()
+	}
 }

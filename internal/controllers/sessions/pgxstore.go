@@ -20,7 +20,8 @@ import (
 // PostgresStore represents the session store.
 type PostgresStore struct {
 	pool                *pgxpool.Pool
-	stopCleanup         chan bool
+	stopCleanup         context.CancelFunc
+	cleanupDone         chan struct{}
 	tableName           string
 	encryptionMasterKey string
 }
@@ -68,8 +69,10 @@ func NewWithConfig(pool *pgxpool.Pool, config Config) *PostgresStore {
 
 	p := &PostgresStore{pool: pool, tableName: config.TableName, encryptionMasterKey: config.EncryptionMasterKey}
 	if config.CleanUpInterval > 0 {
-		p.stopCleanup = make(chan bool)
-		go p.startCleanup(config.CleanUpInterval)
+		var ctx context.Context
+		ctx, p.stopCleanup = context.WithCancel(context.Background())
+		p.cleanupDone = make(chan struct{})
+		go p.startCleanup(ctx, config.CleanUpInterval)
 	}
 	return p
 }
@@ -264,41 +267,37 @@ func (p *PostgresStore) AllCtx(ctx context.Context) (map[string][]byte, error) {
 	return result, rows.Err()
 }
 
-func (p *PostgresStore) startCleanup(interval time.Duration) {
+func (p *PostgresStore) startCleanup(ctx context.Context, interval time.Duration) {
+	defer close(p.cleanupDone)
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			err := p.deleteExpired()
-			if err != nil {
+			attempt, cancel := context.WithTimeout(ctx, 30*time.Second)
+			err := p.deleteExpired(attempt)
+			cancel()
+			if err != nil && ctx.Err() == nil {
 				log.Println(err)
 			}
-		case <-p.stopCleanup:
-			ticker.Stop()
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// StopCleanup terminates the background cleanup goroutine for the PostgresStore
-// instance. It's rare to terminate this; generally PostgresStore instances and
-// their cleanup goroutines are intended to be long-lived and run for the lifetime
-// of your application.
-//
-// There may be occasions though when your use of the PostgresStore is transient.
-// An example is creating a new PostgresStore instance in a test function. In this
-// scenario, the cleanup goroutine (which will run forever) will prevent the
-// PostgresStore object from being garbage collected even after the test function
-// has finished. You can prevent this by manually calling StopCleanup.
+// StopCleanup cancels active database work and joins the worker. Concurrent and
+// repeated calls are safe; disabled cleanup needs no shutdown operation.
 func (p *PostgresStore) StopCleanup() {
 	if p.stopCleanup != nil {
-		p.stopCleanup <- true
+		p.stopCleanup()
+		<-p.cleanupDone
 	}
 }
 
-func (p *PostgresStore) deleteExpired() error {
+func (p *PostgresStore) deleteExpired(ctx context.Context) error {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE expiry < current_timestamp", p.tableName)
-	_, err := p.pool.Exec(context.Background(), stmt)
+	_, err := p.pool.Exec(ctx, stmt)
 	return err
 }
 

@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Session expiry cleanup now uses cancellable, thirty-second database attempts,
+  idempotent joined shutdown and worker-before-pool closure. PostgreSQL race
+  tests pass in 3.806 seconds, including twelve simultaneous stop calls and
+  manager closure while cleanup waits on a held table lock. The full Linux
+  ARM64 console build passes. This addresses worker lifecycle; indexed token
+  lookup and durable session revocation remain separate work below.
+
 - [Session token storage](session-storage.md) now serializes encrypted token
   resolution/writes and performs primary-key migration in one statement.
   Deletion removes every representation, ambiguous legacy credentials retire

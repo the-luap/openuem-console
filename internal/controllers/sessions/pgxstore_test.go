@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
@@ -22,6 +23,76 @@ type sessionFixture struct {
 	model *models.Model
 	pool  *pgxpool.Pool
 	key   string
+}
+
+func blockedCleanup(t *testing.T, f sessionFixture) *sessions.PostgresStore {
+	t.Helper()
+	tx, err := f.model.DB.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback() })
+	if _, err = tx.ExecContext(t.Context(), `LOCK TABLE sessions IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatal(err)
+	}
+	store := sessions.NewWithConfig(f.pool, sessions.Config{CleanUpInterval: time.Millisecond})
+	deadline := time.Now().Add(2 * time.Second)
+	for f.pool.Stat().AcquiredConns() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if f.pool.Stat().AcquiredConns() == 0 {
+		store.StopCleanup()
+		t.Fatal("cleanup never started its database attempt")
+	}
+	return store
+}
+
+func TestSessionCleanupStopCancelsAndJoinsConcurrently(t *testing.T) {
+	f := newSessionFixture(t, false)
+	store := blockedCleanup(t, f)
+	done := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		for range 12 {
+			wg.Go(store.StopCleanup)
+		}
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("cleanup shutdown did not cancel and join its blocked query")
+	}
+	store.StopCleanup()
+	// pgx releases the lease before returning, but destroys a canceled connection
+	// asynchronously. The locked query must disappear without releasing our lock.
+	deadline := time.Now().Add(2 * time.Second)
+	for f.pool.Stat().AcquiredConns() != 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if f.pool.Stat().AcquiredConns() != 0 {
+		t.Fatal("cleanup retained a database connection after shutdown")
+	}
+	f.store.StopCleanup() // Cleanup is disabled for this store.
+}
+
+func TestSessionManagerCloseJoinsCleanupBeforePoolClose(t *testing.T) {
+	f := newSessionFixture(t, false)
+	store := blockedCleanup(t, f)
+	sm := &sessions.SessionManager{Manager: scs.New(), Pool: f.pool}
+	sm.Manager.Store = store
+	done := make(chan struct{})
+	go func() { sm.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("manager closed the pool before stopping its blocked cleanup worker")
+	}
+	sm.Close()
+	var absent *sessions.SessionManager
+	absent.Close()
+	(&sessions.SessionManager{Manager: scs.New()}).Close()
 }
 
 func newSessionFixture(t *testing.T, encrypted bool, connections ...int32) sessionFixture {

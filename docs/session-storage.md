@@ -28,6 +28,12 @@ IDs, requires one matching encrypted record and respects the request context.
 Database cursors close before subsequent operations, including when the pool has
 only one connection. Transaction rollback uses a bounded cleanup context.
 
+Expiry cleanup uses cancellable database attempts with a thirty-second deadline.
+Stopping the worker cancels an active query and waits for the goroutine to exit;
+repeated or concurrent stop calls are safe. Session-manager shutdown joins this
+worker before closing its pool. Owned PostgreSQL tests hold a table lock to
+exercise shutdown while cleanup is waiting on the database.
+
 Disposable PostgreSQL race tests reproduce the previous twelve-row concurrent
 commit and incomplete deletion, hidden cancellation, and mixed-record owner
 failure. Regressions cover one-record concurrent commits, deletion, automatic
