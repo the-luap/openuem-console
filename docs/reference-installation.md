@@ -110,6 +110,12 @@ checks for reloads once per minute; renewal uses the configured issuer interval.
 No TCP 80 listener is required. Provider authorization, reachable
 DNS/ACME services and client trust in the issued chain remain deployment inputs.
 
+The issuer image must also provide the private readiness socket and `--ready`
+probe. Its Docker health check validates the active service's original state,
+account and valid published TLS. The installer requires this positive result
+after startup and before marking setup complete. No additional host port or
+readiness credential is created.
+
 Public mode publishes only gateway TCP 443. The four backend networks are private;
 the gateway's source-network policy controls administrator access. Select the
 actual VPN or management source networks as observed at the gateway. Source

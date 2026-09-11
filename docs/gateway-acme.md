@@ -152,6 +152,44 @@ issuance failures. Lego's normal renewal and ACME Renewal Information (ARI)
 decisions remain enabled. No unconditional force-renew flag is used.
 [Pinned renewal implementation](https://github.com/go-acme/lego/blob/v5.4.1/cmd/cmd_run_renew.go).
 
+## Local renewal readiness
+
+Both issuer Compose definitions enable a private `/tmp/issuer.sock` endpoint and
+a Docker health check. The endpoint stays inside the issuer's mode-0700 temporary
+filesystem and opens no TCP port. A custom daemon invocation enables it with
+`--readiness-socket /absolute/private/directory/issuer.sock`; the canonical parent
+must already be private, and the full path is limited to 100 bytes.
+
+Check the actual running service using its same protected configuration:
+
+```sh
+docker compose -f deploy/acme/compose.yaml exec -T acme /openuem-acme \
+  --config /run/openuem-acme/issuer.json --ready \
+  --readiness-socket /tmp/issuer.sock
+```
+
+Success prints only `{"ready":true}`. The probe performs no issuance, state write,
+lease acquisition or provider request. The live service checks both original
+directory/lease identities, its retained installation UUID, paired bindings,
+original account key, accessible provider inputs and the selected gateway TLS pair,
+including hostname, certificate purpose, chain and lifetime. A configuration digest
+binds the local request to the daemon's actual configuration. A historical ready
+status file or a stopped process cannot satisfy this check.
+
+Readiness remains available during a network attempt and after a transient renewal
+failure while retained public TLS is valid. Continue monitoring the last attempt
+and expiry for degraded renewal; readiness does not establish future provider
+availability. Missing keys, lost bindings, inconsistent or expired publication and
+changed leases fail immediately. The server bounds connections, active checks,
+request sizes and deadlines, and joins checks on shutdown. It removes only its own
+socket; a protected stale socket can be reclaimed after acquiring the issuer's
+leases, while an active or unexpected entry is preserved.
+
+`--ready`, `--check` and `--once` are separate modes. A readiness socket is supported
+only for the running daemon or its read-only readiness probe. The reference
+installer requires positive local readiness after startup and again before
+recording installation completion.
+
 ## Publication, failure and recovery
 
 Each successful result is validated for hostname, matching private key, complete

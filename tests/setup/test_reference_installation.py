@@ -335,6 +335,7 @@ class ProtectedInstallation(unittest.TestCase):
         current["HostConfig"].update({"Memory": 128 << 20, "PidsLimit": 64, "NetworkMode": network_name})
         current["HostConfig"]["RestartPolicy"] = {"Name": "unless-stopped", "MaximumRetryCount": 0}
         current["Config"]["StopTimeout"] = 15
+        current["Config"]["Healthcheck"] = installer.ISSUER_HEALTH
         current["NetworkSettings"]["Networks"] = {network_name: {}}
         paths = (("acme/config", "/run/openuem-acme", True), ("acme/state", "/var/lib/openuem-acme", False),
                  ("public", "/var/lib/openuem-public-tls", False))
@@ -364,6 +365,7 @@ class ProtectedInstallation(unittest.TestCase):
                                     (current["Mounts"][0], "RW", True), (current["Mounts"][0], "Source", "/different"),
                                     (current["HostConfig"], "NetworkMode", "host"), (current["HostConfig"], "Memory", 0),
                                     (current["HostConfig"], "RestartPolicy", {"Name": "no", "MaximumRetryCount": 0}),
+                                    (current["Config"], "Healthcheck", {"Test": ["NONE"]}),
                                     (current["NetworkSettings"], "Networks", {network_name: {}, "private-backend": {}}),
                                     (network, "Internal", False), (network["Labels"], installer.PROJECT_LABEL, "different")):
             with self.subTest(field=field):

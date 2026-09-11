@@ -160,30 +160,30 @@ type installationBinding struct {
 
 // A restored publication cannot silently create a replacement account after
 // losing its matching state volume. Both bindings must be new or retained.
-func bindInstallation(state, publication *directory, c Config) error {
+func bindInstallation(state, publication *directory, c Config) (string, error) {
 	_, stateErr := state.root.Lstat("installation.json")
 	_, publicErr := publication.root.Lstat("installation.json")
 	stateMissing, publicMissing := errors.Is(stateErr, os.ErrNotExist), errors.Is(publicErr, os.ErrNotExist)
 	if stateMissing != publicMissing || (stateErr != nil && !stateMissing) || (publicErr != nil && !publicMissing) {
-		return ErrState
+		return "", ErrState
 	}
 	id := uuid.NewString()
 	if !stateMissing {
 		data, err := readProtected(filepath.Join(state.path, "installation.json"), 8192, true)
 		var retained installationBinding
 		if err != nil || decodeJSON(data, &retained) != nil {
-			return ErrState
+			return "", ErrState
 		}
 		parsed, err := uuid.Parse(retained.Installation)
 		if err != nil || parsed == uuid.Nil || parsed.String() != retained.Installation {
-			return ErrState
+			return "", ErrState
 		}
 		id = retained.Installation
 	}
 	if state.bind(c, id) != nil || publication.bind(c, id) != nil {
-		return ErrState
+		return "", ErrState
 	}
-	return nil
+	return id, nil
 }
 
 // Binding prevents accidental staging/production, origin, account or provider

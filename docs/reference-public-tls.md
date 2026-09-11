@@ -13,6 +13,12 @@ services never receive its account or DNS provider configuration. Only the issue
 can write the publication; the gateway reads that complete directory so renewed
 generations remain visible without container replacement.
 
+The issuer's Docker health check uses a private socket in its own temporary
+filesystem. It verifies the live service's retained account/bindings and a valid
+published certificate without issuing or contacting the provider. The automatic
+installer requires the same positive check during startup and completion. See
+[local renewal readiness](gateway-acme.md#local-renewal-readiness).
+
 The [reviewed installation controller](reference-installation.md) selects this
 layout with configuration version 2. It verifies protected inputs, issues the first
 certificate, starts renewal and records the retained account/publication identity.

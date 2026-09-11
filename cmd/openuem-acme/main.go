@@ -26,12 +26,23 @@ func run() error {
 	binary := flag.String("lego-binary", "/lego", "Absolute path to the installed, pinned lego executable")
 	once := flag.Bool("once", false, "Run one bounded issuance/renewal check and publish a valid result")
 	check := flag.Bool("check", false, "Validate protected local inputs without writing state or contacting a provider")
+	ready := flag.Bool("ready", false, "Check the active renewal service through its private local socket")
+	socket := flag.String("readiness-socket", "", "Private absolute Unix socket for renewal service readiness")
 	flag.Parse()
-	if flag.NArg() != 0 || *once && *check {
+	if flag.NArg() != 0 || *once && *check || *ready && (*once || *check || *socket == "") || *socket != "" && (*once || *check) {
 		return acmeissuer.ErrConfiguration
 	}
 	config, err := acmeissuer.ReadConfig(*configuration)
 	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if *ready {
+		if err := acmeissuer.CheckReadiness(ctx, config, *socket); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(os.Stdout, `{"ready":true}`)
 		return err
 	}
 	if *check {
@@ -46,8 +57,13 @@ func run() error {
 		return err
 	}
 	defer service.Close()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	if *socket != "" {
+		readiness, err := service.ListenReadiness(*socket)
+		if err != nil {
+			return err
+		}
+		defer readiness.Close()
+	}
 	report := func(result acmeissuer.Result, err error) { log.Print(acmeissuer.LogLine(result, err)) }
 	if *once {
 		result, err := service.Once(ctx)

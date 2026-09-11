@@ -99,13 +99,20 @@ func TestACMEContainerDNS01(t *testing.T) {
 	configPath := filepath.Join(base, "issuer.json")
 	encodedConfig, _ := json.Marshal(c)
 	writeFixture(t, configPath, encodedConfig)
+	readinessDirectory, err := os.MkdirTemp("/tmp", "issuer-ready-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(readinessDirectory)
+	readinessSocket := filepath.Join(readinessDirectory, "issuer.sock")
 	// The actual command must permit installer review without registering an
 	// account, starting lego, acquiring leases or creating either state volume.
-	for _, flags := range [][]string{{"--check"}, {"--check", "--once"}} {
+	for _, flags := range [][]string{{"--check"}, {"--check", "--once"}, {"--ready"}, {"--ready", "--check"},
+		{"--ready", "--readiness-socket", readinessSocket}, {"--once", "--readiness-socket", readinessSocket}} {
 		arguments := append([]string{"--config", configPath}, flags...)
 		output, err := exec.CommandContext(ctx, binaryPath, arguments...).CombinedOutput()
 		assertACMELogPrivacy(t, output)
-		if len(flags) == 1 {
+		if len(flags) == 1 && flags[0] == "--check" {
 			if err != nil || string(output) != "{\"inputs_valid\":true}\n" {
 				t.Fatal("read-only issuer command did not validate its inputs", err)
 			}
@@ -116,6 +123,14 @@ func TestACMEContainerDNS01(t *testing.T) {
 			if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("read-only issuer command created retained state", err)
 			}
+		}
+	}
+	checkReady := func(want bool) {
+		t.Helper()
+		output, err := exec.CommandContext(ctx, binaryPath, "--config", configPath, "--ready", "--readiness-socket", readinessSocket).CombinedOutput()
+		assertACMELogPrivacy(t, output)
+		if want && (err != nil || string(output) != "{\"ready\":true}\n") || !want && err == nil {
+			t.Fatal("actual issuer readiness command returned an unexpected result", want, err)
 		}
 	}
 	runOnce := func() error {
@@ -214,7 +229,8 @@ func TestACMEContainerDNS01(t *testing.T) {
 	}
 
 	// Exercise the distributed executable's default daemon mode and SIGTERM.
-	daemon := exec.CommandContext(ctx, binaryPath, "--config", configPath)
+	checkReady(false)
+	daemon := exec.CommandContext(ctx, binaryPath, "--config", configPath, "--readiness-socket", readinessSocket)
 	var daemonLog bytes.Buffer
 	daemon.Stdout, daemon.Stderr = &daemonLog, &daemonLog
 	if err := daemon.Start(); err != nil {
@@ -233,6 +249,8 @@ func TestACMEContainerDNS01(t *testing.T) {
 			t.Logf("issuer daemon fixture result: %s", daemonLog.Bytes())
 		}
 	}()
+	eventuallyACME(t, ctx, func() bool { return CheckReadiness(ctx, c, readinessSocket) == nil })
+	checkReady(true)
 	eventuallyACME(t, ctx, func() bool {
 		current, err := os.Readlink(filepath.Join(c.PublicationDirectory, "current"))
 		return err == nil && current != first.Name
@@ -249,6 +267,10 @@ func TestACMEContainerDNS01(t *testing.T) {
 		t.Fatal("issuer did not shut down cleanly", err)
 	}
 	joined = true
+	checkReady(false)
+	if _, err := os.Lstat(readinessSocket); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("issuer shutdown did not retire its readiness socket")
+	}
 	assertACMELogPrivacy(t, daemonLog.Bytes())
 	if !reflect.DeepEqual(account, accountFingerprints(t, c.StateDirectory)) {
 		t.Fatal("renewal replaced the ACME account")

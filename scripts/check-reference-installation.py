@@ -261,6 +261,8 @@ def main():
             identities.extend(issuer)
             current = json.loads(command("docker", "inspect", issuer[0]).stdout)[0]
             assert current["State"]["Running"] and not current["HostConfig"]["PortBindings"]
+            assert current["State"]["Health"]["Status"] == "healthy"
+            assert json.loads(command("docker", "exec", issuer[0], installer.ISSUER_EXECUTABLE, *installer.ISSUER_READY_ARGUMENTS).stdout) == {"ready": True}
             before[current["Id"]] = current["State"]["StartedAt"]
             counts = acme.control("status")
             assert all(counts[name] > 0 for name in ("present", "cleanup", "txt")) and counts["records"] == counts["held"] == 0

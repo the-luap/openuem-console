@@ -27,6 +27,7 @@ var (
 	ErrLocked        = errors.New("another issuer owns this state or publication directory")
 	ErrIssuance      = errors.New("DNS-01 issuance failed; check the issuer configuration, provider credentials and connectivity")
 	ErrPublication   = errors.New("the ACME result could not be validated and published; the previous generation is retained")
+	ErrNotReady      = errors.New("ACME renewal service is not ready with retained valid public TLS")
 )
 
 // Config contains operator-supplied configuration, never request parameters.

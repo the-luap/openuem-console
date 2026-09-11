@@ -61,7 +61,8 @@ def main():
             actual = json.loads(command("docker", "inspect", identity))[0]
             config, host = actual["Config"], actual["HostConfig"]
             assert not actual["State"]["Running"] and config["User"] == account and actual["Image"] == selected["Id"]
-            assert config["Cmd"] == ["--config", "/run/openuem-acme/issuer.json"]
+            assert config["Cmd"] == ["--config", "/run/openuem-acme/issuer.json", "--readiness-socket", "/tmp/issuer.sock"]
+            assert config["Healthcheck"]["Test"] == ["CMD", "/openuem-acme", "--config", "/run/openuem-acme/issuer.json", "--ready", "--readiness-socket", "/tmp/issuer.sock"]
             assert host["Init"] and host["ReadonlyRootfs"] and not host["Privileged"] and host["CapDrop"] == ["ALL"]
             assert host["PidsLimit"] == 64 and host["Memory"] == 128 << 20 and not host.get("PortBindings")
             assert "no-new-privileges:true" in host["SecurityOpt"]

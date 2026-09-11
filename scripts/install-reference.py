@@ -54,6 +54,10 @@ PROJECT_LABEL = "io.openuem.setup.project"
 REVIEW_LABEL = "io.openuem.setup.review"
 JOB_LABEL = "io.openuem.setup.job"
 ISSUER_EXECUTABLE = "/openuem-acme"
+ISSUER_DAEMON_ARGUMENTS = ["--config", "/run/openuem-acme/issuer.json", "--readiness-socket", "/tmp/issuer.sock"]
+ISSUER_READY_ARGUMENTS = ["--config", "/run/openuem-acme/issuer.json", "--ready", "--readiness-socket", "/tmp/issuer.sock"]
+ISSUER_HEALTH = {"Test": ["CMD", ISSUER_EXECUTABLE, *ISSUER_READY_ARGUMENTS], "Interval": 30_000_000_000,
+                 "Timeout": 5_000_000_000, "Retries": 3, "StartPeriod": 15_000_000_000}
 
 
 def read_file(path, limit=1 << 20, secret=True, allow_empty=False):
@@ -517,8 +521,10 @@ class Installation:
         mounts = service.get("volumes", [])
         if any(service.get(name) for name in forbidden) or service.get("image") != self.images["acme"] or service.get("user") != self.account or not service.get("read_only") or not service.get("init") or service.get("cap_drop") != ["ALL"] or "no-new-privileges:true" not in service.get("security_opt", []) or service.get("pull_policy") != "never" or set(service.get("networks", {})) != {"public_tls"}:
             raise InstallationError("issuer service does not retain its reviewed privilege and network boundaries")
-        if service.get("command") != ["--config", "/run/openuem-acme/issuer.json"] or service.get("entrypoint") is not None or service.get("environment") or str(service.get("mem_limit")) != str(128 << 20) or service.get("pids_limit") != 64 or service.get("restart") != "unless-stopped" or service.get("stop_grace_period") != "15s":
+        if service.get("command") != ISSUER_DAEMON_ARGUMENTS or service.get("entrypoint") is not None or service.get("environment") or str(service.get("mem_limit")) != str(128 << 20) or service.get("pids_limit") != 64 or service.get("restart") != "unless-stopped" or service.get("stop_grace_period") != "15s":
             raise InstallationError("issuer command, environment or resource limits changed")
+        if service.get("healthcheck") != {"test": ISSUER_HEALTH["Test"], "interval": "30s", "timeout": "5s", "retries": 3, "start_period": "15s"}:
+            raise InstallationError("issuer must retain its explicit local readiness check")
         if len(mounts) != 3 or any(item.get("type") != "bind" or item.get("bind", {}).get("create_host_path") for item in mounts) or {item["target"]: (item["source"], bool(item.get("read_only"))) for item in mounts} != expected:
             raise InstallationError("issuer account, provider and publication mounts changed")
         if network.get("name") != self.issuer_project + "_public_tls" or network.get("external") or network.get("driver", "bridge") != "bridge" or bool(network.get("internal")) != (self.config["access"] == "isolated"):
@@ -540,6 +546,8 @@ class Installation:
         if identities:
             current = self.docker.objects("retained issuer boundaries", "inspect", identities[0])[0]
             config, host = current["Config"], current["HostConfig"]
+            if config.get("Healthcheck") != ISSUER_HEALTH:
+                raise InstallationError("existing issuer readiness check changed")
             labels = config.get("Labels") or {}
             if labels.get("com.docker.compose.service") != "acme" or labels.get("com.docker.compose.oneoff", "false").lower() != "false" or labels.get(REVIEW_LABEL) != self.review or labels.get(PROJECT_LABEL) != self.project:
                 raise InstallationError("existing issuer does not belong to this installation review")
@@ -618,8 +626,21 @@ class Installation:
         current = self.issuer_resources(model)
         if not current["State"]["Running"]:
             self.docker.run("retained issuer startup", "start", current["Id"])
-        if not self.docker.objects("issuer startup state", "inspect", current["Id"])[0]["State"]["Running"]:
-            raise InstallationError("retained issuer exited before its renewal service started")
+        self.issuer_ready(current["Id"])
+
+    def issuer_ready(self, identity):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            self.check_lease()
+            current = self.docker.objects("issuer readiness state", "inspect", identity)[0]
+            if not current["State"]["Running"]:
+                raise InstallationError("retained issuer exited before renewal readiness")
+            output = self.docker.run("issuer retained publication readiness", "exec", identity, ISSUER_EXECUTABLE,
+                                     *ISSUER_READY_ARGUMENTS, check=False, timeout=5)
+            if output.strip() == '{"ready":true}':
+                return
+            time.sleep(.1)
+        raise InstallationError("renewal service did not verify its retained account and valid publication")
 
     def runtime_model(self, installation, bootstrap):
         environment = {**self.docker.environment, "OPENUEM_REFERENCE_STATE": str(self.root),
@@ -888,6 +909,11 @@ class Installation:
             runtime = self.runtime(False)
             runtime.start("console")
             runtime.services_ready()
+            if self.acme:
+                current = self.issuer_resources(read_record(self.state / "compose-issuer.json"))
+                if current is None:
+                    raise InstallationError("renewal service is missing before installation completion")
+                self.issuer_ready(current["Id"])
             self.step("complete")
             return {"status": "complete", "review_sha256": self.review, "public_origin": self.config["public_origin"], "ready": True}
         finally:

@@ -24,8 +24,10 @@ type Service struct {
 	config             Config
 	binary             string
 	state, publication *directory
+	installationID     string
 	runner             func(context.Context, string, string, []string, []string) error
 	mu                 sync.Mutex
+	lifetime           sync.RWMutex
 	closed             bool
 }
 
@@ -50,7 +52,8 @@ func Open(config Config, binary string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	if bindInstallation(service.state, service.publication, config) != nil {
+	service.installationID, err = bindInstallation(service.state, service.publication, config)
+	if err != nil {
 		return nil, ErrState
 	}
 	current, err := service.publication.current(config.PublicOrigin)
@@ -74,6 +77,8 @@ func Open(config Config, binary string) (*Service, error) {
 func (s *Service) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.lifetime.Lock()
+	defer s.lifetime.Unlock()
 	if s.closed {
 		return
 	}

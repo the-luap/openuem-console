@@ -12,7 +12,13 @@ services:
     mem_limit: 128m
     restart: unless-stopped
     stop_grace_period: 15s
-    command: ['--config', '/run/openuem-acme/issuer.json']
+    command: [--config, /run/openuem-acme/issuer.json, --readiness-socket, /tmp/issuer.sock]
+    healthcheck:
+      test: [CMD, /openuem-acme, --config, /run/openuem-acme/issuer.json, --ready, --readiness-socket, /tmp/issuer.sock]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     tmpfs:
       - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=0700,uid=65532,gid=65532
     volumes:

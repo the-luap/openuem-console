@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The issuer now exposes [local renewal readiness](gateway-acme.md#local-renewal-readiness)
+  through a private Unix socket. It checks the live service's original directory
+  leases, retained installation UUID, paired bindings, original account key,
+  accessible inputs and valid published TLS without issuance or state changes.
+  Bounded connections/checks and joined shutdown preserve unexpected socket entries
+  and recover only a protected stale socket under the service leases. A valid
+  publication remains ready during an active or transiently failed network attempt;
+  missing keys, substituted bindings, changed leases and expired material fail.
+  Both Compose definitions configure the exact local probe as a Docker health
+  check, and the installer requires a positive result before completion. Native
+  race tests and six Linux socket/state tests pass; the real issuer/lego fixture
+  passes readiness, DNS-01, ARI renewal, gateway reload and joined shutdown.
+  Full fresh and interrupted installation acceptance also passes with the retained
+  issuer reporting healthy and the actual local probe returning readiness.
+- The [12cb474 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34557618416)
+  passes all four supplied/automatic TLS installation scenarios on Linux amd64 and
+  arm64, plus its Windows checks. Its [ACME workflow](https://github.com/the-luap/openuem-console/actions/runs/34557618441)
+  and [gateway workflow](https://github.com/the-luap/openuem-console/actions/runs/34557621103)
+  also pass.
 - Configuration version 2 of the [reference installer](reference-installation.md)
   now performs automatic DNS-01 setup with a reviewed local issuer image and
   protected provider inputs. Its offline input check has no writable mounts or
