@@ -50,7 +50,7 @@ try {
         [windowsRequests, 18],
         [windowsDispatch, 36],
         [windowsChecks, 42],
-        [windowsSources, 48],
+        [windowsSources, 51],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);
