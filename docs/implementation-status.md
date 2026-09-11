@@ -61,6 +61,38 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Windows software delivery now has matching reference PKI and worker pins.
+  The [broker migration](https://github.com/the-luap/openuem-cert-manager/blob/466c4b3170ef10bae3350ebff971d4e276b93fdf/docs/broker-upgrade.md)
+  adds the exact `software` grant from either supported preceding renderer,
+  preserves completed v1 journals and uses separate v2 records. Its
+  [native CI](https://github.com/the-luap/openuem-cert-manager/actions/runs/34591466304)
+  passes on Linux amd64/arm64 and Windows. Local broker/CLI/private-PKI race
+  tests and all three actual offline distribution scenarios also pass, retaining
+  service identities, JetStream messages and a durable consumer. The reference
+  maintenance controller accepts only the reviewed v2 deltas, retains completed
+  v1 maintenance history and rejects incomplete or altered prior operations.
+  Twelve maintenance and eighteen installation unit checks pass. The fresh
+  seven-service reference installer reaches authenticated readiness; its
+  interrupted bootstrap also recovers the retained database and console. Full
+  reference maintenance with the actual original initializer passes interrupted
+  upgrade recovery, broker recreation, retained queued commands, atomic public
+  TLS renewal, release admission and an authenticated device WSS worker request.
+  These are owned synthetic containers, not a deployment or endpoint acceptance.
+
+- [Native Windows boot evidence](https://github.com/the-luap/openuem-agent/blob/15044d8c1e0d2d17452d0b6321d9a1ae62953021/docs/windows-software-boot-evidence.md)
+  is retained in the protected software intent before admission. New work rejects
+  missing or changing evidence. Legacy intents remain readable with no invented
+  boot proof. The bounded reader combines the native loader boot sequence with
+  the System process creation value; a service restart or resumed kernel session
+  cannot establish a later boot merely by changing one component. Journal
+  reopen/retry preserves the original evidence, and parser fuzzing passes 764,547
+  local inputs. The full local agent/store/executor race suites, Windows
+  amd64/arm64 builds and focused vet pass. [Agent CI](https://github.com/the-luap/openuem-agent/actions/runs/34590356368)
+  passes on Linux, macOS and Windows, including the native Windows reader,
+  separate-process comparison and DPAPI journal tests without skips. No test
+  rebooted a physical endpoint. Signed post-boot reconciliation, reservation
+  release and physical restart/hibernate acceptance remain open.
+
 - [Explicit Windows software dispatch](windows-software-requests.md) joins the
   approved MSI/EXE catalog to the authenticated individual-agent channel. A fresh
   review binds exact device/scope, operation/revision, actor, certificate/recipient

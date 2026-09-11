@@ -88,14 +88,18 @@ inputs. Its optional release-image mode then invokes the actual
 manifest and non-executable package. That driver does not obtain public TLS or
 produce a natively signed installer.
 
-Use the broker initializer revision pinned by the console workflow. The separate
-container test exposed an older initializer grant without `hardware`, `recovery`
-and `rotation`; the current worker correctly rejects that configuration. Revision
-`e7525ad161cc06323e8cc7573f1d6525379d88a7` includes the current subjects and an exact
-grant regression test. The workflow now pins its successor
-`633bc7bb0dc34c1240a72a9df25c74ad19451885`, which also supplies the independent
-administrator root and a
-[reviewed broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/b06bac13bd0e72f306a87ed119d2f7be66a66063/docs/broker-upgrade.md).
+Use the broker initializer revision pinned by the console workflow. Current
+readiness and workers require the exact twelve-operation grant, including
+`hardware`, `recovery`, `rotation` and `software`. The initializer pin
+`466c4b3170ef10bae3350ebff971d4e276b93fdf` uses shared protocol `de9cd6f67c5e`,
+retains the independent administrator root, and supplies the
+[reviewed broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/466c4b3170ef10bae3350ebff971d4e276b93fdf/docs/broker-upgrade.md).
+The worker pin `a9886d2135f6b00c294fc8014650fcfb596463d2` includes authenticated
+Windows software delivery. The prior PKI pin generated only eleven operations;
+its missing software grant failed the current authenticated readiness probe.
+Version 2 accepts only the exact original eight-operation or preceding
+eleven-operation configuration and preserves completed v1 migration records.
+Incomplete v1 migrations must first be resumed with their original distribution.
 The reference runner invokes its read-only preview against freshly generated
 configuration and requires an exact unchanged result before starting services.
 The separate upgrade distribution test runs the actual previous initializer and

@@ -17,8 +17,8 @@ sibling checkouts are excluded. The images have no shell or system CA bundle.
 The build does not publish images or change a running installation.
 
 The individual worker's separate image is built by the worker repository at
-[revision 4a5462e](https://github.com/the-luap/openuem-worker/commit/4a5462e832d9896816a7759af9a9a9453fc302c9).
-See its [container operations guide](https://github.com/the-luap/openuem-worker/blob/4a5462e832d9896816a7759af9a9a9453fc302c9/docs/individual-container.md).
+[revision a9886d2](https://github.com/the-luap/openuem-worker/commit/a9886d2135f6b00c294fc8014650fcfb596463d2).
+See its [container operations guide](https://github.com/the-luap/openuem-worker/blob/a9886d2135f6b00c294fc8014650fcfb596463d2/docs/individual-container.md).
 
 ## Runtime inputs
 

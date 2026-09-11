@@ -18,6 +18,65 @@ class ProtectedMetadata(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = pathlib.Path(self.temporary.name)
 
+    def test_broker_preview_accepts_only_reviewed_software_migrations(self):
+        operation = self.operation()
+        operation.setup = "synthetic-private-pki"
+        plan = {"version": 2, "before_sha256": "a" * 64, "after_sha256": "b" * 64,
+                "change_required": True, "added_worker_requests": ["software"]}
+        operation.job = lambda *args: json.dumps(plan)
+        for additions in (["software"], ["hardware", "recovery", "rotation", "software"]):
+            plan["added_worker_requests"] = additions
+            self.assertEqual(operation.broker_plan(), plan)
+        plan.update(after_sha256="a" * 64, change_required=False, added_worker_requests=[])
+        self.assertEqual(operation.broker_plan(), plan)
+        baseline = dict(plan)
+        for mutation in ({"version": 1}, {"version": 2.0}, {"version": True}, {"change_required": 0},
+                         {"before_sha256": None}, {"after_sha256": "B" * 64},
+                         {"after_sha256": "b" * 64}, {"extra": "field"},
+                         {"change_required": True, "added_worker_requests": ["software"]},
+                         {"change_required": True, "after_sha256": "b" * 64, "added_worker_requests": ["hardware", "recovery", "rotation"]},
+                         {"change_required": True, "after_sha256": "b" * 64, "added_worker_requests": ["software", ">"]},
+                         {"change_required": True, "after_sha256": "b" * 64, "added_worker_requests": ["software", "hardware", "recovery", "rotation"]}):
+            with self.subTest(mutation=mutation):
+                plan = baseline | mutation
+                with self.assertRaises(maintenance.MaintenanceError):
+                    operation.broker_plan()
+
+    def test_software_migration_retains_completed_preceding_maintenance(self):
+        operation = self.operation()
+        operation.args = types.SimpleNamespace(project_name="synthetic-project")
+        operation.check_preceding_maintenance()
+        state = self.root / "maintenance" / maintenance.PRECEDING_OPERATION
+        state.mkdir(parents=True, mode=0o700)
+        state.parent.chmod(0o700)
+        definition = {"synthetic": "previous frozen definition"}
+        record = {"version": 1, "operation": maintenance.PRECEDING_OPERATION,
+                  "binding": {"state": str(self.root), "project": "synthetic-project", "configuration": maintenance.digest(definition)},
+                  "containers": {}, "broker": {}}
+        record["review_sha256"] = maintenance.Maintenance.review_hash(record)
+        maintenance.write_record(state / "review.json", record)
+        maintenance.write_record(state / "compose.json", {"version": 1, "review_sha256": record["review_sha256"], "compose": definition})
+        (state / "lease").touch(mode=0o600)
+        for index, name in enumerate(maintenance.STEPS):
+            with self.assertRaises(maintenance.MaintenanceError):
+                operation.check_preceding_maintenance()
+            maintenance.write_record(state / (str(index + 1) + "-" + name + ".json"),
+                                     {"version": 1, "review_sha256": record["review_sha256"], "step": name})
+        before = {path.name: path.read_bytes() for path in state.iterdir()}
+        operation.check_preceding_maintenance()
+        self.assertEqual({path.name: path.read_bytes() for path in state.iterdir()}, before)
+        self.assertNotEqual(maintenance.OPERATION, maintenance.PRECEDING_OPERATION)
+        for name in before:
+            if name == "lease":
+                continue
+            with self.subTest(name=name):
+                path = state / name
+                path.write_bytes(b'{}')
+                with self.assertRaises(maintenance.MaintenanceError):
+                    operation.check_preceding_maintenance()
+                self.assertEqual(path.read_bytes(), b'{}')
+                path.write_bytes(before[name])
+
     def test_rendered_compose_values_preserve_literal_dollars_and_mapping_keys(self):
         rendered = {"command": ["Reference $$Literal $$$$Budget $${HOME}"],
                     "environment": {"UNCHANGED$$KEY": "$$VALUE"}, "read_only": True, "entrypoint": None}

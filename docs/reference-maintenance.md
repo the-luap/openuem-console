@@ -3,8 +3,9 @@
 [`scripts/maintain-reference-broker.py`](../scripts/maintain-reference-broker.py)
 reviews and resumes the known worker-grant migration in an existing
 [seven-service reference project](reference-composition.md). It adds the
-`hardware`, `recovery` and `rotation` request subscriptions through the PKI
-component's [retained broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/b06bac13bd0e72f306a87ed119d2f7be66a66063/docs/broker-upgrade.md).
+`software` request subscription and, where absent, `hardware`, `recovery` and
+`rotation` through the PKI component's
+[retained broker upgrade](https://github.com/the-luap/openuem-cert-manager/blob/466c4b3170ef10bae3350ebff971d4e276b93fdf/docs/broker-upgrade.md).
 The database keeps running. Application services and the gateway have a planned
 interruption; the broker container is recreated against the reviewed local image
 and the same persistent JetStream directory.
@@ -91,7 +92,7 @@ here, not a claim that every Docker restart leaves an old file mounted.
 ## Interruption and retained state
 
 The state directory is
-`OPENUEM_REFERENCE_STATE/maintenance/broker-worker-grant-v1/`. It contains a
+`OPENUEM_REFERENCE_STATE/maintenance/broker-worker-grant-v2/`. It contains a
 private review, frozen Compose model, OS lease and six ordered completion
 markers. Files are created exclusively, synchronized and never overwritten;
 directories use mode 0700 and files mode 0600. Treat the rendered model as private
@@ -99,6 +100,14 @@ deployment metadata even though raw database URL and encryption-key settings are
 refused. The PKI
 component retains its own configuration backup and migration journal separately
 under `broker/state`.
+
+A completed `broker-worker-grant-v1` maintenance directory remains untouched.
+The controller verifies its retained review, frozen definition and all six
+completion markers before beginning the separate software migration. Incomplete
+or changed v1 history is rejected. Resume an interrupted v1 operation with its
+original console controller, pinned PKI distribution and reviewed inputs first;
+then request a fresh v2 review. The v2 controller never overwrites the old review
+or reports its incomplete operation as complete.
 
 After interruption, repeat the same invocation and original review digest.
 Completed steps remain durable, and the controller resumes before declaring

@@ -31,7 +31,8 @@ NETWORKS = {"database": {"data"}, "broker": {"messaging", "broker_backend"},
             "authorization": {"data", "messaging"}, "commands": {"data", "messaging"},
             "worker": {"data", "messaging"}, "gateway": {"edge", "console_backend", "broker_backend"}}
 STEPS = ("clients-stopped", "broker-stopped", "configuration-applied", "broker-started", "services-ready", "complete")
-OPERATION = "broker-worker-grant-v1"
+OPERATION = "broker-worker-grant-v2"
+PRECEDING_OPERATION = "broker-worker-grant-v1"
 
 
 def encoded(value):
@@ -226,6 +227,7 @@ class Maintenance:
         self.root = broker_path.parents[2].resolve(strict=True)
         root_info = private(self.root, True)
         self.root_identity = (root_info.st_dev, root_info.st_ino)
+        self.check_preceding_maintenance()
         self.state = self.root / "maintenance" / OPERATION
         if self.state.exists() or self.state.is_symlink():
             private(self.root / "maintenance", True)
@@ -278,6 +280,30 @@ class Maintenance:
     @staticmethod
     def review_hash(record):
         return digest({key: value for key, value in record.items() if key != "review_sha256"})
+
+    def check_preceding_maintenance(self):
+        state = self.root / "maintenance" / PRECEDING_OPERATION
+        if not state.exists() and not state.is_symlink():
+            return
+        private(state.parent, True)
+        private(state, True)
+        wanted = {"review.json", "compose.json", "lease"} | {str(index + 1) + "-" + name + ".json" for index, name in enumerate(STEPS)}
+        if {item.name for item in state.iterdir()} != wanted:
+            raise MaintenanceError("preceding maintenance must be completed with its original controller and reviewed inputs")
+        private(state / "lease")
+        record = read_record(state / "review.json")
+        if record is None or set(record) != {"version", "operation", "binding", "containers", "broker", "review_sha256"} or type(record["version"]) is not int or record["version"] != 1 or record["operation"] != PRECEDING_OPERATION or self.review_hash(record) != record["review_sha256"]:
+            raise MaintenanceError("preceding maintenance review is incomplete or changed")
+        binding = record["binding"]
+        if type(binding) is not dict or binding.get("state") != str(self.root) or binding.get("project") != self.args.project_name:
+            raise MaintenanceError("preceding maintenance belongs to another installation")
+        snapshot = read_record(state / "compose.json")
+        if snapshot is None or set(snapshot) != {"version", "review_sha256", "compose"} or snapshot["version"] != 1 or snapshot["review_sha256"] != record["review_sha256"] or digest(snapshot["compose"]) != binding.get("configuration"):
+            raise MaintenanceError("preceding maintenance definition is incomplete or changed")
+        for index, name in enumerate(STEPS):
+            marker = read_record(state / (str(index + 1) + "-" + name + ".json"))
+            if marker != {"version": 1, "review_sha256": record["review_sha256"], "step": name}:
+                raise MaintenanceError("preceding maintenance must be completed with its original controller and reviewed inputs")
 
     def read_steps(self):
         present = []
@@ -429,10 +455,10 @@ class Maintenance:
     def broker_plan(self):
         plan = decode(self.job("broker configuration preview", self.setup, "none", mount(self.root / "broker/state", "/broker"),
                                ["individual-broker-upgrade", "--directory", "/broker", "--check"]))
-        if set(plan) != {"version", "before_sha256", "after_sha256", "change_required", "added_worker_requests"} or plan["version"] != 1 or not all(re.fullmatch(r"[0-9a-f]{64}", plan[name]) for name in ("before_sha256", "after_sha256")):
+        if set(plan) != {"version", "before_sha256", "after_sha256", "change_required", "added_worker_requests"} or type(plan["version"]) is not int or plan["version"] != 2 or not all(type(plan[name]) is str and re.fullmatch(r"[0-9a-f]{64}", plan[name]) for name in ("before_sha256", "after_sha256")):
             raise MaintenanceError("unsupported broker upgrade preview")
-        additions = ["hardware", "recovery", "rotation"] if plan["change_required"] else []
-        if type(plan["change_required"]) is not bool or plan["added_worker_requests"] != additions:
+        additions = (["software"], ["hardware", "recovery", "rotation", "software"]) if plan["change_required"] else ([],)
+        if type(plan["change_required"]) is not bool or plan["added_worker_requests"] not in additions or plan["change_required"] != (plan["before_sha256"] != plan["after_sha256"]):
             raise MaintenanceError("broker migration changes an unsupported permission boundary")
         return plan
 
@@ -535,6 +561,7 @@ class Maintenance:
             return {"status": "already-complete", "review_sha256": expected}
         if not self.record["broker"]["change_required"]:
             return {"status": "unchanged", "review_sha256": expected}
+        self.check_preceding_maintenance()
         ensure_directory(self.root / "maintenance")
         info = ensure_directory(self.state)
         self.state_identity = (info.st_dev, info.st_ino)

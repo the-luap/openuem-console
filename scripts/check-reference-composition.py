@@ -108,9 +108,9 @@ def main():
                                          *mount(root / "broker/state", "/broker"), args.pki_image,
                                          "individual-broker-upgrade", "--directory", "/broker", "--check").stdout)
         if args.legacy_broker_image:
-            if not broker_plan["change_required"] or broker_plan["before_sha256"] != broker_digest or broker_plan["added_worker_requests"] != ["hardware", "recovery", "rotation"]:
+            if broker_plan["version"] != 2 or not broker_plan["change_required"] or broker_plan["before_sha256"] != broker_digest or broker_plan["added_worker_requests"] != ["hardware", "recovery", "rotation", "software"]:
                 raise RuntimeError("the actual legacy broker setup did not require the supported migration")
-        elif broker_plan != {"version": 1, "before_sha256": broker_digest, "after_sha256": broker_digest,
+        elif broker_plan != {"version": 2, "before_sha256": broker_digest, "after_sha256": broker_digest,
                            "change_required": False, "added_worker_requests": []}:
             raise RuntimeError("fresh broker configuration unexpectedly requires a migration")
         protected(root / "pg_hba.conf", "local all all trust\nhostssl all all all scram-sha-256\nhostnossl all all all reject\n")
