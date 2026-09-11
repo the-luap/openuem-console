@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The legacy network-adapter page now renders reported DNS servers/domain as
+  visible escaped text. The owned browser fixture reproduces the old HTML-tooltip
+  interpretation and verifies that neither injected elements nor its harmless
+  script marker survive the correction. A keyboard-focusable table region also
+  fixes measured 390/768-pixel overflow. Computer-view race tests and all twelve
+  network browser cases pass; the complete browser matrix now contains 333 passing
+  cases. Server-administrator route authority is unchanged. See
+  [desktop network rendering evidence](desktop-network-inventory.md).
+
 - Native Windows package replacement and staging cleanup now pass on both
   architectures at agent `9f2a102`. The owned MSI major upgrade proves exact
   old/new product state, removal of the old registry payload, an already-current

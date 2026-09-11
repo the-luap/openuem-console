@@ -133,7 +133,7 @@ jobs:
       - name: Compile protocol and console tests before long database checks
         run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
       - name: Render synthetic console states before database regression
-        run: go test -race -count=1 ./internal/views/mdm_views ./internal/views/windows_views ./internal/views/desktop_views
+        run: go test -race -count=1 ./internal/views/mdm_views ./internal/views/windows_views ./internal/views/desktop_views ./internal/views/computers_views
         env:
           APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui
       - name: Preserve synthetic console renderings for browser checks
