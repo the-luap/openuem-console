@@ -108,6 +108,16 @@ increments roll back if auditing fails. The page shows the latest 25 changes;
 records are retained. Binding changes do not claim atomic revocation of an
 already admitted or in-progress session.
 
+Every successful OIDC callback starts a fresh session, including a repeat login
+to the same account. Previous second-factor and password-recovery flags are
+cleared, and the previous session token is retired. Local second-factor checks
+must be completed again when required by the account. The authenticated cookie
+is written only after session-owner association and login confirmation succeed.
+On failure, authentication values are cleared before bounded session cleanup,
+so a cleanup error or the session middleware's later save cannot issue the
+failed account's authenticated session. This is failure-safe admission, not a
+single transaction spanning the session store and all account operations.
+
 Provider-specific production configuration, actual IdP acceptance and the other
 SSO/SEC-01 requirements remain open.
 
@@ -128,3 +138,7 @@ exercise administrator-only reads/mutations, CSRF, confirmation, stale forms,
 provider changes and redacted deletion failures. Browser tests cover unlinked,
 active, disabled, ineligible, long and disabled-provider states at 390/768/1440
 pixels, including keyboard confirmation and exact hidden account/provider fields.
+Owned regression fixtures also reproduce and reject inherited 2FA/recovery flags
+and authenticated sessions after owner-association or confirmation failures.
+The fixed cases cover both account switching and reauthentication, old-token
+retirement, and injected session-store and cleanup failures.

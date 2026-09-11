@@ -448,36 +448,48 @@ func ReadOIDCCookie(c echo.Context, name string, secretKey string) (string, erro
 	return value, nil
 }
 
-func (h *Handler) CreateSession(c echo.Context, user *ent.User) error {
-	msg := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if msg != user.ID {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
+// CreateSession establishes a fresh OpenID session. Never inherit another
+// account's second-factor or recovery flags, even when reauthenticating the same
+// local account. Cookies are issued only after admission bookkeeping succeeds.
+func (h *Handler) CreateSession(c echo.Context, user *ent.User) (err error) {
+	ctx := c.Request().Context()
+	sm := h.SessionManager.Manager
+	defer func() {
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			// Clear in-memory authentication before attempting storage cleanup. The
+			// outer session middleware may retry a commit when rendering this error.
+			_ = sm.Clear(ctx)
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			defer cancel()
+			if cleanupErr := sm.Destroy(cleanup); cleanupErr != nil {
+				log.Print("[ERROR]: could not remove failed OpenID session")
+			}
 		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-		if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
-		// if it's the first time let's confirm login
-		if err := h.Model.ConfirmLogIn(user.ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
+	}()
+	if err = sm.Clear(ctx); err != nil {
+		return err
 	}
-
+	if err = sm.RenewToken(ctx); err != nil {
+		return err
+	}
+	sm.Put(ctx, "uid", user.ID)
+	sm.Put(ctx, "username", user.Name)
+	sm.Put(ctx, "user-agent", c.Request().UserAgent())
+	sm.Put(ctx, "ip-address", c.Request().RemoteAddr)
+	sm.Put(ctx, "usepasswd", user.Passwd)
+	sm.Put(ctx, "email", user.Email)
+	sm.Put(ctx, "twofa", false)
+	token, expiry, err := sm.Commit(ctx)
+	if err != nil {
+		return err
+	}
+	if err = h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
+		return err
+	}
+	if err = h.Model.ConfirmLogIn(user.ID); err != nil {
+		return err
+	}
+	sm.WriteSessionCookie(ctx, c.Response().Writer, token, expiry)
 	return nil
 }
 

@@ -247,6 +247,19 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 	e.GET("/oidc", h.OIDCLogIn)
 	e.GET("/oidc/callback", h.OIDCCallback)
 	e.GET("/fixture/session", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) })
+	e.GET("/fixture/old-session", func(c echo.Context) error {
+		uid := "password-victim"
+		if c.QueryParam("same") == "yes" {
+			uid = "oidc-reader"
+		}
+		sm.Put(c.Request().Context(), "uid", uid)
+		sm.Put(c.Request().Context(), "twofa", true)
+		sm.Put(c.Request().Context(), "forgot", true)
+		return c.NoContent(200)
+	})
+	e.GET("/fixture/old-flags", func(c echo.Context) error {
+		return c.JSON(200, map[string]bool{"twofa": sm.GetBool(c.Request().Context(), "twofa"), "forgot": sm.GetBool(c.Request().Context(), "forgot")})
+	})
 	type browser map[string]*http.Cookie
 	request := func(b browser, path string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -434,5 +447,65 @@ func TestOIDCConsoleWithPostgresAndOwnedTLSProvider(t *testing.T) {
 		if rec.Code < 400 || before != after || request(b, "/fixture/session").Body.String() != "" || b[oidcFlowCookie] != nil {
 			t.Fatal("invalid flow continued to the provider or session", mode, rec.Code, before, after)
 		}
+	}
+	configure("authelia")
+	t.Run("account switch clears previous authentication", func(t *testing.T) {
+		for _, path := range []string{"/fixture/old-session", "/fixture/old-session?same=yes"} {
+			b := browser{}
+			if rec := request(b, path); rec.Code != 200 {
+				t.Fatal(rec.Code)
+			}
+			old := browser{}
+			for name, cookie := range b {
+				copy := *cookie
+				old[name] = &copy
+			}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal(rec.Code)
+			}
+			var flags map[string]bool
+			if err := json.Unmarshal(request(b, "/fixture/old-flags").Body.Bytes(), &flags); err != nil || flags["twofa"] || flags["forgot"] {
+				t.Fatal("new OpenID sign-in inherited another account's authentication flags", flags, err)
+			}
+			if uid := request(old, "/fixture/session").Body.String(); uid != "" {
+				t.Fatal("previous session remained authenticated after OpenID sign-in", uid)
+			}
+		}
+	})
+	for _, target := range []string{"owner", "confirmation", "cleanup", "store"} {
+		t.Run("failed session "+target, func(t *testing.T) {
+			table, event := "sessions", "UPDATE OF user_sessions"
+			if target == "confirmation" {
+				table, event = "users", "UPDATE OF register"
+			}
+			if target == "store" {
+				event = "INSERT"
+			}
+			if _, err := m.DB.Exec(`CREATE FUNCTION fail_oidc_admission() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned admission failure'; END $$; CREATE TRIGGER fail_oidc_admission BEFORE ` + event + ` ON ` + table + ` FOR EACH ROW EXECUTE FUNCTION fail_oidc_admission()`); err != nil {
+				t.Fatal(err)
+			}
+			if target == "cleanup" {
+				if _, err := m.DB.Exec(`CREATE TRIGGER fail_oidc_cleanup BEFORE DELETE ON sessions FOR EACH ROW EXECUTE FUNCTION fail_oidc_admission()`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			defer func() {
+				if target == "cleanup" {
+					if _, err := m.DB.Exec(`DROP TRIGGER fail_oidc_cleanup ON sessions`); err != nil {
+						t.Error(err)
+					}
+				}
+				if _, err := m.DB.Exec(`DROP TRIGGER fail_oidc_admission ON ` + table + `; DROP FUNCTION fail_oidc_admission()`); err != nil {
+					t.Error(err)
+				}
+			}()
+			b := browser{}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code < 400 {
+				t.Fatal("failed admission returned success", rec.Code)
+			}
+			if uid := request(b, "/fixture/session").Body.String(); uid != "" {
+				t.Fatal("failed admission issued an authenticated session", uid)
+			}
+		})
 	}
 }
