@@ -254,6 +254,17 @@ docker run --rm --network none --dns 127.0.0.1 --read-only --cap-drop ALL \
 
 The [dedicated workflow](../.github/workflows/acme-issuer.yml) runs this fixture
 on native Linux amd64 and arm64 and requires an explicit test pass, not a skip.
+It runs both default and forced authorization reuse with the test-only
+`OPENUEM_ACME_TEST_AUTHZ_REUSE=0`/`100` setting. Initial issuance must demonstrate
+real DNS validation and complete TXT cleanup. Renewal must replace the certificate
+and gateway TLS pair while retaining the account and cleaning every new challenge,
+but the CA may reuse an already valid authorization. Pebble's pinned comparison
+permits a 1% reuse case even at zero; requiring a second challenge made the earlier
+test nondeterministic. The forced-reuse case now proves renewal without another
+DNS presentation. Both isolated container modes pass locally in 4.59/9.23 seconds,
+and issuer race tests pass in 8.901 seconds.
+[Pinned authorization reuse behavior](https://github.com/letsencrypt/pebble/blob/v2.10.1/wfe/wfe.go#L1565).
+
 It also runs `scripts/check-reference-acme.py` with separate issuer and
 Pebble/provider containers on a uniquely named internal Docker network. That
 fixture verifies real DNS-01 requests and TXT cleanup across the network,

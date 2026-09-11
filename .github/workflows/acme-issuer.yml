@@ -59,15 +59,18 @@ jobs:
           docker build -f Dockerfile.acme --target smoke -t acme-smoke:check .
           OPENUEM_ACME_IMAGE=acme-runtime:check OPENUEM_ACME_ROOT=/tmp/acme-config-check \
             docker compose -f deploy/acme/compose.yaml config --quiet
-      - name: Verify real DNS-01 and renewal with no external networking
+      - name: Verify real DNS-01 and renewal with optional authorization reuse
         run: |
           set -euo pipefail
-          docker run --rm --network none --dns 127.0.0.1 --read-only --cap-drop ALL \
-            --security-opt no-new-privileges --pids-limit 128 --memory 256m \
-            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=32m \
-            --env OPENUEM_ACME_TEST_BINARY=/openuem-acme \
-            acme-smoke:check | tee acme-smoke.log
-          grep -q '^--- PASS: TestACMEContainerDNS01 ' acme-smoke.log
+          for reuse in 0 100; do
+            docker run --rm --network none --dns 127.0.0.1 --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 128 --memory 256m \
+              --tmpfs /tmp:rw,nosuid,nodev,noexec,size=32m \
+              --env OPENUEM_ACME_TEST_BINARY=/openuem-acme \
+              --env OPENUEM_ACME_TEST_AUTHZ_REUSE="$reuse" \
+              acme-smoke:check | tee "acme-smoke-$reuse.log"
+            grep -q '^--- PASS: TestACMEContainerDNS01 ' "acme-smoke-$reuse.log"
+          done
       - name: Verify DNS-01 across separate issuer and provider containers
         run: python3 scripts/check-reference-acme.py acme-smoke:check
       - name: Check the image has no listeners, test server or credentials

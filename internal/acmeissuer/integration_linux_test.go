@@ -42,6 +42,13 @@ func TestACMEContainerDNS01(t *testing.T) {
 	if binaryPath == "" {
 		t.Skip("requires the isolated ACME smoke container")
 	}
+	reuse := os.Getenv("OPENUEM_ACME_TEST_AUTHZ_REUSE")
+	if reuse == "" {
+		reuse = "0"
+	}
+	if reuse != "0" && reuse != "100" {
+		t.Fatal("owned authorization reuse must be default or forced")
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 75*time.Second)
 	defer cancel()
 	c, _ := fixtureConfig(t)
@@ -75,7 +82,7 @@ func TestACMEContainerDNS01(t *testing.T) {
 	pebblePath := filepath.Join(base, "pebble.json")
 	writeFixture(t, pebblePath, pebbleConfig)
 	pebble := exec.CommandContext(ctx, "/pebble", "-config", pebblePath, "-dnsserver", "127.0.0.1:53")
-	pebble.Env = []string{"PEBBLE_VA_NOSLEEP=1", "PEBBLE_AUTHZREUSE=0", "PEBBLE_WFE_NONCEREJECT=0"}
+	pebble.Env = []string{"PEBBLE_VA_NOSLEEP=1", "PEBBLE_AUTHZREUSE=" + reuse, "PEBBLE_WFE_NONCEREJECT=0"}
 	pebble.Stdout, pebble.Stderr = io.Discard, io.Discard
 	if err := pebble.Start(); err != nil {
 		t.Fatal(err)
@@ -164,6 +171,12 @@ func TestACMEContainerDNS01(t *testing.T) {
 		t.Fatal("real DNS-01 issuance failed", err)
 	}
 	first := readFixtureGeneration(t, c)
+	dns.mu.Lock()
+	firstPresent, firstCleanup, firstTXT, firstRecords := dns.present, dns.cleanup, dns.txt, len(dns.records)
+	dns.mu.Unlock()
+	if firstPresent < 1 || firstCleanup != firstPresent || firstTXT < 4 || firstRecords != 0 {
+		t.Fatal("initial issuance did not validate and clean real DNS challenges", firstPresent, firstCleanup, firstTXT, firstRecords)
+	}
 	if !reflect.DeepEqual(account, accountFingerprints(t, c.StateDirectory)) {
 		t.Fatal("retry replaced the ACME account")
 	}
@@ -282,8 +295,15 @@ func TestACMEContainerDNS01(t *testing.T) {
 	service.Close()
 	dns.mu.Lock()
 	defer dns.mu.Unlock()
-	if dns.present < 2 || dns.cleanup < 2 || dns.txt < 4 || len(dns.records) != 0 {
-		t.Fatal("real issuance and renewal must validate and clean DNS challenges", dns.present, dns.cleanup, dns.txt, len(dns.records))
+	// A CA may reuse the initial valid authorization for renewal. Pebble 2.10.1
+	// compares rand.Intn(100) > reusePercent, so even zero permits a 1% reuse case.
+	// Require real initial validation and cleanup of every presented challenge;
+	// certificate replacement, account retention and gateway reload were proven above.
+	if dns.present < firstPresent || dns.cleanup != dns.present || dns.txt < firstTXT || len(dns.records) != 0 {
+		t.Fatal("renewal lost DNS evidence or retained a presented challenge", dns.present, dns.cleanup, dns.txt, len(dns.records))
+	}
+	if reuse == "100" && dns.present != firstPresent {
+		t.Fatal("forced authorization reuse unexpectedly presented another challenge")
 	}
 	if err := filepath.WalkDir(c.PublicationDirectory, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {

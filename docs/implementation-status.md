@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- ACME renewal fixtures now verify both default and forced reuse of an existing
+  valid authorization. This fixes a false failure caused by pinned Pebble allowing
+  1% reuse even at zero, while retaining actual initial DNS validation, cleanup,
+  ARI renewal, account identity and gateway TLS replacement assertions. Both
+  isolated, network-disabled modes pass in 4.59/9.23 seconds; issuer race tests
+  pass in 8.901 seconds. See [ACME fixture evidence](gateway-acme.md).
+
 - Explicit `windows-burn` plans now bind the required metadata proof into signed
   intent. The shared protocol requires the capability in a new device-signed
   recipient registration before task sealing. Legacy wire encodings and retained
