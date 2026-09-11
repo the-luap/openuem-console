@@ -5,11 +5,11 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/invopop/ctxi18n"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/views/account_views"
+	"github.com/open-uem/openuem-console/internal/views/locales"
 )
 
 const accountLanguageKey = "openuem.account.language"
@@ -39,7 +39,7 @@ func (h *Handler) UserLocale(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		language := h.accountLanguage(c)
 		if !language.Unavailable && language.Selected != "" {
-			ctx, err := ctxi18n.WithLocale(c.Request().Context(), language.Selected)
+			ctx, err := locales.WithLocale(c.Request().Context(), language.Selected)
 			if err == nil {
 				c.SetRequest(c.Request().WithContext(ctx))
 			}

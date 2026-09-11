@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -22,10 +21,10 @@ import (
 
 func auditViewTestContext(t *testing.T) (context.Context, echo.Context, *partials.CommonInfo) {
 	t.Helper()
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
-	ctx, err := ctxi18n.WithLocale(t.Context(), "en")
+	ctx, err := locales.WithLocale(t.Context(), "en")
 	if err != nil {
 		t.Fatal(err)
 	}

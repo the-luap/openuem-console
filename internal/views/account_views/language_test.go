@@ -21,10 +21,10 @@ import (
 )
 
 func TestAccountLanguageViewsUseCatalogFallbackAndResponsiveProfile(t *testing.T) {
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
-	ctx, err := ctxi18n.WithLocale(context.Background(), "en")
+	ctx, err := locales.WithLocale(context.Background(), "en")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestAccountLanguageViewsUseCatalogFallbackAndResponsiveProfile(t *testing.T
 		if !preferences.ValidLanguage(code) {
 			t.Fatal("unsupported fixture language")
 		}
-		localized, err := ctxi18n.WithLocale(ctx, code)
+		localized, err := locales.WithLocale(ctx, code)
 		if err != nil {
 			t.Fatal(err)
 		}

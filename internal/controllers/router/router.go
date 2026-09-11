@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	session "github.com/canidam/echo-scs-session"
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	mw "github.com/labstack/echo/v4/middleware"
 	"github.com/open-uem/openuem-console/internal/controllers/router/middleware"
@@ -36,7 +35,7 @@ func New(s *sessions.SessionManager, server, port, maxUploadSize string) *echo.E
 	faviconHandler(e, assetsPath)
 
 	// Add i18n middleware
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		log.Fatalf("[FATAL]: could not load translations: %v", err)
 	}
 	e.Use(middleware.GetLocale)

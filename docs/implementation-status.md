@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Language catalogs](account-language.md) now decode strings before constructing
+  translation dictionaries, fixing visible JSON escapes in ampersands, quotes,
+  control characters and Unicode. Catalog loading runs once, validates string
+  leaves and preserves English fallback, plural rules and interpolation inputs.
+  All runtime and fixture locale selection uses the same immutable catalog.
+  Catalog, view and router race tests pass; actual Linux ARM64 routes exercise
+  persisted account preferences with production sessions and CSRF. The full
+  console build and all 600 browser cases pass, including the correctly decoded
+  and HTML-escaped management label in every bundled locale. This fixes catalog
+  loading; complete translation coverage and broader UX-01 acceptance stay open.
+
 - Shared management links now use a native **Management pages** disclosure,
   initially closed, while current inventory tabs remain visible. Existing scope
   targets and role-specific links are retained. All view race suites pass,

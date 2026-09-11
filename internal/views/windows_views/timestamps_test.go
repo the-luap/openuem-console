@@ -10,18 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/invopop/ctxi18n"
 	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 )
 
 func TestWindowsTimestampsPreserveSchedulingPrecision(t *testing.T) {
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
 	for _, language := range preferences.Languages() {
-		ctx, err := ctxi18n.WithLocale(context.Background(), language.Code)
+		ctx, err := locales.WithLocale(context.Background(), language.Code)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
@@ -21,12 +20,12 @@ import (
 )
 
 func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing.T) {
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
 	for _, language := range preferences.Languages() {
 		for _, role := range []access.Role{access.Viewer, access.Operator, access.TenantAdmin, access.Administrator} {
-			ctx, err := ctxi18n.WithLocale(context.Background(), language.Code)
+			ctx, err := locales.WithLocale(context.Background(), language.Code)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -52,6 +51,9 @@ func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing
 			html := body.String()
 			if !strings.Contains(html, "Management pages") || !strings.Contains(html, `aria-label="Management pages"`) || strings.Contains(html, "management_navigation.") {
 				t.Fatal("navigation catalog fallback missing", language.Code, role)
+			}
+			if !strings.Contains(html, "Apple setup &amp; enrollment") || strings.Contains(html, `\u0026`) {
+				t.Fatal("catalog text was not decoded before HTML escaping", language.Code, role)
 			}
 			if strings.Contains(html, `/tenant/1/site/1/deploy"`) != (role == access.Administrator) {
 				t.Fatal("legacy deployment navigation authority changed", role)

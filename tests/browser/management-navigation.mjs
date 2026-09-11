@@ -19,7 +19,7 @@ export default async function run(browser, record) {
       check(opened.outline!=='none' && opened.width>0,'Keyboard disclosure focus is not visible');
       const expected={
         'Approved software':'/software/catalog','All devices':'/devices','Apple profiles':'/ios/configurations',
-        'Apple setup and enrollment':'/ios/setup','Desktop enrollment':'/desktop/enrollment','Native Windows management':'/windows',
+        'Apple setup & enrollment':'/ios/setup','Desktop enrollment':'/desktop/enrollment','Native Windows management':'/windows',
       };
       if(role==='administrator'){
         expected['Windows software deployment']='/deploy';expected['Windows profiles']='/profiles';

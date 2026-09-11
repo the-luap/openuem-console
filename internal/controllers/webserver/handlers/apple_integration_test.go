@@ -29,7 +29,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/google/uuid"
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/agent"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
@@ -105,10 +104,10 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if err = store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err = ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err = locales.Load(); err != nil {
 		t.Fatal(err)
 	}
-	ctx, err = ctxi18n.WithLocale(ctx, "en")
+	ctx, err = locales.WithLocale(ctx, "en")
 	if err != nil {
 		t.Fatal(err)
 	}

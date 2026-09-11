@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
@@ -21,10 +20,10 @@ import (
 )
 
 func TestMemoryViewsPreserveLiteralReportsAndReadOnlySearch(t *testing.T) {
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
-	ctx, err := ctxi18n.WithLocale(context.Background(), "en")
+	ctx, err := locales.WithLocale(context.Background(), "en")
 	if err != nil {
 		t.Fatal(err)
 	}

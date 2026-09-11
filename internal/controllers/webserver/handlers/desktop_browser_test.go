@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/invopop/ctxi18n"
 	"github.com/labstack/echo/v4"
 	consolemiddleware "github.com/open-uem/openuem-console/internal/controllers/router/middleware"
+	"github.com/open-uem/openuem-console/internal/views/locales"
 )
 
 // This opt-in loopback TLS fixture shares the isolated database created by the
@@ -45,7 +45,7 @@ func runConsoleBrowserFixture(t *testing.T, h *Handler, ctx context.Context, pat
 	e := echo.New()
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			requestCtx, err := ctxi18n.WithLocale(c.Request().Context(), "en")
+			requestCtx, err := locales.WithLocale(c.Request().Context(), "en")
 			if err != nil {
 				return err
 			}

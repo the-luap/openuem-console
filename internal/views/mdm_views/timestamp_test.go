@@ -10,20 +10,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/invopop/ctxi18n"
 	"github.com/open-uem/openuem-console/internal/preferences"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 )
 
 func TestTimestampsRetainUTCAndMissingEvidenceWithoutJavaScript(t *testing.T) {
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		t.Fatal(err)
 	}
 	offset := time.Date(2026, 1, 2, 8, 34, 56, 0, time.FixedZone("Fixture offset", 19800))
 	before := time.Date(2026, 3, 29, 0, 30, 0, 0, time.UTC)
 	after := before.Add(time.Hour)
 	for _, language := range preferences.Languages() {
-		ctx, err := ctxi18n.WithLocale(context.Background(), language.Code)
+		ctx, err := locales.WithLocale(context.Background(), language.Code)
 		if err != nil {
 			t.Fatal(err)
 		}

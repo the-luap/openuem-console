@@ -6,7 +6,7 @@ en:
     windows_deployment: "Windows software deployment"
     windows_profiles: "Windows profiles"
     apple_profiles: "Apple profiles"
-    apple_enrollment: "Apple setup and enrollment"
+    apple_enrollment: "Apple setup & enrollment"
     ade: "Automated Device Enrollment"
     desktop_enrollment: "Desktop enrollment"
     windows_management: "Native Windows management"

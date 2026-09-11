@@ -7,7 +7,7 @@ fallback. An explicit selection applies to that account on every browser. Select
 
 The selector uses the existing English, Catalan, French, German, Norwegian,
 Portuguese and Spanish catalogs. New copy is authored in the English catalog and
-uses the existing translation library's fallback. Several newer management pages
+falls back to English when another catalog lacks a key. Several newer management pages
 still contain English copy; the preference does not claim full translation
 coverage. Shared application, login and registration documents now identify the
 active catalog through their HTML `lang` attribute.
@@ -15,6 +15,17 @@ active catalog through their HTML `lang` attribute.
 Shared inventory and management navigation labels also use the catalog. The
 management disclosure's English fallback and existing role-specific links are
 rendered against all seven bundled locales.
+
+Catalogs are decoded and validated once at startup, then shared as immutable
+dictionaries. The application constructs dictionaries through the translation
+library's public API because its v0.9.0 JSON string decoder retains escape
+sequences. Ampersands, quotes, line breaks and Unicode now retain their original
+catalog values; literal backslashes are decoded only as required by the source
+format. Interpolation arguments remain unchanged, and templates still escape
+the resulting text for HTML. Existing exact, ordered browser-language matching,
+English fallback and locale-specific plural rules are preserved. Concurrent
+catalog tests cover all seven languages and decoded fallback strings; rendered
+navigation checks the final escaped HTML and visible browser label.
 
 The preference is persisted in `uem_user_preferences`, separate from authentication
 and device permissions. Console startup applies its additive migration under a
