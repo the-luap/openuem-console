@@ -34,7 +34,9 @@ templ CertificateRenewals(c echo.Context, info *partials.CommonInfo, device wind
 						<dt>Current device access</dt>
 						<dd>{ DeviceStatus(device) }</dd>
 						<dt>Current certificate expires (UTC)</dt>
-						<dd>{ scheduleTimestamp(device.CertificateExpiresAt) }</dd>
+						<dd>
+							@ScheduleTime(device.CertificateExpiresAt)
+						</dd>
 					</dl>
 					<div role="region" aria-label="Certificate renewal history table" tabindex="0">
 						<table class="uk-table uk-table-divider">
@@ -44,11 +46,15 @@ templ CertificateRenewals(c echo.Context, info *partials.CommonInfo, device wind
 								for _,renewal:=range history {
 									<tr>
 										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/renewals/"+renewal.ID)) }>Open renewal { renewal.ID }</a></td>
-										<td>{ scheduleTimestamp(renewal.CreatedAt) }</td>
+										<td>
+											@ScheduleTime(renewal.CreatedAt)
+										</td>
 										<td>{ renewalState(renewal.Phase) }</td>
 										<td>
 											if renewal.CompletedAt!=nil {
-												{ scheduleTimestamp(*renewal.CompletedAt) }
+
+	@ScheduleTime(*renewal.CompletedAt)
+
 											} else {
 												Pending
 											}
@@ -85,13 +91,19 @@ templ renewalCertificate(label string, certificate windows.RenewalCertificateMet
 				<dt>Fingerprint (SHA-256)</dt>
 				<dd class="font-mono break-all">{ certificate.FingerprintSHA256 }</dd>
 				<dt>Issued (UTC)</dt>
-				<dd>{ scheduleTimestamp(certificate.IssuedAt) }</dd>
+				<dd>
+					@ScheduleTime(certificate.IssuedAt)
+				</dd>
 				<dt>Expires (UTC)</dt>
-				<dd>{ scheduleTimestamp(certificate.ExpiresAt) }</dd>
+				<dd>
+					@ScheduleTime(certificate.ExpiresAt)
+				</dd>
 				<dt>Access revoked (UTC)</dt>
 				<dd>
 					if certificate.RevokedAt!=nil {
-						{ scheduleTimestamp(*certificate.RevokedAt) }
+
+	@ScheduleTime(*certificate.RevokedAt)
+
 					} else {
 						No certificate revocation recorded
 					}
@@ -120,12 +132,16 @@ templ CertificateRenewal(c echo.Context, info *partials.CommonInfo, device windo
 						<dt>Revision</dt>
 						<dd>{ fmt.Sprint(detail.Renewal.Revision) }</dd>
 						<dt>Issued (UTC)</dt>
-						<dd>{ scheduleTimestamp(detail.Renewal.CreatedAt) }</dd>
+						<dd>
+							@ScheduleTime(detail.Renewal.CreatedAt)
+						</dd>
 						<dt>Current device access</dt>
 						<dd>{ DeviceStatus(device) }</dd>
 						if detail.Renewal.CompletedAt!=nil {
 							<dt>Completed (UTC)</dt>
-							<dd>{ scheduleTimestamp(*detail.Renewal.CompletedAt) }</dd>
+							<dd>
+								@ScheduleTime(*detail.Renewal.CompletedAt)
+							</dd>
 						}
 					</dl>
 					if detail.Renewal.Phase=="pending" {

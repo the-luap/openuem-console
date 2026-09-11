@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Native Windows MDM now uses the [localized UTC timestamp renderer](localized-report-times.md)
+  for enrollment, certificate health/renewal, CSP evidence, update schedules and
+  disconnection history. Scheduling evidence retains its exact fractional digits,
+  including submillisecond values and leading zeros; locale-specific separators
+  do not change machine-readable timestamps. Nullable results remain **Not
+  received**. Native Windows view race tests pass in 5.913 seconds, and the real
+  Linux ARM64 router and full console build pass. Twenty-one precision cases and
+  33 actual certificate-health/update-run browser cases join the permanent suite;
+  all 462 browser cases pass. Scoped links, cancellation confirmation and reported
+  uncertainty remain intact on 390/768/1440-pixel screens.
+
 - [Localized report timestamps](localized-report-times.md) now use the selected
   catalog for native Apple management, shared software history, scoped computer
   reports, desktop enrollment and audit history. Exact UTC instants remain in

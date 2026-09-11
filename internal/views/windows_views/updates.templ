@@ -38,7 +38,9 @@ templ UpdateRuns(c echo.Context, info *partials.CommonInfo, device windows.Devic
 							<thead><tr><th scope="col">Policy run</th><th scope="col">Action</th><th scope="col">Evidence status</th><th scope="col">Created</th></tr></thead>
 							<tbody>
 								for _, run := range runs {
-									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+run.Run.ID)) }>{ run.Name }</a><div>{ run.Run.ID }</div></td><td>{ updateMode(run.Run.Mode) }</td><td>{ updateState(run.Phase) }</td><td>{ timestamp(run.Run.CreatedAt) }</td></tr>
+									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/"+run.Run.ID)) }>{ run.Name }</a><div>{ run.Run.ID }</div></td><td>{ updateMode(run.Run.Mode) }</td><td>{ updateState(run.Phase) }</td><td>
+										@ReportTime(run.Run.CreatedAt)
+									</td></tr>
 								}
 							</tbody>
 						</table>
@@ -76,7 +78,11 @@ templ UpdateRun(c echo.Context, info *partials.CommonInfo, device windows.Device
 					if detail.Reason!="" {
 						<p>Reported reason: { updateState(detail.Reason) }</p>
 					}
-					<dl class="uk-description-list"><dt>Run ID</dt><dd>{ detail.Run.ID }</dd><dt>Action</dt><dd>{ updateMode(detail.Run.Mode) }</dd><dt>Created</dt><dd>{ timestamp(detail.Run.CreatedAt) }</dd><dt>Admission expires</dt><dd>{ timestamp(detail.Run.ExpiresAt) }</dd><dt>Created by</dt><dd>{ detail.Run.CreatedBy }</dd></dl>
+					<dl class="uk-description-list"><dt>Run ID</dt><dd>{ detail.Run.ID }</dd><dt>Action</dt><dd>{ updateMode(detail.Run.Mode) }</dd><dt>Created</dt><dd>
+						@ReportTime(detail.Run.CreatedAt)
+					</dd><dt>Admission expires</dt><dd>
+						@ReportTime(detail.Run.ExpiresAt)
+					</dd><dt>Created by</dt><dd>{ detail.Run.CreatedBy }</dd></dl>
 					if detail.Run.RingID!="" {
 						<dl class="uk-description-list"><dt>Source ring / revision</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", detail.Run.RingID, detail.Run.RingRevision+1, detail.Run.RingRevision))) }>{ detail.Run.RingID } · { fmt.Sprint(detail.Run.RingRevision) }</a></dd><dt>Cohort rollout</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rollouts/"+detail.Run.RolloutID)) }>{ detail.Run.RolloutID }</a></dd></dl>
 					}
@@ -126,7 +132,11 @@ templ UpdateRun(c echo.Context, info *partials.CommonInfo, device windows.Device
 							<thead><tr><th scope="col">Step</th><th scope="col">Status</th><th scope="col">Sent</th><th scope="col">Completed</th></tr></thead>
 							<tbody>
 								for index, step := range detail.Steps {
-									<tr><td>{ updateStep(index) }</td><td>{ updateState(step.Phase) }</td><td>{ optionalTimestamp(step.DeliveredAt) }</td><td>{ optionalTimestamp(step.CompletedAt) }</td></tr>
+									<tr><td>{ updateStep(index) }</td><td>{ updateState(step.Phase) }</td><td>
+										@OptionalReportTime(step.DeliveredAt)
+									</td><td>
+										@OptionalReportTime(step.CompletedAt)
+									</td></tr>
 								}
 							</tbody>
 						</table>
@@ -145,7 +155,9 @@ templ UpdateRun(c echo.Context, info *partials.CommonInfo, device windows.Device
 								<thead><tr><th scope="col">Setting</th><th scope="col">Reviewed value</th><th scope="col">Configured / status</th><th scope="col">Effective / status</th><th scope="col">Evidence</th><th scope="col">Received</th></tr></thead>
 								<tbody>
 									for _, row := range detail.Outcomes {
-										<tr><td>{ row.Name }</td><td>{ fmt.Sprint(row.Expected) }</td><td>{ observedInteger(row.Configured) }<div>{ fmt.Sprintf("Status %d", row.ConfigStatus) }</div></td><td>{ observedInteger(row.Effective) }<div>{ fmt.Sprintf("Status %d", row.EffectiveStatus) }</div></td><td>{ updateState(row.State) }</td><td>{ optionalTimestamp(row.EvidenceReceivedAt) }</td></tr>
+										<tr><td>{ row.Name }</td><td>{ fmt.Sprint(row.Expected) }</td><td>{ observedInteger(row.Configured) }<div>{ fmt.Sprintf("Status %d", row.ConfigStatus) }</div></td><td>{ observedInteger(row.Effective) }<div>{ fmt.Sprintf("Status %d", row.EffectiveStatus) }</div></td><td>{ updateState(row.State) }</td><td>
+											@OptionalReportTime(row.EvidenceReceivedAt)
+										</td></tr>
 									}
 								</tbody>
 							</table>

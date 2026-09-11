@@ -11,7 +11,9 @@
     const instant = new Date(value);
     if (!Number.isFinite(instant.getTime())) return;
     const locale = node.lang || document.documentElement.lang || "en";
-    const seconds = node.getAttribute("data-uem-precision") === "second";
+    const precision = node.getAttribute("data-uem-precision");
+    const fractional = precision === "fraction";
+    const seconds = fractional || precision === "second";
     const key = locale + (seconds ? "/second" : "/minute");
     try {
       let formatter = formatters.get(key);
@@ -23,7 +25,18 @@
         });
         if (formatters.size < 16) formatters.set(key, formatter);
       }
-      const text = formatter.format(instant) + " UTC";
+      // Date carries milliseconds only. Preserve the exact fractional digits
+      // from the server's canonical ISO value, without numeric conversion.
+      const fraction = fractional && value.match(/\.(\d{1,9})Z$/);
+      let display = formatter.format(instant);
+      if (fraction) {
+        const decimal = new Intl.NumberFormat(locale).formatToParts(1.1)
+          .find(part => part.type === "decimal")?.value || ".";
+        display = formatter.formatToParts(instant).map(part =>
+          part.type === "second" ? part.value + decimal + fraction[1] : part.value,
+        ).join("");
+      }
+      const text = display + " UTC";
       if (node.textContent !== text) node.textContent = text;
     } catch {
       // Unsupported locales or Intl implementations retain the server's UTC text.

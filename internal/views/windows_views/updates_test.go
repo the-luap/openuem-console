@@ -73,6 +73,7 @@ func TestUpdateViewsPreserveHistoricalEvidenceAndCancellationBoundary(t *testing
 			if test.mode == "remove" && (!strings.Contains(html, "No readable value") || !strings.Contains(html, "Status 404") || !strings.Contains(html, "another source may remain")) {
 				t.Fatal("removal confused absence with a numeric zero")
 			}
+			writeWindowsBrowserFixture(t, "windows-update-"+test.name, out.Bytes())
 			if dir := os.Getenv("OPENUEM_WINDOWS_UI_ARTIFACTS"); dir != "" {
 				if err := os.MkdirAll(dir, 0700); err != nil {
 					t.Fatal(err)

@@ -29,7 +29,11 @@ templ CertificateReminders(c echo.Context, info *partials.CommonInfo, history []
 					for _,r:=range history {
 						<article class="windows-csp-observation" aria-label={ certificateReminderKind(r.Kind) }>
 							<h3 class="text-lg font-semibold">{ certificateReminderKind(r.Kind) } · { certificateReminderStage(r.Stage) }</h3>
-							<dl class="uk-description-list"><dt>Deadline (UTC)</dt><dd>{ scheduleTimestamp(r.Deadline) }</dd><dt>Reminder created (UTC)</dt><dd>{ scheduleTimestamp(r.CreatedAt) }</dd></dl>
+							<dl class="uk-description-list"><dt>Deadline (UTC)</dt><dd>
+								@ScheduleTime(r.Deadline)
+							</dd><dt>Reminder created (UTC)</dt><dd>
+								@ScheduleTime(r.CreatedAt)
+							</dd></dl>
 							if r.DeviceID!="" {
 								<a class="underline break-all" href={ templ.URL(fmt.Sprintf("/tenant/%d/site/%d/windows/%s/renewals", r.Scope.TenantID, r.Scope.SiteID, r.DeviceID)) }>Device renewal history: { r.DeviceID }</a>
 							}
@@ -38,7 +42,9 @@ templ CertificateReminders(c echo.Context, info *partials.CommonInfo, history []
 								<p>{ certificateReminderSMTPStatus(r.SMTPUnavailable) }</p>
 							}
 							if r.NextAttemptAt!=nil {
-								<p>Next pending attempt: { scheduleTimestamp(*r.NextAttemptAt) }</p>
+								<p>Next pending attempt:{ " " }
+									@ScheduleTime(*r.NextAttemptAt)
+								</p>
 							}
 							if r.Pending+r.Accepted+r.Canceled==0 {
 								<p>No eligible recipient has been queued for this reminder.</p>

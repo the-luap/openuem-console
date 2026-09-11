@@ -33,7 +33,9 @@ templ CSPObservations(c echo.Context, info *partials.CommonInfo, device windows.
 							<thead><tr><th scope="col">Device message</th><th scope="col">Received (UTC)</th><th scope="col">Evidence at this point</th></tr></thead>
 							<tbody>
 								for _, observation := range history.Observations {
-									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands/%s/observations/%d", device.ID, history.Command.ID, observation.MessageID))) }>Open message { fmt.Sprint(observation.MessageID) }</a></td><td>{ scheduleTimestamp(observation.ReceivedAt) }</td><td>{ cspObservationOutcome(observation.Outcome) }</td></tr>
+									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands/%s/observations/%d", device.ID, history.Command.ID, observation.MessageID))) }>Open message { fmt.Sprint(observation.MessageID) }</a></td><td>
+										@ScheduleTime(observation.ReceivedAt)
+									</td><td>{ cspObservationOutcome(observation.Outcome) }</td></tr>
 								}
 							</tbody>
 						</table>
@@ -65,7 +67,9 @@ templ CSPObservation(c echo.Context, info *partials.CommonInfo, device windows.D
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">{ cspObservationOutcome(observation.Outcome) }</h2>
-					<dl class="uk-description-list"><dt>Received (UTC)</dt><dd>{ scheduleTimestamp(observation.ReceivedAt) }</dd><dt>Stored session ID</dt><dd>{ observation.SessionID }</dd><dt>Device message</dt><dd>{ fmt.Sprint(observation.MessageID) }</dd></dl>
+					<dl class="uk-description-list"><dt>Received (UTC)</dt><dd>
+						@ScheduleTime(observation.ReceivedAt)
+					</dd><dt>Stored session ID</dt><dd>{ observation.SessionID }</dd><dt>Device message</dt><dd>{ fmt.Sprint(observation.MessageID) }</dd></dl>
 					<p class="my-3">This immutable snapshot shows cumulative evidence after this message. Its status and values may differ from the current command. Later results or administrative resolution do not change this record.</p>
 					if observation.StopReason!="" {
 						<p>Collection stop reason (diagnostic only)</p>

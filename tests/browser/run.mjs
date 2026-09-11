@@ -15,6 +15,8 @@ import windowsChecks from "./windows-software-reconciliation.mjs";
 import windowsSources from "./windows-software-sources.mjs";
 import accountLanguage from "./account-language.mjs";
 import timestamps from "./timestamps.mjs";
+import windowsTimestamps from "./windows-timestamps.mjs";
+import windowsEvidenceTimes from "./windows-evidence-times.mjs";
 import network from "./desktop-network.mjs";
 import scopedNetwork from "./desktop-network-scoped.mjs";
 
@@ -59,6 +61,8 @@ try {
         [scopedNetwork, 24],
         [accountLanguage,30],
         [timestamps,21],
+        [windowsTimestamps,21],
+        [windowsEvidenceTimes,33],
       ]) {
         const before = report.cases.length;
         await suite(browser, record);

@@ -33,7 +33,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 				<section class="uk-card uk-card-default min-w-0" aria-labelledby="windows-credential-heading">
 					<div class="uk-card-body grid min-w-0 gap-4">
 						<h2 id="windows-credential-heading" class="uk-card-title">Enrollment credentials created</h2>
-						<p>This password is shown once and enrolls one device. Share it securely with the intended user before { timestamp(data.Created.ExpiresAt) }.</p>
+						<p>This password is shown once and enrolls one device. Share it securely with the intended user before{ " " }
+							@ReportTime(data.Created.ExpiresAt)
+						.</p>
 						<label class="grid gap-2">Enrollment username<input class="uk-input" readonly value={ data.Credential.Username } autocomplete="off"/></label>
 						<label class="grid min-w-0 gap-2">One-time enrollment password<textarea id="windows-enrollment-password" class="uk-textarea min-w-0 font-mono" readonly rows="3" autocomplete="off" spellcheck="false">{ data.Credential.Password }</textarea></label>
 						<label class="grid gap-2">Enrollment server<input class="uk-input" readonly value={ data.PublicOrigin }/></label>
@@ -48,7 +50,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 				<div class="uk-card-header"><h2 class="uk-card-title">Organization certificate authority</h2></div>
 				<div class="uk-card-body grid min-w-0 gap-4">
 					if data.Authority!=nil {
-						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Authority expires</dt><dd>{ timestamp(data.Authority.ExpiresAt) }</dd><dt>Device certificate lifetime</dt><dd>{ fmt.Sprintf("%d days",data.Authority.ValiditySeconds/86400) }</dd><dt>CA fingerprint (SHA-256)</dt><dd class="break-all font-mono">{ data.Authority.FingerprintSHA256 }</dd></dl>
+						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Authority expires</dt><dd>
+							@ReportTime(data.Authority.ExpiresAt)
+						</dd><dt>Device certificate lifetime</dt><dd>{ fmt.Sprintf("%d days",data.Authority.ValiditySeconds/86400) }</dd><dt>CA fingerprint (SHA-256)</dt><dd class="break-all font-mono">{ data.Authority.FingerprintSHA256 }</dd></dl>
 					} else if data.SetupError=="" && info.Can(access.ManageCertificates) {
 						<p>Create the authority used to sign individual Windows device identities in this organization.</p>
 						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/setup") } class="grid gap-4">
@@ -87,7 +91,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 								<caption class="sr-only">Native Windows devices in this site</caption><thead><tr><th scope="col">Reported name</th><th scope="col">Reported Windows version</th><th scope="col">Enrolled</th><th scope="col">Identity status</th></tr></thead>
 								<tbody>
 									for _,row:=range data.Devices {
-										<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.ID)) }>{ row.Name }</a><div class="text-sm break-all">{ row.ID }</div></td><td>{ row.OSVersion }</td><td class="whitespace-nowrap">{ timestamp(row.CreatedAt) }</td><td>{ DeviceStatus(row) }</td></tr>
+										<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.ID)) }>{ row.Name }</a><div class="text-sm break-all">{ row.ID }</div></td><td>{ row.OSVersion }</td><td class="whitespace-nowrap">
+											@ReportTime(row.CreatedAt)
+										</td><td>{ DeviceStatus(row) }</td></tr>
 									}
 								</tbody>
 							</table>
@@ -126,7 +132,9 @@ templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData)
 										for _,row:=range data.Invitations {
 											<tr>
 												<td class="break-all">{ row.Username }<div class="text-sm">{ row.ID }</div></td>
-												<td>{ timestamp(row.ExpiresAt) }</td>
+												<td>
+													@ReportTime(row.ExpiresAt)
+												</td>
 												<td>{ invitationStatus(row) }</td>
 												<td>
 													if row.RevokedAt==nil && row.ConsumedAt==nil {
@@ -207,9 +215,13 @@ templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetad
 						<dt>Enrollment context</dt>
 						<dd>{ data.EnrollmentType }</dd>
 						<dt>Enrolled</dt>
-						<dd>{ timestamp(data.CreatedAt) }</dd>
+						<dd>
+							@ReportTime(data.CreatedAt)
+						</dd>
 						<dt>Certificate expires</dt>
-						<dd>{ timestamp(data.CertificateExpiresAt) }</dd>
+						<dd>
+							@ReportTime(data.CertificateExpiresAt)
+						</dd>
 						<dt>Device certificate fingerprint (SHA-256)</dt>
 						<dd class="break-all font-mono">{ data.FingerprintSHA256 }</dd>
 					</dl>
@@ -222,7 +234,9 @@ templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetad
 						<p class="my-3">Windows reported that disconnection had started. This native identity can no longer authenticate or receive management commands. Local removal of policies, certificates and managed data has not been independently verified.</p>
 						<dl class="uk-description-list">
 							<dt>Reported and access revoked (UTC)</dt>
-							<dd>{ scheduleTimestamp(data.Unenrollment.ReceivedAt) }</dd>
+							<dd>
+								@ScheduleTime(data.Unenrollment.ReceivedAt)
+							</dd>
 							<dt>Report ID</dt>
 							<dd>{ data.Unenrollment.ID }</dd>
 							<dt>Reporting certificate fingerprint (SHA-256)</dt>

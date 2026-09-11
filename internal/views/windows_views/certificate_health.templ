@@ -18,7 +18,9 @@ templ CertificateHealth(c echo.Context, info *partials.CommonInfo, report window
 				<h1 class="text-2xl font-semibold">Windows certificate health</h1>
 				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-reminders")) }>Expiry reminder history</a>
 				<p class="mt-2">Review certificate expiry and pending replacements in the selected organization and site.</p>
-				<p>Expiry assessed at { scheduleTimestamp(report.AssessedAt) }. Refresh this page for a new assessment.</p>
+				<p>Expiry assessed at{ " " }
+					@ScheduleTime(report.AssessedAt)
+				. Refresh this page for a new assessment.</p>
 				<p class="uk-text-muted">The renewal window shows when the server accepts renewal requests. It does not confirm that Windows has scheduled a renewal or that a device is online.</p>
 				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Windows management</a>
 			</div>
@@ -31,9 +33,13 @@ templ CertificateHealth(c echo.Context, info *partials.CommonInfo, report window
 						<p class="font-semibold">{ certificateHealthLabel(report.Authority.State) }</p>
 						<dl class="uk-description-list">
 							<dt>Authority certificate expires</dt>
-							<dd>{ scheduleTimestamp(report.Authority.ExpiresAt) }</dd>
+							<dd>
+								@ScheduleTime(report.Authority.ExpiresAt)
+							</dd>
 							<dt>Full-lifetime issuance ends</dt>
-							<dd>{ scheduleTimestamp(report.Authority.IssuanceEndsAt) }</dd>
+							<dd>
+								@ScheduleTime(report.Authority.IssuanceEndsAt)
+							</dd>
 							<dt>Device certificate lifetime</dt>
 							<dd>{ certificateHealthDuration(report.Authority.ValiditySeconds) }</dd>
 							<dt>Server renewal window before device certificate expiry</dt>
@@ -69,15 +75,23 @@ templ CertificateHealth(c echo.Context, info *partials.CommonInfo, report window
 							<h3 class="text-lg font-semibold"><a class="underline" href={ templ.URL(certificateHealthDeviceURL(row.Device, "")) }>{ row.Device.Name }</a></h3>
 							<p class="break-all text-sm">{ row.Device.ID } · { fmt.Sprintf("Site %d",row.Device.SiteID) }</p>
 							<p class="font-semibold mt-3">{ certificateHealthLabel(row.CurrentState) }</p>
-							<dl class="uk-description-list"><dt>Current confirmed certificate expires</dt><dd>{ scheduleTimestamp(row.Current.ExpiresAt) }</dd><dt>Server renewal window opens</dt><dd>{ scheduleTimestamp(row.RenewalOpensAt) }</dd></dl>
+							<dl class="uk-description-list"><dt>Current confirmed certificate expires</dt><dd>
+								@ScheduleTime(row.Current.ExpiresAt)
+							</dd><dt>Server renewal window opens</dt><dd>
+								@ScheduleTime(row.RenewalOpensAt)
+							</dd></dl>
 							if row.Device.Unenrollment!=nil {
-								<p>Disconnection reported at { scheduleTimestamp(row.Device.Unenrollment.ReceivedAt) }. Local cleanup has not been verified.</p>
+								<p>Disconnection reported at{ " " }
+									@ScheduleTime(row.Device.Unenrollment.ReceivedAt)
+								. Local cleanup has not been verified.</p>
 							}
 							if row.Pending!=nil && row.Replacement!=nil {
 								<div class="uk-alert uk-alert-warning mt-3">
 									<p class="font-semibold">Replacement pending confirmation</p>
 									<p>The issued replacement has not been confirmed by an authenticated management exchange. The current certificate above remains the confirmed identity.</p>
-									<p>{ certificateHealthLabel(row.ReplacementState) } · Expires { scheduleTimestamp(row.Replacement.ExpiresAt) }</p>
+									<p>{ certificateHealthLabel(row.ReplacementState) } · Expires{ " " }
+										@ScheduleTime(row.Replacement.ExpiresAt)
+									</p>
 									<a class="underline" href={ templ.URL(certificateHealthDeviceURL(row.Device, "/renewals/"+row.Pending.ID)) }>Review pending replacement</a>
 								</div>
 							}

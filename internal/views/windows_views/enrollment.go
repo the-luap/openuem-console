@@ -23,7 +23,6 @@ type EnrollmentData struct {
 func (EnrollmentData) String() string     { return "[protected Windows enrollment page]" }
 func (v EnrollmentData) GoString() string { return v.String() }
 
-func timestamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") }
 func invitationStatus(i windows.EnrollmentInvitation) string {
 	if i.RevokedAt != nil {
 		return "Revoked"

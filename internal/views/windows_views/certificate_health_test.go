@@ -92,6 +92,7 @@ func TestWindowsCertificateHealthViewPreservesLifecycleAndScopedLinks(t *testing
 			if strings.Contains(html, "<script>Device</script>") || strings.Contains(html, `method="post"`) {
 				t.Fatal("health view did not escape data or introduced mutation")
 			}
+			writeWindowsBrowserFixture(t, "windows-health-"+state, out.Bytes())
 			if dir := os.Getenv("OPENUEM_WINDOWS_HEALTH_VIEW_ARTIFACTS"); dir != "" {
 				if err := os.MkdirAll(dir, 0700); err != nil {
 					t.Fatal(err)

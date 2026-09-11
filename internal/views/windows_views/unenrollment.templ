@@ -28,7 +28,9 @@ templ unenrollmentAccess(device windows.DeviceMetadata) {
 			if device.Unenrollment!=nil {
 				<h3 class="font-semibold">Device disconnection reported</h3>
 				<p class="my-3">Windows reported that disconnection had started. Local removal of policies, certificates and managed data has not been independently verified. This report does not establish which request or person initiated disconnection.</p>
-				<dl class="uk-description-list"><dt>Reported and access revoked (UTC)</dt><dd>{ scheduleTimestamp(device.Unenrollment.ReceivedAt) }</dd><dt>Report ID</dt><dd>{ device.Unenrollment.ID }</dd><dt>Reporting certificate fingerprint (SHA-256)</dt><dd class="font-mono break-all">{ device.Unenrollment.FingerprintSHA256 }</dd></dl>
+				<dl class="uk-description-list"><dt>Reported and access revoked (UTC)</dt><dd>
+					@ScheduleTime(device.Unenrollment.ReceivedAt)
+				</dd><dt>Report ID</dt><dd>{ device.Unenrollment.ID }</dd><dt>Reporting certificate fingerprint (SHA-256)</dt><dd class="font-mono break-all">{ device.Unenrollment.FingerprintSHA256 }</dd></dl>
 			} else {
 				<p class="my-3">No authenticated disconnection report has been received. A command acknowledgment alone does not prove local cleanup.</p>
 			}
@@ -57,7 +59,9 @@ templ UnenrollmentRequests(c echo.Context, info *partials.CommonInfo, device win
 								for _,detail:=range history {
 									<tr>
 										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+detail.Command.ID)) }>Open request { detail.Command.ID }</a></td>
-										<td>{ scheduleTimestamp(detail.Command.CreatedAt) }</td>
+										<td>
+											@ScheduleTime(detail.Command.CreatedAt)
+										</td>
 										<td>{ cspState(detail.Command.Phase) }</td>
 										<td>
 											if detail.Release!=nil {
@@ -187,18 +191,26 @@ templ UnenrollmentRequest(c echo.Context, info *partials.CommonInfo, device wind
 						<dt>Requested by</dt>
 						<dd class="break-all">{ detail.Command.CreatedBy }</dd>
 						<dt>Created (UTC)</dt>
-						<dd>{ scheduleTimestamp(detail.Command.CreatedAt) }</dd>
+						<dd>
+							@ScheduleTime(detail.Command.CreatedAt)
+						</dd>
 						<dt>Delivery expires (UTC)</dt>
-						<dd>{ scheduleTimestamp(detail.Command.ExpiresAt) }</dd>
+						<dd>
+							@ScheduleTime(detail.Command.ExpiresAt)
+						</dd>
 						<dt>Reason for disconnection</dt>
 						<dd class="break-all">{ detail.Reason }</dd>
 						if detail.Command.DeliveredAt!=nil {
 							<dt>Delivered (UTC)</dt>
-							<dd>{ scheduleTimestamp(*detail.Command.DeliveredAt) }</dd>
+							<dd>
+								@ScheduleTime(*detail.Command.DeliveredAt)
+							</dd>
 						}
 						if detail.Command.CompletedAt!=nil {
 							<dt>Command outcome recorded (UTC)</dt>
-							<dd>{ scheduleTimestamp(*detail.Command.CompletedAt) }</dd>
+							<dd>
+								@ScheduleTime(*detail.Command.CompletedAt)
+							</dd>
 						}
 					</dl>
 					if detail.Command.DeliveredAt!=nil && detail.Release==nil && device.RevokedAt==nil {
@@ -227,7 +239,9 @@ templ UnenrollmentRequest(c echo.Context, info *partials.CommonInfo, device wind
 					<div class="uk-card-body">
 						<h2 class="uk-card-title">Review recorded</h2>
 						<p class="my-3">The disconnection hold was released after review. This does not undo the delivered request, prove cleanup or restore revoked access. A later authenticated disconnection report still ends native management access.</p>
-						<dl class="uk-description-list"><dt>Reviewed by</dt><dd class="break-all">{ detail.Release.ReleasedBy }</dd><dt>Reviewed command revision</dt><dd>{ fmt.Sprint(detail.Release.ReviewedRevision) }</dd><dt>Reviewed (UTC)</dt><dd>{ scheduleTimestamp(detail.Release.ReleasedAt) }</dd><dt>Review reason</dt><dd class="break-all">{ detail.Release.Reason }</dd></dl>
+						<dl class="uk-description-list"><dt>Reviewed by</dt><dd class="break-all">{ detail.Release.ReleasedBy }</dd><dt>Reviewed command revision</dt><dd>{ fmt.Sprint(detail.Release.ReviewedRevision) }</dd><dt>Reviewed (UTC)</dt><dd>
+							@ScheduleTime(detail.Release.ReleasedAt)
+						</dd><dt>Review reason</dt><dd class="break-all">{ detail.Release.Reason }</dd></dl>
 					</div>
 				</section>
 			}

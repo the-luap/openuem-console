@@ -35,7 +35,9 @@ templ UpdateRings(c echo.Context, info *partials.CommonInfo, rings []windows.Upd
 							<caption class="sr-only">Current ring revisions in this site</caption><thead><tr><th scope="col">Ring</th><th scope="col">Revision</th><th scope="col">State</th><th scope="col">Saved</th></tr></thead>
 							<tbody>
 								for _, ring := range rings {
-									<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID)) }>{ ring.Name }</a><div class="text-sm break-all">{ ring.RingID }</div></td><td>{ fmt.Sprint(ring.Revision) }</td><td>{ ringState(ring.Enabled) }</td><td>{ timestamp(ring.CreatedAt) }</td></tr>
+									<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID)) }>{ ring.Name }</a><div class="text-sm break-all">{ ring.RingID }</div></td><td>{ fmt.Sprint(ring.Revision) }</td><td>{ ringState(ring.Enabled) }</td><td>
+										@ReportTime(ring.CreatedAt)
+									</td></tr>
 								}
 							</tbody>
 						</table>
@@ -77,7 +79,9 @@ templ UpdateRingHistory(c echo.Context, info *partials.CommonInfo, id string, ri
 						} else {
 							<p>Saved revision</p>
 						}
-						<dl class="uk-description-list"><dt>State at this revision</dt><dd>{ ringState(ring.Enabled) }</dd><dt>Saved</dt><dd>{ timestamp(ring.CreatedAt) }</dd><dt>Saved by</dt><dd>{ ring.CreatedBy }</dd></dl>
+						<dl class="uk-description-list"><dt>State at this revision</dt><dd>{ ringState(ring.Enabled) }</dd><dt>Saved</dt><dd>
+							@ReportTime(ring.CreatedAt)
+						</dd><dt>Saved by</dt><dd>{ ring.CreatedBy }</dd></dl>
 						<div class="flex flex-wrap gap-3 my-4">
 							if before==0 && i==0 && ring.Enabled {
 								<a class="uk-button uk-button-primary" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s/assign?revision=%d&mode=apply", id, ring.Revision))) }>Assign this revision</a>

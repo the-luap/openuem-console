@@ -59,7 +59,9 @@ templ CSPCommandPreview(c echo.Context, info *partials.CommonInfo, device window
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">Selected device and admission</h2>
-					<dl class="uk-description-list"><dt>Organization / site</dt><dd>{ updateTargetScope(info,device) }</dd><dt>Native device ID</dt><dd>{ device.ID }</dd><dt>Enrollment type</dt><dd>{ device.EnrollmentType }</dd><dt>Current certificate expires</dt><dd>{ scheduleTimestamp(device.CertificateExpiresAt) }</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("seconds") } seconds after confirmation</dd><dt>Compiled request size</dt><dd>{ fmt.Sprint(draft.Preview.EncodedBytes) } bytes</dd></dl>
+					<dl class="uk-description-list"><dt>Organization / site</dt><dd>{ updateTargetScope(info,device) }</dd><dt>Native device ID</dt><dd>{ device.ID }</dd><dt>Enrollment type</dt><dd>{ device.EnrollmentType }</dd><dt>Current certificate expires</dt><dd>
+						@ScheduleTime(device.CertificateExpiresAt)
+					</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("seconds") } seconds after confirmation</dd><dt>Compiled request size</dt><dd>{ fmt.Sprint(draft.Preview.EncodedBytes) } bytes</dd></dl>
 					if draft.Preview.UserTarget {
 						<p class="my-3">This command includes user targets. Delivery requires Full enrollment and an eligible enrolled-user session. The current identity record does not establish a current user session.</p>
 					}

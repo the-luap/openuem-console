@@ -50,13 +50,6 @@ func updateStep(index int) string {
 	return fmt.Sprintf("Policy read-back · batch %d", index-1)
 }
 
-func optionalTimestamp(t *time.Time) string {
-	if t == nil {
-		return "Not received"
-	}
-	return timestamp(*t)
-}
-
 func observedInteger(n *int) string {
 	if n == nil {
 		return "No readable value"

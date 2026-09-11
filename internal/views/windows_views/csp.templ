@@ -41,7 +41,11 @@ templ CSPCommands(c echo.Context, info *partials.CommonInfo, device windows.Devi
 									<tr>
 										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+command.ID)) }>{ command.ID }</a></td>
 										<td>{ cspState(command.Phase) }</td>
-										<td>{ scheduleTimestamp(command.CreatedAt) }<div>{ scheduleTimestamp(command.ExpiresAt) }</div></td>
+										<td>
+											@ScheduleTime(command.CreatedAt)
+										<div>
+											@ScheduleTime(command.ExpiresAt)
+										</div></td>
 										<td>
 											if command.UnenrollmentRequestID!="" {
 												<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+command.UnenrollmentRequestID)) }>Disconnection request</a>
@@ -107,14 +111,24 @@ templ CSPCommand(c echo.Context, info *partials.CommonInfo, device windows.Devic
 					if detail.Reason!="" {
 						<p>Recorded reason: <code>{ detail.Reason }</code></p>
 					}
-					<dl class="uk-description-list"><dt>Command ID</dt><dd>{ detail.Command.ID }</dd><dt>Request ID</dt><dd>{ detail.Command.RequestKey }</dd><dt>State revision</dt><dd>{ fmt.Sprint(detail.Command.Revision) }</dd><dt>Created by</dt><dd>{ detail.Command.CreatedBy }</dd><dt>Created</dt><dd>{ scheduleTimestamp(detail.Command.CreatedAt) }</dd><dt>Admission expires</dt><dd>{ scheduleTimestamp(detail.Command.ExpiresAt) }</dd><dt>Last state update</dt><dd>{ scheduleTimestamp(detail.Command.UpdatedAt) }</dd></dl>
+					<dl class="uk-description-list"><dt>Command ID</dt><dd>{ detail.Command.ID }</dd><dt>Request ID</dt><dd>{ detail.Command.RequestKey }</dd><dt>State revision</dt><dd>{ fmt.Sprint(detail.Command.Revision) }</dd><dt>Created by</dt><dd>{ detail.Command.CreatedBy }</dd><dt>Created</dt><dd>
+						@ScheduleTime(detail.Command.CreatedAt)
+					</dd><dt>Admission expires</dt><dd>
+						@ScheduleTime(detail.Command.ExpiresAt)
+					</dd><dt>Last state update</dt><dd>
+						@ScheduleTime(detail.Command.UpdatedAt)
+					</dd></dl>
 					if detail.Command.DeliveredAt!=nil {
-						<dl class="uk-description-list"><dt>Delivery committed</dt><dd>{ scheduleTimestamp(*detail.Command.DeliveredAt) }</dd><dt>Dispatch session / message</dt><dd>{ detail.Command.DeliveredSessionID } · { fmt.Sprint(detail.Command.DeliveredMessage) }</dd></dl>
+						<dl class="uk-description-list"><dt>Delivery committed</dt><dd>
+							@ScheduleTime(*detail.Command.DeliveredAt)
+						</dd><dt>Dispatch session / message</dt><dd>{ detail.Command.DeliveredSessionID } · { fmt.Sprint(detail.Command.DeliveredMessage) }</dd></dl>
 					} else {
 						<p>No delivery has been committed.</p>
 					}
 					if detail.Command.CompletedAt!=nil {
-						<dl class="uk-description-list"><dt>Terminal state recorded</dt><dd>{ scheduleTimestamp(*detail.Command.CompletedAt) }</dd></dl>
+						<dl class="uk-description-list"><dt>Terminal state recorded</dt><dd>
+							@ScheduleTime(*detail.Command.CompletedAt)
+						</dd></dl>
 					}
 					if detail.Command.UnenrollmentRequestID!="" {
 						<p class="uk-alert uk-alert-warning">This fixed disconnection request belongs to the device lifecycle. A command acknowledgment does not prove local cleanup. Cancellation and review require device revocation permission.</p>
