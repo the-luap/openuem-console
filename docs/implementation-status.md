@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The reference release mode now claims its synthetic device through the actual
+  public HTTPS gateway using the shared endpoint client. A trusted setup probe
+  creates the release-bound invitation; the edge client receives only public trust
+  and its own protected files, generates and persists both endpoint keys, and
+  validates the returned certificate against its CSR and authorized WSS origin.
+  Repeated metadata GET/HEAD and an invalid proof do not consume the invitation;
+  identical proofs recover the same identity, while different keys cannot reuse
+  its single use. Full restart preserves claim recovery. Exact release withdrawal
+  denies downloads, metadata and claims before the independent WSS device
+  revocation test. Fresh and interrupted historical-grant maintenance fixtures
+  pass locally on Linux arm64; Linux amd64 cross-compilation, affected vet and
+  runner syntax checks also pass. Existing Linux amd64/arm64 CI invokes both
+  modes. Inventory remains explicit scoped fixture preparation; this is public
+  protocol integration, not native installer execution or hardware acceptance.
+- The [002424f native workflow](https://github.com/the-luap/openuem-console/actions/runs/34545260455)
+  and its [pull-request run](https://github.com/the-luap/openuem-console/actions/runs/34545261089)
+  pass on Linux amd64, Linux arm64 and Windows, including the separate release
+  image, gateway downloads, retained approval and exact withdrawal.
 - The separate [release admission image](agent-release-operations.md#separate-release-job-image)
   now runs the actual protected-file CLI as an unprivileged scratch job. The
   reference fixture stages a synthetic signed manifest and non-executable payload,
@@ -72,8 +90,9 @@ the table's package summaries do not remove any detail from the roadmap.
   locally on Linux arm64, as do the strict image filesystem/startup audit, affected
   vet and workflow checks. Linux amd64/arm64 CI builds and exercises this image.
   The fixture does not produce or execute a natively signed installer; release
-  signing/notarization, public installer claims and endpoint activation remain
-  distinct acceptance requirements.
+  signing/notarization and endpoint activation remain distinct acceptance
+  requirements. Public protocol claim composition is covered by the extension
+  described below.
 - The [73d5e57 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34543954735)
   passes on Linux amd64, Linux arm64 and Windows, including generated independent
   administrator trust, bootstrap mount retirement and retained broker maintenance.

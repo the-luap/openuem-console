@@ -122,7 +122,7 @@ def main():
                              "-test.v", "-test.run=^" + test + "$", "-test.timeout=55s", check=False)
             if result.returncode or "--- PASS: " + test + " " not in result.stdout:
                 # The fixture emits fixed errors instead of database/credential diagnostics.
-                failures = re.findall(r"container_linux_test.go:\d+: ([^\n]+)", result.stdout)
+                failures = re.findall(r"(?:container|public_claim)_linux_test.go:\d+: ([^\n]+)", result.stdout)
                 raise RuntimeError(stage + " failed" + (": " + "; ".join(failures[:3]) if failures else ""))
 
         probe("synthetic external inputs", "TestReferencePrepare", "none", mount(root, "/state", False))
@@ -291,8 +291,19 @@ def main():
                    *mount(root / "installation/state/encryption.key", "/run/encryption.key"),
                    *mount(root / "device", "/device", False)]
         device = [*trust, *mount(root / "device", "/device")]
-        probe("synthetic registry admission", "TestReferenceRegistry", data_network, private,
-              [("OPENUEM_REFERENCE_ACTION", "enroll")])
+        if args.release_image:
+            probe("release-bound invitation preparation", "TestReferenceInvitation", data_network,
+                  [*private, *mount(root / "releases", "/releases"),
+                   *mount(root / "release-keys.pem", "/run/release-keys.pem")])
+            public_claim = [*trust, *mount(root / "device", "/device", False),
+                            *mount(root / "release-keys.pem", "/run/release-keys.pem")]
+            probe("public release-bound HTTPS claim", "TestReferencePublicClaim", edge, public_claim)
+            probe("admitted identity inventory preparation", "TestReferenceRegistry", data_network, private,
+                  [("OPENUEM_REFERENCE_ACTION", "inventory")])
+            print("reference enrollment: public metadata, invalid proof denial, HTTPS claim and same-key recovery passed", flush=True)
+        else:
+            probe("synthetic registry admission", "TestReferenceRegistry", data_network, private,
+                  [("OPENUEM_REFERENCE_ACTION", "enroll")])
         if args.maintenance_probe_image:
             script = repository / "scripts/maintain-reference-broker.py"
             maintenance_args = ["--project-name", project, "--project-directory", str(root),
@@ -456,6 +467,16 @@ def main():
               [("OPENUEM_REFERENCE_ACTION", "verify")])
         if args.release_image:
             probe("retained approved package after restart", "TestReferenceReleaseDownload", edge, release_inputs)
+            probe("retained public claim recovery after restart", "TestReferencePublicClaim", edge, public_claim,
+                  [("OPENUEM_REFERENCE_ACTION", "retry")])
+            withdrawn = release_job("withdraw", release_digest)
+            if withdrawn.get("status") != "withdrawn" or withdrawn.get("digest") != release_digest:
+                raise RuntimeError("release job did not confirm exact withdrawal")
+            probe("withdrawn gateway package denial", "TestReferenceReleaseDownload", edge, release_inputs,
+                  [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
+            probe("withdrawn public claim and metadata denial", "TestReferencePublicClaim", edge, public_claim,
+                  [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
+            print("reference releases: retained restart approval and exact download, metadata and claim withdrawal denial passed", flush=True)
 
         held = command("live device probe", "docker", "run", "--detach", "--network", edge, *probe_base, *device,
                        *mount(root / "ready", "/ready", False), "--env", "OPENUEM_REFERENCE_ACTION=hold",
@@ -476,13 +497,6 @@ def main():
         probe("revoked device re-admission denial", "TestReferenceDevice", edge, device,
               [("OPENUEM_REFERENCE_ACTION", "denied")])
         print("reference restart: retained login/device state, command reconciliation and live WSS revocation passed", flush=True)
-        if args.release_image:
-            withdrawn = release_job("withdraw", release_digest)
-            if withdrawn.get("status") != "withdrawn" or withdrawn.get("digest") != release_digest:
-                raise RuntimeError("release job did not confirm exact withdrawal")
-            probe("withdrawn gateway package denial", "TestReferenceReleaseDownload", edge, release_inputs,
-                  [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
-            print("reference releases: retained restart approval and exact withdrawal denial passed", flush=True)
 
 
 if __name__ == "__main__":

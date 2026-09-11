@@ -385,10 +385,6 @@ func TestReferenceRegistry(t *testing.T) {
 			t.Fatal("synthetic registry claim failed")
 		}
 		record.ID = issued.DeviceID
-		orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-		if _, err := orm.Agent.Create().SetID(record.ID).SetOs("windows").SetHostname("Reference endpoint").SetIP("192.0.2.1").SetMAC("02:00:00:00:00:01").SetWan("192.0.2.1").AddSiteIDs(record.SiteID).Save(ctx); err != nil {
-			t.Fatal("cannot prepare scoped synthetic agent inventory")
-		}
 		seed, _ := keys.Broker.Seed()
 		defer clear(seed)
 		write(t, "/device/broker.seed", seed)
@@ -399,6 +395,31 @@ func TestReferenceRegistry(t *testing.T) {
 		if err != nil || json.Unmarshal(data, &record) != nil {
 			t.Fatal("synthetic endpoint record is unavailable")
 		}
+	}
+	if action == "enroll" || action == "inventory" {
+		seed, err := keyfile.Read("/device/broker.seed", 512)
+		if err != nil {
+			t.Fatal("synthetic endpoint broker key is unavailable")
+		}
+		defer clear(seed)
+		keys, err := nkeys.FromSeed(seed)
+		if err != nil {
+			t.Fatal("synthetic endpoint broker key is invalid")
+		}
+		defer keys.Wipe()
+		public, err := keys.PublicKey()
+		var scope registry.Scope
+		var issuedKey string
+		if err != nil || db.QueryRowContext(ctx, `SELECT tenant_id,site_id,broker_key FROM uem_agent_identities WHERE id=$1 AND revoked_at IS NULL`, record.ID).Scan(&scope.TenantID, &scope.SiteID, &issuedKey) != nil || scope != record.Scope || issuedKey != public {
+			t.Fatal("synthetic inventory does not match the admitted endpoint identity")
+		}
+		// Inventory remains explicit fixture preparation. Public protocol issuance
+		// does not prove native installed-agent reporting or hardware collection.
+		orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+		if _, err := orm.Agent.Create().SetID(record.ID).SetOs("windows").SetHostname("Reference endpoint").SetIP("192.0.2.1").SetMAC("02:00:00:00:00:01").SetWan("192.0.2.1").AddSiteIDs(record.SiteID).Save(ctx); err != nil {
+			t.Fatal("cannot prepare scoped synthetic agent inventory")
+		}
+	} else {
 		orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
 		count, err := orm.WingetConfigExclusion.Query().Where(wingetconfigexclusion.HasOwnerWith(agent.ID(record.ID))).Count(ctx)
 		if err != nil || count != 1 {

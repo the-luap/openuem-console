@@ -163,6 +163,15 @@ The fixture checks:
 - With the release image selected, actual private database admission and public
   gateway HEAD, GET and range downloads whose bytes match the signed manifest;
   retained approval after restart and download denial after exact withdrawal.
+- In that mode, a release-bound invitation prepared through the production store,
+  followed by an actual HTTPS claim from the public edge using the shared endpoint
+  client. The client owns and persists its pending certificate and broker keys;
+  it receives no database credential, server encryption key, CA key or service seed.
+  Repeated metadata GET/HEAD requests and an invalid proof leave the use available.
+  A valid claim consumes one use; identical proofs recover the same certificate
+  immediately and after the complete restart, while different keys are denied.
+  Metadata retains the signed release, exact download target and organization/site.
+  Withdrawal denies metadata and claim recovery before device revocation is tested.
 - A synthetic scoped identity, the real command provisioner's durable consumer
   reconciliation, and a WSS request through gateway, broker authorization and
   the individual worker that changes only that identity's inventory settings.
@@ -178,10 +187,12 @@ The fixture checks:
   retained administrator/device/message state, and a completed retry without
   another container restart.
 
-The trusted registry probe admits a synthetic device directly through the
-registry API. This does not claim a completed public signed-installer claim,
-native Windows enrollment, Apple enrollment or hardware operation. Those
-protocol, release and physical acceptance requirements remain in the roadmap.
+Without the optional release image, the trusted registry probe still admits the
+synthetic device directly. In both modes, inventory is prepared by a trusted
+fixture after checking the stored identity's scope and broker key; the fixture
+does not run installed-agent reporting. Public protocol claims do not establish
+natively signed installer execution, endpoint activation, native Windows MDM,
+Apple enrollment or hardware acceptance. These remain separate requirements.
 
 The Linux amd64/arm64 console workflow builds the probe and all required images,
 then invokes the runner with explicit image arguments. The runner uses a private
