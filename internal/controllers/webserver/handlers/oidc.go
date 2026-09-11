@@ -459,6 +459,7 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcac
 	}
 	extra := map[string]any{oidcSessionKey: string(identityJSON)}
 	if user.Use2fa {
+		extra["authentication-pending"] = true
 		extra[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.OpenID, string(identityJSON), time.Now())
 	}
 	return h.establishUserSession(c, user, false, extra, func(ctx context.Context) error {

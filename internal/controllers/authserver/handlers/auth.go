@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
+	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"net/http"
 	"time"
@@ -49,14 +51,22 @@ func (h *Handler) Auth(c echo.Context) error {
 		"user-agent": c.Request().UserAgent(), "ip-address": c.Request().RemoteAddr,
 	}
 	if user.Use2fa {
+		values["authentication-pending"] = true
 		values[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.Certificate, string(cert.Raw), time.Now())
 	}
 	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {
 			return err
 		}
-		return h.Model.ConfirmLogIn(uid)
+		stage := models.LocalSignInComplete
+		if user.Use2fa {
+			stage = models.LocalSignInPendingMFA
+		}
+		return h.Model.AdmitLocalSignIn(ctx, user, loginproof.Certificate, stage)
 	}); err != nil {
+		if errors.Is(err, models.ErrLocalSignIn) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Certificate account access or sign-in requirements changed.")
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "Certificate sign-in session could not be completed.")
 	}
 

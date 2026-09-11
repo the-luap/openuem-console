@@ -20,7 +20,7 @@ func (h *Handler) requirePrimaryAuthentication(c echo.Context) (*ent.User, error
 	deny := func() (*ent.User, error) {
 		return nil, echo.NewHTTPError(http.StatusForbidden, "Verify your primary sign-in method again before completing two-factor authentication.")
 	}
-	if sm.GetBool(ctx, "forgot") {
+	if sm.GetBool(ctx, "forgot") || !sm.GetBool(ctx, "authentication-pending") || sm.GetBool(ctx, "twofa") {
 		return deny()
 	}
 	uid := sm.GetString(ctx, "uid")

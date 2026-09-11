@@ -390,18 +390,6 @@ func (suite *UserTestSuite) TestUserSetRevokedCertificate() {
 	assert.Equal(suite.T(), openuem_nats.REGISTER_REVOKED, user.Register)
 }
 
-func (suite *UserTestSuite) TestConfirmLogIn() {
-	err := suite.model.ConfirmLogIn("user5")
-	assert.NoError(suite.T(), err, "should confirm user log in")
-
-	user, err := suite.model.GetUserById("user5")
-	assert.NoError(suite.T(), err, "should get confirmed log in user")
-	assert.Equal(suite.T(), "user5", user.ID, "user should have user5 id")
-	assert.Equal(suite.T(), "User 5", user.Name, "user should have User 5 name")
-	assert.Equal(suite.T(), "", user.CertClearPassword, "user should have empty cert clear password")
-	assert.Equal(suite.T(), openuem_nats.REGISTER_COMPLETE, user.Register)
-}
-
 func (suite *UserTestSuite) TestDeleteUser() {
 	err := suite.model.DeleteUser("user6")
 	assert.NoError(suite.T(), err, "should delete user")

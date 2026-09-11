@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Local password/certificate admission now locks current method configuration
+  and account state before confirming login. Revoked/review accounts, incompatible
+  account modes, disabled methods, changed password hashes and changed MFA
+  requirements deny admission; confirmation cannot undo intervening revocation.
+  Forced initial-password accounts enter only the restricted replacement flow.
+  An explicit pending-authentication phase prevents disabling MFA from promoting
+  an unfinished session. The fourteen-case password baseline reproduced ignored
+  policy and denied-account reactivation. Password/certificate, cancellation,
+  first-login and pending-phase regressions pass in the full 26.272-second
+  PostgreSQL/session race suite. Actual Linux ARM64 console routes, protected
+  administrator password lifecycle and full console build pass. Request-time
+  local credential revalidation, recovery/invitation mutation fencing and atomic
+  MFA persistence remain open.
+
 - Public MFA actions now require a fifteen-minute, account/method/credential-bound
   server-side primary-authentication proof. Password recovery cannot enroll or
   confirm MFA, validate TOTP or use backup codes. Current password digest, account
@@ -72,7 +86,7 @@ the table's package summaries do not remove any detail from the roadmap.
   OpenID MFA, and missing/expired/changed-proof denials. Proof/parser and auth/router
   race tests, actual Linux ARM64 console routes, protected administrator lifecycle
   and full Linux build pass. Atomic MFA persistence, one-use/replay guarantees and
-  remaining local sign-in method/approval validation remain open.
+  request-time local credential revalidation remain open.
 
 - Sign-in session creation is shared by password, certificate, OpenID, local
   MFA completion and password replacement. Old authority is cleared on every
@@ -84,8 +98,8 @@ the table's package summaries do not remove any detail from the roadmap.
   including cleanup failure, canceled requests and real mutual-TLS certificate
   sign-in with a disposable CA/OCSP responder. Linux ARM64 administrator password
   lifecycle and full console build pass. OpenID MFA preserves only currently valid
-  identity evidence, with missing evidence requiring reauthentication. Credential
-  mode/approval checks and remaining MFA/recovery authorization remain open.
+  identity evidence, with missing evidence requiring reauthentication. Local account admission and MFA boundaries are covered by the follow-ups above;
+  remaining recovery mutation and concurrency guarantees stay open.
 
 - [Session storage](session-storage.md) now uses unique indexed logical-token
   lookup and permanent transactional revocation receipts. Completed logout,

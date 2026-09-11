@@ -27,8 +27,8 @@ second-factor state from a previous account or flow is never inherited.
 OpenID MFA completion carries forward only an identity which still passes current
 account/binding/policy validation. Its local confirmation remains conditional;
 missing identity requires sign-in again. This shared operation addresses session
-state and cookie publication. Further local credential/method validation and
-remaining MFA persistence and concurrency guarantees remain separate security work.
+state and cookie publication. Local credential/method validation is described below; remaining MFA persistence
+and concurrency guarantees remain separate security work.
 
 Owned regressions reproduced inherited authority and usable cookies after failed
 owner association or login confirmation. Tests cover same-account reauthentication,
@@ -37,6 +37,37 @@ real mutual TLS using a disposable CA and local signed OCSP responses. The compl
 OpenID route matrix covers actual TOTP completion, retained valid identity and
 rejection of missing identity, with both token-encryption modes. The protected
 administrator password/recovery lifecycle also passes with the shared operation.
+
+## Local account admission
+
+Password and certificate admission now lock the current authentication settings
+and account in a Read Committed transaction with a five-second deadline. The
+configured method and account mode must agree. Password admission also matches
+the exact password hash that was verified; both methods reject a changed MFA
+requirement. Revoked, review and incomplete accounts cannot be promoted by login.
+Approved/completed accounts may sign in; issued-certificate accounts can finish
+certificate sign-in. Forced initial-password accounts can enter only the separate
+password-replacement flow, without prematurely completing registration.
+
+The checks run before a password flow starts and again after session ownership is
+associated. Completed admission updates registration and clears the temporary
+certificate password inside that same transaction. Certificate MFA remains pending
+until its second factor completes. The old unconditional `ConfirmLogIn` update has
+been removed. An explicit `authentication-pending` session flag prevents a pending
+first factor from becoming a full session if MFA is disabled while the browser
+is answering its challenge. Public MFA actions require that pending phase too.
+
+Owned regressions reproduced denied account reactivation, password use on a
+certificate account, disabled-method admission and confirmation overwriting an
+intervening revocation. Tests now reject those cases, password changes and newly
+enabled MFA during owner association, plus incompatible certificate account modes.
+A canceled row-lock wait cannot partially confirm an account; a later valid first
+login clears its temporary certificate password. The forced-password lifecycle
+remains restricted and the protected administrator startup/password tests pass.
+
+These checks govern new local sign-in admission. They do not yet provide complete
+request-time local credential revalidation or fence every password-recovery and
+invitation mutation; those remain separate lifecycle requirements.
 
 ## MFA and recovery boundaries
 
@@ -66,7 +97,7 @@ checks cover changed credentials and disabled/revoked state.
 
 These checks do not make the existing enrollment/recovery-code mutations atomic.
 Durable one-use MFA consumption, TOTP replay counters, concurrent enrollment
-completion and comprehensive local sign-in validation remain open. A request which
+completion and request-time local credential revalidation remain open. A request which
 already loaded its primary proof may still race another completion; removing the
 proof from the completed session alone is not a durable consumption receipt.
 

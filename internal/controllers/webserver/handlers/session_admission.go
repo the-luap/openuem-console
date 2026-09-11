@@ -7,9 +7,14 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
 )
 
 func sessionAdmissionError(err error, message string) error {
+	if errors.Is(err, models.ErrLocalSignIn) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Account access or sign-in requirements changed; sign in again.")
+	}
 	var response *echo.HTTPError
 	if errors.As(err, &response) {
 		return response
@@ -41,7 +46,13 @@ func (h *Handler) establishUserSession(c echo.Context, user *ent.User, secondFac
 // account and passes current binding/policy validation. Other old state is cleared.
 func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFactor bool) error {
 	var extra map[string]any
-	confirm := func(context.Context) error { return h.Model.ConfirmLogIn(user.ID) }
+	method := loginproof.Certificate
+	if user.Passwd {
+		method = loginproof.Password
+	}
+	confirm := func(ctx context.Context) error {
+		return h.Model.AdmitLocalSignIn(ctx, user, method, models.LocalSignInComplete)
+	}
 	if user.Openid {
 		if err := h.validateOIDCSession(c, user.ID); err != nil {
 			return err

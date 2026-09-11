@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -119,6 +120,14 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 	if !match {
 		h.AuthLogger.Printf("user %s entered a wrong password", username)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.wrong_username_or_password"), true))
+	}
+
+	stage := models.LocalSignInCheck
+	if user.Register == openuem_nats.REGISTER_FORCE_PASSWORD_CHANGE {
+		stage = models.LocalSignInPasswordReplacement
+	}
+	if err := h.Model.AdmitLocalSignIn(c.Request().Context(), user, loginproof.Password, stage); err != nil {
+		return sessionAdmissionError(err, "Password sign-in could not be checked.")
 	}
 
 	// Check if user is forced to change password
@@ -494,7 +503,9 @@ func (h *Handler) LoginForgotPass(c echo.Context) error {
 }
 
 func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
-	return h.establishUserSession(c, user, false, map[string]any{loginproof.SessionKey: loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now())}, nil)
+	return h.establishUserSession(c, user, false, map[string]any{loginproof.SessionKey: loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now()), "authentication-pending": true}, func(ctx context.Context) error {
+		return h.Model.AdmitLocalSignIn(ctx, user, loginproof.Password, models.LocalSignInPendingMFA)
+	})
 }
 
 func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {

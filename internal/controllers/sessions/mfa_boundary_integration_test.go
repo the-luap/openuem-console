@@ -195,7 +195,7 @@ func TestPasswordMFALifecycleRequiresFreshPrimaryAuthentication(t *testing.T) {
 }
 
 func TestMFARejectsMissingExpiredOrChangedPrimaryProof(t *testing.T) {
-	for _, change := range []string{"missing", "expired", "other account", "changed password", "changed mode", "disabled method", "revoked", "review", "disabled MFA"} {
+	for _, change := range []string{"missing", "missing phase", "expired", "other account", "changed password", "changed mode", "disabled method", "revoked", "review", "disabled MFA"} {
 		t.Run(change, func(t *testing.T) {
 			f := newSessionFixture(t, true)
 			if err := f.model.CreateInitialSettings(); err != nil {
@@ -219,10 +219,13 @@ func TestMFARejectsMissingExpiredOrChangedPrimaryProof(t *testing.T) {
 				t.Fatal(err)
 			}
 			sm.Put(ctx, "uid", user.ID)
+			sm.Put(ctx, "authentication-pending", true)
 			sm.Put(ctx, loginproof.SessionKey, loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now()))
 			switch change {
 			case "missing":
 				sm.Remove(ctx, loginproof.SessionKey)
+			case "missing phase":
+				sm.Remove(ctx, "authentication-pending")
 			case "expired":
 				sm.Put(ctx, loginproof.SessionKey, loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now().Add(-loginproof.Lifetime)))
 			case "other account":

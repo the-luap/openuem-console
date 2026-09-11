@@ -669,6 +669,12 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			return h.Login(c)
 		}
 
+		// A pending first factor cannot silently become a full session if the
+		// account's MFA setting changes while the browser is completing its challenge.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "authentication-pending") && (!user.Use2fa || h.SessionManager.Manager.GetBool(c.Request().Context(), "twofa")) {
+			return h.Login(c)
+		}
+
 		// if use 2fa
 		if user.Use2fa {
 			// check if user has been 2FA authenticated

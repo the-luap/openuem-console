@@ -40,7 +40,14 @@ func TestLocalSessionAdmissionClearsPriorAuthority(t *testing.T) {
 					if err := f.model.CreateDefaultTenantAndSite(); err != nil {
 						t.Fatal(err)
 					}
-					user, err := f.model.Client.User.Create().SetID("login-user").SetName("Owned login").SetPasswd(true).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context())
+					settings, err := f.model.GetAuthenticationSettings()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err = settings.Update().SetUsePasswd(true).Exec(t.Context()); err != nil {
+						t.Fatal(err)
+					}
+					user, err := f.model.Client.User.Create().SetID("login-user").SetName("Owned login").SetPasswd(true).SetHash("owned-validated-hash").SetUse2fa(path == "pending second factor").SetRegister(nats.REGISTER_COMPLETE).Save(t.Context())
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -100,7 +107,17 @@ func TestLocalSessionAdmissionFailureDoesNotIssueIdentity(t *testing.T) {
 		for _, failure := range []string{"owner", "confirmation", "owner and cleanup"} {
 			t.Run(sessionMode(encrypted)+"/"+failure, func(t *testing.T) {
 				f := newSessionFixture(t, encrypted)
-				user, err := f.model.Client.User.Create().SetID("login-user").SetName("Owned login").SetPasswd(true).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context())
+				if err := f.model.CreateInitialSettings(); err != nil {
+					t.Fatal(err)
+				}
+				settings, err := f.model.GetAuthenticationSettings()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = settings.Update().SetUsePasswd(true).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				user, err := f.model.Client.User.Create().SetID("login-user").SetName("Owned login").SetPasswd(true).SetHash("owned-validated-hash").SetRegister(nats.REGISTER_COMPLETE).Save(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -129,6 +146,9 @@ func TestLocalSessionAdmissionFailureDoesNotIssueIdentity(t *testing.T) {
 				}))
 				rec := httptest.NewRecorder()
 				handler.ServeHTTP(rec, httptest.NewRequest("POST", "https://console.test/fixture/admit", nil))
+				if rec.Code != 500 {
+					t.Fatal("admission did not reach the injected storage failure", rec.Code)
+				}
 				if admissionErr == nil {
 					t.Fatal("fault injection did not reject admission")
 				}
@@ -196,7 +216,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 					t.Fatal(err)
 				}
 				const secret = "JBSWY3DPEHPK3PXP"
-				if _, err := f.model.Client.User.Create().SetID("certificate-user").SetName("Owned certificate user").SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret(secret).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context()); err != nil {
+				if _, err := f.model.Client.User.Create().SetID("certificate-user").SetName("Owned certificate user").SetUse2fa(failure != "confirmation").SetTotpSecretConfirmed(true).SetTotpSecret(secret).SetRegister(nats.REGISTER_COMPLETE).Save(t.Context()); err != nil {
 					t.Fatal(err)
 				}
 				sm := scs.New()
