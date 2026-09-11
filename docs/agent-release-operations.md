@@ -38,6 +38,39 @@ certificates and unrelated PEM content are rejected. These are dedicated release
 keys, separate from organization CAs, TLS credentials and broker NKeys. Private
 release keys stay in the protected release-signing environment.
 
+## Separate release job image
+
+`Dockerfile.releases` builds a separate unprivileged scratch image containing only
+the static admission executable and its license. Its source and Go builder are
+explicitly selected, and it contains no shell, signing key, source tree, test
+binary or system trust bundle. It exposes no port and prints English help by
+default. Build and audit it locally with:
+
+```sh
+docker build -f Dockerfile.releases --target runtime -t openuem-agent-releases:local .
+python3 scripts/check-release-image.py openuem-agent-releases:local
+```
+
+Run a database action as a temporary job on the private reference data network.
+Select the runtime UID/GID matching the private inputs, a read-only root filesystem,
+dropped capabilities and `no-new-privileges`. Mount only the protected application
+database URL and its public TLS CA, plus the approved candidate manifest, public
+release key file and read-only package directory required by that action. Keep the
+database URL's `sslrootcert` path and verified hostname consistent with those
+mounts. Pass the URL **path** with `--dburl-file`; the job needs no administrator
+database password, organization CA key, encryption master key or broker seed.
+Offline `inspect` uses `--network none` and needs only the manifest and public keys.
+
+The reference acceptance fixture runs this exact image with a synthetic signed
+manifest and a deliberately non-executable package payload. It checks actual
+database admission, public gateway HEAD/GET/range bytes against the signed hash,
+retained download approval after restart, and HTTP denial following exact-digest
+withdrawal. Its data network and gateway remain unpublished. These checks prove
+the distribution and serving path; they do not assert native package signing,
+notarization, installation or device acceptance.
+
+## Signed manifest inspection
+
 The shared `enrollment/artifacts` package defines schema-1 manifests. The release
 pipeline calls its `Sign` function after native package signing/verification.
 An envelope contains a domain-separated Ed25519 signature over the exact payload.

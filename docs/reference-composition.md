@@ -75,7 +75,10 @@ separate work; the first administrator uses the protected password workflow.
 
 Additional inputs include public HTTPS files, approved release public keys and
 the release repository. The fixture still generates synthetic versions of these
-inputs. That driver is an acceptance fixture, not an ACME or release provisioner.
+inputs. Its optional release-image mode then invokes the actual
+[release admission job](agent-release-operations.md) against a synthetic signed
+manifest and non-executable package. That driver does not obtain public TLS or
+produce a natively signed installer.
 
 Use the broker initializer revision pinned by the console workflow. The separate
 container test exposed an older initializer grant without `hardware`, `recovery`
@@ -157,6 +160,9 @@ The fixture checks:
   preserving the original recovery file and successful replacement-password login.
 - Public Apple unknown-enrollment rejection, desktop bootstrap-key discovery and
   Windows discovery through their actual private HTTPS listeners.
+- With the release image selected, actual private database admission and public
+  gateway HEAD, GET and range downloads whose bytes match the signed manifest;
+  retained approval after restart and download denial after exact withdrawal.
 - A synthetic scoped identity, the real command provisioner's durable consumer
   reconciliation, and a WSS request through gateway, broker authorization and
   the individual worker that changes only that identity's inventory settings.

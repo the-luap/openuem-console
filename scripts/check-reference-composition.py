@@ -48,6 +48,7 @@ def main():
     parser.add_argument("test_binary", type=pathlib.Path)
     parser.add_argument("--legacy-broker-image")
     parser.add_argument("--maintenance-probe-image")
+    parser.add_argument("--release-image")
     args = parser.parse_args()
     if args.legacy_broker_image and not args.maintenance_probe_image:
         raise RuntimeError("legacy maintenance acceptance requires a readiness image")
@@ -261,6 +262,27 @@ def main():
         else:
             health()
         trust = mount(root / "public-ca.pem", "/trust.pem")
+        release_inputs = [*trust, *mount(root / "release-candidate.json", "/run/release-candidate.json"),
+                          *mount(root / "release-keys.pem", "/run/release-keys.pem")]
+        def release_job(action, digest=None):
+            inputs = [*mount(root / "credentials/state/database.url", "/run/database.url"),
+                      *mount(root / "pki/state/trust/backend-ca.pem", "/run/database-ca.pem")]
+            arguments = ["--action", action, "--dburl-file", "/run/database.url", "--actor", "reference-release-fixture"]
+            if action == "accept":
+                inputs += [*mount(root / "releases", "/releases"), *mount(root / "release-keys.pem", "/run/release-keys.pem"),
+                           *mount(root / "release-candidate.json", "/run/release-candidate.json")]
+                arguments += ["--directory", "/releases", "--trusted-keys", "/run/release-keys.pem", "--manifest", "/run/release-candidate.json"]
+            elif action == "withdraw":
+                arguments += ["--digest", digest]
+            return json.loads(command("reference release " + action, "docker", "run", "--rm", "--network", data_network,
+                                      *policy, *inputs, args.release_image, *arguments).stdout)
+        if args.release_image:
+            admitted = release_job("accept")
+            if admitted.get("status") != "accepted" or not re.fullmatch(r"[0-9a-f]{64}", admitted.get("checkpoint", {}).get("digest", "")):
+                raise RuntimeError("release job did not confirm its approved checkpoint")
+            release_digest = admitted["checkpoint"]["digest"]
+            probe("approved gateway package download", "TestReferenceReleaseDownload", edge, release_inputs)
+            print("reference releases: separate admission job and signed-manifest download, HEAD and range passed", flush=True)
         probe("public route separation", "TestReferencePublicRoutes", edge, trust,
               [("OPENUEM_REFERENCE_FORGED_SOURCE", administrator_ip)])
         print("reference console: private administrator and separate public protocol routes passed", flush=True)
@@ -432,6 +454,8 @@ def main():
         probe("retained device WSS admission", "TestReferenceDevice", edge, device)
         probe("retained durable state", "TestReferenceRegistry", data_network, private,
               [("OPENUEM_REFERENCE_ACTION", "verify")])
+        if args.release_image:
+            probe("retained approved package after restart", "TestReferenceReleaseDownload", edge, release_inputs)
 
         held = command("live device probe", "docker", "run", "--detach", "--network", edge, *probe_base, *device,
                        *mount(root / "ready", "/ready", False), "--env", "OPENUEM_REFERENCE_ACTION=hold",
@@ -452,6 +476,13 @@ def main():
         probe("revoked device re-admission denial", "TestReferenceDevice", edge, device,
               [("OPENUEM_REFERENCE_ACTION", "denied")])
         print("reference restart: retained login/device state, command reconciliation and live WSS revocation passed", flush=True)
+        if args.release_image:
+            withdrawn = release_job("withdraw", release_digest)
+            if withdrawn.get("status") != "withdrawn" or withdrawn.get("digest") != release_digest:
+                raise RuntimeError("release job did not confirm exact withdrawal")
+            probe("withdrawn gateway package denial", "TestReferenceReleaseDownload", edge, release_inputs,
+                  [("OPENUEM_REFERENCE_ACTION", "withdrawn")])
+            print("reference releases: retained restart approval and exact withdrawal denial passed", flush=True)
 
 
 if __name__ == "__main__":

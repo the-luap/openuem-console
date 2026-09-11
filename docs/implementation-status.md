@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The separate [release admission image](agent-release-operations.md#separate-release-job-image)
+  now runs the actual protected-file CLI as an unprivileged scratch job. The
+  reference fixture stages a synthetic signed manifest and non-executable payload,
+  admits it through the provisioned PostgreSQL TLS connection, and verifies gateway
+  HEAD, full and ranged downloads against the signed size/hash. Approval survives
+  the complete service restart and historical-grant maintenance with interrupted
+  resume. A final exact-digest withdrawal, using only database URL/public CA mounts,
+  makes subsequent public downloads return 404. Both complete fixture modes pass
+  locally on Linux arm64, as do the strict image filesystem/startup audit, affected
+  vet and workflow checks. Linux amd64/arm64 CI builds and exercises this image.
+  The fixture does not produce or execute a natively signed installer; release
+  signing/notarization, public installer claims and endpoint activation remain
+  distinct acceptance requirements.
+- The [73d5e57 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34543954735)
+  passes on Linux amd64, Linux arm64 and Windows, including generated independent
+  administrator trust, bootstrap mount retirement and retained broker maintenance.
 - The [release admission command](agent-release-operations.md) now accepts
   `--dburl-file` and `OPENUEM_AGENT_DATABASE_URL_FILE` through the shared protected
   credential reader. Raw/file conflicts, missing or damaged files and argument

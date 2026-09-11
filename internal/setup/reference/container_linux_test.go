@@ -7,10 +7,12 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -39,10 +41,14 @@ import (
 	"github.com/open-uem/ent/wingetconfigexclusion"
 	openuem "github.com/open-uem/nats"
 	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/artifacts"
 	"github.com/open-uem/nats/enrollment/keyfile"
 	"github.com/open-uem/nats/enrollment/registry"
 	"github.com/open-uem/nats/enrollment/servicecredentials"
+	"github.com/open-uem/openuem-console/internal/desktop/protocol"
 )
+
+const referencePackage = "Non-executable reference installer integrity fixture.\n"
 
 func fixture(t *testing.T) {
 	t.Helper()
@@ -101,6 +107,97 @@ func TestReferencePrepare(t *testing.T) {
 	defer clear(signing)
 	encoded, _ := x509.MarshalPKIXPublicKey(release)
 	write(t, "/state/release-keys.pem", pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: encoded}))
+	digest := sha256.Sum256([]byte(referencePackage))
+	now := time.Now().UTC()
+	manifest := artifacts.Manifest{Schema: artifacts.Schema, Sequence: 1, Version: "0.12.0", PublishedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
+		Artifacts: []artifacts.Artifact{{Platform: "windows", Architecture: "amd64", Format: "msi", Filename: "openuem-agent-0.12.0-windows-amd64.msi", Size: int64(len(referencePackage)), SHA256: hex.EncodeToString(digest[:])}}}
+	envelope, err := artifacts.Sign(manifest, signing, now)
+	if err != nil {
+		t.Fatal("cannot sign synthetic release metadata")
+	}
+	verified, err := artifacts.Verify(envelope, []ed25519.PublicKey{release}, now, artifacts.Checkpoint{})
+	if err != nil {
+		t.Fatal("synthetic release signature did not verify")
+	}
+	directory := filepath.Join("/state/releases", verified.Digest())
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal("cannot stage synthetic package directory")
+	}
+	write(t, filepath.Join(directory, manifest.Artifacts[0].Filename), []byte(referencePackage))
+	write(t, "/state/release-candidate.json", envelope)
+}
+
+func TestReferenceReleaseDownload(t *testing.T) {
+	fixture(t)
+	data, err := os.ReadFile("/run/release-candidate.json")
+	if err != nil {
+		t.Fatal("synthetic release candidate is unavailable")
+	}
+	public, err := os.ReadFile("/run/release-keys.pem")
+	if err != nil {
+		t.Fatal("synthetic release trust is unavailable")
+	}
+	block, _ := pem.Decode(public)
+	if block == nil {
+		t.Fatal("synthetic release trust is invalid")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	key, ok := parsed.(ed25519.PublicKey)
+	if err != nil || !ok {
+		t.Fatal("synthetic release public key is invalid")
+	}
+	release, err := artifacts.Verify(data, []ed25519.PublicKey{key}, time.Now(), artifacts.Checkpoint{})
+	if err != nil {
+		t.Fatal("synthetic release signature is invalid")
+	}
+	target, err := release.Select("windows", "amd64")
+	if err != nil {
+		t.Fatal("synthetic release target is missing")
+	}
+	path := protocol.DownloadPath(release.Digest(), target.Platform, target.Architecture)
+	client := client(t)
+	if os.Getenv("OPENUEM_REFERENCE_ACTION") == "withdrawn" {
+		status, body, _ := request(t, client, path, nil)
+		if status != http.StatusNotFound || strings.Contains(body, referencePackage) {
+			t.Fatal("withdrawn package remained available through the gateway")
+		}
+		return
+	}
+	for _, method := range []string{http.MethodHead, http.MethodGet, "range"} {
+		verb := method
+		if verb == "range" {
+			verb = http.MethodGet
+		}
+		request, err := http.NewRequestWithContext(t.Context(), verb, "https://uem.example.test:8443"+path, nil)
+		if err != nil {
+			t.Fatal("cannot create synthetic package request")
+		}
+		if method == "range" {
+			request.Header.Set("Range", "bytes=4-11")
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal("gateway package request failed")
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+		response.Body.Close()
+		status, size := http.StatusOK, target.Size
+		if method == "range" {
+			status, size = http.StatusPartialContent, 8
+		}
+		if err != nil || response.StatusCode != status || response.ContentLength != size || !strings.Contains(response.Header.Get("Content-Disposition"), target.Filename) || response.Header.Get("Cache-Control") != "no-store" || response.Header.Get("X-Content-Type-Options") != "nosniff" {
+			t.Fatal("gateway package response lost verified size, status or download headers")
+		}
+		if method == http.MethodHead && len(body) != 0 || method == "range" && string(body) != referencePackage[4:12] {
+			t.Fatal("gateway changed package HEAD or range behavior")
+		}
+		if method == http.MethodGet {
+			digest := sha256.Sum256(body)
+			if hex.EncodeToString(digest[:]) != target.SHA256 || string(body) != referencePackage {
+				t.Fatal("gateway download differs from the signed approved package")
+			}
+		}
+	}
 }
 
 func TestReferenceIdle(t *testing.T) {

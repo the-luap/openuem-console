@@ -197,13 +197,16 @@ jobs:
           set -euo pipefail
           CGO_ENABLED=0 go test -mod=readonly -c -o "$RUNNER_TEMP/reference.test" ./internal/setup/reference
           docker build -f Dockerfile.gateway --target runtime -t reference-gateway:check .
+          docker build -f Dockerfile.releases --target runtime -t reference-releases:check .
+          python3 scripts/check-release-image.py reference-releases:check
           python3 scripts/check-reference-composition.py \
             setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
             database-private-pki:check setup-database-bootstrap:check \
             private-console:check private-broker:check \
             private-service-authorization:check private-service-commands:check \
             individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
-            --maintenance-probe-image setup-reference-probe:check
+            --maintenance-probe-image setup-reference-probe:check \
+            --release-image reference-releases:check
       - name: Retained broker maintenance, interruption recovery and pending commands
         if: runner.os == 'Linux'
         shell: bash
@@ -219,4 +222,5 @@ jobs:
             private-service-authorization:check private-service-commands:check \
             individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
             --legacy-broker-image legacy-broker-initializer:check \
-            --maintenance-probe-image setup-reference-probe:check
+            --maintenance-probe-image setup-reference-probe:check \
+            --release-image reference-releases:check
