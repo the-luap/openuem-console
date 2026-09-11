@@ -76,6 +76,9 @@ with the actual organization, site and legacy agent ID before returning data.
 Audit failure returns an unavailable response without inventory. Waiting,
 unassigned, foreign and ambiguously assigned devices return the same 404 response;
 exactly one site must exist, including associations outside the requested scope.
+The unified desktop list applies the same single-site rule to scoped readers,
+including filtered searches. Server administrators can still inspect ambiguous
+assignments to repair their membership.
 This view also works when individual desktop enrollment is disabled.
 
 Server administrators retain the existing desktop overview. Its edits, other

@@ -14,6 +14,8 @@ import (
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
+	"github.com/open-uem/openuem-console/internal/views/filters"
+	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
 func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.Context, tenant, site, sibling, otherTenant, otherSite int, request func(string, string, string, url.Values) *httptest.ResponseRecorder) {
@@ -71,8 +73,41 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 			}
 		}
 	}
-	if rec := request("scoped-viewer", "GET", base+"/devices", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), `href="`+base+`/computers/windows-fixture"`) {
-		t.Fatal("scoped inventory link missing", rec.Code, rec.Body.String())
+	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin"} {
+		for _, prefix := range []string{"", fmt.Sprintf("/tenant/%d", tenant), base} {
+			for _, filter := range []string{"", "?platform=windows", "?q=inventory"} {
+				rec := request(user, "GET", prefix+"/devices"+filter, nil)
+				if rec.Code != 200 {
+					t.Fatal("scoped inventory list unavailable", rec.Code, rec.Body.String())
+				}
+				for _, hidden := range []string{"inventory-ambiguous", "inventory-two-local-sites", "inventory-foreign", "inventory-orphan", "inventory-waiting"} {
+					if strings.Contains(rec.Body.String(), hidden) {
+						t.Errorf("%s list %s%s exposes %s", user, prefix, filter, hidden)
+					}
+				}
+				if filter == "" && !strings.Contains(rec.Body.String(), `/computers/windows-fixture"`) {
+					t.Fatal("scoped inventory link missing")
+				}
+			}
+		}
+	}
+	if rec := request("apple-console-admin", "GET", base+"/devices", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "inventory-ambiguous") {
+		t.Fatal("administrator cannot inspect ambiguous assignments", rec.Code, rec.Body.String())
+	}
+	for _, user := range []string{"scoped-viewer", "scoped-operator", "organization-admin", "apple-console-admin"} {
+		principal, err := h.Access.Principal(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info := &partials.CommonInfo{TenantID: fmt.Sprint(tenant), SiteID: fmt.Sprint(site), Principal: principal}
+		count, err := h.Model.CountAllComputers(filters.AgentFilter{}, info)
+		want := 2 // The admitted Windows report and the partial report.
+		if principal.IsAdministrator() {
+			want = 4 // Administrators can inspect both ambiguous assignments.
+		}
+		if err != nil || count != want {
+			t.Fatal("inventory count exposed hidden assignments", user, count, err)
+		}
 	}
 	if rec := request("scoped-viewer", "GET", base+"/computers/inventory-partial", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "No hardware report received yet.") || !strings.Contains(rec.Body.String(), "No operating system report received yet.") {
 		t.Fatal("partial report unavailable", rec.Code, rec.Body.String())
