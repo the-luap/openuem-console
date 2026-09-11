@@ -28,6 +28,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	"github.com/pquerna/otp/totp"
 )
 
 type ownedOIDCGrant struct {
@@ -268,6 +269,7 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	e.GET("/fixture/session", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) })
 	e.GET("/myaccount", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) }, h.IsAuthenticated)
 	e.GET("/fixture/remove-identity", func(c echo.Context) error { sm.Remove(c.Request().Context(), oidcSessionKey); return c.NoContent(200) })
+	e.GET("/fixture/complete-mfa", h.LoginTOTPValidate)
 	e.GET("/fixture/old-session", func(c echo.Context) error {
 		uid := "password-victim"
 		if c.QueryParam("same") == "yes" {
@@ -356,6 +358,51 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 		}
 	}
 	configure("authelia")
+	t.Run("MFA preserves only a currently valid OpenID identity", func(t *testing.T) {
+		const secret = "JBSWY3DPEHPK3PXP"
+		if err := m.Client.User.UpdateOneID("oidc-reader").SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret(secret).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := m.Client.User.UpdateOneID("oidc-reader").SetUse2fa(false).SetTotpSecretConfirmed(false).SetTotpSecret("").Exec(t.Context()); err != nil {
+				t.Error(err)
+			}
+		}()
+		for _, missing := range []bool{false, true} {
+			b := browser{}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("OIDC did not create pending MFA session", rec.Code)
+			}
+			oldToken := b[sm.Cookie.Name].Value
+			if missing {
+				request(b, "/fixture/remove-identity")
+			}
+			code, err := totp.GenerateCode(secret, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec := request(b, "/fixture/complete-mfa?confirm-code="+url.QueryEscape(code))
+			if missing {
+				if rec.Code != 401 || request(b, "/fixture/session").Body.String() != "" {
+					t.Fatal("missing OpenID identity did not require reauthentication", rec.Code)
+				}
+				continue
+			}
+			if rec.Code != 302 {
+				t.Fatal("valid OpenID MFA completion failed", rec.Code)
+			}
+			ctx, err := sm.Load(t.Context(), b[sm.Cookie.Name].Value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !sm.GetBool(ctx, "twofa") || sm.GetString(ctx, oidcSessionKey) == "" || b[sm.Cookie.Name].Value == oldToken {
+				t.Fatal("MFA completion lost identity or retained the old token")
+			}
+			if rec = request(b, "/myaccount"); rec.Code != 200 {
+				t.Fatal("completed OpenID MFA could not access protected route", rec.Code)
+			}
+		}
+	})
 	for _, username := range []string{"renamed-user", "password-victim", "certificate-victim", ""} {
 		b := browser{}
 		if rec := request(b, begin(b, "valid", username, "subject-oidc-reader")); rec.Code != 302 || request(b, "/fixture/session").Body.String() != "oidc-reader" {

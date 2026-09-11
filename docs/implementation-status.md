@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Sign-in session creation is shared by password, certificate, OpenID, local
+  MFA completion and password replacement. Old authority is cleared on every
+  renewal, including the same account; owner association and required confirmation
+  finish before cookie publication. A failed admission clears memory before bounded
+  deletion so SCS cannot re-save an authenticated error response. The owned baseline
+  reproduced inherited recovery/MFA state and usable cookies after bookkeeping
+  failures. The full PostgreSQL/session race suite passes in 14.037 seconds,
+  including cleanup failure, canceled requests and real mutual-TLS certificate
+  sign-in with a disposable CA/OCSP responder. Linux ARM64 administrator password
+  lifecycle and full console build pass. OpenID MFA preserves only currently valid
+  identity evidence, with missing evidence requiring reauthentication. Credential
+  mode/approval checks and remaining MFA/recovery authorization remain open.
+
 - [Session storage](session-storage.md) now uses unique indexed logical-token
   lookup and permanent transactional revocation receipts. Completed logout,
   administrator/bulk deletion, truncation and expiry cleanup cannot be undone by

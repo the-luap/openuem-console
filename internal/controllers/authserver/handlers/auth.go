@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -41,33 +42,17 @@ func (h *Handler) Auth(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Access is denied")
 	}
 
-	msg := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if msg != uid {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	values := map[string]any{
+		"uid": user.ID, "username": user.Name, "email": user.Email, "usepasswd": user.Passwd, "twofa": false,
+		"user-agent": c.Request().UserAgent(), "ip-address": c.Request().RemoteAddr,
+	}
+	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
+		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {
+			return err
 		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", uid)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-		if err := h.Model.AddUserToSession(c.Request().Context(), token, uid, h.EncryptionMasterKey); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
-		// if it's the first time let's confirm login and remove the cert password
-		if err := h.Model.ConfirmLogIn(uid); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
+		return h.Model.ConfirmLogIn(uid)
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Certificate sign-in session could not be completed.")
 	}
 
 	if user.Use2fa {

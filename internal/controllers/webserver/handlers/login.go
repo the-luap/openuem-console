@@ -135,18 +135,15 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 		return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 	}
 
-	// Passwords match, create a new session
-	if err := h.NewSession(c, user); err != nil {
-		log.Printf("[ERROR]: could not create a new session after passwords match, reason: %v", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
-	}
-
 	if user.Use2fa {
+		if err := h.NewSession(c, user); err != nil {
+			log.Printf("[ERROR]: could not create a second-factor session: %v", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
+		}
 		if user.TotpSecretConfirmed {
 			return RenderLoginPartial(c, login_views.Use2FA(username, tsSiteKey, tsSecretKey))
-		} else {
-			return h.Register2FA(c)
 		}
+		return h.Register2FA(c)
 	}
 
 	return h.AccessGranted(c, user)
@@ -316,30 +313,8 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 	// 2FA has been enabled
 	h.AuthLogger.Printf("user %s has enabled 2FA", username)
 
-	if err := h.SessionManager.Manager.RenewToken(c.Request().Context()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-	h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-	h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-	h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-	h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-	h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-	h.SessionManager.Manager.Put(c.Request().Context(), "twofa", true)
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-	if err := h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	// if it's the first time let's confirm login
-	if err := h.Model.ConfirmLogIn(user.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	if err := h.completeUserSession(c, user, true); err != nil {
+		return sessionAdmissionError(err, "Second-factor session could not be completed.")
 	}
 
 	// TODO - Get user's default tenant and site
@@ -486,58 +461,12 @@ func (h *Handler) LoginForgotPass(c echo.Context) error {
 }
 
 func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
-	sessionUID := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if sessionUID != user.ID {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		h.SessionManager.Manager.Put(c.Request().Context(), "twofa", false)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-	}
-
-	return nil
+	return h.establishUserSession(c, user, false, nil, nil)
 }
 
 func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
-	err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-	h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-	h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-	h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-	h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-	h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-	if user.Use2fa {
-		h.SessionManager.Manager.Put(c.Request().Context(), "twofa", true)
-	}
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-	if err := h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	// if it's the first time let's confirm login
-	if err := h.Model.ConfirmLogIn(user.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	if err := h.completeUserSession(c, user, user.Use2fa); err != nil {
+		return sessionAdmissionError(err, "Sign-in session could not be completed.")
 	}
 
 	// TODO - Get user's default tenant and site
@@ -737,20 +666,6 @@ func (h *Handler) VerifyForgotPasswordCode(c echo.Context) error {
 
 func (h *Handler) CreateForgotPasswordSession(c echo.Context, user *ent.User) error {
 	return h.createPasswordReplacementSession(c, user, nil)
-}
-
-func (h *Handler) UpdateForgotPasswordSession(c echo.Context, user *ent.User) error {
-	if err := h.SessionManager.Manager.RenewToken(c.Request().Context()); err != nil {
-		return err
-	}
-
-	h.SessionManager.Manager.Remove(c.Request().Context(), "forgot")
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return err
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-	return nil
 }
 
 func (h *Handler) LoginNewUser(c echo.Context) error {

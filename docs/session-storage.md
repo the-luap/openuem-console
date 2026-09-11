@@ -8,6 +8,36 @@ lookup verifies its actual token representation before returning data. Neither
 the digest nor an encrypted database token is accepted as the browser token.
 SCS payload encoding is unchanged; this is not payload encryption.
 
+## Sign-in admission
+
+Password, certificate, OpenID, local MFA completion and password-replacement
+flows use one session-establishment operation. It clears all old values, renews
+the token even for the same account, stores the new flow, associates its owner
+and completes any required login confirmation before publishing the cookie.
+Completed password login without MFA no longer issues an intermediate cookie.
+Pending second-factor sessions also have an owner for administrative deletion.
+An unused recovery helper which removed the recovery restriction has been removed.
+
+Failure clears in-memory identity before attempting bounded storage deletion.
+This prevents outer SCS error rendering from saving an authenticated session again,
+including when deletion itself fails. Cleanup uses a separate two-second context
+so cancellation of the initiating request does not prevent cleanup. Recovery and
+second-factor state from a previous account or flow is never inherited.
+
+OpenID MFA completion carries forward only an identity which still passes current
+account/binding/policy validation. Its local confirmation remains conditional;
+missing identity requires sign-in again. This shared operation addresses session
+state and cookie publication. Further local credential/method validation and
+MFA/recovery workflow authorization remain separate security work.
+
+Owned regressions reproduced inherited authority and usable cookies after failed
+owner association or login confirmation. Tests cover same-account reauthentication,
+account changes, cleanup failure and canceled requests. Certificate tests perform
+real mutual TLS using a disposable CA and local signed OCSP responses. The complete
+OpenID route matrix covers actual TOTP completion, retained valid identity and
+rejection of missing identity, with both token-encryption modes. The protected
+administrator password/recovery lifecycle also passes with the shared operation.
+
 ## Durable deletion
 
 Deleting a session also inserts its digest and deletion time into

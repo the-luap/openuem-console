@@ -36,33 +36,15 @@ func (h *Handler) authorizePasswordReplacement(c echo.Context, user *ent.User, k
 // authority until its independent code is verified. Existing sessions are renewed
 // and all previous replacement/MFA state is removed before recording a new flow.
 func (h *Handler) createPasswordReplacementSession(c echo.Context, user *ent.User, proof *models.PasswordReplacementProof) error {
-	sm, ctx := h.SessionManager.Manager, c.Request().Context()
-	if err := sm.RenewToken(ctx); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be created.")
-	}
-	for _, key := range []string{"password-replacement-kind", "password-replacement-password", "password-replacement-source", "password-replacement-expiry", "twofa"} {
-		sm.Remove(ctx, key)
-	}
-	sm.Put(ctx, "uid", user.ID)
-	sm.Put(ctx, "username", user.Name)
-	sm.Put(ctx, "user-agent", c.Request().UserAgent())
-	sm.Put(ctx, "ip-address", c.Request().RemoteAddr)
-	sm.Put(ctx, "usepasswd", user.Passwd)
-	sm.Put(ctx, "email", user.Email)
-	sm.Put(ctx, "forgot", true)
+	values := map[string]any{"forgot": true}
 	if proof != nil {
-		sm.Put(ctx, "password-replacement-kind", proof.Kind)
-		sm.Put(ctx, "password-replacement-password", proof.PasswordDigest)
-		sm.Put(ctx, "password-replacement-source", proof.SourceDigest)
-		sm.Put(ctx, "password-replacement-expiry", proof.ExpiresAt.Unix())
+		values["password-replacement-kind"] = proof.Kind
+		values["password-replacement-password"] = proof.PasswordDigest
+		values["password-replacement-source"] = proof.SourceDigest
+		values["password-replacement-expiry"] = proof.ExpiresAt.Unix()
 	}
-	token, expiry, err := sm.Commit(ctx)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be stored.")
-	}
-	sm.WriteSessionCookie(ctx, c.Response().Writer, token, expiry)
-	if err = h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be associated.")
+	if err := h.establishUserSession(c, user, false, values, nil); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Password replacement session could not be created.")
 	}
 	return nil
 }

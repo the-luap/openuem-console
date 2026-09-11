@@ -451,51 +451,14 @@ func ReadOIDCCookie(c echo.Context, name string, secretKey string) (string, erro
 // CreateSession establishes a fresh OpenID session. Never inherit another
 // account's second-factor or recovery flags, even when reauthenticating the same
 // local account. Cookies are issued only after admission bookkeeping succeeds.
-func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcaccounts.Session) (err error) {
-	ctx := c.Request().Context()
-	sm := h.SessionManager.Manager
-	defer func() {
-		if err != nil {
-			// Clear in-memory authentication before attempting storage cleanup. The
-			// outer session middleware may retry a commit when rendering this error.
-			_ = sm.Clear(ctx)
-			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
-			defer cancel()
-			if cleanupErr := sm.Destroy(cleanup); cleanupErr != nil {
-				log.Print("[ERROR]: could not remove failed OpenID session")
-			}
-		}
-	}()
-	if err = sm.Clear(ctx); err != nil {
-		return err
-	}
-	if err = sm.RenewToken(ctx); err != nil {
-		return err
-	}
-	sm.Put(ctx, "uid", user.ID)
-	sm.Put(ctx, "username", user.Name)
-	sm.Put(ctx, "user-agent", c.Request().UserAgent())
-	sm.Put(ctx, "ip-address", c.Request().RemoteAddr)
-	sm.Put(ctx, "usepasswd", user.Passwd)
-	sm.Put(ctx, "email", user.Email)
-	sm.Put(ctx, "twofa", false)
+func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcaccounts.Session) error {
 	identityJSON, err := json.Marshal(identity)
 	if err != nil {
 		return err
 	}
-	sm.Put(ctx, oidcSessionKey, string(identityJSON))
-	token, expiry, err := sm.Commit(ctx)
-	if err != nil {
-		return err
-	}
-	if err = h.Model.AddUserToSession(c.Request().Context(), token, user.ID, h.EncryptionMasterKey); err != nil {
-		return err
-	}
-	if err = h.Model.ConfirmOIDCLogIn(ctx, user.ID); err != nil {
-		return err
-	}
-	sm.WriteSessionCookie(ctx, c.Response().Writer, token, expiry)
-	return nil
+	return h.establishUserSession(c, user, false, map[string]any{oidcSessionKey: string(identityJSON)}, func(ctx context.Context) error {
+		return h.Model.ConfirmOIDCLogIn(ctx, user.ID)
+	})
 }
 
 func (h *Handler) GetRedirectURI(c echo.Context) string {

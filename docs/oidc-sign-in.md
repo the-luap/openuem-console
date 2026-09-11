@@ -157,6 +157,10 @@ Owned regression fixtures also reproduce and reject inherited 2FA/recovery flags
 and authenticated sessions after owner-association or confirmation failures.
 The fixed cases cover both account switching and reauthentication, old-token
 retirement, and injected session-store and cleanup failures.
+Session creation now shares the failure-safe operation used by the other login
+methods. Actual local TOTP completion preserves the current OpenID identity while
+renewing the token; missing identity evidence requires reauthentication instead of
+promoting the partial session.
 Protected-route tests cover live identity/policy changes, revocation and account
 mode/approval changes, missing legacy evidence, database lock cancellation and
 recovery, and an account revoked by a database trigger during admission.
