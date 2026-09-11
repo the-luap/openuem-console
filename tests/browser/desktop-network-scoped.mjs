@@ -1,10 +1,12 @@
 // GET submissions stay on the owned read-only fixture server.
+import { checkCurrentLink } from "./inventory-navigation.mjs";
 export default async function run(browser, record) {
   const { visit, evaluate, check, enter, capture } = browser;
   for (const role of ["viewer", "operator"])
     for (const state of ["first", "next", "empty", "long"])
       for (const width of [390, 768, 1440]) {
         await visit("desktop-network-scoped-" + state + "-" + role, width);
+        await checkCurrentLink(browser, "Computer inventory", "Reported network");
         check(await evaluate(`document.querySelector('main').querySelectorAll('img,iframe,form[method="post"],[uk-tooltip]').length === 0 && !window.__ownedNetworkMarkup`), "Network report injected markup, rich tooltips or mutation controls");
         check(await evaluate(`document.querySelector('nav[aria-label="Computer inventory"] a[aria-current="page"]').textContent === 'Reported network'`), "Network navigation lost its active page");
         check(await evaluate(`document.querySelector('main section').textContent.includes('Last agent report: Never reported')`), "Report label and timestamp ran together");

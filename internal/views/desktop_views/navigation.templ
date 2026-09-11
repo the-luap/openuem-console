@@ -1,0 +1,18 @@
+package desktop_views
+
+import (
+	"net/url"
+
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
+	<nav aria-label={ i18n.T(ctx,"inventory_navigation.label") } class="flex flex-wrap gap-2 mt-4">
+		<a class={ inventoryLinkClass(active,"overview") } href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/inventory") } aria-current={ inventoryCurrent(active,"overview") }>{ i18n.T(ctx,"inventory_navigation.overview") }</a>
+		<a class={ inventoryLinkClass(active,"software") } href={ softwareURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"software") }>{ i18n.T(ctx,"inventory_navigation.software") }</a>
+		<a class={ inventoryLinkClass(active,"network") } href={ networkURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"network") }>{ i18n.T(ctx,"inventory_navigation.network") }</a>
+		<a class={ inventoryLinkClass(active,"storage") } href={ storageURL(info,id,inventory.PhysicalStorage,"",0) } aria-current={ inventoryCurrent(active,"storage") }>{ i18n.T(ctx,"storage_inventory.reported") }</a>
+	</nav>
+}

@@ -1,23 +1,12 @@
 package desktop_views
 
 import (
- "net/url"
- "github.com/invopop/ctxi18n/i18n"
  "github.com/labstack/echo/v4"
  "github.com/open-uem/openuem-console/internal/inventory"
  "github.com/open-uem/openuem-console/internal/views/layout"
  "github.com/open-uem/openuem-console/internal/views/mdm_views"
  "github.com/open-uem/openuem-console/internal/views/partials"
 )
-
-templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
- <nav aria-label="Computer inventory" class="flex flex-wrap gap-2 mt-4">
-  <a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/inventory") } aria-current={ inventoryCurrent(active, "overview") }>Overview</a>
-  <a class="uk-button uk-button-default" href={ softwareURL(info, id, "", 0) } aria-current={ inventoryCurrent(active, "software") }>Reported software</a>
-  <a class="uk-button uk-button-default" href={ networkURL(info, id, "", 0) } aria-current={ inventoryCurrent(active, "network") }>Reported network</a>
-  <a class="uk-button uk-button-default" href={ storageURL(info, id, inventory.PhysicalStorage, "", 0) } aria-current={ inventoryCurrent(active, "storage") }>{ i18n.T(ctx,"storage_inventory.reported") }</a>
- </nav>
-}
 
 templ Software(c echo.Context, info *partials.CommonInfo, page *inventory.SoftwarePage, filter inventory.SoftwareFilter) {
  @layout.Base("devices", info) {

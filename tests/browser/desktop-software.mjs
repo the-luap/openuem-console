@@ -1,10 +1,12 @@
 // The fixture server remains read-only; native GET submissions are intercepted.
+import { checkCurrentLink } from "./inventory-navigation.mjs";
 export default async function run(browser, record) {
   const { visit, evaluate, check, enter, capture } = browser;
   for (const role of ["viewer", "operator"])
     for (const state of ["first", "next", "empty", "long"])
       for (const width of [390, 768, 1440]) {
         await visit("desktop-software-" + state + "-" + role, width);
+        await checkCurrentLink(browser, "Computer inventory", "Reported software");
         check(await evaluate(`document.querySelector('main').querySelectorAll('img,iframe,form[method="post"]').length === 0`), "Software report injected markup or mutation controls");
         check(await evaluate(`document.querySelector('nav[aria-label="Computer inventory"] a[aria-current="page"]').textContent === 'Reported software'`), "Software navigation lost its active page");
         const links = await evaluate(`(() => {

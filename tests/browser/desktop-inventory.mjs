@@ -1,9 +1,11 @@
 // Rendered inventory and refresh forms; keyboard submissions never leave the page.
+import { checkCurrentLink } from "./inventory-navigation.mjs";
 export default async function run(browser, record) {
   const { visit, evaluate, check, enter, capture } = browser;
   for (const page of ["desktop-inventory", "desktop-inventory-partial", "desktop-inventory-missing-numbers", "desktop-inventory-zero-numbers"])
     for (const width of [390, 768, 1440]) {
       await visit(page, width);
+      await checkCurrentLink(browser, "Computer inventory", "Overview");
       check(
         await evaluate(`document.querySelector('main').textContent.includes('Computer inventory') &&
           document.querySelector('main').querySelectorAll('form,img,iframe').length === 0 &&
@@ -42,6 +44,7 @@ export default async function run(browser, record) {
     for (const state of ["new", ...Object.keys(labels)])
       for (const width of [390, 768, 1440]) {
         await visit("desktop-refresh-" + state + "-" + role, width);
+        await checkCurrentLink(browser, "Computer inventory", "Overview");
         const hasForm = role === "operator" && state !== "queued" && state !== "pending";
         const data = await evaluate(`(() => {
           const panel = document.querySelector('#inventory-refresh');

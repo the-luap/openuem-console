@@ -37,7 +37,7 @@ templ Storage(c echo.Context, info *partials.CommonInfo, page *inventory.Storage
 					<p class="uk-text-muted mt-2">{ i18n.T(ctx,"storage_inventory.evidence") }</p>
 					<nav aria-label={ i18n.T(ctx, "storage_inventory.kinds") } class="flex flex-wrap gap-2 mt-4">
 						for _, kind := range []inventory.StorageKind{inventory.PhysicalStorage, inventory.LogicalStorage} {
-							<a class="uk-button uk-button-default" href={ storageURL(info, page.DeviceID, kind, "", 0) } aria-current={ inventoryCurrent(string(filter.Kind), string(kind)) }>{ i18n.T(ctx,"storage_inventory."+string(kind)) }</a>
+							<a class={ inventoryLinkClass(string(filter.Kind),string(kind)) } href={ storageURL(info, page.DeviceID, kind, "", 0) } aria-current={ inventoryCurrent(string(filter.Kind), string(kind)) }>{ i18n.T(ctx,"storage_inventory."+string(kind)) }</a>
 						}
 					</nav>
 					if filter.Kind == inventory.LogicalStorage {

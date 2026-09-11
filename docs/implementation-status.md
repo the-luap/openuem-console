@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Shared computer inventory navigation now gives its current page a visible
+  highlight and underline alongside `aria-current="page"`; physical/logical
+  storage selection uses the same styling. Navigation labels come from the
+  existing language catalog with English fallback. Desktop view race tests
+  pass in 4.667 seconds and the full Linux ARM64 console build passes. All 516
+  browser cases pass, including computed active/inactive styling across report
+  pages, unchanged scope/search/cursor links and narrow-screen layouts.
+
 - Delegated hardware and operating-system GET aliases now open the existing
   scoped, audited computer overview. The projection continues to exclude
   signed-in users, notes and internal agent settings. Optional memory and core

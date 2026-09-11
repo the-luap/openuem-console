@@ -114,6 +114,12 @@ The **Reported storage** tab provides [scoped physical and logical disk reports]
 with literal search, bounded pages and audited reads. Stored usage defaults and
 BitLocker strings remain reported evidence; current encryption is not verified.
 
+The shared inventory navigation identifies the current page through a highlighted,
+underlined link and `aria-current="page"`. The physical/logical storage selector
+uses the same presentation. Shared navigation labels use the existing language
+catalog with English fallback. Scoped targets and first-page recovery remain
+unchanged; browser checks verify computed styling and narrow-screen wrapping.
+
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA
 storage, redacted import errors, token-free metadata, confirmation/CSRF rejection

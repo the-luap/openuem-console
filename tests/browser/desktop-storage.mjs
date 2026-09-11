@@ -1,4 +1,5 @@
 // Forms are intercepted on the owned fixture server; no device is contacted.
+import { checkCurrentLink } from "./inventory-navigation.mjs";
 export default async function run(browser, record) {
   const { visit, evaluate, check, enter, capture } = browser;
   for (const kind of ["physical", "logical"])
@@ -6,6 +7,8 @@ export default async function run(browser, record) {
       for (const state of ["first", "next", "empty", "long"])
         for (const width of [390, 768, 1440]) {
           await visit(`desktop-storage-${kind}-${state}-${role}`, width);
+          await checkCurrentLink(browser, "Computer inventory", "Reported storage");
+          await checkCurrentLink(browser, "Storage reports", kind === "physical" ? "Physical disks" : "Logical disks");
           check(await evaluate(`document.querySelector('main').querySelectorAll('img,iframe,form[method="post"],[uk-tooltip]').length===0 && !window.__ownedStorageMarkup`), "Storage report injected markup or mutation controls");
           check(await evaluate(`document.querySelector('nav[aria-label="Computer inventory"] a[aria-current="page"]').textContent==='Reported storage'`), "Storage navigation lost its active page");
           check(await evaluate(`document.querySelector('main section').textContent.includes('Last agent report: Never reported')`), "Storage report label and timestamp ran together");

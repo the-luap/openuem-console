@@ -15,6 +15,13 @@ func inventoryCurrent(active, tab string) string {
 	return "false"
 }
 
+func inventoryLinkClass(active, tab string) string {
+	if active == tab {
+		return "uk-button uk-button-primary underline"
+	}
+	return "uk-button uk-button-default"
+}
+
 func softwareURL(info *partials.CommonInfo, id, search string, after int64) string {
 	return inventoryReportURL(info, id, "software", search, after)
 }
