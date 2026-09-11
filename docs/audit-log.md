@@ -44,6 +44,7 @@ The tests verify encoded fields, not every spreadsheet application's behavior.
 | --- | --- | --- |
 | Apple | `mdm_apple_audit` | Original organization; new device/command events capture site at write time and explicit results |
 | Agent | `uem_agent_audit` | Organization and stored site; legacy result is `recorded` |
+| Inventory | `uem_inventory_audit` | Scoped desktop overview reads with the actual organization/site and legacy agent ID, result `recorded`; available independently of desktop enrollment |
 | Access | `uem_access_audit` | Server-wide; permission change metadata, result `recorded` |
 | Release | `uem_desktop_release_audit` | Server-wide; approved desktop release metadata, result `recorded` |
 | Activity | `uem_audit_activity` | Audit page/export access in the requested scope |

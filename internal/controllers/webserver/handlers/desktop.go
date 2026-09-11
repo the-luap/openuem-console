@@ -17,8 +17,11 @@ import (
 
 func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
-	if method == http.MethodGet && route == "/desktop/enrollment" {
-		return access.ReadDevices, true
+	if method == http.MethodGet {
+		switch route {
+		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview":
+			return access.ReadDevices, true
+		}
 	}
 	if method == http.MethodPost {
 		switch route {

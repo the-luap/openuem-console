@@ -143,8 +143,8 @@ func exerciseMacConsole(t *testing.T, h *Handler, ctx context.Context, tenantID,
 		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Management channel history") || !strings.Contains(rec.Body.String(), old.DeviceID) || !strings.Contains(rec.Body.String(), identity.DeviceID) {
 			t.Fatal("canonical detail or history missing", user, rec.Code, rec.Body.String())
 		}
-		if strings.Contains(rec.Body.String(), "Open agent inventory and actions") != (user == "apple-console-admin") {
-			t.Fatal("association changed legacy action permission", user)
+		if !strings.Contains(rec.Body.String(), "Open agent inventory") {
+			t.Fatal("association omitted permitted inventory link", user)
 		}
 		if rec.Header().Get("Cache-Control") != "no-store" {
 			t.Fatal("device metadata can be cached")
@@ -173,7 +173,7 @@ func exerciseMacConsole(t *testing.T, h *Handler, ctx context.Context, tenantID,
 	if err = h.Model.Client.Agent.UpdateOneID(identity.DeviceID).ClearRelease().Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if rec = request("apple-console-admin", "GET", canonical, nil); rec.Code != 200 || strings.Contains(rec.Body.String(), "Open agent inventory and actions") {
+	if rec = request("apple-console-admin", "GET", canonical, nil); rec.Code != 200 || strings.Contains(rec.Body.String(), "Open agent inventory") {
 		t.Fatal("incomplete inventory exposed legacy actions", rec.Code)
 	}
 	if err = h.Model.Client.Agent.UpdateOneID(identity.DeviceID).SetRelease(installed).Exec(ctx); err != nil {
@@ -182,8 +182,8 @@ func exerciseMacConsole(t *testing.T, h *Handler, ctx context.Context, tenantID,
 	if rec = request("apple-console-admin", "GET", base+"/computers/"+identity.DeviceID, nil); rec.Code != 200 {
 		t.Fatal("canonical agent link does not open inventory", rec.Code, rec.Body.String())
 	}
-	if rec = request("scoped-viewer", "GET", base+"/computers/"+identity.DeviceID, nil); rec.Code != 403 {
-		t.Fatal("canonical read granted legacy access", rec.Code)
+	if rec = request("scoped-viewer", "GET", base+"/computers/"+identity.DeviceID, nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "Computer inventory") || strings.Contains(rec.Body.String(), "endpoint-description") {
+		t.Fatal("canonical read did not open scoped inventory", rec.Code)
 	}
 	var before int
 	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE device_id=$1`, current.DeviceID).Scan(&before); err != nil {
@@ -201,7 +201,7 @@ func exerciseMacConsole(t *testing.T, h *Handler, ctx context.Context, tenantID,
 		t.Fatal(err)
 	}
 	rec = request("apple-console-admin", "GET", canonical, nil)
-	if rec.Code != 200 || strings.Contains(rec.Body.String(), "Open agent inventory and actions") {
+	if rec.Code != 200 || strings.Contains(rec.Body.String(), "Open agent inventory") {
 		t.Fatal("moved legacy inventory retained a canonical action link", rec.Code)
 	}
 	if err = h.Model.Client.Agent.UpdateOneID(identity.DeviceID).ClearSite().AddSiteIDs(siteID).Exec(ctx); err != nil {

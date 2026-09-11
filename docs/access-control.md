@@ -63,11 +63,26 @@ metadata reads, operator invitation revocation, and organization-administrator
 authority setup and identity revocation. Its action routes are explicitly mapped
 to capabilities and verify the selected scope before using the registry.
 
-The unified inventory includes scoped desktop rows, but legacy desktop detail,
-software deployment, remote actions and other legacy administration routes still
-require a server administrator. Those individual desktop permissions remain
-expanded roadmap work. A new route is not implicitly enabled for a scoped role
-because it shares a URL prefix or uses GET.
+The unified inventory links desktop rows to a scoped, read-only overview for
+viewers, operators and organization administrators. Both `/computers/:uuid` and
+`/computers/:uuid/overview` accept the organization/site URL prefixes. Linked Mac
+devices also offer **Open agent inventory**. The overview includes device identity,
+report times, addresses, hardware and operating system version. Missing reports
+have explicit empty states. Notes, task output, agent configuration, remote access
+data and signed-in user information are excluded from the database projection.
+
+The read transaction rechecks current grants and records `inventory.desktop.read`
+with the actual organization, site and legacy agent ID before returning data.
+Audit failure returns an unavailable response without inventory. Waiting,
+unassigned, foreign and ambiguously assigned devices return the same 404 response;
+exactly one site must exist, including associations outside the requested scope.
+This view also works when individual desktop enrollment is disabled.
+
+Server administrators retain the existing desktop overview. Its edits, other
+legacy detail routes, software deployment and remote actions still require a
+server administrator. Those individual desktop action permissions remain roadmap
+work. A new route is not implicitly enabled for a scoped role because it shares a
+URL prefix or uses GET.
 
 ## Concurrent changes and audit
 

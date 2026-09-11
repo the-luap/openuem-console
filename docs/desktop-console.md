@@ -36,6 +36,8 @@ rotation need a separate lifecycle and are not provided by this form.
 | Action | Required permission |
 | --- | --- |
 | Read public CA metadata, invitations and individual identities | Viewer in the selected organization or site |
+| Read the scoped computer overview | Viewer in the selected organization or site |
+| Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
 | Set up the organization authority | Organization administrator for the entire organization |
 | Revoke a device identity | Organization administrator for that device's organization |
@@ -57,7 +59,8 @@ Re-enrollment requires a new endpoint identity.
 Lists use 25-row keyset pages, retain revoked records and never recover invitation
 tokens or private keys. Successful reads are recorded in `uem_agent_audit` with
 actor and scope. Collection events use the nil UUID as their resource ID. A
-general audit viewer and retention/export controls remain pending.
+[general audit viewer](audit-log.md) supports scoped search, export and reviewed
+retention policies.
 
 **Identity ready** means that issuance and the last recorded command-consumer
 provisioning succeeded. It does not mean that the computer is online, that the
@@ -67,13 +70,22 @@ command provisioning. It does not infer online status from unused timestamps.
 
 ## Installation boundary and verification
 
-The current page does not create new installation links. Approved release binding
-and the [private/public HTTP protocol](desktop-public-protocol.md) are implemented.
-Protected endpoint storage and durable claim recovery now pass native agent tests.
-The Windows/Mac installation page, runtime and signed bootstrap integration are
-still in progress. Existing invitations created through the
-shared registry can be reviewed and revoked. Legacy desktop administration routes
-retain their separate server-administrator boundary.
+The page creates installation invitations when an approved release, matching
+packages and the protected bootstrap signer are configured. It binds the chosen
+target, release and organization/site, then displays the invitation URL once.
+The [private/public HTTP protocol](desktop-public-protocol.md) supplies the public
+installation instructions, signed configuration and protected claim/download
+workflow. Protected endpoint storage, durable claim recovery and native installed
+service activation have synthetic tests; finished signed Windows/Mac installer
+distribution and physical endpoint acceptance remain open.
+
+The unified device list and linked Mac page open a read-only computer overview for
+scoped roles. It includes hardware, operating system version and report metadata,
+with explicit empty states for missing reports. It does not depend on enrollment
+being configured. Its reads recheck permissions and commit an inventory audit
+event before responding. See [access control](access-control.md) for the exact
+scope and field boundaries. Other legacy desktop details and actions retain
+their server-administrator boundary.
 
 PostgreSQL tests use the real console router, session store and Ent schema. They
 cover role aliases, foreign objects/scopes, setup origin binding, encrypted CA

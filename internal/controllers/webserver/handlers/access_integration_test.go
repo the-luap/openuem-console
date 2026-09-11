@@ -92,6 +92,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		return rec
 	}
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenantID, siteID)
+	t.Run("scoped desktop inventory", func(t *testing.T) {
+		exerciseDesktopInventoryPermissions(t, h, ctx, tenantID, siteID, sibling.ID, otherTenant.ID, otherSite.ID, request)
+	})
 	t.Run("Mac invitation rights require explicit security permission", func(t *testing.T) {
 		exerciseAppleEnrollmentOptions(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})

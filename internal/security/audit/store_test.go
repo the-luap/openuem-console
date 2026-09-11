@@ -222,12 +222,12 @@ func TestAuditOptionalSourcesAndExportLimits(t *testing.T) {
 	f := testFilter()
 	f.Scope = access.Scope{}
 	page, err := s.List(t.Context(), "admin", f, "")
-	if err != nil || len(page.Sources) != 3 {
+	if err != nil || len(page.Sources) != 4 {
 		t.Fatal("unconfigured platforms broke audit", page, err)
 	}
 	f.Scope.TenantID = 1
 	page, err = s.List(t.Context(), "organization-admin", f, "")
-	if err != nil || len(page.Events) != 0 || len(page.Sources) != 2 || page.Sources[0] != "activity" {
+	if err != nil || len(page.Events) != 0 || strings.Join(page.Sources, ",") != "inventory,activity,retention" {
 		t.Fatal("global access events leaked into organization", page, err)
 	}
 	if _, err = s.db.Exec(`INSERT INTO uem_audit_activity(tenant_id,actor,action,resource_id,result,event_count,created_at) SELECT 1,'limit-fixture','audit.view',repeat('a',64),'success',0,clock_timestamp()-interval '1 hour' FROM generate_series(1,10001)`); err != nil {

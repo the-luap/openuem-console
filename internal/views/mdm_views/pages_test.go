@@ -368,8 +368,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"devices-native-preview", Devices(c, info, nil, "windows", "older device", "", true), []string{"100 most recent native Windows enrollments", "/tenant/1/windows", "full inventory by site"}},
 		{"device", DeviceDetails(c, info, detail), []string{"Installed apps", "Example app", "18.6.2", "22G100", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`, "Automatic renewal starts 30 days", "New push data received; awaiting command-channel confirmation", "New identity in use", strings.Repeat("2b", 32)}},
 		{"mac-device", DeviceDetails(c, info, macDetail), []string{"Design Mac", "Mac management readiness", "Apple silicon", "Not escrowed", "J313AP", "Wait for this Mac to escrow", "Remove update policy", "Device channel"}},
-		{"mac-linked", DeviceDetails(c, info, linked), []string{"Device identity", "Management channel history", "Open agent inventory and actions", linked.Mac.ID}},
-		{"mac-linked-reader", DeviceDetails(c, &reader, linked), []string{"Device identity", "Management channel history", linked.Mac.ID}},
+		{"mac-linked", DeviceDetails(c, info, linked), []string{"Device identity", "Management channel history", "Open agent inventory", linked.Mac.ID}},
+		{"mac-linked-reader", DeviceDetails(c, &reader, linked), []string{"Device identity", "Management channel history", "Open agent inventory", linked.Mac.ID}},
 		{"mac-queued", DeviceDetails(c, info, queued), []string{"Cancel verification"}},
 		{"mac-conflict", DeviceDetails(c, info, conflict), []string{"Conflicting evidence", "Retry profile cleanup"}},
 		{"mac-cleanup", DeviceDetails(c, info, cleanup), []string{"Waiting for the Mac"}},
@@ -516,7 +516,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			if tc.name == "mac-device" && !strings.Contains(html, `disabled>Enforce update policy`) {
 				t.Fatal("unready Mac enforcement button is enabled")
 			}
-			if tc.name == "mac-linked-reader" && (strings.Contains(html, "Open agent inventory and actions") || strings.Contains(html, "Verify management channels")) {
+			if tc.name == "mac-linked-reader" && strings.Contains(html, "Verify management channels") {
 				t.Fatal("canonical device granted a reader mutation controls")
 			}
 			if tc.name == "mac-cleanup" && (strings.Contains(html, "Retry profile cleanup") || strings.Contains(html, "90000000-0000-4000-8000-000000000001/retry") || strings.Contains(html, "Verify management channels")) {

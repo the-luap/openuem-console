@@ -219,7 +219,7 @@ templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, p
 				if scope.TenantID == 0 {
 					<p>This policy covers server permission changes, desktop release events and server-wide audit access. Organization audit events have independent policies.</p>
 				} else {
-					<p>This policy covers this organization's Apple, agent and audit access events across all sites. Windows audit events are included only when explicitly selected.</p>
+					<p>This policy covers this organization's Apple, agent, inventory and audit access events across all sites. Windows audit events are included only when explicitly selected.</p>
 					<p>{ windowsRetentionLabel(policy.WindowsEnabled) }</p>
 				}
 				<p>A finite policy permanently deletes original audit events as they age. Cleanup runs in batches while the console is running. Retention changes and deletion receipts are kept indefinitely. Backup and database recovery copies have separate retention.</p>

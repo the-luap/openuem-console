@@ -18,8 +18,8 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
      <dt>Agent report received</dt><dd>{ When(detail.Mac.AgentSeen) }</dd>
      <dt>Agent identity expires</dt><dd>{ When(&detail.Mac.AgentExpiresAt) }</dd>
     </dl>
-    if detail.AgentURL!="" && info.Principal.IsAdministrator() {
-     <a class="uk-button uk-button-default mt-4" href={ templ.URL(detail.AgentURL) }>Open agent inventory and actions</a>
+    if detail.AgentURL!="" && info.Can(access.ReadDevices) {
+     <a class="uk-button uk-button-default mt-4" href={ templ.URL(detail.AgentURL) }>Open agent inventory</a>
     }
     <details class="mt-4">
      <summary>Management channel history</summary>

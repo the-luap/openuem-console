@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -270,10 +271,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 				name = d.Hostname
 			}
 			seen := d.LastContact
-			deviceURL := ""
-			if info.Principal.IsAdministrator() {
-				deviceURL = partials.GetNavigationUrl(info, "/computers/"+d.ID)
-			}
+			deviceURL := partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(d.ID))
 			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: name, Platform: d.OS, OSVersion: d.Version, Serial: d.Serial, Model: d.Model, Status: "agent", LastSeen: &seen, URL: deviceURL})
 		}
 	}
@@ -491,19 +489,19 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 			return appleFailure(err)
 		}
 	}
-	if mac != nil && info.Principal.IsAdministrator() {
+	if mac != nil && info.Can(access.ReadDevices) {
 		var available bool
-		if err = h.Model.DB.QueryRowContext(c.Request().Context(), `SELECT EXISTS(SELECT 1 FROM agents a JOIN site_agents sa ON sa.agent_id=a.oid WHERE a.oid=$1 AND sa.site_id=$2 AND (SELECT count(*) FROM site_agents WHERE agent_id=a.oid)=1)`, mac.AgentID, d.SiteID).Scan(&available); err != nil {
+		if err = h.Model.DB.QueryRowContext(c.Request().Context(), `SELECT EXISTS(SELECT 1 FROM agents a JOIN site_agents sa ON sa.agent_id=a.oid JOIN sites s ON s.id=sa.site_id WHERE a.oid=$1 AND sa.site_id=$2 AND s.tenant_sites=$3 AND a.agent_status<>'WaitingForAdmission' AND (SELECT count(*) FROM site_agents WHERE agent_id=a.oid)=1)`, mac.AgentID, d.SiteID, scope.TenantID).Scan(&available); err != nil {
 			return err
 		}
-		if available {
+		if available && info.Principal.IsAdministrator() {
 			available, err = h.Model.Client.Agent.Query().Where(agent.ID(mac.AgentID), agent.HasComputer(), agent.HasOperatingsystem(), agent.HasRelease()).Exist(c.Request().Context())
 			if err != nil {
 				return err
 			}
 		}
 		if available {
-			detail.AgentURL = partials.GetNavigationUrl(info, "/computers/"+mac.AgentID)
+			detail.AgentURL = partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(mac.AgentID))
 		}
 	}
 	if d.Family() == apple.PlatformMacOS {
