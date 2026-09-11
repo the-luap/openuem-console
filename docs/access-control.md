@@ -134,6 +134,12 @@ rules. `inventory.shares.read` is required before returning data; audit failure
 returns a redacted error. The legacy share GET delegates scoped readers to this
 projection. Paths grant no file access and remain plain, escaped text.
 
+[Reported security](desktop-security-inventory.md) adds antivirus/update reports
+and bounded update history under the same current membership and read rules.
+The committed `inventory.security.read` audit precedes output. The legacy
+`GET /security/:uuid/updates` delegates scoped readers to this projection.
+Stored support URLs remain escaped text and confer no outbound request authority.
+
 [Account display language](account-language.md) is a self-service preference.
 Its protected form always derives the account from the authenticated session;
 a language selection does not change roles or device permissions.

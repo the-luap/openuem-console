@@ -43,6 +43,7 @@ rotation need a separate lifecycle and are not provided by this form.
 | Read and search reported monitors/printers | Viewer in the selected organization or site |
 | Read and search reported memory modules | Viewer in the selected organization or site |
 | Read and search reported shares | Viewer in the selected organization or site |
+| Read reported security and search update history | Viewer in the selected organization or site |
 | Request fresh computer inventory | Operator in the selected organization or site |
 | Create an installation invitation from an approved release | Operator in the selected organization or site |
 | Revoke an invitation | Operator in its organization or site |
@@ -131,6 +132,11 @@ The **Reported shares** tab provides [scoped share reports](desktop-shares-inven
 with literal search and bounded pagination. Names, descriptions and paths remain
 escaped text. Reports do not prove availability, access rights or complete
 coverage. The legacy share GET delegates scoped readers to this audited page.
+
+The **Reported security** tab provides [scoped antivirus/update reports and
+update history](desktop-security-inventory.md). Stored flags retain missing,
+false and true values; collector zero dates display **Not reported**. Historical
+entries and product flags do not verify current protection or patch completeness.
 
 The shared inventory navigation identifies the current page through a highlighted,
 underlined link and `aria-current="page"`. The physical/logical storage selector
