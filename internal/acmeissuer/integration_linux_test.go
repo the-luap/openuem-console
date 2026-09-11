@@ -341,12 +341,16 @@ func eventuallyACME(t *testing.T, ctx context.Context, check func() bool) {
 }
 
 func fixtureACMETLS(t *testing.T) ([]byte, []byte) {
+	return fixtureACMETLSNames(t, []string{"localhost"}, []net.IP{net.ParseIP("127.0.0.1")})
+}
+
+func fixtureACMETLSNames(t *testing.T, names []string, addresses []net.IP) ([]byte, []byte) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	template := &x509.Certificate{SerialNumber: big.NewInt(1), DNSNames: []string{"localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), DNSNames: names, IPAddresses: addresses,
 		NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, BasicConstraintsValid: true}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
@@ -365,6 +369,7 @@ type acmeDNS struct {
 	records               map[string]bool
 	fail                  bool
 	present, cleanup, txt int
+	address               [4]byte
 }
 
 func (d *acmeDNS) provider(w http.ResponseWriter, r *http.Request) {
@@ -402,13 +407,17 @@ func (d *acmeDNS) provider(w http.ResponseWriter, r *http.Request) {
 }
 
 func startACMEDNS(t *testing.T) *acmeDNS {
+	return startACMEDNSOn(t, "127.0.0.1", [4]byte{127, 0, 0, 1})
+}
+
+func startACMEDNSOn(t *testing.T, listen string, address [4]byte) *acmeDNS {
 	t.Helper()
-	d := &acmeDNS{records: map[string]bool{}}
-	udp, err := net.ListenPacket("udp4", "127.0.0.1:53")
+	d := &acmeDNS{records: map[string]bool{}, address: address}
+	udp, err := net.ListenPacket("udp4", net.JoinHostPort(listen, "53"))
 	if err != nil {
 		t.Fatal("isolated DNS listener", err)
 	}
-	tcp, err := net.Listen("tcp4", "127.0.0.1:53")
+	tcp, err := net.Listen("tcp4", net.JoinHostPort(listen, "53"))
 	if err != nil {
 		udp.Close()
 		t.Fatal(err)
@@ -481,7 +490,7 @@ func (d *acmeDNS) answer(data []byte) []byte {
 		}
 	case dnsmessage.TypeA:
 		if name == "ns.example.test." {
-			add(&dnsmessage.AResource{A: [4]byte{127, 0, 0, 1}})
+			add(&dnsmessage.AResource{A: d.address})
 		}
 	case dnsmessage.TypeTXT:
 		if name == "_acme-challenge.uem.example.test." {

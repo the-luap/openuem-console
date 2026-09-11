@@ -216,6 +216,12 @@ docker run --rm --network none --dns 127.0.0.1 --read-only --cap-drop ALL \
 
 The [dedicated workflow](../.github/workflows/acme-issuer.yml) runs this fixture
 on native Linux amd64 and arm64 and requires an explicit test pass, not a skip.
+It also runs `scripts/check-reference-acme.py` with separate issuer and
+Pebble/provider containers on a uniquely named internal Docker network. That
+fixture verifies real DNS-01 requests and TXT cleanup across the network,
+provider-failure recovery with the original account, the issued chain against
+Pebble's root, and joined server shutdown. It publishes no host port. Provider
+controls and test CA keys exist only in the test image and owned fixture state.
 It also checks that the runtime exposes no port and contains no shell, test server
 or credential material. Live provider access, production issuance, network/firewall
 composition and operational alert delivery still require deployment acceptance.

@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The reference ACME fixture now runs the actual issuer/lego command separately
+  from its Pebble and DNS provider processes on an owned internal Docker network.
+  The Linux arm64 acceptance passes real DNS-01 and TXT cleanup, provider-failure
+  recovery without changing the account key, issued-chain verification against
+  pinned fixture roots, and joined server shutdown. Both test roles require an
+  explicit isolated-fixture opt-in and use non-root containers without host ports.
+  The existing single-container DNS-01/ARI/reload fixture also passes after the
+  shared DNS helper change. This supplies a real provider boundary for the next
+  installer handoff work; automatic DNS-01 installation remains open.
+- The [2bb1a82 Native Apple workflow](https://github.com/the-luap/openuem-console/actions/runs/34551946533)
+  passes its test, Linux/Windows builds and Windows bootstrap-key jobs.
+- The [ab1ccb4 native workflow](https://github.com/the-luap/openuem-console/actions/runs/34553841835)
+  passes Linux amd64, Linux arm64 and Windows, including atomic public TLS reload,
+  separate issuer composition, fresh installation and interrupted broker maintenance.
 - The [reference public TLS composition](reference-public-tls.md) adds a separate
   issuer project with the explicit runtime account, isolated account/configuration
   mounts and its own outbound network. Its actual input preflight passes with

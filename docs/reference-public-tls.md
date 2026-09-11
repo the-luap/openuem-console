@@ -117,3 +117,10 @@ container identities and maintenance readiness. The separate issuer smoke test
 uses actual lego and Pebble DNS-01, including issuance, retained account retry,
 ARI renewal and gateway reload. These are separate acceptance layers; they do not
 claim production-provider, firewall or physical-device acceptance.
+
+`scripts/check-reference-acme.py` additionally separates the real issuer command
+from the Pebble/DNS provider process across an isolated Docker network. It verifies
+actual TXT validation and cleanup, a failed-provider retry with the retained
+account, the issued chain against pinned fixture trust and clean server shutdown.
+This provides the provider boundary for automatic installer integration without
+contacting external services or preparing a substitute gateway certificate.
