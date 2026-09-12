@@ -39,11 +39,11 @@ or a different reported build at the target version remains **Update still
 required**. Missing, pre-admission, stale, future-dated, malformed or incomplete
 evidence is **Result unverified**, with a fixed explanation.
 
-These criteria are stricter than the existing generic inventory-based device
-compliance calculation: this cohort view requires post-admission packet evidence
-and an explicit version/build association. It is an assessment of current
-device-reported evidence, not independent hardware acceptance or a causal proof
-that this assignment installed the update.
+The [individual device assessment](apple-update-assessment.md) shares these
+freshness and version/build association rules. This cohort view additionally
+requires post-admission packet evidence for the original assignment's target.
+It is an assessment of current device-reported evidence, not independent hardware
+acceptance or a causal proof that this assignment installed the update.
 
 ## Current policy and original delivery evidence
 
@@ -52,7 +52,7 @@ version, build, device-local deadline and information URL. The result distinguis
 matching values, a different policy and no policy. Matching values do not prove
 continuous ownership by this assignment; a policy may have been changed away and
 back. Current failure/unavailability flags are shown separately from OS outcomes.
-Raw protocol error details remain on the existing scoped device page.
+Bounded, escaped protocol error details remain on the scoped device page.
 
 The original declarative notification's current queue status is read through its
 saved command ID, exact device/organization and request type. Missing notification

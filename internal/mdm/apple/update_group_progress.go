@@ -50,60 +50,37 @@ func (v UpdateGroupProgressCounts) GoString() string { return v.String() }
 func (UpdateGroupProgress) String() string           { return "[protected Apple update group progress]" }
 func (v UpdateGroupProgress) GoString() string       { return v.String() }
 
-func currentUpdateProgressPolicy(ctx context.Context, tx *sql.Tx, id string) (*UpdatePolicy, bool, error) {
+func currentUpdatePolicyState(ctx context.Context, tx *sql.Tx, id string, withError bool) (*UpdatePolicy, bool, bool, error) {
 	var raw []byte
 	var status sql.NullString
-	var hasError bool
+	var hasError, errorTruncated bool
+	var detail string
 	var updated time.Time
-	err := tx.QueryRowContext(ctx, `SELECT CASE WHEN octet_length(target_version)+octet_length(target_build)+octet_length(deadline)+octet_length(details_url)<=8192 THEN jsonb_build_object('TargetVersion',target_version,'TargetBuild',target_build,'Deadline',deadline,'DetailsURL',details_url) ELSE NULL END,CASE WHEN octet_length(status)<=64 THEN status ELSE NULL END,error<>'',updated_at FROM mdm_apple_update_policies WHERE device_id=$1 FOR SHARE`, id).Scan(&raw, &status, &hasError, &updated)
+	err := tx.QueryRowContext(ctx, `SELECT CASE WHEN octet_length(target_version)+octet_length(target_build)+octet_length(deadline)+octet_length(details_url)<=8192 THEN jsonb_build_object('TargetVersion',target_version,'TargetBuild',target_build,'Deadline',deadline,'DetailsURL',details_url) ELSE NULL END,CASE WHEN octet_length(status)<=64 THEN status ELSE NULL END,error<>'',updated_at,octet_length(error)>8192,CASE WHEN $2 AND octet_length(error)<=8192 THEN error ELSE '' END FROM mdm_apple_update_policies WHERE device_id=$1 FOR SHARE`, id, withError).Scan(&raw, &status, &hasError, &updated, &errorTruncated, &detail)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false, nil
+		return nil, false, false, nil
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	var fields updatePolicyGroupState
 	if len(raw) == 0 || !status.Valid || json.Unmarshal(raw, &fields) != nil {
-		return nil, false, ErrUpdatePlanGroupIntegrity
+		return nil, false, false, ErrUpdatePlanGroupIntegrity
 	}
-	return &UpdatePolicy{DeviceID: id, TargetVersion: fields.TargetVersion, TargetBuild: fields.TargetBuild, Deadline: fields.Deadline, DetailsURL: fields.DetailsURL, Status: status.String, UpdatedAt: updated}, hasError, nil
+	return &UpdatePolicy{DeviceID: id, TargetVersion: fields.TargetVersion, TargetBuild: fields.TargetBuild, Deadline: fields.Deadline, DetailsURL: fields.DetailsURL, Status: status.String, Error: detail, UpdatedAt: updated}, hasError, errorTruncated, nil
+}
+
+func currentUpdateProgressPolicy(ctx context.Context, tx *sql.Tx, id string) (*UpdatePolicy, bool, error) {
+	p, hasError, _, err := currentUpdatePolicyState(ctx, tx, id, false)
+	return p, hasError, err
 }
 
 func assessUpdateGroupResult(d *UpdateGroupDeviceProgress, plan UpdatePlan, admitted, now time.Time) {
-	d.Result, d.Reason = "unverified", ""
-	switch {
-	case d.Availability != "available":
-		d.Reason = "device_unavailable"
-	case d.RecordedAt == nil:
-		d.Reason = "no_report"
-	case d.RecordedAt.After(now):
-		d.Reason = "future_report"
-	case d.RecordedAt.Before(admitted):
-		d.Reason = "before_assignment"
-	case now.Sub(*d.RecordedAt) > 24*time.Hour:
-		d.Reason = "stale_report"
-	case !versionPattern.MatchString(d.ReportedVersion) || len(d.ReportedVersion) > 32:
-		d.Reason = "invalid_report"
-	default:
-		comparison := CompareVersions(d.ReportedVersion, plan.Definition.TargetVersion)
-		if comparison > 0 {
-			d.Result = "target_reported"
-			return
-		}
-		if comparison < 0 {
-			d.Result = "update_required"
-			return
-		}
-		if !updatePlanBuild.MatchString(d.ReportedBuild) {
-			d.Reason = "missing_build"
-			return
-		}
-		if d.ReportedBuild == plan.Definition.TargetBuild {
-			d.Result = "target_reported"
-		} else {
-			d.Result = "update_required"
-		}
+	var observation *OSObservation
+	if d.RecordedAt != nil {
+		observation = &OSObservation{Version: d.ReportedVersion, Build: d.ReportedBuild, Source: d.ReportSource, RecordedAt: *d.RecordedAt}
 	}
+	d.Result, d.Reason = assessUpdateOS(d.Availability, observation, plan.Definition.TargetVersion, plan.Definition.TargetBuild, admitted, now)
 }
 
 // UpdatePlanGroupProgress assesses current state for the exact original native

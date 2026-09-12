@@ -40,6 +40,7 @@ type Detail struct {
 	Profiles         []apple.Profile
 	Policy           *apple.UpdatePolicy
 	Compliance       string
+	UpdateAssessment *apple.UpdateAssessment
 	Releases         []apple.OSRelease
 	CatalogAt        *time.Time
 }

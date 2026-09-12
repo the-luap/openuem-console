@@ -285,7 +285,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 			if detail.Device.Family()==apple.PlatformMacOS {
 				@MacUsers(info, detail.Device, detail.Users)
 			}
-			<section class="uk-card uk-card-default">
+			<section class="uk-card uk-card-default" data-device-update-assessment>
 				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx, "updates.apple_heading") }</h2><p>{ i18n.T(ctx, "updates.apple_description") }</p></div>
 				<div class="uk-card-body">
 					if reason:=detail.Device.Capabilities().UpdateReason; reason!="" {
@@ -293,23 +293,38 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 					}
 					<div class="grid gap-4 md:grid-cols-2">
 						if detail.Policy!=nil {
-							<div>
+							<div class="min-w-0 break-words" data-device-update-policy>
 								<h3 class="font-medium">{ i18n.T(ctx, "updates.policy_heading") }</h3>
 								<p>{ i18n.T(ctx, "updates.target_version", Show(detail.Policy.TargetVersion)) }</p>
 								<p>{ i18n.T(ctx, "updates.target_build", Show(detail.Policy.TargetBuild)) }</p>
 								<p>{ i18n.T(ctx, "updates.deadline_local", Show(detail.Policy.Deadline)) }</p>
 								<p>{ i18n.T(ctx, "updates.compliance", StateLabel(ctx, detail.Compliance)) }</p>
 								<p>{ i18n.T(ctx, "updates.device_status", StateLabel(ctx, detail.Policy.Status)) }</p>
+								if detail.UpdateAssessment!=nil && detail.UpdateAssessment.Reason!="" {
+									<p role="status">{ deviceUpdateAssessmentReason(ctx,detail.UpdateAssessment.Reason) }</p>
+								}
+								if detail.UpdateAssessment!=nil && detail.UpdateAssessment.PolicyErrorTruncated {
+									<p role="alert" class="uk-alert uk-alert-warning">{ i18n.T(ctx,"updates.error_limited") }</p>
+								}
 								if detail.Policy.Error!="" {
 									<div role="alert" class="uk-alert uk-alert-warning">{ detail.Policy.Error }</div>
 								}
 							</div>
 						}
-						<div>
+						<div class="min-w-0 break-words" data-device-update-evidence>
 							<h3 class="font-medium">{ i18n.T(ctx, "updates.reported_heading") }</h3>
-							<p>{ i18n.T(ctx, "updates.reported_version", Show(detail.Device.OSVersion)) }</p>
-							<p>{ i18n.T(ctx, "updates.reported_build", Show(detail.Device.BuildVersion)) }</p>
-							<p>{ i18n.T(ctx, "updates.reported_at")+" " }@Timestamp(detail.Device.InventoryAt)</p>
+							if detail.UpdateAssessment!=nil && detail.UpdateAssessment.Observation!=nil {
+								<p>{ i18n.T(ctx, "updates.reported_version", Show(detail.UpdateAssessment.Observation.Version)) }</p>
+								<p>{ i18n.T(ctx, "updates.reported_build", Show(detail.UpdateAssessment.Observation.Build)) }</p>
+								<p>
+									{ i18n.T(ctx,"updates.evidence_recorded")+" " }
+									@Timestamp(&detail.UpdateAssessment.Observation.RecordedAt)
+								</p>
+								<p>{ i18n.T(ctx,"updates.evidence_source",updateGroupReportSource(detail.UpdateAssessment.Observation.Source)) }</p>
+							} else {
+								<p>{ i18n.T(ctx,"updates.evidence_missing") }</p>
+							}
+							<p>{ i18n.T(ctx,"updates.evidence_description") }</p>
 						</div>
 					</div>
 					if detail.Device.Status=="enrolled" {

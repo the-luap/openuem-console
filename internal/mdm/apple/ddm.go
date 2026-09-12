@@ -278,6 +278,8 @@ func statusString(items map[string]any, path ...string) string {
 	return v
 }
 
+// UpdateCompliance assesses the supplied in-process inventory snapshot. Console
+// reads use AssessDeviceUpdate with separate packet OS evidence and live authority.
 func UpdateCompliance(d Device, p UpdatePolicy, now time.Time) string {
 	if d.Status != "enrolled" {
 		return "not_managed"

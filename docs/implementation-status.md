@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple device update assessments](apple-update-assessment.md) now use audited
+  current policy and packet OS evidence under retained device-read authority.
+  Missing builds, unrelated status deltas, stale/future observations and inactive
+  identities cannot become current compliance. Policy errors remain independent,
+  with bounded escaped details and fixed oversized-source responses. Targeted
+  PostgreSQL 17/race tests pass in 30.946 seconds. Registered Linux console routes,
+  macOS/Linux handler/view/locale race tests, Linux middleware checks and the full
+  Linux build pass. All 153 relevant Chrome cases pass, including 33 new individual
+  assessment cases, with mobile missing-build evidence inspected visually. The
+  complete Apple PostgreSQL/race suite passes in 558.062 seconds.
+
 - [Current Apple update cohort progress](apple-update-progress.md) assesses the
   exact original receipt's native targets under current update/device-read
   authority. It separates fresh post-admission OS evidence, current configured

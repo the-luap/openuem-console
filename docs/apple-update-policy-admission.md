@@ -1,5 +1,8 @@
 # Apple update policy admission
 
+The device page shows a separate [audited update assessment](apple-update-assessment.md)
+using fresh packet OS evidence and independently displayed policy status/errors.
+
 The device page applies or removes an Apple declarative update policy using
 `SetUpdatePolicyWithAccess`. The authenticated actor's current `updates.manage`
 authority is checked inside the policy/notification/audit transaction. A missing

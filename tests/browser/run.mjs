@@ -33,6 +33,7 @@ import appleProfileGroups from "./apple-profile-groups.mjs";
 import appleUpdatePlans from "./apple-update-plans.mjs";
 import appleUpdateGroups from "./apple-update-groups.mjs";
 import appleUpdateSchedules from "./apple-update-schedules.mjs";
+import appleDeviceUpdates from "./apple-device-updates.mjs";
 import appleUpdateProgress from "./apple-update-progress.mjs";
 import oidcAccounts from "./oidc-accounts.mjs";
 
@@ -90,6 +91,7 @@ try {
         [appleUpdateGroups,27],
         [appleUpdateSchedules,27],
         [appleUpdateProgress,27],
+        [appleDeviceUpdates,33],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

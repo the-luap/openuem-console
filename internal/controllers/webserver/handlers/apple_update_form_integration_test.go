@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,49 @@ func exerciseAppleUpdateForms(t *testing.T, h *Handler, ctx context.Context, ten
 	stored, err := h.Apple.UpdatePolicy(ctx, scope, invite.DeviceID)
 	require.NoError(t, err)
 	require.Equal(t, "18.7.1", stored.TargetVersion)
+	devicePath := strings.TrimSuffix(path, "/update")
+	readAssessment := func() string {
+		t.Helper()
+		response := request("scoped-viewer", "GET", devicePath, nil)
+		require.Equal(t, 200, response.Code)
+		body := response.Body.String()
+		start := strings.Index(body, "data-device-update-assessment")
+		require.GreaterOrEqual(t, start, 0)
+		section := strings.SplitN(body[start:], "</section>", 2)[0]
+		require.False(t, strings.Contains(section, "<form"), "Viewer received an update mutation form")
+		return section
+	}
+	section := readAssessment()
+	require.True(t, strings.Contains(section, "No usable OS observation"))
+	require.False(t, strings.Contains(section, "Reported OS version:"), "Merged inventory was used as packet evidence")
+	_, err = h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_apple_os_observations(device_id,version,build,source,recorded_at) VALUES($1,'18.7.1','22H100','declarative_status',clock_timestamp())`, invite.DeviceID)
+	require.NoError(t, err)
+	section = readAssessment()
+	require.True(t, strings.Contains(section, "Up to date") && strings.Contains(section, "Reported build: 22H100"))
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_os_observations SET build='' WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
+	section = readAssessment()
+	require.True(t, strings.Contains(section, "build was not reported together"))
+	require.False(t, strings.Contains(section, "Up to date"))
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_os_observations SET build='22H100' WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET status='failed',error=$2 WHERE device_id=$1`, invite.DeviceID, "Owned <script>policy failure</script>")
+	require.NoError(t, err)
+	section = readAssessment()
+	require.True(t, strings.Contains(section, "Up to date") && strings.Contains(section, "policy failure"))
+	require.False(t, strings.Contains(section, "<script>policy failure</script>"))
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET error=repeat('owned-error',1000) WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
+	section = readAssessment()
+	require.True(t, strings.Contains(section, "exceed the display limit"))
+	require.False(t, strings.Contains(section, "owned-error"))
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET status=repeat('owned-status',1000) WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
+	unavailable := request("scoped-viewer", "GET", devicePath, nil)
+	require.Equal(t, 503, unavailable.Code)
+	require.False(t, strings.Contains(unavailable.Body.String(), "owned-status"))
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET status='waiting',error='' WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
 	for _, bad := range []url.Values{
 		{"remove": {"true", "true"}},
 		{"remove": {"true"}, "deadline": {"2026-10-01T18:00"}},
@@ -55,4 +99,7 @@ func exerciseAppleUpdateForms(t *testing.T, h *Handler, ctx context.Context, ten
 	require.Equal(t, 303, request("scoped-operator", "POST", path, url.Values{"remove": {"true"}}).Code)
 	_, err = h.Apple.UpdatePolicy(ctx, scope, invite.DeviceID)
 	require.ErrorIs(t, err, apple.ErrNotFound)
+	section = readAssessment()
+	require.False(t, strings.Contains(section, "data-device-update-policy"))
+	require.True(t, strings.Contains(section, "Reported OS version: 18.7.1"))
 }

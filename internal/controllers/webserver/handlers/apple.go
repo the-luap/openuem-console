@@ -557,13 +557,17 @@ func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, s
 	if err != nil {
 		return err
 	}
-	detail.Policy, err = h.Apple.UpdatePolicy(c.Request().Context(), scope, id)
-	if err != nil && !errors.Is(err, apple.ErrNotFound) {
-		return err
+	detail.UpdateAssessment, err = h.Apple.AssessDeviceUpdate(c.Request().Context(), h.appleActor(c), h.Access, scope, id)
+	if err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "updates.assessment_permission"))
+		}
+		if errors.Is(err, apple.ErrNotFound) {
+			return appleFailure(c, err)
+		}
+		return echo.NewHTTPError(http.StatusServiceUnavailable, i18n.T(c.Request().Context(), "updates.assessment_unavailable"))
 	}
-	if detail.Policy != nil {
-		detail.Compliance = apple.UpdateCompliance(*d, *detail.Policy, time.Now())
-	}
+	detail.Policy, detail.Compliance = detail.UpdateAssessment.Policy, detail.UpdateAssessment.Compliance
 	catalog, fetched, err := h.Apple.Catalog(c.Request().Context())
 	if err != nil {
 		return err
