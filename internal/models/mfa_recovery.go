@@ -17,7 +17,7 @@ func (m *Model) ConsumeRecoveryCode(parent context.Context, uid, code string) (b
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	// Generated codes have 16 ASCII characters; retain compatibility with longer
+	// Generated codes group 16 random characters with hyphens; retain compatibility with longer
 	// legacy values without accepting unbounded password-comparison input.
 	if uid == "" || len(code) == 0 || len(code) > 256 {
 		return false, nil

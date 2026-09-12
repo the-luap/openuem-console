@@ -2,14 +2,23 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 )
+
+func mfaMutationError(err error) error {
+	if errors.Is(err, models.ErrMFAState) {
+		return echo.NewHTTPError(http.StatusConflict, "Account access or two-factor enrollment changed; sign in again.")
+	}
+	return echo.NewHTTPError(http.StatusServiceUnavailable, "Two-factor authentication could not be updated. Try again.")
+}
 
 // Naming an account during recovery is not proof of its password, certificate
 // or OpenID identity. Every public MFA step requires a fresh first-factor flow.

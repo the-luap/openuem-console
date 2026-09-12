@@ -122,11 +122,49 @@ code and first enrollment, plus actual certificate and OpenID MFA completion.
 Proof identity, method, lifetime, size and malformed-state tests run in CI; database
 checks cover changed credentials and disabled/revoked state.
 
-These checks do not make the existing enrollment mutations atomic.
-Durable one-use primary-proof consumption, TOTP replay counters, concurrent enrollment
-completion and request-time local credential revalidation remain open. A request which
+Enrollment persistence uses the transactions described below. Durable one-use
+primary-proof consumption, TOTP replay counters and request-time local credential
+revalidation remain open. A request which
 already loaded its primary proof may still race another completion; removing the
 proof from the completed session alone is not a durable consumption receipt.
+
+## Atomic MFA enrollment
+
+Secret staging, enrollment confirmation and MFA removal require the full account
+snapshot whose authorization was checked. Configuration is locked before the
+account, using read-committed transactions and a five-second request deadline.
+The transaction rechecks current registration, enabled method, account mode,
+password hash, MFA requirement, confirmation state and exact stored secret.
+An older request cannot replace a changed or already confirmed secret. Existing
+enrollment must be disabled before a new enrollment starts.
+
+Confirmation hashes ten distinct recovery codes before acquiring database locks,
+then replaces the complete code set and marks the exact staged secret confirmed
+in one transaction. A competing completion loses its stale snapshot. Failure
+during insertion or the account update retains the previous codes and MFA state.
+Removal clears the secret and codes and deletes the account's sessions together;
+session-deletion failure rolls back all three changes. Permanent session receipts
+prevent a preloaded session from returning after successful removal.
+
+Public MFA handlers retain the account snapshot returned by primary-authentication
+validation. Account settings read full snapshots rather than selected hash/secret
+fields. TOTP verification decrypts into a separate value using the safe legacy
+decoder; it preserves the stored ciphertext used by the transaction comparison.
+New recovery codes use unbiased random character selection and reject duplicates.
+Conflicting state returns HTTP 409; storage failure returns a generic HTTP 503.
+
+The owned baseline reproduced partial code replacement, code loss on failed
+removal and overwrite of confirmed enrollment. Tests cover failure at insertion,
+confirmation and session deletion; concurrent confirmation for password,
+certificate and OpenID account modes with both storage formats; canceled and
+committed/rolled-back row waits; stale authorization; exact ciphertext retention;
+and the actual account-settings and public password/MFA handlers.
+
+Database confirmation and delivery of the response or a new session are separate
+operations. If response delivery or later session admission fails after commit,
+MFA remains configured; the codes cannot be redisplayed because only their hashes
+are stored. The configured authenticator remains usable. These transactions do
+not provide durable consumption of a pending primary proof or TOTP replay counters.
 
 ## Single-use recovery codes
 
@@ -152,8 +190,8 @@ PostgreSQL row-lock tests now establish one winner, reject stale records, preser
 unused state on canceled waits and rejected writes, and permit valid retries.
 Actual backup-code handlers repeat the four-request test and storage-failure
 checks with plaintext and encrypted session stores. These guarantees concern a
-stored recovery-code record; atomic enrollment/code-set replacement and durable
-one-use primary proofs or TOTP counters remain separate work.
+stored recovery-code record. Enrollment/code-set replacement is covered above;
+durable one-use primary proofs and TOTP counters remain separate work.
 
 ## Durable deletion
 

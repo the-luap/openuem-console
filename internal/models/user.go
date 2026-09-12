@@ -431,65 +431,6 @@ func (m *Model) ChangePassword(username string, password string) error {
 	}
 }
 
-func (m *Model) SaveTOTPSecretKey(username string, secret string) error {
-	exist, err := m.Client.User.Query().Where(user.ID(username)).Exist(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if exist {
-		return m.Client.User.Update().Where(user.ID(username)).SetTotpSecret(secret).Exec(context.Background())
-	} else {
-		return errors.New("user not found")
-	}
-}
-
-func (m *Model) SaveRecoveryCodes(username string, codes []string) error {
-	exist, err := m.Client.User.Query().Where(user.ID(username)).Exist(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if exist {
-		// Check for existing recovery codes
-		hasCodes, err := m.Client.RecoveryCode.Query().Where(recoverycode.HasUserWith(user.ID(username))).Exist(context.Background())
-		if err != nil {
-			return err
-		}
-
-		// Delete existing codes
-		if hasCodes {
-			if _, err := m.Client.RecoveryCode.Delete().Where(recoverycode.HasUserWith(user.ID(username))).Exec(context.Background()); err != nil {
-				return err
-			}
-		}
-
-		// Generate hashes
-		for _, c := range codes {
-			hash, err := argon2id.CreateHash(c, argon2id.DefaultParams)
-			if err != nil {
-				return err
-			}
-
-			if err := m.Client.RecoveryCode.Create().SetUserID(username).SetCode(hash).Exec(context.Background()); err != nil {
-				return err
-			}
-		}
-
-		return m.Client.User.Update().SetUse2fa(true).SetTotpSecretConfirmed(true).Where(user.ID(username)).Exec(context.Background())
-	} else {
-		return errors.New("user not found")
-	}
-}
-
-func (m *Model) GetUserHash(username string) (*ent.User, error) {
-	return m.Client.User.Query().Select(user.FieldHash, user.FieldPasswd).Where(user.ID(username)).First(context.Background())
-}
-
-func (m *Model) GetUserTOTPSecret(username string) (*ent.User, error) {
-	return m.Client.User.Query().Select(user.FieldTotpSecret).Where(user.ID(username)).First(context.Background())
-}
-
 func (m *Model) GetUserIDByEmail(email string) string {
 	user, err := m.Client.User.Query().Select(user.FieldTotpSecret).Where(user.Email(email)).First(context.Background())
 	if err != nil {
@@ -524,17 +465,6 @@ func (m *Model) IsForgotCodeValid(username string, code string) bool {
 
 func (m *Model) RemoveForgotCode(username string) error {
 	return m.Client.User.UpdateOneID(username).SetForgotPasswordCode("").SetForgotPasswordCodeExpiresAt(time.Now()).Exec(context.Background())
-}
-
-func (m *Model) Disable2FA(username string) error {
-	// Delete recovery codes
-	_, err := m.Client.RecoveryCode.Delete().Where(recoverycode.HasUserWith(user.ID(username))).Exec(context.Background())
-	if err != nil {
-		return err
-	}
-
-	// Disable 2FA and remove TOTP secret
-	return m.Client.User.UpdateOneID(username).SetUse2fa(false).SetTotpSecret("").SetTotpSecretConfirmed(false).Exec(context.Background())
 }
 
 func (m *Model) SaveNewAccountToken(username string, token string) error {

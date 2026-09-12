@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -265,9 +267,8 @@ func (h *Handler) Register2FA(c echo.Context) error {
 		}
 	}
 
-	if err := h.Model.SaveTOTPSecretKey(username, totpSecret); err != nil {
-		log.Printf("[ERROR]: could not save TOTP secret key, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_could_not_save_secret"), true))
+	if err := h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret); err != nil {
+		return mfaMutationError(err)
 	}
 
 	return RenderLoginPartial(c, login_views.Register2FA(username, qrCode, key.Secret()))
@@ -291,47 +292,27 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_empty_code"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user := authorized
+
+	secret, _, err := sessiontokens.Decode(user.TotpSecret, h.EncryptionMasterKey)
 	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+		return mfaMutationError(err)
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.TotpSecret, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			user.TotpSecret, err = utils.DecryptSensitiveField(user.TotpSecret, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-			}
-		}
-	}
-
-	valid := totp.Validate(passcode, user.TotpSecret)
+	valid := totp.Validate(passcode, secret)
 	if !valid {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
 
-	// Generate codes
-	codes := []string{}
-	for range 10 {
-		code, err := generateRecoveryCode()
-		if err != nil {
-			log.Printf("[ERROR]: could not generate recovery codes, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
-		}
-		codes = append(codes, code)
+	codes, err := generateRecoveryCodes()
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
-	// Save recovery codse
-	if err := h.Model.SaveRecoveryCodes(username, codes); err != nil {
-		log.Printf("[ERROR]: could not save recovery codes, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	// Save recovery codes
+	if err := h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes); err != nil {
+		return mfaMutationError(err)
 	}
 
 	// 2FA has been enabled
@@ -393,27 +374,14 @@ func (h *Handler) LoginTOTPValidate(c echo.Context) error {
 		}
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user := authorized
+
+	secret, _, err := sessiontokens.Decode(user.TotpSecret, h.EncryptionMasterKey)
 	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+		return mfaMutationError(err)
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.TotpSecret, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			user.TotpSecret, err = utils.DecryptSensitiveField(user.TotpSecret, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-			}
-		}
-	}
-
-	valid := totp.Validate(passcode, user.TotpSecret)
+	valid := totp.Validate(passcode, secret)
 	if !valid {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
@@ -465,11 +433,7 @@ func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
-	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
-	}
+	user := authorized
 
 	code := c.FormValue("recovery-code")
 	if code == "" {
@@ -547,22 +511,32 @@ func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
 }
 
 func generateRecoveryCode() (string, error) {
-	var charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	var randomCode string
-
-	length := 16
-	randomBytes := make([]byte, length)
-
-	for i := range length {
-		_, err := io.ReadFull(rand.Reader, randomBytes)
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	code := make([]byte, 16)
+	for i := range code {
+		index, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			return "", fmt.Errorf("failed to generate recovery code: %v", err)
+			return "", fmt.Errorf("failed to generate recovery code: %w", err)
 		}
-		randomIndex := int(randomBytes[i] % byte(len(charset)))
-		randomCode += string(charset[randomIndex])
+		code[i] = charset[index.Int64()]
 	}
+	return fmt.Sprintf("%s-%s-%s-%s", code[0:4], code[4:8], code[8:12], code[12:16]), nil
+}
 
-	return fmt.Sprintf("%s-%s-%s-%s", randomCode[0:4], randomCode[4:8], randomCode[8:12], randomCode[12:16]), nil
+func generateRecoveryCodes() ([]string, error) {
+	codes := make([]string, 0, 10)
+	seen := make(map[string]bool, 10)
+	for len(codes) < 10 {
+		code, err := generateRecoveryCode()
+		if err != nil {
+			return nil, err
+		}
+		if !seen[code] {
+			seen[code] = true
+			codes = append(codes, code)
+		}
+	}
+	return codes, nil
 }
 
 func (h *Handler) ForgotPasswordEmail(c echo.Context) error {

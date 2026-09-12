@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- MFA secret staging, confirmation and removal now use transactions bound to
+  the full verified account snapshot. Current method configuration, credentials,
+  registration and exact stored MFA state are rechecked under locks. Confirmation
+  replaces all ten unique code hashes together; removal clears the secret/codes
+  and retires sessions atomically. Confirmed or superseded enrollment cannot be
+  overwritten, and a competing completion cannot replace the winner's code set.
+  Handlers preserve ciphertext while verifying TOTP and use full account reads;
+  new codes use unbiased random selection. Four owned baseline cases reproduced
+  partial replacement/removal and confirmed-secret overwrite. Failure injection,
+  concurrent password/certificate/OpenID enrollment, canceled/committed/rolled-back
+  row waits, stale account state and actual account-settings handlers pass in both
+  storage modes. The full PostgreSQL/session race suite passes in 60.406 seconds;
+  auth/router races, actual Linux ARM64 console and administrator routes, and the
+  full Linux build pass. Response delivery remains separate from database commit.
+  Durable primary-proof consumption, TOTP replay counters and request-time local
+  credential checks remain open. See [MFA persistence](session-storage.md#atomic-mfa-enrollment).
+
 - Backup-code consumption now conditionally updates the verified unused record
   inside a request-bound transaction. Concurrent reuse, changed hashes/owners and
   deletion cannot reuse a stale comparison. Canceled row waits roll back, storage
