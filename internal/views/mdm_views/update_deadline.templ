@@ -1,0 +1,37 @@
+package mdm_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+)
+
+templ appleUpdateDeadline(assessment *apple.UpdateDeadlineAssessment, original bool) {
+	if assessment!=nil {
+		<div class="grid gap-2 min-w-0 break-words" style="overflow-wrap:anywhere;" data-update-deadline={ assessment.State } data-deadline-reason={ assessment.Reason }>
+			<h3 class="font-medium">
+				if original {
+					{ i18n.T(ctx,"updates.deadline_original_heading") }
+				} else {
+					{ i18n.T(ctx,"updates.deadline_current_heading") }
+				}
+			</h3>
+			<p>{ updateDeadlineState(ctx,assessment.State) }</p>
+			if assessment.Reason!="" {
+				<p>{ updateDeadlineReason(ctx,assessment.Reason) }</p>
+			}
+			if assessment.TimeZone!=nil {
+				<p>{ i18n.T(ctx,"updates.deadline_zone",assessment.TimeZone.Name) }</p>
+				<p>{ i18n.T(ctx,"updates.deadline_zone_recorded",assessment.TimeZone.RecordedAt.UTC().Format("2006-01-02 15:04:05")) }</p>
+			}
+			if assessment.Earliest!=nil && assessment.Latest!=nil {
+				if assessment.Ambiguous {
+					<p>{ i18n.T(ctx,"updates.deadline_range",assessment.Earliest.UTC().Format("2006-01-02 15:04:05"),assessment.Latest.UTC().Format("2006-01-02 15:04:05")) }</p>
+					<p>{ i18n.T(ctx,"updates.deadline_ambiguous") }</p>
+				} else {
+					<p>{ i18n.T(ctx,"updates.deadline_instant",assessment.Latest.UTC().Format("2006-01-02 15:04:05")) }</p>
+				}
+			}
+			<p>{ i18n.T(ctx,"updates.deadline_estimate_help") }</p>
+		</div>
+	}
+}

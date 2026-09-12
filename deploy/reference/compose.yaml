@@ -1,0 +1,170 @@
+# Prepare protected state with the matching setup commands before starting.
+# The isolated acceptance fixture uses this same runtime composition.
+x-runtime: &runtime
+  user: "${OPENUEM_RUNTIME_UID:?}:${OPENUEM_RUNTIME_GID:?}"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 256
+  mem_limit: 512m
+  pull_policy: never
+  stop_grace_period: 20s
+
+x-input: &input
+  type: bind
+  read_only: true
+  bind: {create_host_path: false}
+
+x-storage: &storage
+  type: bind
+  bind: {create_host_path: false}
+
+services:
+  database:
+    <<: *runtime
+    image: postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+    shm_size: 64m
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/database-password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    command: [postgres, -c, "listen_addresses=*", -c, ssl=on, -c, ssl_cert_file=/run/database-tls/server.pem, -c, ssl_key_file=/run/database-tls/server.key, -c, hba_file=/run/pg_hba.conf, -c, unix_socket_permissions=0700]
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=${OPENUEM_RUNTIME_UID},gid=${OPENUEM_RUNTIME_GID},mode=0700
+    volumes:
+      - {<<: *storage, source: "${OPENUEM_REFERENCE_STATE:?}/database", target: /var/lib/postgresql/data}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/credentials/state/administrator-password", target: /run/database-password}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/database", target: /run/database-tls}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pg_hba.conf", target: /run/pg_hba.conf}
+    healthcheck:
+      test: [CMD, pg_isready, -q, -h, 127.0.0.1, -U, postgres, -d, postgres]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks:
+      data: {aliases: [database.internal]}
+
+  broker:
+    <<: *runtime
+    image: ${OPENUEM_BROKER_IMAGE:?}
+    mem_limit: 768m
+    command: [--config, /run/broker.json]
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/broker.json", target: /run/broker.json}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/broker", target: /run/broker-tls}
+      - {<<: *storage, source: "${OPENUEM_REFERENCE_STATE}/jetstream", target: /var/lib/openuem/jetstream}
+    networks:
+      messaging: {aliases: [broker.internal]}
+      broker_backend: {aliases: [broker.internal]}
+
+  console:
+    <<: *runtime
+    image: ${OPENUEM_CONSOLE_IMAGE:?}
+    command: [start, --domain, "${OPENUEM_DOMAIN:?}", --org-name, "${OPENUEM_ORGANIZATION:?}", --server-name, console.internal, --console-port, "8444", --auth-port, "8445", --cacert, /run/administrator-ca.pem, --cert, /run/console-tls/server.pem, --key, /run/console-tls/server.key]
+    environment:
+      OPENUEM_INDIVIDUAL_AGENT_MODE: "true"
+      OPENUEM_PUBLIC_ORIGIN: ${OPENUEM_PUBLIC_ORIGIN:?}
+      OPENUEM_AGENT_BROKER_URLS: tls://broker.internal:4222
+      OPENUEM_AGENT_BROKER_CA_FILE: /run/backend-ca.pem
+      OPENUEM_AGENT_CONSOLE_KEY_FILE: /run/console.seed
+      OPENUEM_TRUSTED_GATEWAY_CERTIFICATES: /run/console-tls/gateway-leaves.pem
+      OPENUEM_INSTALLATION_ID: ${OPENUEM_INSTALLATION_ID:?}
+      OPENUEM_BOOTSTRAP_ADMIN: ${OPENUEM_BOOTSTRAP_ADMIN:?}
+      JWT_KEY_FILE: /run/jwt.key
+      ENCRYPTION_MASTER_KEY_FILE: /run/encryption.key
+      DATABASE_URL_FILE: /run/database.url
+      APPLE_MDM_LISTEN_ADDR: :8446
+      OPENUEM_AGENT_ENROLLMENT_LISTEN_ADDR: :8447
+      OPENUEM_AGENT_RELEASES_DIRECTORY: /run/releases
+      OPENUEM_AGENT_RELEASE_KEYS_FILE: /run/release-keys.pem
+      OPENUEM_AGENT_BOOTSTRAP_KEY_FILE: /run/desktop-bootstrap.key
+      WINDOWS_MDM_LISTEN_ADDR: :8448
+      WINDOWS_MDM_MASTER_KEY_FILE: /run/windows.key
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=256m,uid=${OPENUEM_RUNTIME_UID},gid=${OPENUEM_RUNTIME_GID},mode=0700
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/credentials/state/database.url", target: /run/database.url}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/database-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/backend-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/jwt.key", target: /run/jwt.key}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/encryption.key", target: /run/encryption.key}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/console-user.seed", target: /run/console.seed}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/console", target: /run/console-tls}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/administrator-ca.pem", target: /run/administrator-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/protocol/state/windows.key", target: /run/windows.key}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/protocol/state/desktop-bootstrap.key", target: /run/desktop-bootstrap.key}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/release-keys.pem", target: /run/release-keys.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/releases", target: /run/releases}
+      - {<<: *storage, source: "${OPENUEM_REFERENCE_STATE}/console-logs", target: /var/log/openuem-server}
+    networks:
+      data: {}
+      messaging: {}
+      console_backend: {aliases: [console.internal]}
+      egress: {}
+
+  authorization:
+    <<: *runtime
+    image: ${OPENUEM_AUTHORIZATION_IMAGE:?}
+    environment:
+      OPENUEM_AGENT_DATABASE_URL_FILE: /run/database.url
+    command: [--broker-urls, tls://broker.internal:4222, --broker-ca, /run/backend-ca.pem, --issuer-key-file, /run/issuer.seed, --auth-key-file, /run/authorization.seed, --system-key-file, /run/revocation.seed]
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/credentials/state/database.url", target: /run/database.url}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/database-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/backend-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/authorization-issuer.seed", target: /run/issuer.seed}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/authorization-user.seed", target: /run/authorization.seed}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/revocation-user.seed", target: /run/revocation.seed}
+    networks: [data, messaging]
+
+  commands:
+    <<: *runtime
+    image: ${OPENUEM_COMMANDS_IMAGE:?}
+    environment:
+      OPENUEM_AGENT_DATABASE_URL_FILE: /run/database.url
+    command: [--broker-urls, tls://broker.internal:4222, --broker-ca, /run/backend-ca.pem, --provisioner-key-file, /run/provisioner.seed]
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/credentials/state/database.url", target: /run/database.url}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/database-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/backend-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/provisioner-user.seed", target: /run/provisioner.seed}
+    networks: [data, messaging]
+
+  worker:
+    <<: *runtime
+    image: ${OPENUEM_WORKER_IMAGE:?}
+    environment:
+      OPENUEM_INDIVIDUAL_AGENT_MODE: "true"
+      OPENUEM_AGENT_DATABASE_URL_FILE: /run/database.url
+      OPENUEM_AGENT_BROKER_URLS: tls://broker.internal:4222
+      OPENUEM_AGENT_BROKER_CA_FILE: /run/backend-ca.pem
+      OPENUEM_AGENT_WORKER_KEY_FILE: /run/worker.seed
+      ENCRYPTION_MASTER_KEY_FILE: /run/encryption.key
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/credentials/state/database.url", target: /run/database.url}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/database-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/trust/backend-ca.pem", target: /run/backend-ca.pem}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/broker/state/worker-user.seed", target: /run/worker.seed}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/installation/state/encryption.key", target: /run/encryption.key}
+    networks: [data, messaging]
+
+  gateway:
+    <<: *runtime
+    image: ${OPENUEM_GATEWAY_IMAGE:?}
+    mem_limit: 256m
+    command: [--listen, ":8443", --public-origin, "${OPENUEM_PUBLIC_ORIGIN:?}", --tls-cert, /run/public/server.pem, --tls-key, /run/public/server.key, --gateway-cert, /run/gateway/client.pem, --gateway-key, /run/gateway/client.key, --backend-ca, /run/gateway/backend-ca.pem, --console-url, https://console.internal:8444, --auth-url, https://console.internal:8445, --apple-url, https://console.internal:8446, --desktop-url, https://console.internal:8447, --windows-url, https://console.internal:8448, --agent-url, https://broker.internal:9222, --admin-networks, "${OPENUEM_ADMIN_NETWORKS:?}"]
+    volumes:
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/public", target: /run/public}
+      - {<<: *input, source: "${OPENUEM_REFERENCE_STATE}/pki/state/gateway", target: /run/gateway}
+    networks:
+      edge: {aliases: ["${OPENUEM_PUBLIC_HOST:?}"]}
+      console_backend: {}
+      broker_backend: {}
+
+networks:
+  data: {internal: true}
+  messaging: {internal: true}
+  console_backend: {internal: true}
+  broker_backend: {internal: true}
+  edge: {}
+  egress: {}

@@ -1,0 +1,90 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ cspObservationNavigation(info *partials.CommonInfo, device windows.DeviceMetadata, command windows.CSPCommand) {
+	@cspNavigation(info, device)
+	<nav aria-label="Command evidence" class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+command.ID)) }>Current command and original intent</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+command.ID+"/observations")) }>Observation history</a>
+	</nav>
+}
+
+templ CSPObservations(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, history windows.CSPObservationHistory, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "CSP commands", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands")}, {Title: "Observation history"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">CSP observation history</h1><p>{ device.Name } · { history.Command.ID }</p>@cspObservationNavigation(info, device, history.Command)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Each entry preserves cumulative operation evidence after one authenticated device message, in message order. Open an entry to inspect the values available at that point. Later replies and administrative resolution do not rewrite earlier entries.</p>
+					<p class="my-3">This history covers received operation evidence. It is not a log of every protocol packet, queue transition or administrator action, and does not establish effective policy or compliance.</p>
+					<div role="region" aria-label="CSP observation history table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Historical observations for this command</caption>
+							<thead><tr><th scope="col">Device message</th><th scope="col">Received (UTC)</th><th scope="col">Evidence at this point</th></tr></thead>
+							<tbody>
+								for _, observation := range history.Observations {
+									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands/%s/observations/%d", device.ID, history.Command.ID, observation.MessageID))) }>Open message { fmt.Sprint(observation.MessageID) }</a></td><td>
+										@ScheduleTime(observation.ReceivedAt)
+									</td><td>{ cspObservationOutcome(observation.Outcome) }</td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(history.Observations)==0 {
+						<p class="my-3">No stored observations in this view. An empty history does not establish whether device effects occurred.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands/%s/observations?offset=%d", device.ID, history.Command.ID, max(0, offset-10)))) }>Previous observations</a>
+						}
+						if more {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/commands/%s/observations?offset=%d", device.ID, history.Command.ID, offset+10))) }>Next observations</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ CSPObservation(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, command windows.CSPCommand, observation windows.CSPObservation) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Observation history", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+command.ID+"/observations")}, {Title: "Historical observation"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Historical CSP observation</h1><p>{ device.Name } · { command.ID }</p>@cspObservationNavigation(info, device, command)
+</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ cspObservationOutcome(observation.Outcome) }</h2>
+					<dl class="uk-description-list"><dt>Received (UTC)</dt><dd>
+						@ScheduleTime(observation.ReceivedAt)
+					</dd><dt>Stored session ID</dt><dd>{ observation.SessionID }</dd><dt>Device message</dt><dd>{ fmt.Sprint(observation.MessageID) }</dd></dl>
+					<p class="my-3">This immutable snapshot shows cumulative evidence after this message. Its status and values may differ from the current command. Later results or administrative resolution do not change this record.</p>
+					if observation.StopReason!="" {
+						<p>Collection stop reason (diagnostic only)</p>
+						<pre class="windows-csp-value" tabindex="0" aria-label="Historical collection stop reason">{ observation.StopReason }</pre>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Operation evidence at this point</h2>
+					<p>Status 202 is asynchronous acceptance; 516 reports failed rollback. Partial Get values are withheld. Empty values and absent results remain distinct. Device acknowledgments do not establish effective policy or compliance.</p>
+					@cspExportForm(info, command, observation.MessageID)
+					@cspOutcomes(observation.Outcomes)
+				</div>
+			</section>
+		</main>
+	}
+}

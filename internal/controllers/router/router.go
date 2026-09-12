@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	session "github.com/canidam/echo-scs-session"
-	"github.com/invopop/ctxi18n"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	mw "github.com/labstack/echo/v4/middleware"
 	"github.com/open-uem/openuem-console/internal/controllers/router/middleware"
@@ -36,7 +36,7 @@ func New(s *sessions.SessionManager, server, port, maxUploadSize string) *echo.E
 	faviconHandler(e, assetsPath)
 
 	// Add i18n middleware
-	if err := ctxi18n.LoadWithDefault(locales.Content, "en"); err != nil {
+	if err := locales.Load(); err != nil {
 		log.Fatalf("[FATAL]: could not load translations: %v", err)
 	}
 	e.Use(middleware.GetLocale)
@@ -51,13 +51,7 @@ func New(s *sessions.SessionManager, server, port, maxUploadSize string) *echo.E
 	}))
 
 	// Add CSRF middleware
-	e.Use(mw.CSRFWithConfig(mw.CSRFConfig{
-		TokenLookup:    "cookie:_csrf",
-		CookiePath:     "/",
-		CookieSecure:   true,
-		CookieHTTPOnly: true,
-		CookieSameSite: http.SameSiteStrictMode,
-	}))
+	e.Use(middleware.CSRF())
 
 	// Add sessions middleware
 	e.Use(session.LoadAndSave(s.Manager))
@@ -120,26 +114,27 @@ func staticAssets(e *echo.Echo, cwd string) string {
 }
 
 func customHTTPErrorHandler(err error, c echo.Context) {
+	if c.Response().Committed {
+		return
+	}
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	if he, ok := err.(*echo.HTTPError); ok {
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
+		c.Response().WriteHeader(he.Code)
 		switch he.Code {
 		case http.StatusNotFound:
 			if err := views.ErrorPage("404", "Page Not Found").Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
 		case http.StatusInternalServerError:
-			message := "Internal server error"
-			if he.Message != nil {
-				message = he.Message.(string)
-			}
-
-			if err := views.ErrorPage("503", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
+			message := publicServerError(c, he.Code)
+			if err := views.ErrorPage("500", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
 		case http.StatusUnauthorized:
 			message := "Unauthorized Access"
 			if he.Message != nil {
-				message = he.Message.(string)
+				message = fmt.Sprint(he.Message)
 			}
 
 			if err := views.ErrorPage("401", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
@@ -153,7 +148,7 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		case http.StatusForbidden:
 			message := "Forbidden"
 			if he.Message != nil {
-				message = he.Message.(string)
+				message = fmt.Sprint(he.Message)
 			}
 
 			if err := views.ErrorPage("403", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
@@ -168,11 +163,47 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 				c.Logger().Error(err)
 			}
 		default:
-			if err := views.ErrorPage(strconv.Itoa(he.Code), err.Error()).Render(c.Request().Context(), c.Response().Writer); err != nil {
+			message := http.StatusText(he.Code)
+			if he.Code >= 500 {
+				message = publicServerError(c, he.Code)
+			} else if he.Message != nil {
+				// Message is the handler's client-facing rejection. HTTPError.Error
+				// also includes Internal, which can contain credentials or raw URLs.
+				message = fmt.Sprint(he.Message)
+			}
+			if err := views.ErrorPage(strconv.Itoa(he.Code), message).Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
 		}
 	} else {
 		c.Logger().Error(err)
+		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
+		c.Response().WriteHeader(http.StatusInternalServerError)
+		_ = views.ErrorPage("500", publicServerError(c, http.StatusInternalServerError)).Render(c.Request().Context(), c.Response().Writer)
 	}
+}
+
+// Server failures never use exception text as browser copy. Refresh/check advice
+// does not imply that an interrupted mutation was rolled back or can be repeated.
+func publicServerError(c echo.Context, code int) string {
+	key := "http_errors.internal"
+	switch code {
+	case http.StatusBadGateway:
+		key = "http_errors.upstream"
+	case http.StatusServiceUnavailable:
+		key = "http_errors.unavailable"
+	case http.StatusGatewayTimeout:
+		key = "http_errors.timeout"
+	}
+	ctx := c.Request().Context()
+	if i18n.GetLocale(ctx) == nil {
+		// Errors can occur before locale middleware has attached its context.
+		if english, err := locales.WithLocale(ctx, "en"); err == nil {
+			ctx = english
+		}
+	}
+	if !i18n.Has(ctx, key) {
+		return "Internal server error"
+	}
+	return i18n.T(ctx, key)
 }

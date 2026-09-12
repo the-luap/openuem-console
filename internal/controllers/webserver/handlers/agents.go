@@ -416,7 +416,7 @@ func (h *Handler) AgentsAdmit(c echo.Context) error {
 					continue
 				}
 
-				if err := h.NATSConnection.Publish("certificates.agent."+agentId, data); err != nil {
+				if err := h.PublishBroker("certificates.agent."+agentId, data); err != nil {
 					log.Println("[ERROR]: ", i18n.T(c.Request().Context(), "nats.no_responder"))
 					errorsFound = true
 					continue
@@ -580,21 +580,7 @@ func (h *Handler) AgentAdmit(c echo.Context) error {
 }
 
 func (h *Handler) AgentForceRun(c echo.Context) error {
-	agentId := c.Param("uuid")
-
-	go func() {
-		if h.NATSConnection == nil || !h.NATSConnection.IsConnected() {
-			log.Printf("[ERROR]: %s", i18n.T(c.Request().Context(), "nats.not_connected"))
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if _, err := h.JetStream.Publish(ctx, "agent.report."+agentId, nil); err != nil {
-			log.Printf("[ERROR]: %v", err)
-		}
-	}()
-
-	return h.ListAgents(c, i18n.T(c.Request().Context(), "agents.force_run_success"), "", true)
+	return h.DesktopRefresh(c)
 }
 
 func (h *Handler) AgentConfirmDisable(c echo.Context) error {
@@ -661,7 +647,7 @@ func (h *Handler) AgentConfirmAdmission(c echo.Context, regenerate bool) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	if err := h.NATSConnection.Publish("certificates.agent."+agentId, data); err != nil {
+	if err := h.PublishBroker("certificates.agent."+agentId, data); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.no_responder"), false))
 	}
 
@@ -697,7 +683,7 @@ func (h *Handler) AgentForceRestart(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 		}
 
-		if _, err := h.NATSConnection.Request("agent.restart."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err := h.RequestBroker("agent.restart."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.no_responder"), false))
 		}
 	}
@@ -706,6 +692,9 @@ func (h *Handler) AgentForceRestart(c echo.Context) error {
 }
 
 func (h *Handler) AgentLogs(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -765,6 +754,9 @@ func (h *Handler) AgentLogs(c echo.Context) error {
 }
 
 func (h *Handler) GetAgentLogFile(c echo.Context, agent *ent.Agent, path string) (string, error) {
+	if err := h.requireEndpointInbound(); err != nil {
+		return "", err
+	}
 	key, err := utils.ReadPEMPrivateKey(h.SFTPKeyPath)
 	if err != nil {
 		return "", err
@@ -920,7 +912,7 @@ func (h *Handler) AgentSettings(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 		}
 
-		err = h.NATSConnection.Publish("agent.settings."+agentId, data)
+		err = h.PublishBroker("agent.settings."+agentId, data)
 		if err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.settings_nats_error", err.Error()), true))
 		}
@@ -941,7 +933,7 @@ func (h *Handler) AgentSettings(c echo.Context) error {
 				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.settings_data_error"), true))
 			}
 
-			err = h.NATSConnection.Publish("agent.settings."+agentId, data)
+			err = h.PublishBroker("agent.settings."+agentId, data)
 			if err != nil {
 				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.settings_nats_error", err.Error()), true))
 			}

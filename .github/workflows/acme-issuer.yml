@@ -1,0 +1,95 @@
+name: ACME issuer
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/acme-issuer.yml'
+      - 'Dockerfile.acme*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/openuem-acme/**'
+      - 'internal/acmeissuer/**'
+      - 'internal/gateway/**'
+      - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
+      - 'internal/desktop/protocol/**'
+      - 'internal/mdm/windows/protocol/**'
+      - 'deploy/acme/**'
+      - 'scripts/check-reference-acme.py'
+  push:
+    branches: [main, 'feature/**']
+    paths:
+      - '.github/workflows/acme-issuer.yml'
+      - 'Dockerfile.acme*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/openuem-acme/**'
+      - 'internal/acmeissuer/**'
+      - 'internal/gateway/**'
+      - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
+      - 'internal/desktop/protocol/**'
+      - 'internal/mdm/windows/protocol/**'
+      - 'deploy/acme/**'
+      - 'scripts/check-reference-acme.py'
+
+permissions:
+  contents: read
+
+jobs:
+  issuer:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - name: Test state, publication and process ownership under the race detector
+        run: |
+          go test -mod=readonly -race -p=1 ./internal/acmeissuer ./cmd/openuem-acme
+          go vet -mod=readonly ./internal/acmeissuer ./cmd/openuem-acme
+      - name: Build the runtime and real local ACME fixture
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.acme --target runtime -t acme-runtime:check .
+          docker build -f Dockerfile.acme --target smoke -t acme-smoke:check .
+          OPENUEM_ACME_IMAGE=acme-runtime:check OPENUEM_ACME_ROOT=/tmp/acme-config-check \
+            docker compose -f deploy/acme/compose.yaml config --quiet
+      - name: Verify real DNS-01 and renewal with optional authorization reuse
+        run: |
+          set -euo pipefail
+          for reuse in 0 100; do
+            docker run --rm --network none --dns 127.0.0.1 --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 128 --memory 256m \
+              --tmpfs /tmp:rw,nosuid,nodev,noexec,size=32m \
+              --env OPENUEM_ACME_TEST_BINARY=/openuem-acme \
+              --env OPENUEM_ACME_TEST_AUTHZ_REUSE="$reuse" \
+              acme-smoke:check | tee "acme-smoke-$reuse.log"
+            grep -q '^--- PASS: TestACMEContainerDNS01 ' "acme-smoke-$reuse.log"
+          done
+      - name: Verify DNS-01 across separate issuer and provider containers
+        run: python3 scripts/check-reference-acme.py acme-smoke:check
+      - name: Check the image has no listeners, test server or credentials
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges acme-runtime:check --help
+          test "$(docker image inspect --format '{{.Config.User}}' acme-runtime:check)" = '65532:65532'
+          test "$(docker image inspect --format '{{json .Config.ExposedPorts}}' acme-runtime:check)" = 'null'
+          container=$(docker create acme-runtime:check --help)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          docker export "$container" -o acme-runtime.tar
+          tar -tf acme-runtime.tar > acme-runtime-files.txt
+          grep -qx 'openuem-acme' acme-runtime-files.txt
+          grep -qx 'lego' acme-runtime-files.txt
+          grep -qx 'etc/ssl/certs/ca-certificates.crt' acme-runtime-files.txt
+          if grep -Eq '(^|/)(issuer\.test|pebble|sh|bash|go\.mod|go\.sum|.*\.(pem|key|seed|pfx))$' acme-runtime-files.txt; then
+            echo 'Runtime image contains test, shell, source or credential material'
+            exit 1
+          fi

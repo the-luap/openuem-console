@@ -1,0 +1,230 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ appleEscalationStatus(r apple.UpdateEscalation) {
+	<div class="grid gap-3" style="overflow-wrap:anywhere;" data-escalation-status={ r.Phase }>
+		<h2 class="uk-card-title">{ escalationPhase(r.Phase) }</h2>
+		<p>Monitoring owner: { r.Actor }</p>
+		if r.Reason!="" {
+			<p role="status">{ escalationReason(r.Reason) }</p>
+		}
+		<p>Open devices at the last check: <strong>{ Number(r.OpenCount) }</strong> · Awaiting verified evidence: <strong>{ Number(r.AwaitingCount) }</strong></p>
+		if r.CheckedAt!=nil {
+			<p>Last saved assessment (UTC): { r.CheckedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+		} else {
+			<p>The first monitoring check has not completed.</p>
+		}
+		if r.NextCheckAt!=nil {
+			<p>Next check due (UTC): { r.NextCheckAt.UTC().Format("2006-01-02 15:04:05") }</p>
+		}
+		if r.IncidentID!="" {
+			<p>Current incident: <code>{ r.IncidentID }</code></p>
+			if r.AcknowledgmentID!="" {
+				<p data-escalation-acknowledged>An operator acknowledged this incident. Installation remains a separate device result.</p>
+			} else {
+				<p data-escalation-unacknowledged>This incident has not been acknowledged.</p>
+			}
+		}
+		if r.Phase!="watching" {
+			<p>Saved incidents remain visible while monitoring is stopped. New device reports are not assessed automatically until monitoring is enabled again.</p>
+		}
+	</div>
+}
+
+templ appleEscalationSnapshot(snapshot *apple.UpdateEscalationSnapshot) {
+	if snapshot!=nil {
+		<section class="uk-card uk-card-default" data-escalation-snapshot>
+			<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+				<h2 class="uk-card-title">Saved decision evidence</h2>
+				<p>Assessed at (UTC): { snapshot.AssessedAt.UTC().Format("2006-01-02 15:04:05") }. These values describe that assessment and may differ from the current device state.</p>
+				for _,d:=range snapshot.Devices {
+					<article class="grid gap-2" data-escalation-evidence={ d.Decision.State }>
+						<h3 class="font-semibold">{ escalationState(d.Decision.State) }</h3>
+						<p>Original native enrollment: <code>{ d.Decision.DeviceID }</code></p>
+						<p>{ escalationReason(d.Decision.Reason) }</p>
+						if d.Observation!=nil {
+							<p>Reported OS: { Show(d.Observation.Version) } · Build: { Show(d.Observation.Build) }</p>
+							<p>OS report recorded (UTC): { d.Observation.RecordedAt.UTC().Format("2006-01-02 15:04:05") } · { updateGroupReportSource(d.Observation.Source) }</p>
+						}
+						if d.ExceptionEndedAt!=nil {
+							<p>Exception ended (UTC): { d.ExceptionEndedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+						}
+						@appleUpdateDeadline(d.Deadline, true)
+					</article>
+				}
+			</div>
+		</section>
+	}
+}
+
+templ AppleUpdateEscalationReview(c echo.Context, info *partials.CommonInfo, p apple.UpdateGroupEscalationReview, configurationKey, acknowledgmentKey string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update alerts", Url: partials.GetNavigationUrl(info, "/ios/update-alerts")}, {Title: "Original cohort", Url: partials.GetNavigationUrl(info, UpdateGroupProgressPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID))}}, info)
+		<main id="device-management" data-update-escalation-page="review" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="grid gap-3"><h1 class="text-2xl font-semibold">Review update monitoring</h1><p>Console alerts track the original assignment's enrollments. Checks run about every five minutes while the console is running. This channel displays alerts here; it does not send email or device commands.</p><p>Unknown evidence keeps an existing incident open. Policy removal, exceptions or a pending deadline can exclude a device without proving an OS installation.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdateRemovalPlan(p.Progress.Assignment.Plan)
+					<p>Original assignment: <code>{ p.Progress.Assignment.ID }</code></p>
+					if p.Current!=nil {
+						@appleEscalationStatus(*p.Current)
+					} else {
+						<h2 class="uk-card-title">Monitoring has not been enabled</h2>
+					}
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID)+"/events")) }>Open monitoring history</a>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" data-escalation-preview>
+					<h2 class="uk-card-title">Fresh preview</h2>
+					<p>Assessed at (UTC): { p.Progress.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					if p.PreviewUnavailable {
+						<p role="status">A fresh preview is unavailable. The saved incident remains unchanged. Pause monitoring or restore the source before enabling it again.</p>
+					} else {
+						<p>Needs attention: { Number(p.NeedsAttention) } · Excluded: { Number(p.Suppressed) } · Deadline pending: { Number(p.Pending) } · Unverified: { Number(p.Unverified) }</p>
+					}
+					<p>This preview does not change the saved incident. The next monitoring check records its own assessment.</p>
+					for _,d:=range p.Decisions {
+						<article class="grid gap-1" style="overflow-wrap:anywhere;"><h3 class="font-semibold">{ escalationState(d.State) }</h3><p>Original native enrollment: { d.DeviceID }</p><p>{ escalationReason(d.Reason) }</p></article>
+					}
+				</div>
+			</section>
+			if info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) {
+				<form method="post" action={ partials.GetNavigationUrl(info, UpdateEscalationPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID)) } class="uk-card uk-card-default" data-escalation-action="configure">
+					<div class="uk-card-body grid gap-4">
+						@CSRF(info)
+						<input type="hidden" name="request_key" value={ configurationKey }/>
+						<input type="hidden" name="configuration_revision" value={ Number(escalationRevision(p.Current)) }/>
+						if p.Current!=nil && p.Current.Phase=="blocked" {
+							<label class="grid gap-2">Monitoring change<select name="enabled" class="uk-select"><option value="yes">Enable under my current permissions</option><option value="no">Pause monitoring</option></select></label>
+						} else {
+							<input type="hidden" name="enabled" value={ escalationEnableValue(p.Current) }/>
+						}
+						<h2 class="uk-card-title">{ escalationAction(p.Current) }</h2>
+						<p>Enabling assigns monitoring to your current permissions. Pausing preserves the saved incident and stops future checks.</p>
+						<label><input type="checkbox" name="confirmed" value="yes" required/> I confirm this monitoring change for the original assignment.</label>
+						<button type="submit" class="uk-button uk-button-primary">{ escalationAction(p.Current) }</button>
+					</div>
+				</form>
+				if p.Current!=nil && p.Current.IncidentID!="" && p.Current.AcknowledgmentID=="" {
+					<form method="post" action={ partials.GetNavigationUrl(info, UpdateEscalationPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID)+"/acknowledge") } class="uk-card uk-card-default" data-escalation-action="acknowledge">
+						<div class="uk-card-body grid gap-4">
+							@CSRF(info)
+							<input type="hidden" name="request_key" value={ acknowledgmentKey }/>
+							<input type="hidden" name="configuration_revision" value={ Number(p.Current.ConfigurationRevision) }/>
+							<input type="hidden" name="incident" value={ p.Current.IncidentID }/>
+							<h2 class="uk-card-title">Acknowledge the saved incident</h2>
+							<p>An acknowledgment records who is handling the incident. It does not resolve the incident or confirm installation. A newly affected device requires a new acknowledgment.</p>
+							<label class="grid gap-2">Action note<textarea name="reason" required maxlength="256" rows="3" class="uk-textarea"></textarea></label>
+							<label><input type="checkbox" name="confirmed" value="yes" required/> I acknowledge the saved incident shown above.</label>
+							<button type="submit" class="uk-button uk-button-primary">Record acknowledgment</button>
+						</div>
+					</form>
+				}
+			}
+			if p.Current!=nil {
+				@appleEscalationSnapshot(p.Current.Snapshot)
+			}
+		</main>
+	}
+}
+
+templ AppleUpdateEscalations(c echo.Context, info *partials.CommonInfo, items []apple.UpdateEscalation, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}}, info)
+		<main id="device-management" data-update-escalation-page="list" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Apple update alerts</h1><p>Saved console alerts and monitoring configurations for this site, newest monitoring configuration created first. Enable monitoring from an original assignment's cohort progress.</p></div>
+			if len(items)==0 {
+				<p>No update monitors are recorded on this page.</p>
+			}
+			for _,r:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+						if r.Assignment!=nil {
+							<h2 class="uk-card-title">{ r.Assignment.Plan.Definition.Name }</h2>
+						}
+						@appleEscalationStatus(r)
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(r.PlanID, r.AssignmentID))) }>Review monitoring and incident</a>
+					</div>
+				</section>
+			}
+			<nav class="flex flex-wrap gap-4" aria-label="Update monitors">
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/update-alerts")) }>Newest monitors</a>
+				if next!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/update-alerts") + "?before=" + next) }>Older monitors</a>
+				}
+			</nav>
+		</main>
+	}
+}
+
+templ AppleUpdateEscalationEvents(c echo.Context, info *partials.CommonInfo, plan, assignment string, items []apple.UpdateEscalationEvent, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update alerts", Url: partials.GetNavigationUrl(info, "/ios/update-alerts")}}, info)
+		<main id="device-management" data-update-escalation-page="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Original monitoring events</h1><p>Immutable configuration, incident and acknowledgment records for this original assignment. Repeated checks with unchanged decisions do not create another incident event.</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(plan, assignment))) }>Review current monitoring</a></div>
+			if len(items)==0 {
+				<p>No monitoring events are recorded on this page.</p>
+			}
+			for _,e:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ escalationEventKind(e.Kind) }</h2>
+						<p>Recorded at (UTC): { e.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+						<p>Open devices: { Number(len(e.OpenTargets)) } · Awaiting evidence: { Number(len(e.AwaitingTargets)) }</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(plan, assignment)+"/events/"+e.ID)) }>Open original monitoring event</a>
+					</div>
+				</section>
+			}
+			<nav class="flex flex-wrap gap-4" aria-label="Monitoring history">
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(plan, assignment)+"/events")) }>Newest events</a>
+				if next!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(plan, assignment)+"/events") + "?before=" + next) }>Older events</a>
+				}
+			</nav>
+		</main>
+	}
+}
+
+templ AppleUpdateEscalationEvent(c echo.Context, info *partials.CommonInfo, e apple.UpdateEscalationEvent) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update alerts", Url: partials.GetNavigationUrl(info, "/ios/update-alerts")}, {Title: "Monitoring history", Url: partials.GetNavigationUrl(info, UpdateEscalationPath(e.PlanID, e.AssignmentID)+"/events")}}, info)
+		<main id="device-management" data-update-escalation-page="event" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">{ escalationEventKind(e.Kind) }</h1><p>This original event is unchanged by later monitoring checks or operator actions. An acknowledgment or an empty incident does not itself establish OS installation.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+					if e.Assignment!=nil {
+						@appleUpdateRemovalPlan(e.Assignment.Plan)
+					}
+					<p>Event: <code>{ e.ID }</code></p>
+					<p>Recorded by: { e.Actor }</p>
+					<p>Recorded at (UTC): { e.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					<p>{ escalationPhase(e.Phase) }</p>
+					if e.StateReason!="" {
+						<p>{ escalationReason(e.StateReason) }</p>
+					}
+					if e.Reason!="" {
+						<p style="white-space:pre-wrap;" data-escalation-note>{ e.Reason }</p>
+					}
+					if e.IncidentID!="" {
+						<p>Incident at this event: <code>{ e.IncidentID }</code></p>
+					}
+					<p>Open devices at this event: { Number(len(e.OpenTargets)) } · Awaiting evidence: { Number(len(e.AwaitingTargets)) }</p>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateEscalationPath(e.PlanID, e.AssignmentID))) }>Review current monitoring</a>
+				</div>
+			</section>
+			@appleEscalationSnapshot(e.Snapshot)
+		</main>
+	}
+}

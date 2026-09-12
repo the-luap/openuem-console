@@ -1,23 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"golang.org/x/time/rate"
 )
 
 func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
+	e.Use(h.UserLocale)
+	h.RegisterApple(e)
+	h.RegisterDesktop(e)
+	h.RegisterWindows(e)
+	h.RegisterAccess(e)
+	h.RegisterAudit(e)
 	e.GET("/", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site", h.Dashboard, h.IsAuthenticated)
 
 	e.GET("/auth", h.Auth)
-	e.GET("/auth/confirm/:token", h.ConfirmEmail)
+	// The handler explicitly rejects every method except GET and POST so
+	// unsupported methods cannot fall through to the protected route fallback.
+	e.Any("/auth/confirm/:token", h.ConfirmEmail)
 
 	e.GET("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
 	e.POST("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
@@ -114,7 +124,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/admin/tenants/:tenant", h.DeleteTenant, h.IsAuthenticated)
 
 	e.GET("/admin/sessions", func(c echo.Context) error { successMessage := ""; return h.ListSessions(c, successMessage) }, h.IsAuthenticated)
-	e.GET("/admin/sessions/:token/delete", h.SessionDelete)
+	e.GET("/admin/sessions/:token/delete", h.SessionDelete, h.IsAuthenticated)
 	e.DELETE("/admin/sessions/:token", h.SessionConfirmDelete, h.IsAuthenticated)
 	e.GET("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
 	e.POST("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
@@ -419,9 +429,9 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
-	e.GET("/profiles/task-types", h.ProfileTaskTypes)
-	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes)
-	e.GET("/profiles/task-definition", h.ProfileTaskDefinition)
+	e.GET("/profiles/task-types", h.ProfileTaskTypes, h.IsAuthenticated)
+	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes, h.IsAuthenticated)
+	e.GET("/profiles/task-definition", h.ProfileTaskDefinition, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
@@ -625,6 +635,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/login/new", h.LoginNewUser)
 
 	e.GET("/myaccount", h.MyAccount, h.IsAuthenticated)
+	e.POST("/myaccount/language", h.UpdateLanguage, h.IsAuthenticated, h.AppleCSRF)
 	e.POST("/myaccount/info", h.UpdatePersonalInfo, h.IsAuthenticated)
 	e.POST("/myaccount/password", h.MyAccountPassword, h.IsAuthenticated)
 	e.POST("/myaccount/enable2fa", h.Enable2FA, h.IsAuthenticated)
@@ -645,15 +656,33 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			return h.Login(c)
 		}
 
-		// get user from database
-		user, err := h.Model.GetUserById(username)
-		if err != nil {
+		// Recovery sessions cannot authorize protected routes.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot") {
 			return h.Login(c)
 		}
 
-		// if sessions includes forgot
-		forgot := h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot")
-		if forgot {
+		// Bound both account lookup and local policy verification. A transient
+		// database failure must not destroy an otherwise valid session.
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+		defer cancel()
+		user, err := h.Model.Client.User.Get(ctx, username)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return h.rejectLocalSession(c)
+			}
+			return echo.NewHTTPError(http.StatusServiceUnavailable, "Session verification is temporarily unavailable.")
+		}
+		if h.SessionManager.Manager.Exists(c.Request().Context(), oidcSessionKey) {
+			if err = h.validateOIDCSession(c, username); err != nil {
+				return err
+			}
+		} else if err = h.validateLocalSession(ctx, c, user); err != nil {
+			return err
+		}
+
+		// A pending first factor cannot silently become a full session if the
+		// account's MFA setting changes while the browser is completing its challenge.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "authentication-pending") && (!user.Use2fa || h.SessionManager.Manager.GetBool(c.Request().Context(), "twofa")) {
 			return h.Login(c)
 		}
 
@@ -683,6 +712,6 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		return next(c)
+		return h.authorizeConsoleRequest(c, next)
 	}
 }

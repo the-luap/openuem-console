@@ -1,0 +1,105 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progress apple.UpdateGroupProgress) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Original group assignment", Url: partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(progress.Assignment.Plan.ID)+"/"+progress.Assignment.ID)}}, info)
+		<main id="device-management" data-update-group-progress class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div style="overflow-wrap:anywhere;">
+				<h1 class="text-2xl font-semibold">Current cohort progress</h1>
+				<p>Current evidence for the original { Number(progress.Counts.Total) } native Apple devices. Later group edits do not change this selection.</p>
+				<p>Assessed at (UTC): { progress.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+				<p>OS observations and current configured policy are evaluated separately. A notification acknowledgment does not establish installation or prove which assignment caused an update.</p>
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(progress.Assignment.Plan.ID, progress.Assignment.ID))) }>Refresh this assessment</a>
+ <a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateEscalationPath(progress.Assignment.Plan.ID,progress.Assignment.ID)))}>Review console update monitoring</a>
+ <a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdatePromotionPath(progress.Assignment.Plan.ID,progress.Assignment.ID)))}>Review pilot promotion</a>
+ <a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdatePromotionHistoryPath(progress.Assignment.Plan.ID,progress.Assignment.ID)))}>Pilot promotion history</a>
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-update-progress-counts>
+					<h2 class="uk-card-title">Reported OS evidence</h2>
+					<p>Target or newer OS reported: <strong>{ Number(progress.Counts.TargetReported) }</strong></p>
+					<p>Update still required: <strong>{ Number(progress.Counts.UpdateRequired) }</strong></p>
+					<p>Result unverified: <strong>{ Number(progress.Counts.Unverified) }</strong></p>
+					<p>Counted results require a usable OS observation recorded after admission and within the last 24 hours. The exact target version also requires its matching build in the same report.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" data-update-policy-counts>
+					<h2 class="uk-card-title">Current configuration</h2>
+					<p>Values match the original plan: <strong>{ Number(progress.Counts.PolicyMatches) }</strong></p>
+					<p>Different configured policy: <strong>{ Number(progress.Counts.PolicyDifferent) }</strong></p>
+					<p>No configured update policy: <strong>{ Number(progress.Counts.PolicyAbsent) }</strong></p>
+					<p>Original enrollment unavailable: <strong>{ Number(progress.Counts.Unavailable) }</strong></p>
+					<p>Active update exceptions: <strong>{ Number(progress.Counts.ActiveExceptions) }</strong></p>
+					<p>Matching policy needs attention: <strong>{ Number(progress.Counts.PolicyAttention) }</strong></p>
+					<p>Matching values do not establish continuous ownership by this assignment. Policies may have been replaced or removed and later restored.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" data-update-deadline-counts>
+					<h2 class="uk-card-title">Original deadline estimates</h2>
+					<p>Estimated deadline elapsed: <strong>{ Number(progress.Counts.DeadlineElapsed) }</strong></p>
+					<p>Estimated deadline pending: <strong>{ Number(progress.Counts.DeadlinePending) }</strong></p>
+					<p>Deadline timing unverified: <strong>{ Number(progress.Counts.DeadlineUnverified) }</strong></p>
+					<p>Original target still required after estimated deadline: <strong>{ Number(progress.Counts.UpdateRequiredAfterDeadline) }</strong></p>
+					<p>These estimates use the original plan's device-local deadline and a device time zone reported within the last 24 hours. The final count also requires fresh OS evidence after admission and at or after the latest estimated deadline. Current policy replacements do not change the original deadline.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdatePlanDefinition(progress.Assignment.Plan)
+					@appleProfileAssignmentGroupSource(info, progress.Assignment.Group, progress.Assignment.GroupScope)
+					<p>Original admission (UTC): { progress.Assignment.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+				</div>
+			</section>
+			for _,device:=range progress.Devices {
+				<section class="uk-card uk-card-default" data-update-progress-device={ device.DeviceID }>
+					<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ Show(device.Name) }</h2>
+						<p>Native Apple enrollment: <code>{ device.DeviceID }</code></p>
+						<h3 class="font-semibold">{ updateGroupProgressResult(device.Result) }</h3>
+						if device.Reason!="" {
+							<p>{ updateGroupProgressReason(device.Reason) }</p>
+						}
+						if device.RecordedAt!=nil {
+							<p>Reported OS: { Show(device.ReportedVersion) } · Build: { Show(device.ReportedBuild) }</p>
+							<p>Version recorded (UTC): { device.RecordedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+							<p>Source: { updateGroupReportSource(device.ReportSource) }</p>
+						}
+						if device.PolicyState=="matches" {
+							<p>Configured values match the original plan.</p>
+						} else if device.PolicyState=="different" {
+							<p>A different update policy is currently configured.</p>
+						} else if device.PolicyState=="absent" {
+							<p>No update policy is currently configured.</p>
+						} else {
+							<p>Current device and policy details are unavailable in this site.</p>
+						}
+						if device.CurrentPolicy!=nil {
+							<p>Current configured target: { device.CurrentPolicy.TargetVersion } · { device.CurrentPolicy.TargetBuild }</p>
+							<p>Current device-local deadline: { device.CurrentPolicy.Deadline }</p>
+							<p>Current policy status: { updateGroupPolicyStatus(device.CurrentPolicy.Status) }</p>
+							if device.PolicyHasError {
+								<p>The current policy has error details. Open the device to review them.</p>
+							}
+						}
+						@appleUpdateExceptionSummary(device.Exception,device.ExceptionActive)
+						@appleUpdateDeadline(device.Deadline,true)
+						<p>Original notification: { updateGroupNotificationStatus(device.NotificationStatus) }</p>
+						if device.Availability!="unavailable" {
+							<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+device.DeviceID)) }>Open current device state</a>
+						}
+					</div>
+				</section>
+			}
+		</main>
+	}
+}

@@ -1,0 +1,25 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ GatekeeperEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a Mac Gatekeeper profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="macos-gatekeeper"/>
+			<input type="hidden" name="payload_scope" value="System"/>
+			<p>Set application assessment and Finder exception policy for the whole Mac. Requires macOS 10.8 or later.</p>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company Mac Gatekeeper"/></label>
+			<label>Identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.mac-gatekeeper"/></label>
+			<label>Allowed application sources<select class="uk-select" name="app_sources" required><option value="identified">App Store and identified developers</option><option value="store">App Store only</option><option value="disabled">Disable Gatekeeper assessment</option></select></label>
+			<p class="uk-text-muted">Disabling assessment removes this Gatekeeper check. Installed profiles and other macOS protections can still affect application launches.</p>
+			<label>Finder exception menu<select class="uk-select" name="finder_override"><option value="">Keep macOS default</option><option value="true">Disable the exception menu</option><option value="false">Allow the exception menu</option></select></label>
+			<label>Blocked malware submission prompt<select class="uk-select" name="malware_upload"><option value="">Keep macOS default</option><option value="false">Suppress the prompt</option><option value="true">Allow the prompt</option></select></label>
+			<p class="uk-text-muted">Changing the submission prompt requires macOS 15 or later. This setting controls the prompt to submit blocked malware to Apple.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the application sources and exception policy.</label>
+			<p>Saving creates a profile. Select Macs below to assign it. Profile installation confirms delivery; application-launch behavior must be checked on the Mac.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create Mac Gatekeeper profile</button>
+		</form>
+	</details>
+}

@@ -1,26 +1,37 @@
 package sessions
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/utils"
 )
 
-// This code is cherry-picked from https://github.com/alexedwards/scs/blob/209de6e426de9259665975ce16b91331d228f052/pgxstore/pgxstore.go#L11
-// so we can support token encryption/decryption
+// Originally adapted from the SCS pgxstore, then extended with encrypted token
+// records, indexed lookup, durable revocation and joined cleanup.
 
 // PostgresStore represents the session store.
 type PostgresStore struct {
 	pool                *pgxpool.Pool
-	stopCleanup         chan bool
+	stopCleanup         context.CancelFunc
+	cleanupDone         chan struct{}
 	tableName           string
 	encryptionMasterKey string
+	revocationsName     string
+	configName          string
+	indexName           string
+	revokeFunction      string
+	ready               atomic.Bool
 }
 
 type Config struct {
@@ -58,253 +69,211 @@ func NewWithCleanupInterval(pool *pgxpool.Pool, cleanupInterval time.Duration) *
 // NewWithConfig returns a new PostgresStore instance with the given configuration.
 // If the TableName field is empty, it will be set to "sessions".
 // If the CleanUpInterval field is 0, the cleanup goroutine will not be started.
+// Call Migrate before use; requests and cleanup cannot access an uninitialized store.
 func NewWithConfig(pool *pgxpool.Pool, config Config) *PostgresStore {
 	if config.TableName == "" {
 		config.TableName = "sessions"
 	}
-
-	p := &PostgresStore{pool: pool, tableName: config.TableName, encryptionMasterKey: config.EncryptionMasterKey}
+	parts := strings.Split(config.TableName, ".")
+	p := &PostgresStore{pool: pool, tableName: pgx.Identifier(parts).Sanitize(), encryptionMasterKey: config.EncryptionMasterKey,
+		revocationsName: sessionRelation(parts, "_revocations"), configName: sessionRelation(parts, "_config"),
+		indexName: sessionRelation(parts[len(parts)-1:], "_lookup_idx"), revokeFunction: sessionRelation(parts, "_revoke")}
 	if config.CleanUpInterval > 0 {
-		p.stopCleanup = make(chan bool)
-		go p.startCleanup(config.CleanUpInterval)
+		var ctx context.Context
+		ctx, p.stopCleanup = context.WithCancel(context.Background())
+		p.cleanupDone = make(chan struct{})
+		go p.startCleanup(ctx, config.CleanUpInterval)
 	}
 	return p
 }
 
-// FindCtx returns the data for a given session token from the PostgresStore instance.
-// If the session token is not found or is expired, the returned exists flag will
-// be set to false.
-func (p *PostgresStore) FindCtx(ctx context.Context, token string) (b []byte, found bool, err error) {
-	if p.encryptionMasterKey != "" {
-		stmt := fmt.Sprintf("SELECT token, data FROM %s WHERE current_timestamp < expiry", p.tableName)
-		rows, err := p.pool.Query(ctx, stmt)
-		if err != nil {
-			return nil, false, nil
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var retrievedToken string
-			err = rows.Scan(&retrievedToken, &b)
-			if err != nil {
-				return nil, false, nil
-			}
-
-			isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(retrievedToken, p.encryptionMasterKey)
-			if err != nil {
-				return nil, false, nil
-			}
-
-			if isAccessTokenEncrypted {
-				retrievedToken, err = utils.DecryptSensitiveField(retrievedToken, p.encryptionMasterKey)
-				if err != nil {
-					return nil, false, nil
-				}
-
-				if retrievedToken == token {
-					return b, true, nil
-				}
-			}
-		}
-	} else {
-		stmt := fmt.Sprintf("SELECT data FROM %s WHERE token = $1 AND current_timestamp < expiry", p.tableName)
-		row := p.pool.QueryRow(ctx, stmt, token)
-		err = row.Scan(&b)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, false, nil
-		} else if err != nil {
-			return nil, false, err
-		}
-		return b, true, nil
+// FindCtx uses the unique logical-token index. Verify the actual record as well:
+// an encrypted database ID or an incompatible encryption key is never a bearer.
+func (p *PostgresStore) FindCtx(ctx context.Context, token string) ([]byte, bool, error) {
+	if !p.ready.Load() {
+		return nil, false, ErrNotInitialized
 	}
-
-	return nil, false, nil
+	var data []byte
+	var record string
+	err := p.pool.QueryRow(ctx, fmt.Sprintf(`SELECT token,data FROM %s s WHERE s.token_lookup=$1 AND current_timestamp<s.expiry AND NOT EXISTS(SELECT 1 FROM %s r WHERE r.token_lookup=s.token_lookup)`, p.tableName, p.revocationsName), sessiontokens.Lookup(token)).Scan(&record, &data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if err = p.verifyRecord(record, token); err != nil {
+		return nil, false, err
+	}
+	return data, true, nil
 }
 
-// CommitCtx adds a session token and data to the PostgresStore instance with the
-// given expiry time. If the session token already exists, then the data and expiry
-// time are updated.
-func (p *PostgresStore) CommitCtx(ctx context.Context, token string, b []byte, expiry time.Time) (err error) {
-
-	// encrypt the token in database if we have the encryption master key
-	if p.encryptionMasterKey != "" {
-		foundToken := ""
-		stmt := fmt.Sprintf("SELECT token FROM %s WHERE current_timestamp < expiry", p.tableName)
-		rows, err := p.pool.Query(ctx, stmt)
-		if err != nil {
-			return err
-		}
-
-		defer rows.Close()
-		for rows.Next() {
-			var retrievedToken string
-			err = rows.Scan(&retrievedToken)
-			if err != nil {
-				return err
-			}
-			isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(retrievedToken, p.encryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if isAccessTokenEncrypted {
-				decryptedRetrievedToken, err := utils.DecryptSensitiveField(retrievedToken, p.encryptionMasterKey)
-				if err != nil {
-					return err
-				}
-
-				if decryptedRetrievedToken == token {
-					foundToken = retrievedToken
-					break
-				}
-			}
-		}
-
-		if foundToken != "" {
-			// token already exists encrypted, update
-			token = foundToken
-		} else {
-			// encrypt token, this will be a new token
-			token, err = utils.EncryptSensitiveField(token, p.encryptionMasterKey)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	stmt := fmt.Sprintf("INSERT INTO %s (token, data, expiry) VALUES ($1, $2, $3) ON CONFLICT (token) DO UPDATE SET data = EXCLUDED.data, expiry = EXCLUDED.expiry", p.tableName)
-	_, err = p.pool.Exec(ctx, stmt, token, b, expiry)
-	return err
-}
-
-// DeleteCtx removes a session token and corresponding data from the PostgresStore
-// instance.
-func (p *PostgresStore) DeleteCtx(ctx context.Context, token string) (err error) {
-	if p.encryptionMasterKey != "" {
-		stmt := fmt.Sprintf("SELECT token FROM %s WHERE current_timestamp < expiry", p.tableName)
-		rows, err := p.pool.Query(ctx, stmt)
-		if err != nil {
-			return err
-		}
-
-		defer rows.Close()
-		for rows.Next() {
-			var retrievedToken string
-			err = rows.Scan(&retrievedToken)
-			if err != nil {
-				return err
-			}
-			isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(retrievedToken, p.encryptionMasterKey)
-			if err != nil {
-				log.Println(err)
-
-				return err
-			}
-
-			if isAccessTokenEncrypted {
-				decryptedRetrievedToken, err := utils.DecryptSensitiveField(retrievedToken, p.encryptionMasterKey)
-				if err != nil {
-					return err
-				}
-
-				if decryptedRetrievedToken == token {
-					stmt := fmt.Sprintf("DELETE FROM %s WHERE token = $1", p.tableName)
-					_, err = p.pool.Exec(ctx, stmt, retrievedToken)
-					return err
-				}
-			}
-		}
-	} else {
-		stmt := fmt.Sprintf("DELETE FROM %s WHERE token = $1", p.tableName)
-		_, err = p.pool.Exec(ctx, stmt, token)
+func (p *PostgresStore) verifyRecord(record, token string) error {
+	plain, encrypted, err := sessiontokens.Decode(record, p.encryptionMasterKey)
+	if err != nil {
 		return err
 	}
-
+	if plain != token || (p.encryptionMasterKey != "" && !encrypted) {
+		return errors.New("session token record does not match its encryption configuration")
+	}
 	return nil
 }
 
-// AllCtx returns a map containing the token and data for all active (i.e.
-// not expired) sessions in the PostgresStore instance.
+func rollbackSession(parent context.Context, tx pgx.Tx) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 2*time.Second)
+	defer cancel()
+	_ = tx.Rollback(ctx)
+}
+
+// Same-token writers take the advisory lock before the row lock. Ordinary SQL
+// deletions take only the row lock and record revocation in that transaction.
+// Reading revocation AFTER acquiring the row lock is essential: a delete may
+// have completed while the writer was waiting for the row.
+func (p *PostgresStore) tokenTransaction(ctx context.Context, lookup []byte) (pgx.Tx, error) {
+	if !p.ready.Load() {
+		return nil, ErrNotInitialized
+	}
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, int64(binary.BigEndian.Uint64(lookup[:8]))); err != nil {
+		rollbackSession(ctx, tx)
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (p *PostgresStore) CommitCtx(ctx context.Context, token string, data []byte, expiry time.Time) error {
+	lookup := sessiontokens.Lookup(token)
+	tx, err := p.tokenTransaction(ctx, lookup)
+	if err != nil {
+		return err
+	}
+	defer rollbackSession(ctx, tx)
+	var record string
+	err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT token FROM %s WHERE token_lookup=$1 FOR UPDATE`, p.tableName), lookup).Scan(&record)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if record != "" {
+		if err = p.verifyRecord(record, token); err != nil {
+			return err
+		}
+	}
+	var revoked bool
+	if err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %s WHERE token_lookup=$1)`, p.revocationsName), lookup).Scan(&revoked); err != nil {
+		return err
+	}
+	if revoked {
+		return ErrRevoked
+	}
+	if record == "" {
+		record = token
+		if p.encryptionMasterKey != "" {
+			if record, err = utils.EncryptSensitiveField(token, p.encryptionMasterKey); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s(token,token_lookup,data,expiry) VALUES($1,$2,$3,$4) ON CONFLICT(token_lookup) DO UPDATE SET data=EXCLUDED.data,expiry=EXCLUDED.expiry`, p.tableName), record, lookup, data, expiry); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (p *PostgresStore) DeleteCtx(ctx context.Context, token string) error {
+	if !p.ready.Load() {
+		return ErrNotInitialized
+	}
+	// SCS destroys an empty, never-committed session without a token.
+	if token == "" {
+		return nil
+	}
+	lookup := sessiontokens.Lookup(token)
+	tx, err := p.tokenTransaction(ctx, lookup)
+	if err != nil {
+		return err
+	}
+	defer rollbackSession(ctx, tx)
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`DELETE FROM %s WHERE token_lookup=$1`, p.tableName), lookup); err != nil {
+		return err
+	}
+	// Also fence a generated token whose first commit is still outstanding.
+	if _, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s(token_lookup) VALUES($1) ON CONFLICT DO NOTHING`, p.revocationsName), lookup); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (p *PostgresStore) AllCtx(ctx context.Context) (map[string][]byte, error) {
-	stmt := fmt.Sprintf("SELECT token, data FROM %s WHERE current_timestamp < expiry", p.tableName)
-	rows, err := p.pool.Query(ctx, stmt)
+	if !p.ready.Load() {
+		return nil, ErrNotInitialized
+	}
+	rows, err := p.pool.Query(ctx, fmt.Sprintf(`SELECT token,token_lookup,data FROM %s s WHERE current_timestamp<s.expiry AND NOT EXISTS(SELECT 1 FROM %s r WHERE r.token_lookup=s.token_lookup)`, p.tableName, p.revocationsName))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	sessions := make(map[string][]byte)
-
+	result := make(map[string][]byte)
 	for rows.Next() {
-		var (
-			token string
-			data  []byte
-		)
-
-		err = rows.Scan(&token, &data)
+		if err = ctx.Err(); err != nil {
+			return nil, err
+		}
+		var record string
+		var lookup, data []byte
+		if err = rows.Scan(&record, &lookup, &data); err != nil {
+			return nil, err
+		}
+		token, _, err := sessiontokens.Decode(record, p.encryptionMasterKey)
 		if err != nil {
 			return nil, err
 		}
-
-		// decrypt token if key is set
-		if p.encryptionMasterKey != "" {
-			isTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(token, p.encryptionMasterKey)
-			if err != nil {
-				return nil, err
-			}
-			if isTokenEncrypted {
-				token, err = utils.DecryptSensitiveField(token, p.encryptionMasterKey)
-				if err != nil {
-					return nil, err
-				}
-			}
+		if !bytes.Equal(lookup, sessiontokens.Lookup(token)) {
+			return nil, errors.New("session token index does not match its record")
 		}
-
-		sessions[token] = data
+		if err = p.verifyRecord(record, token); err != nil {
+			return nil, err
+		}
+		result[token] = data
 	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return sessions, nil
+	return result, rows.Err()
 }
 
-func (p *PostgresStore) startCleanup(interval time.Duration) {
+func (p *PostgresStore) startCleanup(ctx context.Context, interval time.Duration) {
+	defer close(p.cleanupDone)
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			err := p.deleteExpired()
-			if err != nil {
+			if !p.ready.Load() {
+				continue
+			}
+			attempt, cancel := context.WithTimeout(ctx, 30*time.Second)
+			err := p.deleteExpired(attempt)
+			cancel()
+			if err != nil && ctx.Err() == nil {
 				log.Println(err)
 			}
-		case <-p.stopCleanup:
-			ticker.Stop()
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// StopCleanup terminates the background cleanup goroutine for the PostgresStore
-// instance. It's rare to terminate this; generally PostgresStore instances and
-// their cleanup goroutines are intended to be long-lived and run for the lifetime
-// of your application.
-//
-// There may be occasions though when your use of the PostgresStore is transient.
-// An example is creating a new PostgresStore instance in a test function. In this
-// scenario, the cleanup goroutine (which will run forever) will prevent the
-// PostgresStore object from being garbage collected even after the test function
-// has finished. You can prevent this by manually calling StopCleanup.
+// StopCleanup cancels active database work and joins the worker. Concurrent and
+// repeated calls are safe; disabled cleanup needs no shutdown operation.
 func (p *PostgresStore) StopCleanup() {
 	if p.stopCleanup != nil {
-		p.stopCleanup <- true
+		p.stopCleanup()
+		<-p.cleanupDone
 	}
 }
 
-func (p *PostgresStore) deleteExpired() error {
+func (p *PostgresStore) deleteExpired(ctx context.Context) error {
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE expiry < current_timestamp", p.tableName)
-	_, err := p.pool.Exec(context.Background(), stmt)
+	_, err := p.pool.Exec(ctx, stmt)
 	return err
 }
 

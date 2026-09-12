@@ -1,0 +1,263 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}}, info)
+		<main class="windows-management grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="windows-management">
+			<div>
+				<h1 class="text-2xl font-semibold">Native Windows management</h1>
+				<p class="uk-text-muted mt-2">Enroll Windows through its built-in management client. Each device receives an individual identity in the selected organization and site.</p>
+				@mdm_views.Navigation(info)
+				if info.Can(access.ManageCertificates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-health")) }>Certificate health</a>
+				}
+				if info.Can(access.ManageUpdates) && info.SiteID!="0" && info.SiteID!="-1" && info.SiteID!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
+				}
+			</div>
+			if data.SetupError!="" {
+				<div role="status" class="uk-alert uk-alert-warning">{ data.SetupError }</div>
+			}
+			if data.Created!=nil && data.Credential!=nil {
+				<section class="uk-card uk-card-default min-w-0" aria-labelledby="windows-credential-heading">
+					<div class="uk-card-body grid min-w-0 gap-4">
+						<h2 id="windows-credential-heading" class="uk-card-title">Enrollment credentials created</h2>
+						<p>This password is shown once and enrolls one device. Share it securely with the intended user before{ " " }
+							@ReportTime(data.Created.ExpiresAt)
+						.</p>
+						<label class="grid gap-2">Enrollment username<input class="uk-input" readonly value={ data.Credential.Username } autocomplete="off"/></label>
+						<label class="grid min-w-0 gap-2">One-time enrollment password<textarea id="windows-enrollment-password" class="uk-textarea min-w-0 font-mono" readonly rows="3" autocomplete="off" spellcheck="false">{ data.Credential.Password }</textarea></label>
+						<label class="grid gap-2">Enrollment server<input class="uk-input" readonly value={ data.PublicOrigin }/></label>
+						<ol class="list-decimal pl-6 space-y-2"><li>On Windows, open Settings, then Accounts and Access work or school.</li><li>Select Enroll only in device management and enter the enrollment username.</li><li>If Windows requests the management server, enter the enrollment server shown above.</li><li>Enter the one-time password when prompted and complete the enrollment flow.</li></ol>
+						<p>These credentials belong to this enrollment only. Use them instead of a directory or console password. Enrollment does not install the OpenUEM agent.</p>
+						<a href="https://learn.microsoft.com/en-us/windows/client-management/mdm-enrollment-of-windows-devices#enroll-in-device-management-only" target="_blank" rel="noreferrer noopener" class="underline">Microsoft enrollment instructions</a>
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Return to Windows management</a>
+					</div>
+				</section>
+			}
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Organization certificate authority</h2></div>
+				<div class="uk-card-body grid min-w-0 gap-4">
+					if data.Authority!=nil {
+						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Authority expires</dt><dd>
+							@ReportTime(data.Authority.ExpiresAt)
+						</dd><dt>Device certificate lifetime</dt><dd>{ fmt.Sprintf("%d days",data.Authority.ValiditySeconds/86400) }</dd><dt>CA fingerprint (SHA-256)</dt><dd class="break-all font-mono">{ data.Authority.FingerprintSHA256 }</dd></dl>
+					} else if data.SetupError=="" && info.Can(access.ManageCertificates) {
+						<p>Create the authority used to sign individual Windows device identities in this organization.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/setup") } class="grid gap-4">
+							@mdm_views.CSRF(info)
+							<label class="grid gap-2">Organization name<input class="uk-input" name="organization" maxlength="128" required/></label>
+							<div class="grid gap-4 sm:grid-cols-2"><label class="grid gap-2">Minimum device key size<select class="uk-select" name="key_bits"><option value="2048">RSA 2048 bits</option><option value="3072">RSA 3072 bits</option><option value="4096">RSA 4096 bits</option></select></label><label class="grid gap-2">Device certificate lifetime (days)<input class="uk-input" name="validity_days" type="number" min="1" max="365" value="365" required/></label></div>
+							<label><input type="checkbox" name="confirm_setup" value="yes" required/> Create this organization's Windows certificate authority with these settings.</label>
+							<button type="submit" class="uk-button uk-button-primary">Create Windows certificate authority</button>
+						</form>
+					} else if data.Available {
+						<p>The organization is ready to issue Windows enrollment credentials.</p>
+					} else {
+						<p>An organization administrator manages the Windows certificate authority.</p>
+					}
+				</div>
+			</section>
+			if info.SiteID=="0" || info.SiteID=="-1" || info.SiteID=="" {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Choose a site</h2>
+						<p>Select the site that will own the Windows enrollment and device records.</p>
+						<div class="flex flex-wrap gap-3 mt-4">
+							for _,site:=range info.Sites {
+								<a class="uk-button uk-button-default" href={ templ.URL(fmt.Sprintf("/tenant/%s/site/%d/windows", info.TenantID, site.ID)) }>{ site.Description }</a>
+							}
+						</div>
+					</div>
+				</section>
+			} else {
+				<section class="uk-card uk-card-default min-w-0">
+					<div class="uk-card-header"><h2 class="uk-card-title">Native Windows devices</h2><p>Enrollment metadata describes the issued identity. It does not establish current online status or prove that a policy was applied.</p></div>
+					<div class="uk-card-body min-w-0">
+						<form method="get" action={ partials.GetNavigationUrl(info, "/windows") } class="flex flex-wrap items-end gap-3 mb-4"><label class="grid gap-2">Search reported name or device ID<input class="uk-input" name="q" type="search" value={ data.Search } maxlength="128"/></label><button class="uk-button uk-button-default" type="submit">Search</button></form>
+						<div class="overflow-x-auto" role="region" aria-label="Native Windows devices table" tabindex="0">
+							<table class="uk-table uk-table-divider">
+								<caption class="sr-only">Native Windows devices in this site</caption><thead><tr><th scope="col">Reported name</th><th scope="col">Reported Windows version</th><th scope="col">Enrolled</th><th scope="col">Identity status</th></tr></thead>
+								<tbody>
+									for _,row:=range data.Devices {
+										<tr><td><a class="underline break-words" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.ID)) }>{ row.Name }</a><div class="text-sm break-all">{ row.ID }</div></td><td>{ row.OSVersion }</td><td class="whitespace-nowrap">
+											@ReportTime(row.CreatedAt)
+										</td><td>{ DeviceStatus(row) }</td></tr>
+									}
+								</tbody>
+							</table>
+						</div>
+						if len(data.Devices)==0 {
+							<p class="my-4 uk-text-muted">No native Windows devices match this view.</p>
+						}
+						<div class="flex flex-wrap gap-3">
+							if data.DeviceOffset>0 {
+								<a class="uk-button uk-button-default" href={ templ.URL(pageURL(partials.GetNavigationUrl(info, "/windows"), data, "devices_offset", max(0, data.DeviceOffset-25))) }>Previous devices</a>
+							}
+							if data.MoreDevices && data.DeviceOffset<100000 {
+								<a class="uk-button uk-button-default" href={ templ.URL(pageURL(partials.GetNavigationUrl(info, "/windows"), data, "devices_offset", min(100000, data.DeviceOffset+25))) }>More devices</a>
+							}
+						</div>
+					</div>
+				</section>
+				if info.Can(access.EnrollDevices) && data.SetupError=="" {
+					<section class="uk-card uk-card-default min-w-0">
+						<div class="uk-card-header"><h2 class="uk-card-title">Enrollment invitations</h2><p>Create one invitation for each Windows device. Revoking an invitation prevents further use; it does not revoke an already issued device identity.</p></div>
+						<div class="uk-card-body grid min-w-0 gap-4">
+							if data.Available && data.Created==nil {
+								<form method="post" action={ partials.GetNavigationUrl(info, "/windows/invitations") } class="grid gap-4 sm:grid-cols-2">
+									@mdm_views.CSRF(info)
+									<label class="grid gap-2">Enrollment username<input class="uk-input" name="username" maxlength="320" placeholder="person@example.test" autocomplete="off" required/></label>
+									<label class="grid gap-2">Valid for (hours)<input class="uk-input" name="hours" type="number" min="1" max="24" value="1" required/></label>
+									<button class="uk-button uk-button-primary" type="submit">Create one-device invitation</button>
+								</form>
+							} else if !data.Available {
+								<p>Set up an available organization certificate authority before creating invitations.</p>
+							}
+							<div class="overflow-x-auto" role="region" aria-label="Windows invitations table" tabindex="0">
+								<table class="uk-table uk-table-divider">
+									<caption class="sr-only">One-device invitations in this site</caption><thead><tr><th scope="col">Username / invitation</th><th scope="col">Expires</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+									<tbody>
+										for _,row:=range data.Invitations {
+											<tr>
+												<td class="break-all">{ row.Username }<div class="text-sm">{ row.ID }</div></td>
+												<td>
+													@ReportTime(row.ExpiresAt)
+												</td>
+												<td>{ invitationStatus(row) }</td>
+												<td>
+													if row.RevokedAt==nil && row.ConsumedAt==nil {
+														<details>
+															<summary class="cursor-pointer">Revoke invitation</summary>
+															<form method="post" action={ partials.GetNavigationUrl(info, "/windows/invitations/"+row.ID+"/revoke") } class="grid gap-3 mt-3">
+																@mdm_views.CSRF(info)
+																<label><input type="checkbox" name="confirm_revoke" value="yes" required/> Stop further use of this invitation.</label><button class="uk-button uk-button-danger" type="submit">Confirm invitation revocation</button>
+															</form>
+														</details>
+													}
+												</td>
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+							if len(data.Invitations)==0 {
+								<p class="uk-text-muted">No invitations in this view.</p>
+							}
+							<div class="flex flex-wrap gap-3">
+								if data.InvitationOffset>0 {
+									<a class="uk-button uk-button-default" href={ templ.URL(pageURL(partials.GetNavigationUrl(info, "/windows"), data, "invitations_offset", max(0, data.InvitationOffset-25))) }>Previous invitations</a>
+								}
+								if data.MoreInvitations && data.InvitationOffset<100000 {
+									<a class="uk-button uk-button-default" href={ templ.URL(pageURL(partials.GetNavigationUrl(info, "/windows"), data, "invitations_offset", min(100000, data.InvitationOffset+25))) }>More invitations</a>
+								}
+							</div>
+						</div>
+					</section>
+				}
+			}
+		</main>
+	}
+}
+
+templ Device(c echo.Context, info *partials.CommonInfo, data windows.DeviceMetadata) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: data.Name}}, info)
+		<main class="windows-management grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold break-words">{ data.Name }</h1>
+				<p>Native Windows device identity</p>
+				@mdm_views.Navigation(info)
+				if info.Can(access.ManageCertificates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-health")) }>Certificate health</a>
+				}
+				if info.Can(access.ManageUpdates) && info.SiteID!="0" && info.SiteID!="-1" && info.SiteID!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings")) }>Windows update rings</a>
+				}
+				if info.Can(access.ManageWindowsCSP) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/commands")) }>Windows CSP commands</a>
+				}
+				if info.Can(access.RevokeDevices) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/disconnections")) }>Windows disconnections</a>
+				}
+				if info.Can(access.ManageCertificates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/renewals")) }>Certificate renewals</a>
+				}
+				if info.Can(access.ManageUpdates) {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+data.ID+"/updates")) }>Windows update policy runs</a>
+				}
+			</div>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">Enrollment record</h2>
+					<p class="my-3">Device names and operating system fields are reported during enrollment. An issued certificate does not confirm current connectivity or applied policy.</p>
+					<dl class="uk-description-list">
+						<dt>OpenUEM native device ID</dt>
+						<dd class="break-all">{ data.ID }</dd>
+						<dt>Identity status</dt>
+						<dd>{ DeviceStatus(data) }</dd>
+						<dt>Reported device identifier</dt>
+						<dd class="break-all">{ data.ReportedDeviceID }</dd>
+						<dt>Reported Windows version / edition</dt>
+						<dd>{ fmt.Sprintf("%s / %d",data.OSVersion,data.OSEdition) }</dd>
+						<dt>Enrollment context</dt>
+						<dd>{ data.EnrollmentType }</dd>
+						<dt>Enrolled</dt>
+						<dd>
+							@ReportTime(data.CreatedAt)
+						</dd>
+						<dt>Certificate expires</dt>
+						<dd>
+							@ReportTime(data.CertificateExpiresAt)
+						</dd>
+						<dt>Device certificate fingerprint (SHA-256)</dt>
+						<dd class="break-all font-mono">{ data.FingerprintSHA256 }</dd>
+					</dl>
+				</div>
+			</section>
+			if data.Unenrollment!=nil {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Device disconnection reported</h2>
+						<p class="my-3">Windows reported that disconnection had started. This native identity can no longer authenticate or receive management commands. Local removal of policies, certificates and managed data has not been independently verified.</p>
+						<dl class="uk-description-list">
+							<dt>Reported and access revoked (UTC)</dt>
+							<dd>
+								@ScheduleTime(data.Unenrollment.ReceivedAt)
+							</dd>
+							<dt>Report ID</dt>
+							<dd>{ data.Unenrollment.ID }</dd>
+							<dt>Reporting certificate fingerprint (SHA-256)</dt>
+							<dd class="font-mono break-all">{ data.Unenrollment.FingerprintSHA256 }</dd>
+						</dl>
+						<p class="my-3">Enrollment, certificate and command history remain available. A separate OpenUEM agent keeps its own identity.</p>
+					</div>
+				</section>
+			}
+			if data.RevokedAt==nil && info.Can(access.RevokeDevices) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Revoke device access</h2>
+						<p class="my-3">Stop this native identity from authenticating or receiving further management commands. This preserves its history. It does not remove existing Windows policies, unenroll the computer, wipe data or revoke a separate OpenUEM agent.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+data.ID+"/revoke") } class="grid gap-4">
+							@mdm_views.CSRF(info)
+							<label><input type="checkbox" name="confirm_revoke" value="yes" required/> Revoke native management access for this device.</label><button class="uk-button uk-button-danger" type="submit">Confirm device access revocation</button>
+						</form>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}

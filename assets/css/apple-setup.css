@@ -1,0 +1,33 @@
+/* Scope intrinsic sizing and long request metadata to the Apple setup page. */
+#apple-setup {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  color: hsl(var(--foreground));
+}
+
+#apple-setup .uk-card,
+#apple-setup form,
+#apple-setup article {
+  min-width: 0;
+}
+
+#apple-setup p,
+#apple-setup dd,
+#apple-setup label,
+#apple-setup h4 {
+  overflow-wrap: anywhere;
+}
+
+#apple-setup .uk-button {
+  height: auto;
+  min-height: 2.25rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  white-space: normal;
+}
+
+#apple-setup input:not([type="checkbox"]),
+#apple-setup select {
+  min-width: 0;
+  max-width: 100%;
+}

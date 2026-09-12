@@ -1,0 +1,66 @@
+package mdm_views
+
+import (
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ IKEv2CertificateEditor(info *partials.CommonInfo, profiles []apple.Profile) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create an IKEv2 certificate VPN profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="ikev2-certificate-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="vpn-ikev2-certificate"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company certificate VPN"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.vpn.certificate"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole device</option><option value="User">Managed Mac user channel</option></select></label>
+			<label>Connection name<input class="uk-input" name="connection_name" maxlength="255" required placeholder="Company VPN"/></label>
+			<label>VPN server hostname or IP address<input class="uk-input" name="remote_address" maxlength="254" required placeholder="vpn.example.com"/></label>
+			<p>Enter a hostname, IPv4 address or unbracketed IPv6 address, without a URL scheme or port.</p>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<label>Local identifier<input class="uk-input" name="local_identifier" maxlength="255" required placeholder="device.example.com"/></label>
+				<label>Remote identifier<input class="uk-input" name="remote_identifier" maxlength="255" required placeholder="vpn.example.com"/></label>
+			</div>
+			<p>Use the client and server identities expected by your VPN service. The local identifier normally matches the client certificate identity; the remote identifier normally matches the server certificate identity.</p>
+			<label>Authentication<select class="uk-select" name="authentication_mode" required><option value="machine">Machine certificate</option><option value="eap-tls">EAP-TLS certificate</option></select></label>
+			<p data-ikev2-version-status role="status" aria-live="polite">Machine certificate profiles require macOS 10.11 or iOS/iPadOS 8 or later. Certificate options can require newer versions.</p>
+			<label>
+				Identity certificate revision
+				<select class="uk-select" name="identity_revision" required>
+					<option value="">Select a certificate profile revision</option>
+					for _, p := range profiles {
+						if apple.IsIdentityCertificateProfile(p) {
+							<option value={ p.ID + "/" + Number(p.Revision) } data-scope={ p.Scope } data-identity-kind={ p.PayloadTypes[0] }>{ p.Name } · Revision { Number(p.Revision) } · { p.Scope }</option>
+						}
+					}
+				</select>
+			</label>
+			<p>Select exactly one SCEP, ACME, PKCS12 or Active Directory Certificate identity. AD identities require a Mac. The source and VPN must use the same scope.</p>
+			<label>Identity certificate algorithm<select class="uk-select" name="certificate_type" required><option value="">Select the certificate algorithm</option><option value="RSA">RSA</option><option value="RSA-PSS">RSA-PSS</option><option value="ECDSA256">ECDSA P-256</option><option value="ECDSA384">ECDSA P-384</option><option value="ECDSA521">ECDSA P-521</option></select></label>
+			<p>Match the identity configuration and VPN service. SCEP and AD sources use RSA. ACME sources must match their configured RSA or EC key. For PKCS12, verify the actual identity algorithm before selecting it; the server validates the archive envelope only.</p>
+			<label>Server certificate issuer common name<input class="uk-input" name="server_issuer" maxlength="255" required placeholder="Company VPN issuing CA"/></label>
+			<label>Server certificate name override (optional)<input class="uk-input" name="server_name" maxlength="255" placeholder="vpn-certificate.example.com"/></label>
+			<p>The issuer name selects the requested server certificate issuer; it does not establish trust. Leave the override empty to validate the server certificate using the remote identifier.</p>
+			<label>
+				Server trust certificate revision
+				<select class="uk-select" name="trust_revision" required>
+					<option value="" disabled>Select certificate trust</option>
+					<option value="existing" selected>Use the device's existing certificate trust</option>
+					for _, p := range profiles {
+						if apple.IsPublicCertificateProfile(p) {
+							<option value={ p.ID + "/" + Number(p.Revision) } data-scope={ p.Scope }>{ p.Name } · Revision { Number(p.Revision) } · { p.Scope }</option>
+						}
+					}
+				</select>
+			</label>
+			<p data-ikev2-selection-status role="status" aria-live="polite"></p>
+			<p>Optionally copy the public trust certificates from a matching-scope profile. Otherwise the VPN server certificate must chain to trust already present on the device. Review the complete server trust chain with your VPN administrator.</p>
+			<p>The exact source revisions are copied with new payload identifiers. Source updates and deletion do not change the saved copy. SCEP and ACME issuance depends on the configured issuer; an ACME client identifier remains limited to one enrollment. PKCS12 copies retain the imported private key.</p>
+			<p>This form creates a regular IKEv2 connection with no automatic connection or routing override. Configure your VPN service to supply the intended routes. Always On and per-app VPN use separate configuration settings.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the VPN server, certificate identities and algorithm, server trust, exact revisions, target scope and credential reuse.</label>
+			<p>Saving does not contact the issuer or connect to the VPN. Assign the saved profile to its intended devices or managed Mac users. Installation alone does not prove certificate issuance or a working tunnel.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create IKEv2 VPN profile</button>
+		</form>
+	</details>
+	<script src="/assets/js/apple-vpn-ikev2.js" defer></script>
+}

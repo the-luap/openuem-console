@@ -1,0 +1,179 @@
+package mdm_views
+
+import (
+	"strconv"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ appleUpdateExceptionSummary(r *apple.UpdateException, active bool) {
+	if r!=nil {
+		<div class="grid gap-2 min-w-0 break-words" style="overflow-wrap:anywhere;" data-update-exception-active={ strconv.FormatBool(active) }>
+			<h3 class="font-medium">Temporary update exception</h3>
+			if active {
+				<p>New update policy assignments are paused.</p>
+			} else if r.Kind=="resume" {
+				<p>The exception was ended. No policy was restored.</p>
+			} else {
+				<p>The exception has expired. No policy was restored.</p>
+			}
+			<p style="white-space:pre-wrap;">Reason: { r.Reason }</p>
+			if r.ExpiresAt!=nil {
+				<p>Exception expiry (UTC): { r.ExpiresAt.UTC().Format("2006-01-02 15:04:05") }</p>
+			}
+			<p>Exception event recorded (UTC): { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+			<p>OS evidence and deadline estimates remain separate from this exception.</p>
+		</div>
+	}
+}
+
+templ appleUpdateExceptionPolicy(policy *apple.UpdatePolicy) {
+	if policy!=nil {
+		<div class="grid gap-2 min-w-0 break-words" style="overflow-wrap:anywhere;" data-exception-policy>
+			<h3 class="font-medium">Configured policy before this action</h3>
+			<p>Target OS version: { policy.TargetVersion } · Build: { Show(policy.TargetBuild) }</p>
+			<p>Installation deadline (device local time): { policy.Deadline }</p>
+			if policy.DetailsURL!="" {
+				<p>Update information URL: { policy.DetailsURL }</p>
+			}
+		</div>
+	} else {
+		<p>No update policy is configured before this action.</p>
+	}
+}
+
+templ AppleUpdateExceptionReview(c echo.Context, info *partials.CommonInfo, p apple.UpdateExceptionReview, pauseKey, resumeKey string) {
+	@layout.Base("devices",info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c,[]partials.Breadcrumb{{Title:"Devices",Url:partials.GetNavigationUrl(info,"/devices")},{Title:"Update exception history",Url:partials.GetNavigationUrl(info,UpdateExceptionPath(p.DeviceID))}},info)
+		<main id="device-management" data-update-exception-page="review" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div style="overflow-wrap:anywhere;">
+				<h1 class="text-2xl font-semibold">Review update exception</h1>
+				<p>{ Show(p.Name) } · Native Apple enrollment: { p.DeviceID }</p>
+				<p>Assessed at (UTC): { p.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+				<p>A pause removes the reviewed configured update policy and prevents new assignments to this enrollment in this site until the exception expires or is ended. A new pause replaces the current exception.</p>
+				<p>Expiry or ending an exception permits new assignments; it does not restore a previous policy. Moving the device to another site ends the exception's applicability, including if it later returns.</p>
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdateExceptionPolicy(p.Policy)
+					@appleUpdateExceptionSummary(p.Current,p.Current.Active(p.AssessedAt))
+					if p.NotificationAvailable {
+						<p>A pause queues a declarative-management notification. Queuing or acknowledging that notification does not prove the device removed its policy.</p>
+					} else {
+						<p role="status">No declarative-management notification is available with this device's reported capabilities. A pause still removes the server's configured update policy.</p>
+					}
+					<p>An update already in progress may continue. An exception does not roll back the installed operating system or establish device-side acceptance.</p>
+				</div>
+			</section>
+			if p.Availability=="available" {
+				<form method="post" action={ partials.GetNavigationUrl(info,UpdateExceptionPath(p.DeviceID)) } class="uk-card uk-card-default" data-exception-action="pause">
+					<div class="uk-card-body grid gap-4">
+						@CSRF(info)
+						<input type="hidden" name="request_key" value={ pauseKey }/>
+						<input type="hidden" name="review_token" value={ p.ReviewToken }/>
+						<input type="hidden" name="kind" value="pause"/>
+						<h2 class="uk-card-title">Create or replace an exception</h2>
+						<label>Exception expiry (UTC)<input class="uk-input" type="datetime-local" name="expires_at" required/></label>
+						<p>Choose a future UTC time within 30 days. This exception expiry uses UTC; the policy's installation deadline uses device local time.</p>
+						<label>Reason<textarea class="uk-textarea" name="reason" rows="3" maxlength="256" required></textarea></label>
+						<label class="flex items-start gap-3"><input type="checkbox" name="confirmed" value="yes" required/><span>I reviewed this device's policy and exception. Remove the configured policy and pause new assignments until this expiry.</span></label>
+						<button class="uk-button uk-button-primary" type="submit">Confirm update exception</button>
+					</div>
+				</form>
+				if p.Current.Active(p.AssessedAt) {
+					<form method="post" action={ partials.GetNavigationUrl(info,UpdateExceptionPath(p.DeviceID)) } class="uk-card uk-card-default" data-exception-action="resume">
+						<div class="uk-card-body grid gap-4">
+							@CSRF(info)
+							<input type="hidden" name="request_key" value={ resumeKey }/>
+							<input type="hidden" name="review_token" value={ p.ReviewToken }/>
+							<input type="hidden" name="kind" value="resume"/>
+							<h2 class="uk-card-title">End the current exception</h2>
+							<label>Reason<textarea class="uk-textarea" name="reason" rows="3" maxlength="256" required></textarea></label>
+							<label class="flex items-start gap-3"><input type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the current exception. Permit new update assignments without restoring an old policy.</span></label>
+							<button class="uk-button uk-button-default" type="submit">End update exception</button>
+						</div>
+					</form>
+				}
+			} else {
+				<p role="status">This enrollment is inactive or its identity has expired. No exception action is available.</p>
+			}
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(p.DeviceID))) }>Open exception history</a>
+		</main>
+	}
+}
+
+templ AppleUpdateException(c echo.Context,info *partials.CommonInfo,r apple.UpdateException) {
+	@layout.Base("devices",info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c,[]partials.Breadcrumb{{Title:"Devices",Url:partials.GetNavigationUrl(info,"/devices")},{Title:"Update exception history",Url:partials.GetNavigationUrl(info,UpdateExceptionPath(r.DeviceID))}},info)
+		<main id="device-management" data-update-exception-page="receipt" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					<h1 class="text-2xl font-semibold">Original update exception event</h1>
+					<p>This immutable receipt records the original action. The current exception, policy and device placement may have changed.</p>
+					<p>Native Apple enrollment: { r.DeviceID } · Revision: { Number(r.Revision) }</p>
+					<p>Recorded by: { r.Actor }</p>
+					<p>Recorded at (UTC): { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					if r.Kind=="pause" {
+						<p>Pause recorded. The configured policy was removed from the server.</p>
+						if r.ExpiresAt!=nil {
+							<p>Requested exception expiry (UTC): { r.ExpiresAt.UTC().Format("2006-01-02 15:04:05") }</p>
+						}
+						if r.CommandID!="" {
+							<p>A declarative-management notification was queued. This is not proof of device-side removal.</p>
+						} else {
+							<p>No declarative-management notification was available at admission.</p>
+						}
+					} else {
+						<p>The exception was ended. No policy was restored and no device command was queued by this action.</p>
+					}
+					<p style="white-space:pre-wrap;">Reason: { r.Reason }</p>
+					@appleUpdateExceptionPolicy(r.PreviousPolicy)
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(r.DeviceID)+"/review")) }>Review current exception state</a>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ AppleUpdateExceptions(c echo.Context,info *partials.CommonInfo,id string,items []apple.UpdateException,next string) {
+	@layout.Base("devices",info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+			@partials.Header(c,[]partials.Breadcrumb{{Title:"Devices",Url:partials.GetNavigationUrl(info,"/devices")}},info)
+		<main id="device-management" data-update-exception-page="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div style="overflow-wrap:anywhere;">
+				<h1 class="text-2xl font-semibold">Update exception history</h1>
+				<p>Original exception events for native enrollment { id } in this site. These events do not establish current device state.</p>
+				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(id)+"/review")) }>Review current exception state</a>
+			</div>
+			if len(items)==0 {
+				<p>No exception events are recorded on this page.</p>
+			}
+			for _,item:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">Revision { Number(item.Revision) }</h2>
+						if item.Kind=="pause" {
+							<p>Pause recorded</p>
+						} else {
+							<p>Exception ended</p>
+						}
+						<p>Recorded by: { item.Actor }</p>
+						<p>Recorded at (UTC): { item.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+						<p style="white-space:pre-wrap;">Reason: { item.Reason }</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(id)+"/"+item.ID)) }>Open original exception event</a>
+					</div>
+				</section>
+			}
+			<div class="flex flex-wrap gap-4">
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(id))) }>Newest exception events</a>
+				if next!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info,UpdateExceptionPath(id))+"?before="+next) }>Older exception events</a>
+				}
+			</div>
+		</main>
+	}
+}

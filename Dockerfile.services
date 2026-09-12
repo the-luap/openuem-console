@@ -1,0 +1,30 @@
+FROM --platform=$BUILDPLATFORM golang:1.26.8-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
+WORKDIR /src
+ENV GOTOOLCHAIN=local
+COPY go.mod go.sum ./
+COPY cmd/openuem-agent-auth ./cmd/openuem-agent-auth
+COPY cmd/openuem-agent-commands ./cmd/openuem-agent-commands
+COPY internal/desktop/authservice ./internal/desktop/authservice
+COPY internal/desktop/commandservice ./internal/desktop/commandservice
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o /out/ \
+      ./cmd/openuem-agent-auth ./cmd/openuem-agent-commands
+
+FROM scratch AS base
+COPY LICENSE /licenses/openuem-console.LICENSE
+USER 65532:65532
+STOPSIGNAL SIGTERM
+
+FROM base AS authorization
+COPY --from=build /out/openuem-agent-auth /openuem-agent-auth
+ENTRYPOINT ["/openuem-agent-auth"]
+CMD ["--help"]
+
+FROM base AS commands
+COPY --from=build /out/openuem-agent-commands /openuem-agent-commands
+ENTRYPOINT ["/openuem-agent-commands"]
+CMD ["--help"]

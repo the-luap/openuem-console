@@ -1,0 +1,72 @@
+name: Gateway container
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/gateway-container.yml'
+      - 'Dockerfile.gateway*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/openuem-gateway/**'
+      - 'internal/gateway/**'
+      - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
+      - 'internal/desktop/protocol/**'
+      - 'internal/mdm/windows/protocol/**'
+  push:
+    branches: [main, 'feature/**']
+    paths:
+      - '.github/workflows/gateway-container.yml'
+      - 'Dockerfile.gateway*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/openuem-gateway/**'
+      - 'internal/gateway/**'
+      - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
+      - 'internal/desktop/protocol/**'
+      - 'internal/mdm/windows/protocol/**'
+
+permissions:
+  contents: read
+
+jobs:
+  gateway:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the minimal runtime and isolated process fixture
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.gateway --target runtime -t gateway-runtime:check .
+          docker build -f Dockerfile.gateway --target smoke -t gateway-smoke:check .
+      - name: Run the actual unprivileged gateway with only loopback networking
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 128m \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
+            --env OPENUEM_GATEWAY_TEST_BINARY=/openuem-gateway \
+            gateway-smoke:check | tee gateway-smoke.log
+          grep -q '^--- PASS: TestGatewayContainerProcess ' gateway-smoke.log
+      - name: Check the runtime entrypoint and distribution boundary
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges gateway-runtime:check --help
+          test "$(docker image inspect --format '{{.Config.User}}' gateway-runtime:check)" = '65532:65532'
+          docker image inspect --format '{{json .Config.ExposedPorts}}' gateway-runtime:check | grep -qx '{"8443/tcp":{}}'
+          container=$(docker create gateway-runtime:check --help)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          docker export "$container" -o gateway-runtime.tar
+          tar -tf gateway-runtime.tar > gateway-runtime-files.txt
+          grep -qx 'openuem-gateway' gateway-runtime-files.txt
+          if grep -Eq '(^|/)(gateway\.test|go\.mod|go\.sum|.*\.(pem|key|seed|pfx))$' gateway-runtime-files.txt; then
+            echo 'Runtime image contains test, source or credential material'
+            exit 1
+          fi

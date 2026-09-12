@@ -1,0 +1,120 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ CertificateHealth(c echo.Context, info *partials.CommonInfo, report windows.CertificateHealthReport, options windows.CertificateHealthOptions, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: "Certificate health"}}, info)
+		<main class="windows-management grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows certificate health</h1>
+				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-reminders")) }>Expiry reminder history</a>
+				<p class="mt-2">Review certificate expiry and pending replacements in the selected organization and site.</p>
+				<p>Expiry assessed at{ " " }
+					@ScheduleTime(report.AssessedAt)
+				. Refresh this page for a new assessment.</p>
+				<p class="uk-text-muted">The renewal window shows when the server accepts renewal requests. It does not confirm that Windows has scheduled a renewal or that a device is online.</p>
+				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Windows management</a>
+			</div>
+			<section class="uk-card uk-card-default" aria-labelledby="certificate-health-issuer">
+				<div class="uk-card-body grid gap-3">
+					<h2 id="certificate-health-issuer" class="uk-card-title">Organization certificate authority</h2>
+					if report.Authority==nil {
+						<p>No Windows certificate authority is configured for this organization.</p>
+					} else {
+						<p class="font-semibold">{ certificateHealthLabel(report.Authority.State) }</p>
+						<dl class="uk-description-list">
+							<dt>Authority certificate expires</dt>
+							<dd>
+								@ScheduleTime(report.Authority.ExpiresAt)
+							</dd>
+							<dt>Full-lifetime issuance ends</dt>
+							<dd>
+								@ScheduleTime(report.Authority.IssuanceEndsAt)
+							</dd>
+							<dt>Device certificate lifetime</dt>
+							<dd>{ certificateHealthDuration(report.Authority.ValiditySeconds) }</dd>
+							<dt>Server renewal window before device certificate expiry</dt>
+							<dd>{ certificateHealthDuration(report.Authority.RenewalSeconds) }</dd>
+						</dl>
+						<p>Issuance stops before CA expiry to leave room for the full device certificate lifetime and a five-minute margin. Existing device certificate expiry is shown separately below.</p>
+						<details><summary class="cursor-pointer">Authority identity</summary><dl class="uk-description-list"><dt>Authority ID</dt><dd class="font-mono">{ report.Authority.ID }</dd><dt>SHA-256 fingerprint</dt><dd class="font-mono">{ report.Authority.FingerprintSHA256 }</dd></dl></details>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default" aria-labelledby="certificate-health-devices">
+				<div class="uk-card-body grid gap-4">
+					<h2 id="certificate-health-devices" class="uk-card-title">Device certificates</h2>
+					<form method="get" action={ partials.GetNavigationUrl(info, "/windows/certificate-health") } class="flex flex-wrap items-end gap-3">
+						<label class="grid gap-2">Search reported name or device ID<input class="uk-input" type="search" name="q" maxlength="128" value={ options.Search }/></label>
+						<label class="grid gap-2">
+							Show
+							<select class="uk-select" name="filter">
+								for _, filter:=range certificateHealthFilters {
+									<option value={ filter.Value } selected?={ filter.Value == options.Filter }>{ filter.Label }</option>
+								}
+							</select>
+						</label>
+						<label class="grid gap-2">Warning period (days)<input class="uk-input" type="number" name="days" min="1" max="365" required value={ strconv.Itoa(options.WithinDays) }/></label>
+						<button type="submit" class="uk-button uk-button-primary">Apply filters</button>
+					</form>
+					<p class="uk-text-muted">Needs attention includes active device identities with expiry warnings, an open renewal window, a pending replacement, a revoked or not-yet-valid identity, or an issuer warning. Revoked device access is listed separately.</p>
+					if len(report.Devices)==0 {
+						<p role="status">No devices match these certificate health filters.</p>
+					}
+					for _, row:=range report.Devices {
+						<article class="windows-csp-observation" aria-label={ "Certificate health for " + row.Device.Name }>
+							<h3 class="text-lg font-semibold"><a class="underline" href={ templ.URL(certificateHealthDeviceURL(row.Device, "")) }>{ row.Device.Name }</a></h3>
+							<p class="break-all text-sm">{ row.Device.ID } · { fmt.Sprintf("Site %d",row.Device.SiteID) }</p>
+							<p class="font-semibold mt-3">{ certificateHealthLabel(row.CurrentState) }</p>
+							<dl class="uk-description-list"><dt>Current confirmed certificate expires</dt><dd>
+								@ScheduleTime(row.Current.ExpiresAt)
+							</dd><dt>Server renewal window opens</dt><dd>
+								@ScheduleTime(row.RenewalOpensAt)
+							</dd></dl>
+							if row.Device.Unenrollment!=nil {
+								<p>Disconnection reported at{ " " }
+									@ScheduleTime(row.Device.Unenrollment.ReceivedAt)
+								. Local cleanup has not been verified.</p>
+							}
+							if row.Pending!=nil && row.Replacement!=nil {
+								<div class="uk-alert uk-alert-warning mt-3">
+									<p class="font-semibold">Replacement pending confirmation</p>
+									<p>The issued replacement has not been confirmed by an authenticated management exchange. The current certificate above remains the confirmed identity.</p>
+									<p>{ certificateHealthLabel(row.ReplacementState) } · Expires{ " " }
+										@ScheduleTime(row.Replacement.ExpiresAt)
+									</p>
+									<a class="underline" href={ templ.URL(certificateHealthDeviceURL(row.Device, "/renewals/"+row.Pending.ID)) }>Review pending replacement</a>
+								</div>
+							}
+							<details class="mt-3">
+								<summary class="cursor-pointer">Current certificate identity</summary>
+								<dl class="uk-description-list"><dt>Certificate ID</dt><dd class="font-mono">{ row.Current.ID }</dd><dt>SHA-256 fingerprint</dt><dd class="font-mono">{ row.Current.FingerprintSHA256 }</dd></dl>
+								if row.ConfirmedRenewalID!="" {
+									<a class="underline" href={ templ.URL(certificateHealthDeviceURL(row.Device, "/renewals/"+row.ConfirmedRenewalID)) }>View confirmation evidence</a>
+								}
+							</details>
+							<a class="uk-button uk-button-default mt-3" href={ templ.URL(certificateHealthDeviceURL(row.Device, "/renewals")) }>Certificate renewal history</a>
+						</article>
+					}
+					<nav class="flex flex-wrap gap-3" aria-label="Certificate health pages">
+						if options.Offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(certificateHealthPage(partials.GetNavigationUrl(info, "/windows/certificate-health"), options, max(0, options.Offset-25))) }>Previous devices</a>
+						}
+						if more && options.Offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(certificateHealthPage(partials.GetNavigationUrl(info, "/windows/certificate-health"), options, min(100000, options.Offset+25))) }>More devices</a>
+						}
+					</nav>
+				</div>
+			</section>
+		</main>
+	}
+}

@@ -1,0 +1,200 @@
+name: Native Apple management
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'feature/**']
+
+permissions:
+  contents: read
+
+jobs:
+  windows-bootstrap-key:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: Native protected bootstrap key provisioning
+        run: go test -count=1 -run TestBootstrapSigningKey ./internal/desktop
+      - name: Native protected release database files and offline inspection
+        run: go test -count=1 -run 'TestRelease(Command|KeyLoader|CLI)' ./internal/desktop ./cmd/openuem-agent-releases
+      - name: Native public TLS renewal and connection continuity
+        run: go test -count=1 -run TestPublicTLS ./internal/gateway
+      - name: Native encrypted recovery files and command boundaries
+        run: go test -count=1 ./internal/recovery ./cmd/openuem-recovery
+      - name: Native protected vendor signing files
+        run: go test -count=1 -run "VendorSigningFiles|VendorPrivateKey" ./internal/mdm/apple
+      - name: APNs certificate connection protocol
+        run: go test -count=1 -run TestAPNsCheck ./internal/mdm/apple
+      - name: SCEP signatures, encryption and parser boundaries
+        run: go test -count=1 -run TestSCEP ./internal/mdm/apple
+      - name: Automated Device Enrollment signatures and service protocol
+        run: go test -count=1 ./internal/mdm/ade
+      - name: Native Windows enrollment, CSP commands and TLS boundaries
+        run: go test -count=1 ./internal/mdm/windows/...
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openuem_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: openuem_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U openuem_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APPLE_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+      AGENT_ENROLLMENT_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+      WINDOWS_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: PostgreSQL 17 backup clients on the disposable runner
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 --max-time 30 \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc --output "$RUNNER_TEMP/pgdg.asc"
+          sudo install -m 644 "$RUNNER_TEMP/pgdg.asc" /usr/share/keyrings/openuem-postgresql.asc
+          . /etc/os-release
+          sudo tee /etc/apt/sources.list.d/openuem-recovery-pgdg.sources >/dev/null <<EOF
+          Types: deb
+          URIs: https://apt.postgresql.org/pub/repos/apt
+          Suites: ${VERSION_CODENAME}-pgdg
+          Components: main
+          Signed-By: /usr/share/keyrings/openuem-postgresql.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_restore --version
+      - name: Encrypted backup, CLI restore and existing platform identities
+        env:
+          OPENUEM_RECOVERY_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+          OPENUEM_RECOVERY_TEST_PG_DUMP: /usr/lib/postgresql/17/bin/pg_dump
+          OPENUEM_RECOVERY_TEST_PG_RESTORE: /usr/lib/postgresql/17/bin/pg_restore
+        run: |
+          # Whole-database create/drop operations share one PostgreSQL instance.
+          go test -race -p 1 -count=1 ./internal/recovery ./cmd/openuem-recovery
+          go test -race -p 1 -count=1 -run 'Test(Apple|Windows|Desktop)Recovery' ./internal/mdm/apple ./internal/mdm/windows ./internal/desktop
+      - name: Bounded recovery bundle grammar fuzzing
+        run: go test -run '^$' -fuzz='^FuzzRecoveryBundle$' -fuzztime=15s -parallel=2 ./internal/recovery
+      - name: Native Windows enrollment, authenticated SyncML and CSP persistence
+        run: go test -race -count=1 ./internal/mdm/windows/...
+      - name: Bounded Windows discovery parser fuzzing
+        run: go test -run '^$' -fuzz=FuzzDiscovery -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows enrollment policy parser fuzzing
+        run: go test -run '^$' -fuzz=FuzzPolicyRequest -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows certificate enrollment parser fuzzing
+        # Bound input count, minimization time and overall runtime independently.
+        run: go test -run '^$' -fuzz='^FuzzWSTEPRequest$' -fuzztime=10000x -fuzzminimizetime=1s -timeout=2m -parallel=2 ./internal/mdm/windows
+      - name: Windows enrollment CSR proof and parser fuzzing
+        run: go test -run '^$' -fuzz=FuzzEnrollmentCSR -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows CMS renewal proof fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsRenewalProof$' -fuzztime=15s -fuzzminimizetime=1s -parallel=2 ./internal/mdm/windows
+      - name: Windows certificate renewal SOAP parser fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWSTEPRenewalRequest$' -fuzztime=15s -fuzzminimizetime=1s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows SyncML digest fuzzing
+        run: go test -run '^$' -fuzz=FuzzSyncMLDigest -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Bounded Windows SyncML XML codec fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSyncML$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows SyncML data preservation fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSyncMLDataCodec$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows SyncML session transition fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSyncMLSessionTransition$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows disconnection notification fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsUnenrollment$' -fuzztime=15s -fuzzminimizetime=1s -parallel=2 ./internal/mdm/windows
+      - name: Windows CSP compiler fuzzing
+        run: go test -run '^$' -fuzz='^FuzzCSPCompiler$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows CSP result transition fuzzing
+        # A fixed input budget lets workers finish before the outer hard timeout.
+        run: go test -run '^$' -fuzz='^FuzzCSPResultTransition$' -fuzztime=10000x -fuzzminimizetime=1s -timeout=2m -parallel=2 ./internal/mdm/windows
+      - name: Windows typed update policy fuzzing
+        run: go test -run '^$' -fuzz='^FuzzUpdatePolicy$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: Windows immutable ring target fuzzing
+        run: go test -run '^$' -fuzz='^FuzzUpdateRingTargets$' -fuzztime=15s -parallel=2 ./internal/mdm/windows
+      - name: WinGet source snapshots and bounded HTTPS protocol
+        run: go test -race -count=1 ./internal/software/winget
+      - name: WinGet snapshot parser fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSnapshot$' -fuzztime=15s -parallel=2 ./internal/software/winget
+      - name: WinGet MSI translation fuzzing
+        run: go test -run '^$' -fuzz='^FuzzMSIPlan$' -fuzztime=15s -parallel=2 ./internal/software/winget
+      - name: WinGet Burn translation fuzzing
+        run: go test -run '^$' -fuzz='^FuzzBurnPlan$' -fuzztime=15s -parallel=2 ./internal/software/winget
+      - run: go tool templ generate
+      - name: Compile protocol and console tests before long database checks
+        run: go test -race -run '^$' ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/mdm_views
+      - name: Render synthetic console states before database regression
+        run: go test -race -count=1 ./internal/views/mdm_views ./internal/views/windows_views ./internal/views/desktop_views ./internal/views/computers_views ./internal/views/account_views ./internal/views/access_views
+        env:
+          APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui
+      - name: Preserve synthetic console renderings for browser checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-mdm-ui
+          path: ${{ runner.temp }}/apple-mdm-ui
+          if-no-files-found: ignore
+          retention-days: 7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Chrome startup lifecycle and diagnostics
+        run: node --test tests/browser/chrome-startup.test.mjs
+      - name: Certificate, network and inventory forms in Chrome
+        timeout-minutes: 10
+        run: node tests/browser/run.mjs
+        env:
+          APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui
+          BROWSER_TEST_ARTIFACTS: ${{ runner.temp }}/apple-mdm-browser
+      - name: Preserve browser regression results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-mdm-browser
+          path: ${{ runner.temp }}/apple-mdm-browser
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Atomic protected first-administrator bootstrap
+        run: go test -race -count=1 ./internal/setup/administrator ./internal/common
+      - name: Scoped console routes and response privacy
+        run: go test -race -count=1 ./internal/controllers/webserver/handlers
+      - name: Bounded custom Windows CSP editor JSON fuzzing
+        run: go test -run '^$' -fuzz='^FuzzWindowsCSPJSON$' -fuzztime=15s -parallel=2 ./internal/controllers/webserver/handlers
+      - name: Protocol, persistence and TLS
+        run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver
+      - name: Gateway identity, route isolation, certificate login and CSRF
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/sessiontokens ./internal/security/loginproof ./internal/security/mfaadmission ./internal/security/sessiongeneration ./internal/security/audit ./internal/security/exporttext ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/... ./internal/controllers/sessions
+      - name: Legacy session token decoder fuzzing
+        run: go test -run '^$' -fuzz='^FuzzSessionTokenDecoder$' -fuzztime=15s -parallel=2 ./internal/security/sessiontokens
+      - name: Existing console models and account lifecycles
+        run: go test -race -count=1 ./internal/models
+      - name: Individual agent authorization and command service lifecycles
+        run: go test -race -count=1 ./internal/desktop/... ./cmd/openuem-agent-releases
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - run: go tool templ generate
+      - run: go build ./...
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: amd64
+          CGO_ENABLED: '0'

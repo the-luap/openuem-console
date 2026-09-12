@@ -3,14 +3,18 @@ package handlers
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"image/png"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/alexedwards/argon2id"
 	validator "github.com/go-passwd/validator"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/openuem-console/internal/views/account_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -18,6 +22,7 @@ import (
 )
 
 func (h *Handler) MyAccount(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -39,7 +44,7 @@ func (h *Handler) MyAccount(c echo.Context) error {
 		return err
 	}
 
-	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, ""), commonInfo))
+	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, h.languageSaved(c), h.accountLanguage(c)), commonInfo))
 }
 
 func (h *Handler) UpdatePersonalInfo(c echo.Context) error {
@@ -69,7 +74,7 @@ func (h *Handler) UpdatePersonalInfo(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_find_user"), true))
 	}
 
-	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, i18n.T(c.Request().Context(), "login.personal_info_updated")), commonInfo))
+	return RenderView(c, account_views.MyAccountIndex("| My Account", account_views.MyAccount(c, user, defaultCountry, commonInfo, i18n.T(c.Request().Context(), "login.personal_info_updated"), h.accountLanguage(c)), commonInfo))
 }
 
 func (h *Handler) MyAccountPassword(c echo.Context) error {
@@ -78,10 +83,17 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user, err := h.Model.Client.User.Get(c.Request().Context(), username)
 	if err != nil {
 		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	}
+
+	if !user.Passwd || user.Openid {
+		return echo.NewHTTPError(http.StatusForbidden, "This account does not use password sign-in.")
+	}
+	if user.Use2fa && (!user.TotpSecretConfirmed || !h.SessionManager.Manager.GetBool(c.Request().Context(), "twofa")) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Complete two-factor sign-in before changing the password.")
 	}
 
 	currentPassword := c.FormValue("current-password")
@@ -90,12 +102,12 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 	}
 
 	newPassword := c.FormValue("new-password")
-	if currentPassword == "" {
+	if newPassword == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.new_password_empty"), true))
 	}
 
 	confirmNewPassword := c.FormValue("confirm-new-password")
-	if currentPassword == "" {
+	if confirmNewPassword == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.confirm_new_password_empty"), true))
 	}
 
@@ -119,8 +131,14 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 	}
 
 	// Change password in database
-	if err := h.Model.ChangePassword(username, newPassword); err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_save_new_password"), true))
+	if err := h.Model.ChangeAccountPassword(c.Request().Context(), user, newPassword); err != nil {
+		if errors.Is(err, models.ErrPasswordUnchanged) {
+			return echo.NewHTTPError(http.StatusBadRequest, "Choose a password different from the current password.")
+		}
+		if errors.Is(err, models.ErrPasswordReplacement) || errors.Is(err, models.ErrLocalSignIn) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Account access or credentials changed. Sign in again before changing the password.")
+		}
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Password change could not be saved. Try again.")
 	}
 
 	// Log this change
@@ -131,15 +149,19 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 }
 
 func (h *Handler) Enable2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserHash(username)
+	user, err := h.Model.Client.User.Get(c.Request().Context(), username)
 	if err != nil {
 		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	}
+	if user.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
 	}
 
 	if user.Passwd {
@@ -192,15 +214,24 @@ func (h *Handler) Enable2FA(c echo.Context) error {
 		}
 	}
 
-	if err := h.Model.SaveTOTPSecretKey(username, totpSecret); err != nil {
-		log.Printf("[ERROR]: could not save TOTP secret key, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_could_not_save_secret"), true))
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StageOIDCTOTPSecret(c.Request().Context(), user, totpSecret, identity)
+	} else {
+		err = h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret)
+	}
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	return RenderAccountPartial(c, account_views.Enable2FA(username, qrCode, key.Secret()))
 }
 
 func (h *Handler) Enabled2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -211,47 +242,43 @@ func (h *Handler) Enabled2FA(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_empty_code"), true))
 	}
 
-	user, err := h.Model.GetUserTOTPSecret(username)
+	user, err := h.Model.Client.User.Get(c.Request().Context(), username)
 	if err != nil {
 		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
-
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.TotpSecret, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			user.TotpSecret, err = utils.DecryptSensitiveField(user.TotpSecret, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-			}
-		}
+	if user.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
 	}
 
-	valid := totp.Validate(passcode, user.TotpSecret)
+	secret, _, err := sessiontokens.Decode(user.TotpSecret, h.EncryptionMasterKey)
+	if err != nil {
+		return mfaMutationError(err)
+	}
+
+	valid := totp.Validate(passcode, secret)
 	if !valid {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
 
-	// Generate codes
-	codes := []string{}
-	for range 10 {
-		code, err := generateRecoveryCode()
-		if err != nil {
-			log.Printf("[ERROR]: could not generate recovery codes, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
-		}
-		codes = append(codes, code)
+	codes, err := generateRecoveryCodes()
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	// Save recovery codes
-	if err := h.Model.SaveRecoveryCodes(username, codes); err != nil {
-		log.Printf("[ERROR]: could not save recovery codes, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmOIDCMFA(c.Request().Context(), user, codes, identity)
+	} else {
+		err = h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes)
+	}
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	// 2FA has been enabled
@@ -266,7 +293,7 @@ func (h *Handler) Disable2FA(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserHash(username)
+	user, err := h.Model.Client.User.Get(c.Request().Context(), username)
 	if err != nil {
 		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
@@ -290,9 +317,17 @@ func (h *Handler) Disable2FA(c echo.Context) error {
 	}
 
 	// Remove 2FA from database
-	if err := h.Model.Disable2FA(username); err != nil {
-		log.Printf("[ERROR]: could not disable 2FA for %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_disable_2fa"), true))
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.DisableOIDCMFA(c.Request().Context(), user, identity)
+	} else {
+		err = h.Model.Disable2FA(c.Request().Context(), user)
+	}
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	user, err = h.Model.GetUserById(username)
@@ -319,4 +354,11 @@ func ValidatePasswordComplexity(password string) error {
 	}
 
 	return nil
+}
+
+func (h *Handler) languageSaved(c echo.Context) string {
+	if h.SessionManager.Manager.PopBool(c.Request().Context(), "language_saved") {
+		return i18n.T(c.Request().Context(), "account_language.saved")
+	}
+	return ""
 }

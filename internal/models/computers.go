@@ -67,6 +67,7 @@ func (m *Model) CountAllComputers(f filters.AgentFilter, c *partials.CommonInfo)
 	}
 
 	// Apply filters
+	applyComputerScopeUniqueness(query, c)
 	applyComputerFilters(query, f)
 
 	count, err := query.Count(context.Background())
@@ -74,6 +75,16 @@ func (m *Model) CountAllComputers(f filters.AgentFilter, c *partials.CommonInfo)
 		return 0, err
 	}
 	return count, err
+}
+
+func applyComputerScopeUniqueness(query *ent.AgentQuery, info *partials.CommonInfo) {
+	// Count all site edges, including hidden sites. An ambiguous assignment must
+	// not expose inventory to delegated readers; administrators can still repair it.
+	if !info.Principal.IsAdministrator() {
+		query.Where(func(s *sql.Selector) {
+			s.Where(sql.ExprP("(SELECT count(*) FROM site_agents WHERE agent_id = " + s.C(agent.FieldID) + ") = 1"))
+		})
+	}
 }
 
 func mainQuery(s *sql.Selector, p partials.PaginationAndSort) {
@@ -163,6 +174,8 @@ func (m *Model) GetComputersByPage(p partials.PaginationAndSort, f filters.Agent
 
 	// Apply filters
 	applyComputerFilters(query, f)
+
+	applyComputerScopeUniqueness(query, c)
 
 	// Apply sort
 	switch p.SortBy {

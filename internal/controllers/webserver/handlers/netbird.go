@@ -124,7 +124,7 @@ func (h *Handler) Netbird(c echo.Context, successMessage string) error {
 	}
 
 	// Try to get info using NATS refresh
-	msg, err := h.NATSConnection.Request("agent.netbird.refresh."+agentID, nil, 10*time.Second)
+	msg, err := h.RequestBroker("agent.netbird.refresh."+agentID, nil, 10*time.Second)
 	if err == nil {
 		result := nats.Netbird{}
 		if err := json.Unmarshal(msg.Data, &result); err != nil {
@@ -240,7 +240,7 @@ func (h *Handler) NetbirdInstall(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.install."+agentID, nil, 10*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.install."+agentID, nil, 10*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))
@@ -355,7 +355,7 @@ func (h *Handler) NetbirdRegister(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_create_request", err.Error()), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.register."+agentID, data, 1*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.register."+agentID, data, 1*time.Minute)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.register_request_failed", err.Error()), true))
 	}
@@ -391,7 +391,7 @@ func (h *Handler) NetbirdUninstall(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.uninstall."+agentId, nil, 10*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.uninstall."+agentId, nil, 10*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))
@@ -462,7 +462,7 @@ func (h *Handler) NetbirdSwitchProfile(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_create_request", err.Error()), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.switchprofile."+agentID, data, 2*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.switchprofile."+agentID, data, 2*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))
@@ -499,7 +499,7 @@ func (h *Handler) NetbirdRefresh(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.refresh."+agentID, nil, 5*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.refresh."+agentID, nil, 5*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))
@@ -562,7 +562,7 @@ func (h *Handler) NetbirdConnect(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_create_request", err.Error()), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.up."+agentID, data, 30*time.Second)
+	msg, err := h.RequestBroker("agent.netbird.up."+agentID, data, 30*time.Second)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))
@@ -625,7 +625,7 @@ func (h *Handler) NetbirdDisconnect(c echo.Context, successMessage string) error
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_create_request", err.Error()), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.netbird.down."+agentID, data, 5*time.Minute)
+	msg, err := h.RequestBroker("agent.netbird.down."+agentID, data, 5*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "no responders") {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.agent_offline"), true))

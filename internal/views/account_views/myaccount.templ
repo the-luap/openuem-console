@@ -10,16 +10,17 @@ import (
 	"strings"
 )
 
-templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInfo *partials.CommonInfo, successMessage string) {
+templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInfo *partials.CommonInfo, successMessage string, language LanguageData) {
 	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "login.my_account")}}, commonInfo)
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-		<div class="uk-width-1-2@m uk-card uk-card-default">
+	<main class="grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" style="grid-template-columns:minmax(0,1fr);">
+		@LanguagePreference(commonInfo, language)
+		<div class="uk-width-1-2@m uk-card uk-card-default min-w-0">
 			<div class="uk-card-body uk-flex uk-flex-column gap-4">
 				if successMessage != "" {
 					@partials.SuccessMessage(successMessage)
 				}
 				<div id="error" class="hidden"></div>
-				<div class="uk-width-1-2@m uk-card uk-card-default">
+				<div class="uk-width-1-2@m uk-card uk-card-default min-w-0">
 					<div class="uk-card-header">
 						<h3 class="uk-card-title">{ i18n.T(ctx, "login.my_account") } </h3>
 						<p class="uk-margin-small-top uk-text-small">
@@ -27,9 +28,10 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 						</p>
 					</div>
 					<div class="uk-card-body">
-						<div class="flex gap-8">
+						<div class="flex flex-wrap gap-8">
 							<form
-								class="flex flex-col justify-between mt-6 uk-card uk-card-body w-1/6 px-6 py-4"
+								class="flex flex-col justify-between mt-6 uk-card uk-card-body min-w-0 px-6 py-4"
+								style="flex:1 1 24rem; max-width:100%;"
 								hx-post="/myaccount/info"
 								hx-target="#main"
 								hx-swap="outerHTML"
@@ -97,7 +99,7 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 										</div>
 									</fieldset>
 								</div>
-								<div class="flex justify-between mt-2">
+								<div class="flex flex-wrap gap-2 justify-between mt-2">
 									<button
 										type="reset"
 										class="uk-button uk-button-secondary"
@@ -123,7 +125,8 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 									hx-post="/myaccount/password"
 									hx-target="#main"
 									hx-swap="outerHTML"
-									class="flex flex-col justify-between mt-6 uk-card uk-card-body w-1/6 px-6 py-4"
+									class="flex flex-col justify-between mt-6 uk-card uk-card-body min-w-0 px-6 py-4"
+									style="flex:1 1 24rem; max-width:100%;"
 									autocomplete="off"
 								>
 									<div class="flex flex-col gap-4">
@@ -241,7 +244,7 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 										</fieldset>
 									</div>
 									<span class="uk-text uk-text-small uk-text-muted">{ i18n.T(ctx, "login.password_complexity") }</span>
-									<div class="flex justify-between mt-2">
+									<div class="flex flex-wrap gap-2 justify-between mt-2">
 										<button type="reset" class="uk-button uk-button-secondary">
 											{ i18n.T(ctx, "Reset") }
 										</button>
@@ -250,7 +253,7 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 								</form>
 							}
 							if !user.Openid {
-								<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body w-1/3 px-6 py-4">
+								<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body min-w-0 px-6 py-4" style="flex:1 1 24rem; max-width:100%;">
 									<div class="flex flex-col gap-4">
 										<h3 class="uk-card-title">{ i18n.T(ctx, "login.twofa") }</h3>
 										if user.Use2fa {
@@ -301,7 +304,7 @@ templ MyAccount(c echo.Context, user *ent.User, defaultCountry string, commonInf
 }
 
 templ Enable2FA(username string, qrCode string, secret string) {
-	<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body w-1/3 px-6 py-4">
+	<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body min-w-0 px-6 py-4" style="flex:1 1 24rem; max-width:100%;">
 		<form class="flex flex-col gap-4" autocomplete="off">
 			<div class="flex flex-col gap-4">
 				<h3 class="uk-card-title">{ i18n.T(ctx, "login.twofa") }</h3>
@@ -362,7 +365,7 @@ templ Enable2FA(username string, qrCode string, secret string) {
 }
 
 templ Enabled2FA(codes string) {
-	<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body w-1/3 px-6 py-4">
+	<div id="account" class="flex flex-col justify-between mt-6 uk-card uk-card-body min-w-0 px-6 py-4" style="flex:1 1 24rem; max-width:100%;">
 		<div class="flex flex-col gap-4">
 			<h3 class="uk-card-title">{ i18n.T(ctx, "login.twofa") }</h3>
 			<span class="uk-text uk-text-small uk-text-muted">{ i18n.T(ctx, "login.recovery_codes_instructions") }</span>

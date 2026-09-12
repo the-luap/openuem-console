@@ -1,0 +1,186 @@
+# Desktop installer release admission
+
+`openuem-agent-releases` inspects, accepts, shows and withdraws installer releases.
+Admission authenticates a release manifest, checks every declared package's bytes
+and stores a monotonic checkpoint in PostgreSQL. It does not sign native packages,
+perform Windows Authenticode verification or submit Mac packages for notarization.
+The trusted release pipeline must complete and verify those platform steps before
+signing a manifest. The [public protocol listener](desktop-public-protocol.md)
+must be configured separately; accepting a release does not enable HTTP routes
+by itself. Native bootstrap and installer integration remain in progress.
+
+## Trust and repository preparation
+
+Build the command with `go build ./cmd/openuem-agent-releases`. Select the console's
+protected database URL file with `--dburl-file /run/database.url` or
+`OPENUEM_AGENT_DATABASE_URL_FILE=/run/database.url` for database actions. This
+keeps the URL and password out of process arguments and environment metadata.
+Mount the file read-only for the intended service account. It uses the shared
+Unix ownership/mode and Windows ACL checks and requires a bounded network
+PostgreSQL URL. Parser and driver errors do not echo credentials.
+
+An explicit `--dburl-file` selects a file instead of the environment's file path.
+The legacy raw `OPENUEM_AGENT_DATABASE_URL` remains supported when no file is
+selected; raw and file inputs together are rejected. Missing or damaged files
+never fall back to the raw value. The `inspect` action loads neither database
+input, so offline manifest verification remains independent of server credentials.
+
+The console must first apply its additive `uem_desktop_*` migrations. This command
+does not run schema migrations or load the encryption master key or organization
+CA keys. Restrict it and its database credentials to trusted server administrators
+and the authorized release pipeline; it is not a scoped end-user API.
+
+Configure a protected PEM file containing one to eight pinned Ed25519 **public**
+release keys. On Unix the file must belong to the current account or root and have
+no group/other permissions, for example mode `0600`. Windows uses the shared
+credential file ACL validation. Duplicate keys, private keys, other algorithms,
+certificates and unrelated PEM content are rejected. These are dedicated release
+keys, separate from organization CAs, TLS credentials and broker NKeys. Private
+release keys stay in the protected release-signing environment.
+
+## Separate release job image
+
+`Dockerfile.releases` builds a separate unprivileged scratch image containing only
+the static admission executable and its license. Its source and Go builder are
+explicitly selected, and it contains no shell, signing key, source tree, test
+binary or system trust bundle. It exposes no port and prints English help by
+default. Build and audit it locally with:
+
+```sh
+docker build -f Dockerfile.releases --target runtime -t openuem-agent-releases:local .
+python3 scripts/check-release-image.py openuem-agent-releases:local
+```
+
+Run a database action as a temporary job on the private reference data network.
+Select the runtime UID/GID matching the private inputs, a read-only root filesystem,
+dropped capabilities and `no-new-privileges`. Mount only the protected application
+database URL and its public TLS CA, plus the approved candidate manifest, public
+release key file and read-only package directory required by that action. Keep the
+database URL's `sslrootcert` path and verified hostname consistent with those
+mounts. Pass the URL **path** with `--dburl-file`; the job needs no administrator
+database password, organization CA key, encryption master key or broker seed.
+Offline `inspect` uses `--network none` and needs only the manifest and public keys.
+
+The reference acceptance fixture runs this exact image with a synthetic signed
+manifest and a deliberately non-executable package payload. It checks actual
+database admission, public gateway HEAD/GET/range bytes against the signed hash,
+retained download approval after restart, and HTTP denial following exact-digest
+withdrawal. Its data network and gateway remain unpublished. These checks prove
+the distribution and serving path; they do not assert native package signing,
+notarization, installation or device acceptance.
+
+## Signed manifest inspection
+
+The shared `enrollment/artifacts` package defines schema-1 manifests. The release
+pipeline calls its `Sign` function after native package signing/verification.
+An envelope contains a domain-separated Ed25519 signature over the exact payload.
+That payload binds version, sequence, timestamps and each target's filename,
+byte size and SHA-256 digest. Windows supports `exe`/`msi`, Mac supports `pkg`,
+with explicit `amd64`/`arm64` selection. Unknown fields, ambiguous JSON, unsupported
+targets and unapproved filenames are rejected. Validity is at most thirty days;
+packages are bounded to 512 MiB each.
+
+Inspect the envelope before arranging the repository:
+
+```sh
+openuem-agent-releases --action inspect \
+  --trusted-keys /etc/openuem/release-public-keys.pem \
+  --manifest /srv/openuem/releases/release.json
+```
+
+This needs neither database access nor package files. Its JSON status is
+`candidate`, and `checkpoint.digest` identifies the required directory. Inspection
+checks current signature/validity, but cannot compare the candidate to persisted
+approval state. It does not approve or install anything.
+
+Place the unchanged packages in this layout, using the exact signed filenames:
+
+```text
+releases/
+  <manifest-payload-sha256>/
+    openuem-agent-0.12.0-windows-amd64.msi
+    openuem-agent-0.12.0-macos-arm64.pkg
+```
+
+Publish through atomic file/directory renames. The serving process must have
+read-only access; never update a published file in place. The catalog rejects
+nonregular files, final-file symlinks and symbolic-link release directories. Its
+directory handles constrain access beneath the configured repository. After
+hashing a download, it returns the same open file descriptor for serving, so an
+atomic path replacement cannot substitute different bytes. Every subsequent open
+checks file integrity again. Callers own and must close the returned descriptor.
+
+## Admission, status and withdrawal
+
+After staging every declared target, accept the envelope:
+
+```sh
+openuem-agent-releases --action accept \
+  --directory /srv/openuem/releases \
+  --trusted-keys /etc/openuem/release-public-keys.pem \
+  --manifest /srv/openuem/releases/release.json \
+  --actor release-pipeline
+```
+
+The command checks all package bytes before starting its database transaction,
+then locks and reloads the checkpoint and verifies current validity again. It
+persists approval, checkpoint and audit together. Concurrent approvals cannot
+lower the final sequence. Output has status `accepted` and public metadata only;
+raw database errors, connection credentials and key contents are not returned.
+Operations have a two-minute context deadline.
+
+Read the current signed metadata with `--action show`, the same `--directory` and
+`--trusted-keys`. Current metadata is reverified against the configured key ring,
+stored sequence/digest and current time. This reports approval; actual file
+availability is checked during admission and each package open.
+
+Withdraw a release by its exact current digest:
+
+```sh
+openuem-agent-releases --action withdraw \
+  --digest <current-manifest-payload-sha256> \
+  --actor administrator-id
+```
+
+Withdrawal requires only database access, so it works even if the repository or
+public-key file is unavailable. The first withdrawal is audited, and an identical
+retry is idempotent. The checkpoint is retained. A stale withdrawal cannot change
+a newer current release. Requests already authorized may finish; new opens fail.
+
+There is no automatic fallback after withdrawal, expiry, missing files or removal
+of a trusted signing key. An identical publish cannot undo a withdrawal. Publish
+a newly approved sequence to resume admission; returning deliberately to older
+package bytes also requires a new sequence. Reusing a sequence for a different
+payload is rejected. Trust-key rotation can re-sign the identical payload with an
+explicitly configured new key without changing its digest or sequence, unless
+the release has been withdrawn. Preserve the checkpoint with backups and do not
+reset it to bypass admission failures.
+
+## Evidence and remaining wiring
+
+PostgreSQL tests cover concurrent approvals, conflicting sequences, unchanged
+retries, migrations/restarts, withdrawal, missing/changed/linked files, canceled
+operations, stored-signature revalidation and atomic path replacement. The real
+administration runner is exercised through a second database connection, including
+database-independent inspection, metadata-only output and file-independent
+withdrawal. Shared-library tests cover key rotation, expiry, strict target/content
+binding and bounded readers; native Windows CI covers the manifest parser and
+credential ACL implementation.
+
+The store now atomically binds each installer invitation to an exact release and
+target, and rejects an invitation expiry beyond the release's expiry. Canonical origin,
+scope, target and release mismatches roll the entire invitation back. Native claim
+transactions verify both endpoint keys and hold a shared release-checkpoint lock
+through issuance. A concurrent withdrawal waits for already authorized issuance;
+later requests fail. Unbound registry-only invitations and superseded releases
+cannot issue through this installer path. Existing issued identities are not
+revoked by withdrawing a release. A pending installation whose release has been
+superseded or withdrawn needs a new invitation; retries require its selected
+release to remain current and active.
+
+The optional public HTTP protocol now serves approved packages, scanner-safe
+metadata and release-bound key-proof claims through the pinned private listener
+and gateway. The installation page, invitation-creation UI, signed bootstrap
+configuration/installer flow and native release signing jobs remain integration
+steps. Test package bytes are non-executable fixtures
+and provide no physical installation or native signing evidence.

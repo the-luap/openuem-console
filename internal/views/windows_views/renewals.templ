@@ -1,0 +1,184 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ renewalNavigation(info *partials.CommonInfo, device windows.DeviceMetadata) {
+	<nav aria-label="Certificate renewal navigation" class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>Device identity</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/renewals")) }>Renewal history</a>
+	</nav>
+}
+
+templ CertificateRenewals(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, history []windows.CertificateRenewal, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Device identity", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID)}, {Title: "Certificate renewals"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Certificate renewal history</h1>
+				<p class="break-all">{ device.Name }</p>
+				@renewalNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Review replacement certificates from newest to oldest. A pending replacement becomes confirmed when the device completes an authenticated management exchange using it.</p>
+					<dl class="uk-description-list">
+						<dt>Current device access</dt>
+						<dd>{ DeviceStatus(device) }</dd>
+						<dt>Current certificate expires (UTC)</dt>
+						<dd>
+							@ScheduleTime(device.CertificateExpiresAt)
+						</dd>
+					</dl>
+					<div role="region" aria-label="Certificate renewal history table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Stored certificate replacements for this device</caption>
+							<thead><tr><th scope="col">Renewal</th><th scope="col">Issued (UTC)</th><th scope="col">Status</th><th scope="col">Completed (UTC)</th></tr></thead>
+							<tbody>
+								for _,renewal:=range history {
+									<tr>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/renewals/"+renewal.ID)) }>Open renewal { renewal.ID }</a></td>
+										<td>
+											@ScheduleTime(renewal.CreatedAt)
+										</td>
+										<td>{ renewalState(renewal.Phase) }</td>
+										<td>
+											if renewal.CompletedAt!=nil {
+
+	@ScheduleTime(*renewal.CompletedAt)
+
+											} else {
+												Pending
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(history)==0 {
+						<p class="my-3">No certificate renewals in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/renewals?offset=%d", device.ID, max(0, offset-10)))) }>Previous renewals</a>
+						}
+						if more {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/renewals?offset=%d", device.ID, offset+10))) }>Next renewals</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ renewalCertificate(label string, certificate windows.RenewalCertificateMetadata) {
+	<section class="uk-card uk-card-default">
+		<div class="uk-card-body">
+			<h2 class="uk-card-title">{ label }</h2>
+			<dl class="uk-description-list">
+				<dt>Certificate ID</dt>
+				<dd>{ certificate.ID }</dd>
+				<dt>Fingerprint (SHA-256)</dt>
+				<dd class="font-mono break-all">{ certificate.FingerprintSHA256 }</dd>
+				<dt>Issued (UTC)</dt>
+				<dd>
+					@ScheduleTime(certificate.IssuedAt)
+				</dd>
+				<dt>Expires (UTC)</dt>
+				<dd>
+					@ScheduleTime(certificate.ExpiresAt)
+				</dd>
+				<dt>Access revoked (UTC)</dt>
+				<dd>
+					if certificate.RevokedAt!=nil {
+
+	@ScheduleTime(*certificate.RevokedAt)
+
+					} else {
+						No certificate revocation recorded
+					}
+				</dd>
+			</dl>
+		</div>
+	</section>
+}
+
+templ CertificateRenewal(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, detail windows.CertificateRenewalDetail) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Renewal history", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/renewals")}, {Title: "Certificate replacement"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Certificate replacement</h1>
+				<p class="break-all">{ device.Name }</p>
+				@renewalNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ renewalState(detail.Renewal.Phase) }</h2>
+					<dl class="uk-description-list">
+						<dt>Renewal ID</dt>
+						<dd>{ detail.Renewal.ID }</dd>
+						<dt>Revision</dt>
+						<dd>{ fmt.Sprint(detail.Renewal.Revision) }</dd>
+						<dt>Issued (UTC)</dt>
+						<dd>
+							@ScheduleTime(detail.Renewal.CreatedAt)
+						</dd>
+						<dt>Current device access</dt>
+						<dd>{ DeviceStatus(device) }</dd>
+						if detail.Renewal.CompletedAt!=nil {
+							<dt>Completed (UTC)</dt>
+							<dd>
+								@ScheduleTime(*detail.Renewal.CompletedAt)
+							</dd>
+						}
+					</dl>
+					if detail.Renewal.Phase=="pending" {
+						<p class="my-3">The device has not confirmed this replacement. The previous certificate remains current until confirmation, subject to its expiry and access revocation.</p>
+					}
+					if detail.Renewal.Phase=="confirmed" {
+						<p class="my-3">The device used the replacement in an authenticated management exchange. The previous certificate was revoked at confirmation. Later renewals may have replaced this certificate again.</p>
+						<dl class="uk-description-list"><dt>Confirmation session ID</dt><dd>{ detail.Renewal.ConfirmedSessionID }</dd><dt>Confirmation message</dt><dd>{ fmt.Sprint(detail.Renewal.ConfirmedMessageID) }</dd></dl>
+					}
+					if detail.Renewal.Phase=="canceled" {
+						<p class="my-3">This replacement was canceled before confirmation and its access was revoked.</p>
+						<h3 class="font-semibold">Cancellation reason</h3>
+						<p class="break-all">{ detail.Resolution }</p>
+					}
+				</div>
+			</section>
+			<div class="windows-policy-fields">
+				@renewalCertificate("Previous certificate", detail.Source)
+				@renewalCertificate("Replacement certificate", detail.Replacement)
+			</div>
+			if info.Can(access.ManageCertificates) && canCancelRenewal(detail) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Cancel pending replacement</h2>
+						<p class="my-3">Revoke this unconfirmed replacement. The previous certificate keeps its existing access and expiry. This action preserves sessions, pending commands and renewal history.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/renewals/"+detail.Renewal.ID+"/cancel") } class="grid gap-4">
+							@mdm_views.CSRF(info)
+							<input type="hidden" name="expected_revision" value={ fmt.Sprint(detail.Renewal.Revision) }/>
+							<label for="renewal-resolution">Cancellation reason</label>
+							<input class="uk-input" id="renewal-resolution" name="resolution" required maxlength="320" aria-describedby="renewal-resolution-help"/>
+							<p id="renewal-resolution-help">Use a short, single-line reason without leading or trailing spaces.</p>
+							<label><input type="checkbox" name="confirm_cancel" value="yes" required/> Cancel this replacement certificate.</label>
+							<button class="uk-button uk-button-danger" type="submit">Confirm replacement cancellation</button>
+						</form>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}

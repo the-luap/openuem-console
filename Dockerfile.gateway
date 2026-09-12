@@ -1,0 +1,40 @@
+FROM --platform=$BUILDPLATFORM golang:1.26.8-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
+WORKDIR /src
+ENV GOTOOLCHAIN=local
+COPY go.mod go.sum ./
+COPY cmd/openuem-gateway ./cmd/openuem-gateway
+COPY internal/gateway ./internal/gateway
+COPY internal/security/clientidentity ./internal/security/clientidentity
+COPY internal/security/loginproof ./internal/security/loginproof
+COPY internal/desktop/protocol ./internal/desktop/protocol
+COPY internal/mdm/windows/protocol ./internal/mdm/windows/protocol
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o /out/openuem-gateway ./cmd/openuem-gateway
+
+FROM build AS test-build
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go test -mod=readonly -trimpath -buildvcs=false -c -o /out/gateway.test ./internal/gateway
+
+FROM scratch AS runtime
+COPY --from=build /out/openuem-gateway /openuem-gateway
+USER 65532:65532
+EXPOSE 8443/tcp
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/openuem-gateway"]
+CMD ["--listen", ":8443"]
+
+# The test image contains synthetic fixtures in a separate binary. Distribute
+# only the runtime target; this target tests that exact runtime executable.
+FROM runtime AS smoke
+COPY --from=test-build /out/gateway.test /gateway.test
+ENV OPENUEM_GATEWAY_TEST_BINARY=/openuem-gateway
+ENTRYPOINT ["/gateway.test"]
+CMD ["-test.v", "-test.run=^TestGatewayContainerProcess$", "-test.timeout=30s"]
+
+FROM runtime AS final

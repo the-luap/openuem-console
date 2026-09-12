@@ -19,6 +19,9 @@ import (
 )
 
 func (h *Handler) RustDeskStart(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	rustdeskSettings := &ent.Rustdesk{}
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -71,7 +74,7 @@ func (h *Handler) RustDeskStart(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "rustdesk.could_not_prepare_request", err.Error()), true))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.rustdesk.start."+agentId, data, time.Duration(h.NATSTimeout)*time.Second)
+	msg, err := h.RequestBroker("agent.rustdesk.start."+agentId, data, time.Duration(h.NATSTimeout)*time.Second)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "rustdesk.could_not_send_request", err.Error()), true))
 	}
@@ -97,6 +100,9 @@ func (h *Handler) RustDeskStart(c echo.Context) error {
 }
 
 func (h *Handler) RustDeskStop(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	agentId := c.Param("uuid")
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -128,7 +134,7 @@ func (h *Handler) RustDeskStop(c echo.Context) error {
 		return RenderView(c, computers_views.InventoryIndex(" | Inventory", computers_views.RemoteAssistance(c, p, agent, confirmDelete, hasRustDeskSettings, false, commonInfo, err.Error(), netbird, offline), commonInfo))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.rustdesk.stop."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second)
+	msg, err := h.RequestBroker("agent.rustdesk.stop."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second)
 	if err != nil {
 		return RenderView(c, computers_views.InventoryIndex(" | Inventory", computers_views.RemoteAssistance(c, p, agent, confirmDelete, hasRustDeskSettings, false, commonInfo, err.Error(), netbird, offline), commonInfo))
 	}

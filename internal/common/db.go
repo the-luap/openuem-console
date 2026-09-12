@@ -1,8 +1,10 @@
 package common
 
 import (
+	"github.com/open-uem/openuem-console/internal/gateway"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -63,9 +65,8 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Println("[WARN]: could not default nickname to default site")
 		}
 
-		// Create argon2 default password for openuem admin if not exist
-		if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-			log.Println("[WARN]: could not create default openuem password")
+		if err := w.InitializeAdministrator(); err != nil {
+			return err
 		}
 
 		// Encrypt sensitive fields if they're set in clear and we have a master key
@@ -73,7 +74,9 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 		}
 
-		w.StartConsoleService()
+		if err := w.StartConsoleService(); err != nil {
+			return err
+		}
 
 		// Start a job to check latest OpenUEM releases
 		channel, err := w.Model.GetDefaultUpdateChannel()
@@ -154,9 +157,9 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Println("[WARN]: could not default nickname to default site")
 				}
 
-				// Create argon2 default password for openuem admin if not exist
-				if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-					log.Println("[WARN]: could not create default openuem password")
+				if err := w.InitializeAdministrator(); err != nil {
+					log.Print("[ERROR]: first-administrator startup failed")
+					return
 				}
 
 				// Encrypt sensitive fields if they're set in clear and we have a master key
@@ -164,7 +167,10 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 				}
 
-				w.StartConsoleService()
+				if err := w.StartConsoleService(); err != nil {
+					log.Print("[ERROR]: console startup failed")
+					return
+				}
 
 				// Start a job to check latest OpenUEM releases
 				channel, err := w.Model.GetDefaultUpdateChannel()
@@ -194,7 +200,17 @@ func (w *Worker) StartDBConnectJob() error {
 	return nil
 }
 
-func (w *Worker) StartConsoleService() {
+func (w *Worker) StartConsoleService() error {
+	publicOrigin := ""
+	if configured := os.Getenv("OPENUEM_PUBLIC_ORIGIN"); configured != "" {
+		origin, err := gateway.ParseOrigin(configured)
+		if err != nil {
+			log.Printf("[ERROR]: invalid OPENUEM_PUBLIC_ORIGIN: %v", err)
+			return err
+		}
+		publicOrigin = origin.String()
+	}
+
 	// Get port information
 	consolePort := "1323"
 	if w.ConsolePort != "" {
@@ -219,10 +235,23 @@ func (w *Worker) StartConsoleService() {
 		sessionLifetimeInMinutes = 1440
 	}
 
-	w.SessionManager = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	w.SessionManager, err = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	if err != nil {
+		return err
+	}
+
+	// Publish issuer trust before accepting console requests.
+	w.AuthServer = authserver.New(w.Model, w.SessionManager, w.CACertPath, serverName, consolePort, authPort, w.ReverseProxyAuthPort, w.EncryptionMasterKey)
 
 	// HTTPS web server
 	w.WebServer = webserver.New(w.Model, w.NATSServers, w.SessionManager, w.TaskScheduler, w.JWTKey, w.ConsoleCertPath, w.ConsolePrivateKeyPath, w.SFTPPrivateKeyPath, w.CACertPath, serverName, consolePort, authPort, w.DownloadDir, w.Domain, w.OrgName, w.OrgProvince, w.OrgLocality, w.OrgAddress, w.Country, w.ReverseProxyAuthPort, w.ReverseProxyServer, w.ServerReleasesFolder, w.CommonSoftwareDBFolder, w.Version, w.EncryptionMasterKey, w.ReenableCertAuth, w.ReenablePasswdAuth, w.ResetOpenUEMUser, w.AuthLogger)
+	w.WebServer.Handler.IndividualAgentService = w.IndividualAgentService
+	if err := w.WebServer.Handler.StartNATSConnectJob(); err != nil {
+		_ = w.WebServer.Close()
+		w.SessionManager.Close()
+		return err
+	}
+	w.WebServer.Handler.PublicOrigin = publicOrigin
 	go func() {
 		if err := w.WebServer.Serve(":"+consolePort, w.ConsoleCertPath, w.ConsolePrivateKeyPath); err != http.ErrServerClosed {
 			log.Printf("[ERROR]: the server has stopped, reason: %v", err.Error())
@@ -231,13 +260,15 @@ func (w *Worker) StartConsoleService() {
 	log.Println("[INFO]: console is running")
 
 	// HTTPS auth server
-	w.AuthServer = authserver.New(w.Model, w.SessionManager, w.CACertPath, serverName, consolePort, authPort, w.ReverseProxyAuthPort, w.EncryptionMasterKey)
+	w.AuthServer.Handler.PublicOrigin = publicOrigin
+	w.AuthServer.Handler.AuthLogger = w.AuthLogger
 	go func() {
 		if err := w.AuthServer.Serve(":"+authPort, w.ConsoleCertPath, w.ConsolePrivateKeyPath); err != http.ErrServerClosed {
 			log.Printf("[ERROR]: the server has stopped, reason: %v", err.Error())
 		}
 	}()
 	log.Println("[INFO]: auth server is running")
+	return nil
 }
 
 func (w *Worker) EncryptSensitiveFields() error {
@@ -271,10 +302,8 @@ func (w *Worker) EncryptSensitiveFields() error {
 		return err
 	}
 
-	// 7. Encrypt Sessions tokens if needed
-	if err := w.EncryptSessionsTokens(); err != nil {
-		return err
-	}
+	// Session tokens migrate with their durable lookup/revocation schema before
+	// either HTTP server starts. That migration also verifies the configured key.
 
 	return nil
 }
@@ -470,37 +499,6 @@ func (w *Worker) EncryptSentitiveTaskInformation() error {
 
 				if err := w.Model.UpdateLocalUserPassword(t.ID, encryptedKey); err != nil {
 					log.Printf("[ERROR]: could not encrypt Local User Password, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptSessionsTokens() error {
-	tokens, err := w.Model.GetSessionsTokens()
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tokens {
-		if t.ID != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(t.ID, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedToken, err := utils.EncryptSensitiveField(t.ID, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateSessionToken(t.ID, encryptedToken); err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
 					continue
 				}
 			}

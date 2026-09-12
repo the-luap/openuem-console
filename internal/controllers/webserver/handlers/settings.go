@@ -512,7 +512,7 @@ func (h *Handler) ChangeAgentFrequency(c echo.Context, settings *models.GeneralS
 		return err
 	}
 
-	if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+	if err := h.PublishBroker("agent.newconfig", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.agent_frequency_error"), true))
 	}
 
@@ -528,7 +528,7 @@ func (h *Handler) ChangeAgentFrequency(c echo.Context, settings *models.GeneralS
 			return err
 		}
 
-		if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+		if err := h.PublishBroker("agent.newconfig", data); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.agent_frequency_error"), true))
 		}
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.agent_frequency_could_not_be_saved"), true))
@@ -581,7 +581,7 @@ func (h *Handler) ChangeWingetFrequency(c echo.Context, settings *models.General
 		return err
 	}
 
-	if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+	if err := h.PublishBroker("agent.newconfig", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.winget_configure_frequency_error"), true))
 	}
 
@@ -597,7 +597,7 @@ func (h *Handler) ChangeWingetFrequency(c echo.Context, settings *models.General
 			return err
 		}
 
-		if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+		if err := h.PublishBroker("agent.newconfig", data); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.winget_configure_frequency_error"), true))
 		}
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.winget_configure_frequency_could_not_be_saved"), true))
@@ -650,7 +650,7 @@ func (h *Handler) ChangeSFTPSetting(c echo.Context, settings *models.GeneralSett
 		return err
 	}
 
-	if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+	if err := h.PublishBroker("agent.newconfig", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_sftp_error"), true))
 	}
 
@@ -666,7 +666,7 @@ func (h *Handler) ChangeSFTPSetting(c echo.Context, settings *models.GeneralSett
 			return err
 		}
 
-		if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+		if err := h.PublishBroker("agent.newconfig", data); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_sftp_error"), true))
 		}
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_sftp_could_not_be_saved"), true))
@@ -724,7 +724,7 @@ func (h *Handler) ChangeRemoteAssistanceSetting(c echo.Context, settings *models
 		return err
 	}
 
-	if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+	if err := h.PublishBroker("agent.newconfig", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_remote_assistance_error"), true))
 	}
 
@@ -740,7 +740,7 @@ func (h *Handler) ChangeRemoteAssistanceSetting(c echo.Context, settings *models
 			return err
 		}
 
-		if err := h.NATSConnection.Publish("agent.newconfig", data); err != nil {
+		if err := h.PublishBroker("agent.newconfig", data); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_remote_assistance_error"), true))
 		}
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.disable_remote_assistance_could_not_be_saved"), true))

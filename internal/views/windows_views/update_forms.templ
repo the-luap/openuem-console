@@ -1,0 +1,113 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+templ UpdatePolicyForm(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft UpdatePolicyDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}, {Title: "New update policy run"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Configure Windows update policy</h1>
+				<p>{ device.Name }</p>@updateNavigation(info, device)
+			</div>
+			if draft.Error!="" {
+				<div class="uk-alert uk-alert-danger" role="alert">{ draft.Error }</div>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>Leave a value blank or choose Unmanaged to omit it from this run. Zero and No are explicit settings. New values do not remove previously managed settings unless you select the removal action.</p>
+					<p class="my-3">Windows may restart according to the configured deadlines and grace periods. Active hours do not prevent a forced restart after those limits.</p>
+					<p><a class="underline" href="https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update" target="_blank" rel="noreferrer noopener">Microsoft update policy definitions</a></p>
+					<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/preview") } class="grid gap-4 mt-4">
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="request_key" value={ draft.Form.Get("request_key") }/>
+						<label class="grid gap-2">Policy name<input class="uk-input" name="name" value={ draft.Form.Get("name") } maxlength="128" required/></label>
+						<label class="grid gap-2">Action<select class="uk-select" name="mode"><option value="apply" selected?={ draft.Form.Get("mode")=="apply" }>Apply selected settings</option><option value="remove" selected?={ draft.Form.Get("mode")=="remove" }>Remove selected settings from this management source</option></select></label>
+						<label class="grid gap-2">Admission lifetime (hours)<input class="uk-input" type="number" name="hours" min="1" max="168" step="1" value={ draft.Form.Get("hours") } required/><span class="uk-text-muted">Time allowed for new steps to be admitted, starting when you confirm. It does not set a Windows restart time or undo settings after expiry.</span></label>
+						@updatePolicyInputs(draft.Form)
+						<button type="submit" class="uk-button uk-button-primary">Review policy and device</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ updateDraftFields(draft UpdatePolicyDraft) {
+	for _, name := range []string{"name", "request_key", "mode", "hours"} {
+		<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+	}
+	for _, field := range UpdatePolicyFields() {
+		<input type="hidden" name={ field.Name } value={ draft.Form.Get(field.Name) }/>
+	}
+}
+
+templ UpdatePolicyPreview(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft UpdatePolicyDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Native Windows management", Url: partials.GetNavigationUrl(info, "/windows")}, {Title: device.Name}, {Title: "Review update policy"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Review Windows update policy</h1>
+				<p>{ device.Name }</p>@updateNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ draft.Form.Get("name") }</h2>
+					<p>Review this device, action and complete setting selection. Nothing has been queued by this preview.</p>
+					<dl class="uk-description-list"><dt>Device</dt><dd>{ device.Name } · { device.ID }</dd><dt>Organization / site</dt><dd>{ updateTargetScope(info, device) }</dd><dt>Action</dt><dd>{ updateMode(draft.Form.Get("mode")) }</dd><dt>Admission lifetime after confirmation</dt><dd>{ draft.Form.Get("hours") } hours</dd></dl>
+					if draft.Form.Get("mode")=="remove" {
+						<p>Only the selected settings will be removed from this management source. Effective policy from other sources may remain. The listed numeric values identify your selection; they will not be applied by a removal run.</p>
+					} else {
+						<p>Only the explicit settings below will be managed by this run. Windows may restart according to the selected deadlines and grace periods; active hours do not prevent a forced restart after those limits.</p>
+					}
+					<dl class="uk-description-list">
+						for _, row := range updatePolicyRows(draft.Policy) {
+							<dt>{ row.Label }</dt>
+							<dd>{ row.Value }</dd>
+						}
+					</dl>
+					<p class="my-3">Confirmation queues platform checks, configuration and separate policy read-back. Windows must contact the server to receive them. Queue acceptance does not prove applied settings, installed patches or a reboot.</p>
+					<form class="grid gap-3" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/create") }>
+						@mdm_views.CSRF(info)
+						@updateDraftFields(draft)
+						<label><input type="checkbox" name="confirm_policy" value="yes" required/> Queue this reviewed action and these settings for this device.</label><button class="uk-button uk-button-primary" type="submit">Confirm and queue policy run</button>
+					</form>
+					<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/updates/preview") }>
+						@mdm_views.CSRF(info)
+						@updateDraftFields(draft)
+						<button class="uk-button uk-button-default" name="edit_policy" value="yes" type="submit">Edit selected settings</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+// Shared typed controls keep ring and per-device optional settings identical.
+templ updatePolicyInputs(form url.Values) {
+	<div class="windows-policy-fields">
+		for _, field := range UpdatePolicyFields() {
+			<label class="grid gap-2">
+				{ field.Label }
+				if field.Boolean {
+					<select class="uk-select" name={ field.Name }><option value="" selected?={ form.Get(field.Name)=="" }>Unmanaged</option><option value="true" selected?={ form.Get(field.Name)=="true" }>Yes</option><option value="false" selected?={ form.Get(field.Name)=="false" }>No</option></select>
+				} else {
+					<input class="uk-input" type="number" name={ field.Name } min={ fmt.Sprint(field.Minimum) } max={ fmt.Sprint(field.Maximum) } step="1" value={ form.Get(field.Name) } placeholder="Unmanaged"/>
+				}
+				if field.Help!="" {
+					<span class="uk-text-muted">{ field.Help }</span>
+				}
+			</label>
+		}
+	</div>
+}

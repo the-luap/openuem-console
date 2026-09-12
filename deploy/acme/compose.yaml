@@ -1,0 +1,40 @@
+# Standalone DNS-01 issuer component. This does not start the private backends
+# or gateway. See docs/gateway-acme.md for initial issuance and gateway mounts.
+services:
+  acme:
+    image: ${OPENUEM_ACME_IMAGE:?Set the locally built or approved issuer image digest}
+    user: '65532:65532'
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    restart: unless-stopped
+    stop_grace_period: 15s
+    command: [--config, /run/openuem-acme/issuer.json, --readiness-socket, /tmp/issuer.sock]
+    healthcheck:
+      test: [CMD, /openuem-acme, --config, /run/openuem-acme/issuer.json, --ready, --readiness-socket, /tmp/issuer.sock]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=0700,uid=65532,gid=65532
+    volumes:
+      - type: bind
+        source: ${OPENUEM_ACME_ROOT:?Set the absolute issuer configuration root}/config
+        target: /run/openuem-acme
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OPENUEM_ACME_ROOT:?Set the absolute issuer configuration root}/state
+        target: /var/lib/openuem-acme
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OPENUEM_ACME_ROOT:?Set the absolute issuer configuration root}/publication
+        target: /var/lib/openuem-public-tls
+        bind:
+          create_host_path: false

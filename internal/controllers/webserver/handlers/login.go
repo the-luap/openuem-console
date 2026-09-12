@@ -2,15 +2,18 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -20,6 +23,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/utils"
@@ -119,6 +126,14 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.wrong_username_or_password"), true))
 	}
 
+	stage := models.LocalSignInCheck
+	if user.Register == openuem_nats.REGISTER_FORCE_PASSWORD_CHANGE {
+		stage = models.LocalSignInPasswordReplacement
+	}
+	if err := h.Model.AdmitLocalSignIn(c.Request().Context(), user, loginproof.Password, stage); err != nil {
+		return sessionAdmissionError(err, "Password sign-in could not be checked.")
+	}
+
 	// Check if user is forced to change password
 	if user.Register == openuem_nats.REGISTER_FORCE_PASSWORD_CHANGE {
 		csrfToken, ok := c.Get("csrf").(string)
@@ -127,31 +142,32 @@ func (h *Handler) LoginPasswordAuth(c echo.Context) error {
 		}
 
 		// Create a session as we'll require the user to change the password
-		if err := h.CreateForgotPasswordSession(c, user); err != nil {
-			log.Printf("[ERROR]: could not create a forgot password session for user %s, reason: %v", user.ID, err)
+		if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementInitial, "", time.Time{}); err != nil {
+			return err
 		}
 
 		return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 	}
 
-	// Passwords match, create a new session
-	if err := h.NewSession(c, user); err != nil {
-		log.Printf("[ERROR]: could not create a new session after passwords match, reason: %v", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
-	}
-
 	if user.Use2fa {
+		if err := h.NewSession(c, user); err != nil {
+			log.Printf("[ERROR]: could not create a second-factor session: %v", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
+		}
 		if user.TotpSecretConfirmed {
 			return RenderLoginPartial(c, login_views.Use2FA(username, tsSiteKey, tsSecretKey))
-		} else {
-			return h.Register2FA(c)
 		}
+		return h.Register2FA(c)
 	}
 
 	return h.AccessGranted(c, user)
 }
 
 func (h *Handler) LoginPasswordChange(c echo.Context) error {
+	proof, err := h.passwordReplacementProof(c)
+	if err != nil {
+		return err
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -193,15 +209,12 @@ func (h *Handler) LoginPasswordChange(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.password_complexity_invalid"), true))
 	}
 
-	if err := h.Model.ChangePassword(username, password); err != nil {
+	if err := h.Model.ChangePasswordWithProof(c.Request().Context(), username, password, proof); err != nil {
+		if errors.Is(err, models.ErrPasswordUnchanged) {
+			return RenderError(c, partials.ErrorMessage("Choose a password different from the current password.", true))
+		}
 		log.Printf("[ERROR]: could not save the new password %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_save_new_password"), true))
-	}
-
-	// Invalidate code to set new password
-	if err := h.Model.RemoveForgotCode(username); err != nil {
-		log.Printf("[ERROR]: could not remove forgot code, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_remove_forgot_code"), true))
 	}
 
 	// Password has been changed
@@ -212,6 +225,14 @@ func (h *Handler) LoginPasswordChange(c echo.Context) error {
 }
 
 func (h *Handler) Register2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
+	user, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if user.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -249,15 +270,35 @@ func (h *Handler) Register2FA(c echo.Context) error {
 		}
 	}
 
-	if err := h.Model.SaveTOTPSecretKey(username, totpSecret); err != nil {
-		log.Printf("[ERROR]: could not save TOTP secret key, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_could_not_save_secret"), true))
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, true)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StageOIDCTOTPSecret(c.Request().Context(), user, totpSecret, identity)
+	} else {
+		primary, authErr := h.localMFAAuthorization(c, user)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StagePrimaryTOTPSecret(c.Request().Context(), user, totpSecret, primary)
+	}
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	return RenderLoginPartial(c, login_views.Register2FA(username, qrCode, key.Secret()))
 }
 
 func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusConflict, "Two-factor authentication is already enrolled.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -268,76 +309,47 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_empty_code"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user := authorized
+
+	secret, _, err := sessiontokens.Decode(user.TotpSecret, h.EncryptionMasterKey)
 	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+		return mfaMutationError(err)
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.TotpSecret, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			user.TotpSecret, err = utils.DecryptSensitiveField(user.TotpSecret, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-			}
-		}
-	}
-
-	valid := totp.Validate(passcode, user.TotpSecret)
-	if !valid {
+	evidence, err := mfaadmission.TOTP(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, secret, passcode, time.Now())
+	if err != nil {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
 
-	// Generate codes
-	codes := []string{}
-	for range 10 {
-		code, err := generateRecoveryCode()
-		if err != nil {
-			log.Printf("[ERROR]: could not generate recovery codes, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
-		}
-		codes = append(codes, code)
+	codes, err := generateRecoveryCodes()
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
-	// Save recovery codse
-	if err := h.Model.SaveRecoveryCodes(username, codes); err != nil {
-		log.Printf("[ERROR]: could not save recovery codes, reason: %v", err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	// Save recovery codes
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, true)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmOIDCMFA(c.Request().Context(), user, codes, identity)
+	} else {
+		primary, authErr := h.localMFAAuthorization(c, user)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmPrimaryMFA(c.Request().Context(), user, codes, primary)
+	}
+	if err != nil {
+		return mfaMutationError(err)
 	}
 
 	// 2FA has been enabled
 	h.AuthLogger.Printf("user %s has enabled 2FA", username)
 
-	if err := h.SessionManager.Manager.RenewToken(c.Request().Context()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-	h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-	h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-	h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-	h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-	h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-	h.SessionManager.Manager.Put(c.Request().Context(), "twofa", true)
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-	if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	// if it's the first time let's confirm login
-	if err := h.Model.ConfirmLogIn(user.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	if err := h.completeUserSession(c, user, true, evidence); err != nil {
+		return sessionAdmissionError(err, "Second-factor session could not be completed.")
 	}
 
 	// TODO - Get user's default tenant and site
@@ -353,28 +365,19 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(err.Error(), true))
 	}
 
-	u := ""
-	if h.ReverseProxyServer != "" {
-		referer, err := url.Parse(c.Request().Referer())
-		if err != nil {
-			log.Printf("[ERROR]: could not parse referer, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(err.Error(), true))
-		}
-
-		if referer.Port() == "" {
-			u = fmt.Sprintf("https://%s/tenant/%d/site/%d/dashboard", referer.Hostname(), myTenant.ID, mySite.ID)
-		} else {
-			u = fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", referer.Hostname(), referer.Port(), myTenant.ID, mySite.ID)
-		}
-
-	} else {
-		u = fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", h.ServerName, h.ConsolePort, myTenant.ID, mySite.ID)
-	}
+	u := fmt.Sprintf("%s/tenant/%d/site/%d/dashboard", h.consoleOrigin(), myTenant.ID, mySite.ID)
 
 	return RenderLoginPartial(c, login_views.ShowRecoveryCodes(strings.Join(codes, "\n"), u))
 }
 
 func (h *Handler) LoginTOTPValidate(c echo.Context) error {
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if !authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusForbidden, "Complete two-factor enrollment before using an authentication code.")
+	}
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -401,37 +404,28 @@ func (h *Handler) LoginTOTPValidate(c echo.Context) error {
 		}
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user := authorized
+
+	secret, _, err := sessiontokens.Decode(user.TotpSecret, h.EncryptionMasterKey)
 	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+		return mfaMutationError(err)
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.TotpSecret, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			user.TotpSecret, err = utils.DecryptSensitiveField(user.TotpSecret, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_secret_cannot_be_decrypted", err), true))
-			}
-		}
-	}
-
-	valid := totp.Validate(passcode, user.TotpSecret)
-	if !valid {
+	evidence, err := mfaadmission.TOTP(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, secret, passcode, time.Now())
+	if err != nil {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
 
 	// Access granted
-	return h.AccessGranted(c, user)
+	return h.accessGranted(c, user, evidence)
 }
 
 func (h *Handler) LoginTOTPBackupRequest(c echo.Context) error {
+	_, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
 	tsSiteKey, tsSecretKey, err := h.Model.GetTurnstileSettings()
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "settings.turnstile_could_not_get_settings", err), true))
@@ -441,6 +435,13 @@ func (h *Handler) LoginTOTPBackupRequest(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
+	authorized, err := h.requirePrimaryAuthentication(c)
+	if err != nil {
+		return err
+	}
+	if !authorized.TotpSecretConfirmed {
+		return echo.NewHTTPError(http.StatusForbidden, "Complete two-factor enrollment before using an authentication code.")
+	}
 	// if CloudFlare Turnstile is used, check response
 	tsSiteKey, tsSecretKey, err := h.Model.GetTurnstileSettings()
 	if err != nil {
@@ -462,24 +463,26 @@ func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
-	if err != nil {
-		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
-	}
+	user := authorized
 
 	code := c.FormValue("recovery-code")
 	if code == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_empty_code"), true))
 	}
 
-	isValid := h.Model.ConsumeRecoveryCode(username, code)
+	isValid, err := h.Model.ConsumeRecoveryCode(c.Request().Context(), username, code)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Recovery code verification is temporarily unavailable.")
+	}
 	if !isValid {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_recovery_code"), true))
 	}
 
-	// Access granted
-	return h.AccessGranted(c, user)
+	evidence, err := mfaadmission.Backup(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, time.Now())
+	if err != nil {
+		return sessionAdmissionError(err, "Second-factor session could not be completed.")
+	}
+	return h.accessGranted(c, user, evidence)
 }
 
 func (h *Handler) LoginForgotPass(c echo.Context) error {
@@ -500,58 +503,22 @@ func (h *Handler) LoginForgotPass(c echo.Context) error {
 }
 
 func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
-	sessionUID := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if sessionUID != user.ID {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	return h.establishUserSession(c, user, false, map[string]any{"authentication-pending": true}, func(ctx context.Context) error {
+		generation, err := h.Model.BeginLocalMFA(ctx, user, loginproof.Password, nil)
+		if err == nil {
+			h.SessionManager.Manager.Put(ctx, loginproof.SessionKey, loginproof.NewLocal(user.ID, loginproof.Password, user.Hash, generation, time.Now()))
 		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		h.SessionManager.Manager.Put(c.Request().Context(), "twofa", false)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-	}
-
-	return nil
+		return err
+	})
 }
 
 func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
-	err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
+	return h.accessGranted(c, user, nil)
+}
 
-	h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-	h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-	h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-	h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-	h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-	h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-	if user.Use2fa {
-		h.SessionManager.Manager.Put(c.Request().Context(), "twofa", true)
-	}
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-	if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-
-	// if it's the first time let's confirm login
-	if err := h.Model.ConfirmLogIn(user.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+func (h *Handler) accessGranted(c echo.Context, user *ent.User, evidence *mfaadmission.Evidence) error {
+	if err := h.completeUserSession(c, user, user.Use2fa, evidence); err != nil {
+		return sessionAdmissionError(err, "Sign-in session could not be completed.")
 	}
 
 	// TODO - Get user's default tenant and site
@@ -581,41 +548,36 @@ func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
 		}
 	}
 
-	if h.ReverseProxyServer != "" {
-		referer, err := url.Parse(c.Request().Referer())
-		if err != nil {
-			log.Printf("[ERROR]: could not parse referer, reason: %v", err)
-			return RenderError(c, partials.ErrorMessage(err.Error(), true))
-		}
-
-		if referer.Port() == "" {
-			return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s/tenant/%d/site/%d/dashboard", referer.Hostname(), myTenant.ID, mySite.ID))
-		} else {
-			return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", referer.Hostname(), referer.Port(), myTenant.ID, mySite.ID))
-		}
-
-	} else {
-		return c.Redirect(http.StatusFound, fmt.Sprintf("https://%s:%s/tenant/%d/site/%d/dashboard", h.ServerName, h.ConsolePort, myTenant.ID, mySite.ID))
-	}
+	return c.Redirect(http.StatusFound, fmt.Sprintf("%s/tenant/%d/site/%d/dashboard", h.consoleOrigin(), myTenant.ID, mySite.ID))
 }
 
 func generateRecoveryCode() (string, error) {
-	var charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	var randomCode string
-
-	length := 16
-	randomBytes := make([]byte, length)
-
-	for i := range length {
-		_, err := io.ReadFull(rand.Reader, randomBytes)
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	code := make([]byte, 16)
+	for i := range code {
+		index, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			return "", fmt.Errorf("failed to generate recovery code: %v", err)
+			return "", fmt.Errorf("failed to generate recovery code: %w", err)
 		}
-		randomIndex := int(randomBytes[i] % byte(len(charset)))
-		randomCode += string(charset[randomIndex])
+		code[i] = charset[index.Int64()]
 	}
+	return fmt.Sprintf("%s-%s-%s-%s", code[0:4], code[4:8], code[8:12], code[12:16]), nil
+}
 
-	return fmt.Sprintf("%s-%s-%s-%s", randomCode[0:4], randomCode[4:8], randomCode[8:12], randomCode[12:16]), nil
+func generateRecoveryCodes() ([]string, error) {
+	codes := make([]string, 0, 10)
+	seen := make(map[string]bool, 10)
+	for len(codes) < 10 {
+		code, err := generateRecoveryCode()
+		if err != nil {
+			return nil, err
+		}
+		if !seen[code] {
+			seen[code] = true
+			codes = append(codes, code)
+		}
+	}
+	return codes, nil
 }
 
 func (h *Handler) ForgotPasswordEmail(c echo.Context) error {
@@ -664,7 +626,7 @@ func (h *Handler) ForgotPasswordEmail(c echo.Context) error {
 			MessageText:      fmt.Sprintf("Here’s your confirmation code: %s. You can copy it into the open browser window or click the link below to confirm this request", code),
 			MessageGreeting:  "You or someone else has indicated that you have forgotten your login password",
 			MessageAction:    "Generate a new password",
-			MessageActionURL: c.Request().Header.Get("Origin") + fmt.Sprintf("/login/forgotverify?code=%s", code),
+			MessageActionURL: h.consoleOrigin() + fmt.Sprintf("/login/forgotverify?code=%s", code),
 		}
 
 		data, err := json.Marshal(notification)
@@ -676,7 +638,7 @@ func (h *Handler) ForgotPasswordEmail(c echo.Context) error {
 			return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 		}
 
-		if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+		if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 			return err
 		}
 
@@ -742,14 +704,14 @@ func (h *Handler) VerifyForgotPasswordCode(c echo.Context) error {
 		}
 	}
 
-	valid := h.Model.IsForgotCodeValid(username, confirmCode)
-	if !valid {
-		log.Printf("[ERROR]: %s is not a valid code", confirmCode)
-		if c.Request().Method == "GET" {
-			return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.forgot_verify_error"))
-		} else {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.forgot_verify_error"), true))
-		}
+	user, err := h.Model.GetUserById(username)
+	valid := false
+	if err == nil && user.ForgotPasswordCode != "" && user.ForgotPasswordCodeExpiresAt.After(time.Now()) {
+		valid, err = argon2id.ComparePasswordAndHash(confirmCode, user.ForgotPasswordCode)
+	}
+	if err != nil || !valid {
+		log.Print("[WARN]: password recovery proof rejected")
+		return echo.NewHTTPError(http.StatusUnauthorized, "Password recovery authorization is invalid or expired.")
 	}
 
 	csrfToken, ok := c.Get("csrf").(string)
@@ -757,75 +719,42 @@ func (h *Handler) VerifyForgotPasswordCode(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "authentication.csrf_token_not_found"))
 	}
 
+	if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementRecovery, models.PasswordReplacementDigest(user.ForgotPasswordCode), user.ForgotPasswordCodeExpiresAt); err != nil {
+		return err
+	}
+
 	return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 }
 
 func (h *Handler) CreateForgotPasswordSession(c echo.Context, user *ent.User) error {
-	msg := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
-	if msg != user.ID {
-		err := h.SessionManager.Manager.RenewToken(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", user.ID)
-		h.SessionManager.Manager.Put(c.Request().Context(), "username", user.Name)
-		h.SessionManager.Manager.Put(c.Request().Context(), "user-agent", c.Request().UserAgent())
-		h.SessionManager.Manager.Put(c.Request().Context(), "ip-address", c.Request().RemoteAddr)
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", user.Passwd)
-		h.SessionManager.Manager.Put(c.Request().Context(), "email", user.Email)
-		h.SessionManager.Manager.Put(c.Request().Context(), "forgot", true)
-		token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-
-		if err := h.Model.AddUserToSession(token, user.ID, h.EncryptionMasterKey); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-	}
-
-	return nil
-}
-
-func (h *Handler) UpdateForgotPasswordSession(c echo.Context, user *ent.User) error {
-	if err := h.SessionManager.Manager.RenewToken(c.Request().Context()); err != nil {
-		return err
-	}
-
-	h.SessionManager.Manager.Remove(c.Request().Context(), "forgot")
-	token, expiry, err := h.SessionManager.Manager.Commit(c.Request().Context())
-	if err != nil {
-		return err
-	}
-	h.SessionManager.Manager.WriteSessionCookie(c.Request().Context(), c.Response().Writer, token, expiry)
-	return nil
+	return h.createPasswordReplacementSession(c, user, nil)
 }
 
 func (h *Handler) LoginNewUser(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Referrer-Policy", "no-referrer")
 	// 1. Parse token
 	tokenString := c.QueryParam("token")
 
 	if tokenString == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.token_invalid"))
+		return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.invitation_invalid"))
+	}
+	if h.JWTKey == "" || len(tokenString) > 8192 {
+		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 
 	token, err := jwt.ParseWithClaims(tokenString, &MyCustomClaims{}, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
 		return []byte(h.JWTKey), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS512"}), jwt.WithExpirationRequired(), jwt.WithIssuer("OpenUEM"), jwt.WithSubject("New password"), jwt.WithIssuedAt())
 
-	if err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "could not parse claims")
+	if err != nil || !token.Valid {
+		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 
 	if claims, ok := token.Claims.(*MyCustomClaims); ok {
 		// Is the token expired?
-		if time.Now().After(claims.ExpiresAt.Time) {
-			return echo.NewHTTPError(http.StatusForbidden, "token has expired, please contact your administrator to request a new email to set your initial password")
+		if claims.ID == "" || claims.IssuedAt == nil || claims.ExpiresAt == nil || !time.Now().Before(claims.ExpiresAt.Time) || !claims.ExpiresAt.After(claims.IssuedAt.Time) || claims.ExpiresAt.Sub(claims.IssuedAt.Time) > time.Hour {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 		}
 
 		// Get user from database
@@ -834,6 +763,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
+		invitationBinding := models.PasswordReplacementDigest(user.NewUserToken)
 		// Check if token exists in database for this user
 		if h.EncryptionMasterKey != "" {
 			isNewUserTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(user.NewUserToken, h.EncryptionMasterKey)
@@ -849,13 +779,8 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			}
 		}
 
-		if user.NewUserToken != tokenString {
-			return echo.NewHTTPError(http.StatusForbidden, "token is not valid, please contact your administrator to request a new email to set your initial password")
-		}
-
-		// Delete token
-		if err := h.Model.DeleteNewAccountToken(user.ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "could not delete token")
+		if subtle.ConstantTimeCompare([]byte(user.NewUserToken), []byte(tokenString)) != 1 {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 		}
 
 		// Create a session as we'll require the user to change the password
@@ -864,7 +789,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "authentication.csrf_token_not_found"))
 		}
 
-		if err := h.CreateForgotPasswordSession(c, user); err != nil {
+		if err := h.authorizePasswordReplacement(c, user, models.PasswordReplacementInvitation, invitationBinding, claims.ExpiresAt.Time); err != nil {
 			return err
 		}
 
@@ -878,7 +803,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 		return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "unknown claims type, cannot proceed")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 }
 
@@ -899,4 +824,15 @@ func generateForgotCode() (string, error) {
 	}
 
 	return fmt.Sprintf("%s", randomCode.String()[0:6]), nil
+}
+
+// consoleOrigin uses trusted configuration, never request headers or a Referer.
+func (h *Handler) consoleOrigin() string {
+	if h.PublicOrigin != "" {
+		return h.PublicOrigin
+	}
+	if h.ReverseProxyServer != "" {
+		return "https://" + h.ReverseProxyServer
+	}
+	return fmt.Sprintf("https://%s:%s", h.ServerName, h.ConsolePort)
 }

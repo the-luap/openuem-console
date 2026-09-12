@@ -1,0 +1,281 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ unenrollmentNavigation(info *partials.CommonInfo, device windows.DeviceMetadata) {
+	<nav aria-label="Disconnection navigation" class="flex flex-wrap gap-3 my-4">
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>Device identity</a>
+		<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections")) }>Disconnection history</a>
+		if info.Can(access.RevokeDevices) && canRequestUnenrollment(device) {
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/new")) }>Request disconnection</a>
+		}
+	</nav>
+}
+
+templ unenrollmentAccess(device windows.DeviceMetadata) {
+	<section class="uk-card uk-card-default">
+		<div class="uk-card-body">
+			<h2 class="uk-card-title">Current device access</h2>
+			<p class="my-3">{ DeviceStatus(device) }</p>
+			if device.Unenrollment!=nil {
+				<h3 class="font-semibold">Device disconnection reported</h3>
+				<p class="my-3">Windows reported that disconnection had started. Local removal of policies, certificates and managed data has not been independently verified. This report does not establish which request or person initiated disconnection.</p>
+				<dl class="uk-description-list"><dt>Reported and access revoked (UTC)</dt><dd>
+					@ScheduleTime(device.Unenrollment.ReceivedAt)
+				</dd><dt>Report ID</dt><dd>{ device.Unenrollment.ID }</dd><dt>Reporting certificate fingerprint (SHA-256)</dt><dd class="font-mono break-all">{ device.Unenrollment.FingerprintSHA256 }</dd></dl>
+			} else {
+				<p class="my-3">No authenticated disconnection report has been received. A command acknowledgment alone does not prove local cleanup.</p>
+			}
+		</div>
+	</section>
+}
+
+templ UnenrollmentRequests(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, history []windows.UnenrollmentRequestDetail, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Device identity", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID)}, {Title: "Disconnection history"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows disconnection history</h1>
+				<p class="break-all">{ device.Name }</p>
+				@unenrollmentNavigation(info, device)
+			</div>
+			@unenrollmentAccess(device)
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p class="my-3">Review requests from newest to oldest. A device can have one unresolved disconnection request. Opening a new request returns you to any existing unresolved request.</p>
+					<div role="region" aria-label="Disconnection history table" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Disconnection requests and independent administrative reviews</caption><thead><tr><th scope="col">Request</th><th scope="col">Created (UTC)</th><th scope="col">Command status</th><th scope="col">Review</th></tr></thead>
+							<tbody>
+								for _,detail:=range history {
+									<tr>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+detail.Command.ID)) }>Open request { detail.Command.ID }</a></td>
+										<td>
+											@ScheduleTime(detail.Command.CreatedAt)
+										</td>
+										<td>{ cspState(detail.Command.Phase) }</td>
+										<td>
+											if detail.Release!=nil {
+												<span>Review recorded</span>
+											} else if detail.Command.DeliveredAt!=nil && device.RevokedAt==nil {
+												<span>Awaiting report or review</span>
+											} else {
+												<span>No administrative review</span>
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(history)==0 {
+						<p class="my-3">No disconnection requests in this view.</p>
+					}
+					<div class="flex flex-wrap gap-3">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/disconnections?offset=%d", device.ID, max(0, offset-10)))) }>Previous requests</a>
+						}
+						if more {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/%s/disconnections?offset=%d", device.ID, offset+10))) }>Next requests</a>
+						}
+					</div>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ unenrollmentImpact() {
+	<p class="my-3">Ask Windows to leave native management at its next successful management session. Windows may remove managed settings, certificates and managed data. Ensure the user can still sign in and recover access after management ends.</p>
+	<p class="my-3">This is not a device wipe. A separate OpenUEM agent keeps its own identity. Queuing the request leaves server access active until Windows reports disconnection or an administrator revokes access.</p>
+	<p class="my-3">Once delivered, the request cannot be canceled or undone here. Further commands wait for a disconnection report or an explicit administrative review.</p>
+}
+
+templ UnenrollmentForm(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft UnenrollmentDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Disconnection history", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections")}, {Title: "Request disconnection"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Request Windows disconnection</h1>
+				<p class="break-all">{ device.Name }</p>
+				@unenrollmentNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					@unenrollmentImpact()
+					if draft.Error!="" {
+						<p role="alert" class="uk-alert uk-alert-danger">{ draft.Error }</p>
+					}
+					<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/preview") } class="grid gap-4">
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="request_key" value={ draft.Form.Get("request_key") }/>
+						<label for="disconnection-reason">Reason for disconnection</label>
+						<input class="uk-input" id="disconnection-reason" name="reason" value={ draft.Form.Get("reason") } required maxlength="320" aria-describedby="disconnection-reason-help"/>
+						<p id="disconnection-reason-help">Use a short, single-line reason without leading or trailing spaces.</p>
+						<label for="disconnection-hours">Delivery window (hours)</label>
+						<input class="uk-input" id="disconnection-hours" name="hours" type="number" value={ draft.Form.Get("hours") } required min="1" max="168" step="1" aria-describedby="disconnection-hours-help"/>
+						<p id="disconnection-hours-help">From 1 to 168 hours after confirmation. An undelivered request expires when this window ends; delivery does not prove cleanup.</p>
+						<button class="uk-button uk-button-default" type="submit">Preview disconnection</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UnenrollmentPreview(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, draft UnenrollmentDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Disconnection history", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections")}, {Title: "Review disconnection"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Review Windows disconnection</h1>
+				<p class="break-all">{ device.Name }</p>
+				@unenrollmentNavigation(info, device)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p class="my-3">This preview has not queued a command.</p>
+					<dl class="uk-description-list"><dt>Selected device</dt><dd class="break-all">{ device.Name }</dd><dt>Native device ID</dt><dd>{ device.ID }</dd><dt>Reason</dt><dd class="break-all">{ draft.Form.Get("reason") }</dd><dt>Delivery window after confirmation</dt><dd>{ draft.Form.Get("hours") } hours</dd></dl>
+					@unenrollmentImpact()
+					<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/create") } class="grid gap-4">
+						@mdm_views.CSRF(info)
+						for _,field:=range []string{"request_key","hours","reason"} {
+							<input type="hidden" name={ field } value={ draft.Form.Get(field) }/>
+						}
+						<label><input type="checkbox" name="confirm_disconnect" value="yes" required/> Disconnect this selected device from native Windows management; managed settings, certificates and data may be removed.</label>
+						<button class="uk-button uk-button-danger" type="submit">Confirm disconnection request</button>
+					</form>
+					<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/preview") } class="my-4">
+						@mdm_views.CSRF(info)
+						for _,field:=range []string{"request_key","hours","reason"} {
+							<input type="hidden" name={ field } value={ draft.Form.Get(field) }/>
+						}
+						<button class="uk-button uk-button-default" type="submit" name="edit_request" value="yes">Edit request</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UnenrollmentRequest(c echo.Context, info *partials.CommonInfo, device windows.DeviceMetadata, detail windows.UnenrollmentRequestDetail) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Disconnection history", Url: partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections")}, {Title: "Disconnection request"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows disconnection request</h1>
+				<p class="break-all">{ device.Name }</p>
+				@unenrollmentNavigation(info, device)
+			</div>
+			@unenrollmentAccess(device)
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ cspState(detail.Command.Phase) }</h2>
+					<dl class="uk-description-list">
+						<dt>Request ID</dt>
+						<dd>{ detail.Command.ID }</dd>
+						<dt>Command revision</dt>
+						<dd>{ fmt.Sprint(detail.Command.Revision) }</dd>
+						<dt>Requested by</dt>
+						<dd class="break-all">{ detail.Command.CreatedBy }</dd>
+						<dt>Created (UTC)</dt>
+						<dd>
+							@ScheduleTime(detail.Command.CreatedAt)
+						</dd>
+						<dt>Delivery expires (UTC)</dt>
+						<dd>
+							@ScheduleTime(detail.Command.ExpiresAt)
+						</dd>
+						<dt>Reason for disconnection</dt>
+						<dd class="break-all">{ detail.Reason }</dd>
+						if detail.Command.DeliveredAt!=nil {
+							<dt>Delivered (UTC)</dt>
+							<dd>
+								@ScheduleTime(*detail.Command.DeliveredAt)
+							</dd>
+						}
+						if detail.Command.CompletedAt!=nil {
+							<dt>Command outcome recorded (UTC)</dt>
+							<dd>
+								@ScheduleTime(*detail.Command.CompletedAt)
+							</dd>
+						}
+					</dl>
+					if detail.Command.DeliveredAt!=nil && detail.Release==nil && device.RevokedAt==nil {
+						<p class="uk-alert uk-alert-warning my-3">Further management commands are held pending a disconnection report or an explicit review. A device acknowledgment does not prove that Windows completed local cleanup.</p>
+					}
+					if detail.DeliveryReason!="" {
+						<p class="my-3">{ unenrollmentDeliveryReason(detail.DeliveryReason) }</p>
+					}
+					for _,outcome:=range detail.Outcomes {
+						<dl class="uk-description-list">
+							<dt>Device response status</dt>
+							<dd>{ cspStatus(outcome.Status) }</dd>
+							if outcome.OriginalError!="" {
+								<dt>Device-reported error</dt>
+								<dd class="break-all">{ outcome.OriginalError }</dd>
+							}
+						</dl>
+					}
+					if info.Can(access.ManageWindowsCSP) {
+						<a class="uk-button uk-button-default my-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID+"/commands/"+detail.Command.ID)) }>Command evidence</a>
+					}
+				</div>
+			</section>
+			if detail.Release!=nil {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Review recorded</h2>
+						<p class="my-3">The disconnection hold was released after review. This does not undo the delivered request, prove cleanup or restore revoked access. A later authenticated disconnection report still ends native management access.</p>
+						<dl class="uk-description-list"><dt>Reviewed by</dt><dd class="break-all">{ detail.Release.ReleasedBy }</dd><dt>Reviewed command revision</dt><dd>{ fmt.Sprint(detail.Release.ReviewedRevision) }</dd><dt>Reviewed (UTC)</dt><dd>
+							@ScheduleTime(detail.Release.ReleasedAt)
+						</dd><dt>Review reason</dt><dd class="break-all">{ detail.Release.Reason }</dd></dl>
+					</div>
+				</section>
+			}
+			if info.Can(access.RevokeDevices) && canCancelUnenrollment(detail) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Cancel undelivered request</h2>
+						<p class="my-3">Stop this request before delivery. Existing management access and history remain unchanged.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+detail.Command.ID+"/cancel") } class="grid gap-4">
+							@mdm_views.CSRF(info)
+							<input type="hidden" name="expected_revision" value={ fmt.Sprint(detail.Command.Revision) }/>
+							<label><input type="checkbox" name="confirm_cancel" value="yes" required/> Cancel this undelivered disconnection request.</label>
+							<button class="uk-button uk-button-danger" type="submit">Confirm request cancellation</button>
+						</form>
+					</div>
+				</section>
+			}
+			if info.Can(access.RevokeDevices) && canReleaseUnenrollment(device,detail) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title">Review missing disconnection report</h2>
+						<p class="my-3">Investigate the device before allowing further commands. Windows may still act on the delivered request. Recording this review ends any live delivery session and permits later authenticated management; it does not resend or undo the request.</p>
+						<p class="my-3">If continued access is unwanted, use <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>Revoke device access on the device identity page</a>.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/windows/"+device.ID+"/disconnections/"+detail.Command.ID+"/release") } class="grid gap-4">
+							@mdm_views.CSRF(info)
+							<input type="hidden" name="expected_revision" value={ fmt.Sprint(detail.Command.Revision) }/>
+							<label for="disconnection-resolution">Review reason</label><input class="uk-input" id="disconnection-resolution" name="resolution" required maxlength="320" aria-describedby="disconnection-resolution-help"/>
+							<p id="disconnection-resolution-help">Record what you investigated and why further management may proceed.</p>
+							<label><input type="checkbox" name="confirm_release" value="yes" required/> I investigated this request and accept that the device may still disconnect. Allow further management commands.</label>
+							<button class="uk-button uk-button-danger" type="submit">Record review and release hold</button>
+						</form>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}

@@ -1,0 +1,200 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ Enrollment(c echo.Context, info *partials.CommonInfo, data EnrollmentData) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Desktop enrollment", Url: partials.GetNavigationUrl(info, "/desktop/enrollment")}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Desktop enrollment</h1>
+				<p class="uk-text-muted mt-2">Individual Windows and Mac identities for this organization and site.</p>
+				@mdm_views.Navigation(info)
+			</div>
+			if data.SetupError!="" {
+				<div role="alert" class="uk-alert uk-alert-warning">{ data.SetupError }</div>
+			}
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Organization identity</h2><p>Each enrolled computer generates its own private keys. The organization's certificate authority signs its public identity.</p></div>
+				<div class="uk-card-body min-w-0">
+					if data.Authority!=nil {
+						<dl class="uk-description-list"><dt>Organization</dt><dd class="break-words">{ data.Authority.Organization }</dd><dt>Public enrollment address</dt><dd class="break-all">{ data.Authority.PublicOrigin }</dd><dt>Certificate authority expires</dt><dd>
+							@mdm_views.Timestamp(&data.Authority.ExpiresAt)
+						</dd></dl>
+					} else if data.SetupError=="" {
+						if data.PublicOrigin=="" {
+							<p role="status">A server administrator must configure the public enrollment address before setup.</p>
+						} else if info.Can(access.ManageCertificates) {
+							<form method="post" action={ partials.GetNavigationUrl(info, "/desktop/setup") } enctype="multipart/form-data" class="grid min-w-0 gap-4">
+								@mdm_views.CSRF(info)
+								<label>Organization name<input name="organization" class="uk-input" value={ data.Organization } maxlength="255" required/></label>
+								<p class="break-all">Enrollment address: { data.PublicOrigin }</p>
+								<fieldset class="grid gap-3"><legend class="font-semibold">Certificate authority</legend><label><input type="radio" name="authority_source" value="automatic" checked/> Create an organization authority automatically</label><label><input type="radio" name="authority_source" value="enterprise"/> Import an enterprise authority</label></fieldset>
+								<details><summary class="cursor-pointer">Enterprise authority files</summary><div class="grid gap-3 mt-3"><label>CA certificate (PEM)<input class="uk-input" type="file" name="authority_certificate" accept=".pem,.crt,.cer"/></label><label>CA private key (PEM)<input class="uk-input" type="file" name="authority_key" accept=".pem,.key"/></label><p class="uk-text-muted">Use these files only when importing an enterprise authority. The private key is encrypted in the database and is never included in an enrollment download.</p></div></details>
+								<button type="submit" class="uk-button uk-button-primary">Set up organization identity</button>
+							</form>
+						} else {
+							<p>An organization administrator must set up the certificate authority.</p>
+						}
+					}
+				</div>
+			</section>
+			@InvitationCreation(info, data)
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Enrollment invitations</h2><p>Invitation tokens are shown only when created. Revoking an invitation stops new enrollment; existing device identities remain managed.</p></div>
+				<div class="uk-card-body min-w-0">
+					<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Enrollment invitations table">
+						<table class="uk-table uk-table-divider min-w-[48rem]">
+							<caption class="sr-only">Enrollment invitations in the selected organization and site</caption>
+							<thead><tr><th scope="col">Invitation</th><th scope="col">Target</th><th scope="col">Uses</th><th scope="col">Expires</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+							<tbody>
+								for _,row:=range data.Invitations.Rows {
+									<tr>
+										<td class="break-all">{ row.ID }</td>
+										<td>{ row.Platform } / { row.Architecture }</td>
+										<td>{ fmt.Sprintf("%d / %d",row.Uses,row.MaxUses) }</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.ExpiresAt)
+										</td>
+										<td>{ invitationState(row) }</td>
+										<td>
+											if row.RevokedAt==nil && info.Can(access.EnrollDevices) {
+												<details>
+													<summary class="cursor-pointer">Revoke invitation</summary>
+													<p class="my-3">Stop further use of this invitation?</p>
+													<form method="post" action={ partials.GetNavigationUrl(info, "/desktop/invitations/"+row.ID+"/revoke") }>
+														@mdm_views.CSRF(info)
+														<input type="hidden" name="confirm_revoke" value="yes"/><button class="uk-button uk-button-danger" type="submit">Confirm revocation</button>
+													</form>
+												</details>
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(data.Invitations.Rows)==0 {
+						<p class="uk-text-muted my-4">No invitations in this view.</p>
+					}
+					if data.Invitations.Next!="" {
+						<a class="uk-button uk-button-default" href={ templ.URL(nextPage(partials.GetNavigationUrl(info, "/desktop/enrollment"), "invitations_before", data.Invitations.Next)) }>Older invitations</a>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Individual identities</h2></div>
+				<div class="uk-card-body min-w-0">
+					<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Individual identities table">
+						<table class="uk-table uk-table-divider min-w-[48rem]">
+							<caption class="sr-only">Individual identities in the selected organization and site</caption>
+							<thead><tr><th scope="col">Device</th><th scope="col">Target</th><th scope="col">Issued</th><th scope="col">Certificate expires</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+							<tbody>
+								for _,row:=range data.Identities.Rows {
+									<tr>
+										<td><span class="font-medium break-words">{ row.DisplayName }</span><br/><span class="uk-text-muted break-all">{ row.ID }</span></td>
+										<td>{ row.Platform } / { row.Architecture }</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.EnrolledAt)
+										</td>
+										<td class="whitespace-nowrap">
+											@mdm_views.Timestamp(&row.CertificateExpiresAt)
+										</td>
+										<td>{ identityState(row) }</td>
+										<td>
+											if row.RevokedAt==nil && info.Can(access.RevokeDevices) {
+												<details>
+													<summary class="cursor-pointer">Revoke identity</summary>
+													<p class="my-3">Revoke management access for <strong>{ row.DisplayName }</strong>? Its broker connection and command channel will be removed. Enroll the computer again to restore management.</p>
+													<form method="post" action={ partials.GetNavigationUrl(info, "/desktop/identities/"+row.ID+"/revoke") }>
+														@mdm_views.CSRF(info)
+														<input type="hidden" name="confirm_revoke" value="yes"/><button class="uk-button uk-button-danger" type="submit">Confirm revocation</button>
+													</form>
+												</details>
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if len(data.Identities.Rows)==0 {
+						<p class="uk-text-muted my-4">No individual desktop identities in this view.</p>
+					}
+					if data.Identities.Next!="" {
+						<a class="uk-button uk-button-default" href={ templ.URL(nextPage(partials.GetNavigationUrl(info, "/desktop/enrollment"), "identities_before", data.Identities.Next)) }>Older identities</a>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ InvitationCreation(info *partials.CommonInfo, data EnrollmentData) {
+	<section class="uk-card uk-card-default min-w-0" aria-labelledby="desktop-invitation-title">
+		<div class="uk-card-header"><h2 id="desktop-invitation-title" class="uk-card-title">New enrollment invitation</h2><p>Authorize individual Windows or Mac enrollment into the selected organization and site.</p></div>
+		<div class="uk-card-body grid min-w-0 gap-4">
+			if data.FormError!="" {
+				<p role="alert" class="uk-alert uk-alert-danger">{ data.FormError }</p>
+			}
+			if data.Created!=nil {
+				<div role="status" class="uk-alert uk-alert-success">Invitation created. Copy its installation link now; it will not be shown again.</div>
+				<label class="grid min-w-0 gap-2">Installation link<input class="uk-input w-full min-w-0" readonly value={ data.Created.URL }/></label>
+				<a class="uk-button uk-button-primary" href={ templ.URL(data.Created.URL) } target="_blank" rel="noopener noreferrer">Open installation instructions</a>
+				<dl class="uk-description-list"><dt>Computer type</dt><dd>{ targetLabel(data.Created.Platform, data.Created.Architecture) }</dd><dt>Organization / site IDs</dt><dd>{ fmt.Sprintf("%d / %d",data.Created.TenantID,data.Created.SiteID) }</dd><dt>Approved agent</dt><dd>{ data.Created.Version }</dd><dt>Maximum computers</dt><dd>{ fmt.Sprint(data.Created.MaxUses) }</dd><dt>Expires</dt><dd>
+					@mdm_views.Timestamp(&data.Created.ExpiresAt)
+				</dd></dl>
+				<label class="grid min-w-0 gap-2">Invitation token<textarea id="desktop-invitation-token" class="uk-textarea w-full min-w-0 font-mono" readonly rows="2" spellcheck="false" autocomplete="off">{ invitationToken(data.Created) }</textarea></label>
+				<p>Use this token with the installed, signed agent's <code>enroll</code> command. An administrator must place it in a private invitation file and authorize the server address and organization/site IDs. Share it only with the intended installer or administrator.</p>
+				<p class="uk-text-muted">An administrator completes installation and service activation. An invitation or saved identity does not confirm that a computer is online.</p>
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info,"/desktop/enrollment")) }>Return to invitations</a>
+			} else if !info.Can(access.EnrollDevices) {
+				<p>You have read-only access to enrollment invitations in this view.</p>
+			} else if data.Authority==nil {
+				<p>Set up the organization identity before creating an invitation.</p>
+			} else if info.SiteID=="-1" || info.SiteID=="0" || info.SiteID=="" {
+				<p>Choose the site that should manage the enrolled computers.</p>
+				<div class="flex flex-wrap gap-2">
+					for _,site:=range info.Sites {
+						<a class="uk-button uk-button-default" href={ templ.URL(fmt.Sprintf("/tenant/%s/site/%d/desktop/enrollment",info.TenantID,site.ID)) }>{ site.Description }</a>
+					}
+				</div>
+			} else if data.InvitationSetup!="" {
+				<p role="status">{ data.InvitationSetup }</p>
+			} else {
+				<p>Approved agent: <strong>{ data.ReleaseVersion }</strong>. Invitations expire no later than{ " " }
+					@mdm_views.Timestamp(&data.ReleaseExpires)
+				.</p>
+				<form method="post" action={ partials.GetNavigationUrl(info,"/desktop/invitations") } class="grid min-w-0 gap-4">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="release_digest" value={ data.ReleaseDigest }/>
+					<label class="grid gap-2">Computer type<select name="target" class="uk-select w-full min-w-0" required>
+						<option value="">Choose a computer type</option>
+						for _,target:=range data.Targets {
+							<option value={ target.Platform+"/"+target.Architecture } selected?={ data.InvitationForm.Target==target.Platform+"/"+target.Architecture }>{ targetLabel(target.Platform,target.Architecture) }</option>
+						}
+					</select></label>
+					<div class="grid min-w-0 gap-4 sm:grid-cols-2">
+						<label class="grid gap-2">Maximum computers<input class="uk-input w-full min-w-0" type="number" name="max_uses" min="1" max="1000" value={ fmt.Sprint(data.InvitationForm.MaxUses) } required/></label>
+						<label class="grid gap-2">Valid for<select name="hours" class="uk-select w-full min-w-0" required>
+							<option value="1" selected?={ data.InvitationForm.Hours==1 }>Up to 1 hour</option>
+							<option value="4" selected?={ data.InvitationForm.Hours==4 }>Up to 4 hours</option>
+							<option value="24" selected?={ data.InvitationForm.Hours==24 }>Up to 1 day</option>
+							<option value="72" selected?={ data.InvitationForm.Hours==72 }>Up to 3 days</option>
+							<option value="168" selected?={ data.InvitationForm.Hours==168 }>Up to 7 days</option>
+						</select></label>
+					</div>
+					<label class="flex items-start gap-2"><input class="mt-1 shrink-0" type="checkbox" name="confirm_create" value="yes" required/><span>I authorize enrollment into organization { info.TenantID } / site { info.SiteID }. Each computer will receive its own protected identity.</span></label>
+					<button class="uk-button uk-button-primary" type="submit">Create invitation</button>
+				</form>
+			}
+		</div>
+	</section>
+}

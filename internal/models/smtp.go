@@ -98,6 +98,7 @@ func (m *Model) UpdateSMTPSettings(settings *SMTPSettings) error {
 		SetSMTPPort(settings.Port).
 		SetSMTPUser(settings.User).
 		SetSMTPPassword(settings.Password).
+		SetSMTPAuth(settings.Auth).
 		SetMessageFrom(settings.MailFrom).
 		SetSMTPEncryptionType(smtpsettings.SMTPEncryptionType(settings.EncryptionType)).
 		Exec(context.Background())

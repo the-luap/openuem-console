@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	model "github.com/open-uem/openuem-console/internal/models/servers"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -17,6 +18,10 @@ import (
 func (h *Handler) GetCommonInfo(c echo.Context) (*partials.CommonInfo, error) {
 	var err error
 	var tenant *ent.Tenant
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return nil, err
+	}
 
 	csrfToken, ok := c.Get("csrf").(string)
 	if c.Request().Method != "GET" && (!ok || csrfToken == "") {
@@ -24,13 +29,15 @@ func (h *Handler) GetCommonInfo(c echo.Context) (*partials.CommonInfo, error) {
 	}
 
 	info := partials.CommonInfo{
-		SM:             h.SessionManager,
-		CurrentVersion: h.Version,
-		Translator:     views.GetTranslatorForDates(c),
-		IsAdmin:        strings.Contains(c.Request().URL.String(), "admin"),
-		IsProfile:      strings.Contains(c.Request().URL.String(), "profiles"),
-		IsTask:         strings.Contains(c.Request().URL.String(), "tasks"),
-		CSRFToken:      csrfToken,
+		EndpointInboundDisabled: h.IndividualAgentService != nil,
+		Principal:               principal,
+		SM:                      h.SessionManager,
+		CurrentVersion:          h.Version,
+		Translator:              views.GetTranslatorForDates(c),
+		IsAdmin:                 strings.Contains(c.Path(), "/admin"),
+		IsProfile:               strings.Contains(c.Path(), "/profiles"),
+		IsTask:                  strings.Contains(c.Path(), "/tasks"),
+		CSRFToken:               csrfToken,
 	}
 
 	if strings.Contains(c.Request().URL.String(), "computers") && !strings.HasSuffix(c.Request().URL.String(), "computers") {
@@ -59,67 +66,86 @@ func (h *Handler) GetCommonInfo(c echo.Context) (*partials.CommonInfo, error) {
 		return nil, err
 	}
 
-	if tenantID == "" {
-		if info.IsAdmin || info.IsProfile || info.IsTask {
-			info.TenantID = "-1"
-			info.SiteID = "-1"
-			return &info, nil
+	visibleTenants := info.Tenants[:0]
+	for _, candidate := range info.Tenants {
+		if principal.HasOrganization(candidate.ID) {
+			visibleTenants = append(visibleTenants, candidate)
 		}
-		tenant, err = h.Model.GetDefaultTenant()
+	}
+	info.Tenants = visibleTenants
+	if (tenantID == "" && principal.IsAdministrator() && (info.IsAdmin || info.IsProfile || info.IsTask)) || strings.HasPrefix(c.Path(), "/myaccount") {
+		info.TenantID = "-1"
+		info.SiteID = "-1"
+		return &info, nil
+	}
+	if len(info.Tenants) == 0 {
+		return nil, echo.NewHTTPError(403, "No organization access is assigned to this account")
+	}
+	if tenantID == "" {
+		preferred, err := h.Model.GetDefaultTenant()
 		if err != nil {
 			return nil, err
+		}
+		tenant = info.Tenants[0]
+		for _, candidate := range info.Tenants {
+			if candidate.ID == preferred.ID {
+				tenant = candidate
+				break
+			}
 		}
 		info.TenantID = strconv.Itoa(tenant.ID)
 	} else {
 		id, err := strconv.Atoi(tenantID)
-		if err != nil {
-			return nil, err
+		if err != nil || id <= 0 || strconv.Itoa(id) != tenantID {
+			return nil, echo.NewHTTPError(404, "Organization not found")
 		}
-
-		tenant, err = h.Model.GetTenantByID(id)
-		if err != nil {
-			tenant, err = h.Model.GetDefaultTenant()
-			if err != nil {
-				return nil, err
+		for _, candidate := range info.Tenants {
+			if candidate.ID == id {
+				tenant = candidate
+				break
 			}
-			info.TenantID = strconv.Itoa(tenant.ID)
-		} else {
-			info.TenantID = tenantID
 		}
+		if tenant == nil {
+			return nil, echo.NewHTTPError(404, "Organization not found")
+		}
+		info.TenantID = tenantID
 	}
-
 	info.Sites, err = h.Model.GetAssociatedSites(tenant)
 	if err != nil {
 		return nil, err
 	}
-
+	visibleSites := info.Sites[:0]
+	for _, candidate := range info.Sites {
+		if principal.Can(access.ReadDevices, access.Scope{TenantID: tenant.ID, SiteID: candidate.ID}) {
+			visibleSites = append(visibleSites, candidate)
+		}
+	}
+	info.Sites = visibleSites
 	if siteID != "" {
 		id, err := strconv.Atoi(siteID)
-		if err != nil {
-			return nil, err
+		if err != nil || id <= 0 || strconv.Itoa(id) != siteID {
+			return nil, echo.NewHTTPError(404, "Site not found")
 		}
-
-		_, err = h.Model.GetSiteById(tenant.ID, id)
-		if err != nil {
-			s, err := h.Model.GetDefaultSite(tenant)
-			if err != nil {
-				return nil, err
+		found := false
+		for _, candidate := range info.Sites {
+			if candidate.ID == id {
+				found = true
+				break
 			}
-			info.SiteID = strconv.Itoa(s.ID)
-			info.ProfileSiteID = info.SiteID
-		} else {
-			info.SiteID = siteID
-			info.ProfileSiteID = info.SiteID
 		}
+		if !found {
+			return nil, echo.NewHTTPError(404, "Site not found")
+		}
+		info.SiteID = siteID
+		info.ProfileSiteID = siteID
 	} else {
-		s, err := h.Model.GetDefaultSite(tenant)
-		if err != nil {
-			return nil, err
-		}
-		info.ProfileSiteID = strconv.Itoa(s.ID)
-
-		if len(info.Sites) != 0 {
-			info.SiteID = "-1"
+		info.SiteID = "-1"
+		info.ProfileSiteID = "-1"
+		if len(info.Sites) > 0 {
+			info.ProfileSiteID = strconv.Itoa(info.Sites[0].ID)
+			if !principal.Can(access.ReadDevices, access.Scope{TenantID: tenant.ID}) {
+				info.SiteID = info.ProfileSiteID
+			}
 		}
 	}
 

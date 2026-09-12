@@ -1,0 +1,359 @@
+package audit_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func BaseURL(scope access.Scope) string {
+	base := ""
+	if scope.TenantID > 0 {
+		base = fmt.Sprintf("/tenant/%d", scope.TenantID)
+	}
+	if scope.SiteID > 0 {
+		base += fmt.Sprintf("/site/%d", scope.SiteID)
+	}
+	return base + "/audit"
+}
+
+func scopeLabel(scope access.Scope) string {
+	if scope.TenantID == 0 {
+		return "All organizations and server events"
+	}
+	if scope.SiteID == 0 {
+		return fmt.Sprintf("Organization %d · All sites", scope.TenantID)
+	}
+	return fmt.Sprintf("Organization %d · Site %d", scope.TenantID, scope.SiteID)
+}
+
+func policyLabel(days int) string {
+	if days == 0 {
+		return "Retain indefinitely"
+	}
+	return fmt.Sprintf("Retain %d days", days)
+}
+
+func dateTime(t time.Time) string  { return t.UTC().Format("2006-01-02 15:04:05 UTC") }
+func inputTime(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.999999999") }
+
+func filterValues(f audit.Filter) url.Values {
+	return url.Values{"source": {f.Source}, "actor": {f.Actor}, "action": {f.Action}, "target": {f.Resource}, "result": {f.Result}, "from": {f.From.UTC().Format(time.RFC3339Nano)}, "until": {f.Until.UTC().Format(time.RFC3339Nano)}}
+}
+
+func nextURL(f audit.Filter, cursor string) string {
+	v := filterValues(f)
+	v.Set("before", cursor)
+	return BaseURL(f.Scope) + "?" + v.Encode()
+}
+
+templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit.Page) {
+	@layout.Base("audit", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Audit log", Url: BaseURL(f.Scope)}}, info)
+		<main class="audit-main">
+			<header class="audit-heading">
+				<div>
+					<h1 class="text-2xl font-semibold">Audit log</h1>
+					<p>
+						{ scopeLabel(f.Scope) }
+					</p>
+				</div>
+				<nav aria-label="Audit navigation" class="audit-actions">
+					if f.Scope.SiteID == 0 {
+						<a class="uk-button uk-button-default" href={ templ.URL(BaseURL(f.Scope) + "/retention") }>Retention policy</a>
+					}
+					if f.Scope.SiteID > 0 {
+						<a class="uk-button uk-button-default" href={ templ.URL(BaseURL(access.Scope{TenantID: f.Scope.TenantID})) }>All sites</a>
+					}
+					if info.Principal.IsAdministrator() && f.Scope.TenantID > 0 {
+						<a class="uk-button uk-button-default" href="/audit">All organizations</a>
+					}
+					if f.Scope.TenantID == 0 {
+						<a class="underline" href="/admin/access/audit">Permission change details</a>
+					}
+				</nav>
+			</header>
+			<section class="uk-card uk-card-default" aria-label="Audit filters">
+				<form class="uk-card-body audit-filters" method="get" action={ templ.URL(BaseURL(f.Scope)) }>
+					<label>From, inclusive (UTC)<input class="uk-input" type="datetime-local" step="any" name="from" value={ inputTime(f.From) } required/></label>
+					<label>Until, exclusive (UTC)<input class="uk-input" type="datetime-local" step="any" name="until" value={ inputTime(f.Until) } required/></label>
+					<label>
+						Source
+						<select class="uk-select" name="source">
+							<option value="">All available sources</option>
+							for _, source := range audit.SourceNames() {
+								<option value={ source } selected?={ f.Source == source }>
+									{ audit.SourceLabel(source) }
+								</option>
+							}
+						</select>
+					</label>
+					<label>
+						Result
+						<select class="uk-select" name="result">
+							<option value="">All results</option>
+							for _, result := range []string{"recorded","success","failure","denied","deferred","cancelled"} {
+								<option value={ result } selected?={ f.Result == result }>
+									{ strings.Title(result) }
+								</option>
+							}
+						</select>
+					</label>
+					<label>Actor (exact)<input class="uk-input" name="actor" maxlength="255" value={ f.Actor }/></label>
+					<label>Action (exact)<input class="uk-input" name="action" maxlength="255" value={ f.Action } placeholder="apple.command.failed"/></label>
+					<label>Target ID (exact)<input class="uk-input" name="target" maxlength="255" value={ f.Resource }/></label>
+					<div class="audit-actions"><button type="submit" class="uk-button uk-button-primary">Apply filters</button><a class="underline" href={ templ.URL(BaseURL(f.Scope)) }>Reset</a></div>
+				</form>
+			</section>
+			<div class="audit-heading">
+				<div>
+					<p>
+						{ fmt.Sprintf("%d events on this page · newest first", len(page.Events)) }
+					</p>
+					<p class="uk-text-muted">
+						{ "Available sources: "+sourceLabels(page.Sources) }
+					</p>
+				</div>
+				<form method="post" action={ templ.URL(BaseURL(f.Scope) + "/export") } class="audit-actions">
+					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+					for key, values := range filterValues(f) {
+						<input type="hidden" name={ key } value={ values[0] }/>
+					}
+					<button class="uk-button uk-button-default" type="submit" name="format" value="csv">Export CSV</button><button class="uk-button uk-button-default" type="submit" name="format" value="json">Export JSON</button>
+				</form>
+			</div>
+			<p class="uk-text-muted">Exports include all matching events, up to 10,000 events and 16 MiB. CSV marks formula-like text with [text]; JSON preserves text values. Configuration contents and credentials are excluded.</p>
+			<p class="uk-text-muted">Recorded means the original event has no explicit outcome. Historical events without a site remain organization-wide; they do not appear in site filters. The log combines available audit sources and does not cover every legacy console action.</p>
+			<section aria-label="Audit events" class="audit-events">
+				if len(page.Events) == 0 {
+					<p class="uk-card uk-card-default uk-card-body" role="status">No events match these filters.</p>
+				}
+				for _, event := range page.Events {
+					<article class="uk-card uk-card-default audit-event">
+						<div class="audit-heading">
+							<h2 class="font-semibold">
+								{ event.Action }
+							</h2>
+							<span class="audit-result" data-result={ event.Result }>
+								{ strings.Title(event.Result) }
+							</span>
+						</div>
+						<dl class="audit-metadata">
+							<div>
+								<dt>Time</dt>
+								<dd>
+									@auditTimestamp(event.CreatedAt)
+								</dd>
+							</div>
+							<div>
+								<dt>Actor</dt>
+								<dd>
+									{ event.Actor }
+								</dd>
+							</div>
+							<div>
+								<dt>Source / event</dt>
+								<dd>
+									{ fmt.Sprintf("%s / %d", audit.SourceLabel(event.Source), event.ID) }
+								</dd>
+							</div>
+							<div>
+								<dt>Scope</dt>
+								<dd>
+									if event.TenantID == 0 {
+										Server-wide
+									} else if event.SiteID == 0 {
+										{ fmt.Sprintf("Organization %d · Organization-wide", event.TenantID) }
+									} else {
+										{ fmt.Sprintf("Organization %d · Site %d", event.TenantID, event.SiteID) }
+									}
+								</dd>
+							</div>
+						</dl>
+						<p class="audit-target">
+							<span class="uk-text-muted">Target: </span>
+							<code>
+								{ event.Resource }
+							</code>
+						</p>
+					</article>
+				}
+			</section>
+			if page.Next != "" {
+				<nav aria-label="Audit pagination"><a class="uk-button uk-button-default" href={ templ.URL(nextURL(f, page.Next)) }>Older events</a></nav>
+			}
+		</main>
+	}
+}
+
+templ Retention(c echo.Context, info *partials.CommonInfo, scope access.Scope, policy audit.RetentionPolicy, history []audit.RetentionEvent, preview *audit.RetentionPreview) {
+	@layout.Base("audit", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Audit log", Url: BaseURL(scope)}, {Title: "Retention policy"}}, info)
+		<main class="audit-main">
+			<header>
+				<h1 class="text-2xl font-semibold">Audit retention</h1>
+				<p>
+					{ scopeLabel(scope) }
+				</p>
+			</header>
+			<section class="uk-card uk-card-default uk-card-body audit-stack">
+				<h2 class="text-xl font-semibold">
+					{ policyLabel(policy.Days) }
+				</h2>
+				if policy.UpdatedAt != nil {
+					<p>
+						{ fmt.Sprintf("Updated by %s · ",policy.UpdatedBy) }
+@auditTimestamp(*policy.UpdatedAt)
+{ fmt.Sprintf(" · Revision %d",policy.Revision) }
+					</p>
+				} else {
+					<p>No expiration policy has been configured. Existing audit events are retained.</p>
+				}
+				if scope.TenantID == 0 {
+					<p>This policy covers server permission changes, desktop release events and server-wide audit access. Organization audit events have independent policies.</p>
+				} else {
+					<p>This policy covers this organization's Apple, agent, inventory and audit access events across all sites. Windows audit events are included only when explicitly selected.</p>
+					<p>{ windowsRetentionLabel(policy.WindowsEnabled) }</p>
+				}
+				<p>A finite policy permanently deletes original audit events as they age. Cleanup runs in batches while the console is running. Retention changes and deletion receipts are kept indefinitely. Backup and database recovery copies have separate retention.</p>
+				<form method="post" action={ templ.URL(BaseURL(scope) + "/retention/preview") } class="audit-actions">
+					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+					if scope.TenantID > 0 {
+						<label class="audit-confirm"><input type="checkbox" name="include_windows" value="yes" checked?={ retentionWindowsSelection(policy, preview) }/> Include Windows audit events in this retention policy.</label>
+					}
+					<label>Days to retain<input class="uk-input" type="number" name="days" min="0" max="3650" step="1" value={ strconv.Itoa(retentionDaysSelection(policy, preview)) } aria-describedby="retention-days-help" required/></label><button class="uk-button uk-button-primary" type="submit">Preview change</button>
+				</form>
+				<p id="retention-days-help" class="uk-text-muted">Enter 0 to retain indefinitely, or 30–3,650 days. Previewing does not change the policy.</p>
+			</section>
+			if preview != nil {
+				<section class="uk-card uk-card-default uk-card-body audit-stack" aria-labelledby="retention-preview-title">
+					<h2 id="retention-preview-title" class="text-xl font-semibold">Review retention change</h2>
+					<p>
+						{ policyLabel(preview.Policy.Days)+" → "+policyLabel(preview.Days) }
+					</p>
+					if scope.TenantID > 0 {
+						<p>{ windowsRetentionLabel(preview.Policy.WindowsEnabled)+" → "+windowsRetentionLabel(preview.WindowsEnabled) }</p>
+					}
+					if preview.Cutoff != nil {
+						<p>
+							Events before{ " " }
+@auditTimestamp(*preview.Cutoff)
+{ " " }currently qualify for deletion:
+						</p>
+					} else {
+						<p>Automatic deletion will stop. Previously deleted events cannot be restored by this change.</p>
+					}
+					<dl class="audit-metadata">
+						for _, source := range audit.SourceNames() {
+							if count, ok := preview.Counts[source]; ok {
+								<div>
+									<dt>
+										{ audit.SourceLabel(source) }
+									</dt>
+									<dd>
+										{ strconv.FormatInt(count, 10)+" events" }
+									</dd>
+								</div>
+							}
+						}
+					</dl>
+					<p>These counts are a preview. Confirming applies an ongoing age policy: qualifying events, including those that age later, are deleted in subsequent cleanup batches.</p>
+					<p>
+						This preview is valid for your account until{ " " }
+@auditTimestamp(preview.ExpiresAt)
+{ " " }and can be used once.
+					</p>
+					<form method="post" action={ templ.URL(BaseURL(scope) + "/retention/apply") } class="audit-stack">
+						<input type="hidden" name="csrf" value={ info.CSRFToken }/><input type="hidden" name="preview" value={ preview.ID }/><input type="hidden" name="token" value={ preview.Token }/>
+						<label class="audit-confirm"><input type="checkbox" name="confirm" value="yes" required/> I confirm this ongoing retention policy and any permanent deletion it enables for this scope.</label>
+						<div class="audit-actions"><button type="submit" class="uk-button uk-button-danger">Apply retention policy</button><a class="underline" href={ templ.URL(BaseURL(scope) + "/retention") }>Cancel</a></div>
+					</form>
+				</section>
+			}
+			<section class="audit-stack" aria-label="Retention history">
+				<h2 class="text-xl font-semibold">Recent policy changes and deletion receipts</h2>
+				<p class="uk-text-muted">The latest 25 entries for this scope. Search the audit log's Retention source for older entries.</p>
+				if len(history) == 0 {
+					<p>No retention changes or deletions recorded.</p>
+				}
+				for _, event := range history {
+					<article class="uk-card uk-card-default uk-card-body audit-stack">
+						<h3 class="font-semibold">
+							{ event.Action }
+						</h3>
+						<p>
+							{ event.Actor+" · " }
+@auditTimestamp(event.CreatedAt)
+						</p>
+						<p>
+							{ fmt.Sprintf("%s · Revision %d", policyLabel(event.Days), event.Revision) }
+						</p>
+						if scope.TenantID > 0 {
+							<p>{ windowsRetentionLabel(event.WindowsEnabled) }</p>
+							if event.PreviousWindowsEnabled != nil {
+								<p>{ "Previous Windows setting: "+windowsRetentionLabel(*event.PreviousWindowsEnabled) }</p>
+							}
+						}
+						if event.PreviousDays != nil {
+							<p>
+								{ "Previous policy: "+policyLabel(*event.PreviousDays) }
+							</p>
+						}
+						if event.Action == "retention.prune" {
+							<p>
+								{ fmt.Sprintf("Deleted %d %s events", event.Count, audit.SourceLabel(event.Source)) }
+							</p>
+						}
+						if event.Cutoff != nil {
+							<p>
+								Cutoff:{ " " }
+@auditTimestamp(*event.Cutoff)
+							</p>
+						}
+					</article>
+				}
+			</section>
+		</main>
+	}
+}
+
+func sourceLabels(sources []string) string {
+	labels := make([]string, len(sources))
+	for i, source := range sources {
+		labels[i] = audit.SourceLabel(source)
+	}
+	return strings.Join(labels, ", ")
+}
+
+func windowsRetentionLabel(enabled bool) string {
+	if enabled {
+		return "Windows audit events follow this policy"
+	}
+	return "Windows audit events are retained indefinitely"
+}
+
+func retentionWindowsSelection(policy audit.RetentionPolicy, preview *audit.RetentionPreview) bool {
+	if preview != nil {
+		return preview.WindowsEnabled
+	}
+	return policy.WindowsEnabled
+}
+
+func retentionDaysSelection(policy audit.RetentionPolicy, preview *audit.RetentionPreview) int {
+	if preview != nil {
+		return preview.Days
+	}
+	return policy.Days
+}
+
+// Keep exact audit instants and second precision while localizing display.
+templ auditTimestamp(value time.Time) {
+ <time datetime={ value.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision="second" title={ value.UTC().Format(time.RFC3339Nano) }>{ dateTime(value) }</time>
+}

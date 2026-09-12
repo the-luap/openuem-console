@@ -25,6 +25,7 @@ import (
 	"github.com/open-uem/ent/task"
 	openuem_nats "github.com/open-uem/nats"
 	ansiblecfg "github.com/open-uem/openuem-ansible-config/ansible"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/computers_views"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -34,7 +35,13 @@ import (
 )
 
 func (h *Handler) Overview(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopInventory(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -154,7 +161,13 @@ func (h *Handler) Overview(c echo.Context) error {
 }
 
 func (h *Handler) Computer(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopInventory(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -191,7 +204,13 @@ func (h *Handler) Computer(c echo.Context) error {
 }
 
 func (h *Handler) OperatingSystem(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopInventory(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -229,7 +248,13 @@ func (h *Handler) OperatingSystem(c echo.Context) error {
 }
 
 func (h *Handler) NetworkAdapters(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopNetwork(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -291,7 +316,13 @@ func (h *Handler) NetworkAdapters(c echo.Context) error {
 }
 
 func (h *Handler) Printers(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopPeripherals(c, inventory.PrinterReports)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -334,7 +365,13 @@ func (h *Handler) Printers(c echo.Context) error {
 }
 
 func (h *Handler) LogicalDisks(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopStorage(c, inventory.LogicalStorage)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -371,7 +408,13 @@ func (h *Handler) LogicalDisks(c echo.Context) error {
 }
 
 func (h *Handler) PhysicalDisks(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopStorage(c, inventory.PhysicalStorage)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -408,7 +451,13 @@ func (h *Handler) PhysicalDisks(c echo.Context) error {
 }
 
 func (h *Handler) Shares(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopShares(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -446,7 +495,13 @@ func (h *Handler) Shares(c echo.Context) error {
 }
 
 func (h *Handler) Monitors(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.desktopPeripherals(c, inventory.MonitorReports)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -483,7 +538,13 @@ func (h *Handler) Monitors(c echo.Context) error {
 }
 
 func (h *Handler) Apps(c echo.Context) error {
-	var err error
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return err
+	}
+	if !principal.IsAdministrator() {
+		return h.DesktopSoftware(c)
+	}
 
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -552,6 +613,9 @@ func (h *Handler) Apps(c echo.Context) error {
 }
 
 func (h *Handler) RemoteAssistance(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -1099,7 +1163,7 @@ func (h *Handler) ComputerDeployInstall(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	err = h.NATSConnection.Publish("agent.installpackage."+agentId, data)
+	err = h.PublishBroker("agent.installpackage."+agentId, data)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), true))
 	}
@@ -1164,7 +1228,7 @@ func (h *Handler) ComputerDeployUpdate(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	err = h.NATSConnection.Publish("agent.updatepackage."+agentId, data)
+	err = h.PublishBroker("agent.updatepackage."+agentId, data)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), true))
 	}
@@ -1244,7 +1308,7 @@ func (h *Handler) ComputerDeployUninstall(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	err = h.NATSConnection.Publish("agent.uninstallpackage."+agentId, data)
+	err = h.PublishBroker("agent.uninstallpackage."+agentId, data)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), true))
 	}
@@ -1348,7 +1412,7 @@ func (h *Handler) PowerManagement(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.poweroff_could_not_marshal"), false))
 		}
 
-		if _, err := h.NATSConnection.Request("agent.poweroff."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err := h.RequestBroker("agent.poweroff."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.request_error", err.Error()), true))
 		}
 
@@ -1379,7 +1443,7 @@ func (h *Handler) PowerManagement(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.reboot_could_not_marshal"), false))
 		}
 
-		if _, err := h.NATSConnection.Request("agent.reboot."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err := h.RequestBroker("agent.reboot."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.request_error", err.Error()), true))
 		}
 
@@ -1556,6 +1620,9 @@ func (h *Handler) ComputerConfirmDelete(c echo.Context) error {
 }
 
 func (h *Handler) ComputerStartVNC(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -1607,7 +1674,7 @@ func (h *Handler) ComputerStartVNC(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.vnc_could_not_marshal"), false))
 		}
 
-		if _, err := h.NATSConnection.Request("agent.startvnc."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err := h.RequestBroker("agent.startvnc."+agentId, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(err.Error(), true))
 		}
 
@@ -1625,6 +1692,9 @@ func (h *Handler) ComputerStartVNC(c echo.Context) error {
 }
 
 func (h *Handler) ComputerStartRustDesk(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err
@@ -1651,6 +1721,9 @@ func (h *Handler) ComputerStartRustDesk(c echo.Context) error {
 }
 
 func (h *Handler) ComputerStopVNC(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	var err error
 
 	commonInfo, err := h.GetCommonInfo(c)
@@ -1674,7 +1747,7 @@ func (h *Handler) ComputerStopVNC(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	if _, err := h.NATSConnection.Request("agent.stopvnc."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+	if _, err := h.RequestBroker("agent.stopvnc."+agentId, nil, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.no_responder"), false))
 	}
 
@@ -1682,6 +1755,9 @@ func (h *Handler) ComputerStopVNC(c echo.Context) error {
 }
 
 func (h *Handler) GenerateRDPFile(c echo.Context) error {
+	if err := h.requireEndpointInbound(); err != nil {
+		return err
+	}
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
 		return err
@@ -1758,7 +1834,7 @@ func (h *Handler) SetDefaultPrinter(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.defaultprinter."+agentId, []byte(printerName), time.Duration(h.NATSTimeout)*time.Second)
+	msg, err := h.RequestBroker("agent.defaultprinter."+agentId, []byte(printerName), time.Duration(h.NATSTimeout)*time.Second)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.request_error", err.Error()), true))
 	}
@@ -1823,7 +1899,7 @@ func (h *Handler) RemovePrinter(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
 	}
 
-	msg, err := h.NATSConnection.Request("agent.removeprinter."+agentId, []byte(printerName), time.Duration(h.NATSTimeout)*time.Second)
+	msg, err := h.RequestBroker("agent.removeprinter."+agentId, []byte(printerName), time.Duration(h.NATSTimeout)*time.Second)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.request_error", err.Error()), true))
 	}
@@ -1913,7 +1989,7 @@ func (h *Handler) IsAgentOffline(c echo.Context) bool {
 		return true
 	}
 
-	if _, err := h.NATSConnection.Request(fmt.Sprintf("agent.ping.%s", agentId), nil, 1*time.Second); err != nil {
+	if _, err := h.RequestBroker(fmt.Sprintf("agent.ping.%s", agentId), nil, 1*time.Second); err != nil {
 		return true
 	}
 
@@ -2053,7 +2129,7 @@ func (h *Handler) RunTask(c echo.Context) error {
 		}
 
 		// send request to agent
-		if _, err = h.NATSConnection.Request("agent.ansible."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err = h.RequestBroker("agent.ansible."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.could_not_send_ansible_playbook_request", err), true))
 		}
 	}
@@ -2077,7 +2153,7 @@ func (h *Handler) RunTask(c echo.Context) error {
 		}
 
 		// send request to agent
-		if _, err = h.NATSConnection.Request("agent.windowstask."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+		if _, err = h.RequestBroker("agent.windowstask."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.could_not_send_windows_task_request", err), true))
 		}
 	}
@@ -2128,7 +2204,7 @@ func (h *Handler) RunProfile(c echo.Context) error {
 	}
 
 	// send request to agent
-	if _, err = h.NATSConnection.Request("agent.runprofile."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
+	if _, err = h.RequestBroker("agent.runprofile."+agentID, data, time.Duration(h.NATSTimeout)*time.Second); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.could_not_send_profile_request", err), true))
 	}
 

@@ -1,0 +1,251 @@
+name: Individual console broker
+
+on:
+  push:
+    branches: [feature/native-ios-management]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  console-broker:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the pinned private database PKI initializer
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: the-luap/openuem-cert-manager
+          ref: 466c4b3170ef10bae3350ebff971d4e276b93fdf
+          path: .database-pki-source
+          persist-credentials: false
+      - name: Check out the actual preceding broker initializer
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: the-luap/openuem-cert-manager
+          ref: 938ea1a77eba4c9eb4517db629fc42ef2f8b96ad
+          path: .legacy-broker-source
+          persist-credentials: false
+      - name: Check out the pinned individual agent worker
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: the-luap/openuem-worker
+          ref: e06c89815841c95503dbcf294553e455b015ea0e
+          path: .worker-source
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: Generate console templates
+        run: go tool templ generate
+      - name: Native console configuration, broker and route gates
+        run: go test -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker|Reference)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./internal/setup/readiness ./cmd/openuem-reference-probe ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Linux race and lifecycle checks
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 -timeout=4m -run '^Test(Individual|ProtectedAdministrator|InstallationSecrets|Environment|GeneratedBroker|Reference)' ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./internal/setup/readiness ./cmd/openuem-reference-probe ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Vet affected startup paths
+        run: go vet ./internal/common ./internal/setup/administrator ./internal/setup/secrets ./internal/setup/readiness ./cmd/openuem-reference-probe ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap ./cmd/openuem-agent-auth ./cmd/openuem-agent-commands ./internal/commands ./internal/desktop/consolebroker ./internal/desktop/authservice ./internal/desktop/commandservice ./internal/controllers/webserver ./internal/controllers/webserver/handlers ./internal/views/computers_views
+      - name: Resumable database bootstrap, console migrations and private service processes
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/database-credentials.test" ./internal/setup/secrets
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/agent-auth.test" ./internal/desktop/authservice
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/agent-commands.test" ./internal/desktop/commandservice
+          for target in authorization commands; do
+            docker build -f Dockerfile.services --target "$target" -t "private-service-$target:check" .
+          done
+          python3 scripts/check-service-images.py private-service-authorization:check private-service-commands:check
+          docker build -f Dockerfile.console --target runtime -t private-console:check .
+          python3 scripts/check-console-image.py private-console:check
+          docker build -f Dockerfile.broker --target runtime -t private-broker:check .
+          python3 scripts/check-broker-image.py private-broker:check
+          docker build -f Dockerfile.console --target smoke -t private-console-smoke:check .
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 64 --memory 256m \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=32m,uid=65532,gid=65532,mode=0700 \
+            private-console-smoke:check | tee console-smoke.log
+          grep -q '^--- PASS: TestConsoleContainerRuntime ' console-smoke.log
+          extract_binary() {
+            local image="$1" executable="$2" output="$3"
+            container=$(docker create "$image" --help)
+            trap 'docker rm -f "$container" >/dev/null' EXIT
+            docker cp "$container:/$executable" "$RUNNER_TEMP/$output"
+            if [ -n "${4:-}" ]; then
+              docker cp "$container:/assets" "$RUNNER_TEMP/$4"
+            fi
+            docker rm "$container"
+            trap - EXIT
+          }
+          extract_binary private-service-authorization:check openuem-agent-auth agent-auth
+          extract_binary private-service-commands:check openuem-agent-commands agent-commands
+          extract_binary private-console:check openuem-console console console-assets
+          extract_binary private-broker:check nats-server broker
+          docker build -f Dockerfile.setup --target database-bootstrap -t setup-database-bootstrap:check .
+          container=$(docker create setup-database-bootstrap:check --help)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          docker cp "$container:/openuem-database-bootstrap" "$RUNNER_TEMP/database-bootstrap"
+          docker rm "$container"
+          trap - EXIT
+          (
+            cd .database-pki-source
+            CGO_ENABLED=0 go build -mod=readonly -o "$RUNNER_TEMP/database-private-pki" .
+          )
+          (
+            cd .worker-source
+            CGO_ENABLED=0 go test -mod=readonly -c -o "$RUNNER_TEMP/agent-worker.test" ./internal/common
+            docker build -f Dockerfile.individual -t individual-worker:check .
+            python3 scripts/check-individual-image.py individual-worker:check
+          )
+          extract_binary individual-worker:check openuem-worker agent-worker
+          docker run --rm --network none --add-host database.internal:127.0.0.1 \
+            --add-host console.internal:127.0.0.1 --add-host nats.internal:127.0.0.1 --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 128 --memory 768m \
+            --shm-size 64m --user postgres --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m \
+            --tmpfs /var/log/openuem-server:rw,nosuid,nodev,noexec,size=16m,uid=999,gid=999,mode=0700 \
+            --env GOMAXPROCS=2 \
+            --env OPENUEM_DATABASE_TEST_BOOTSTRAP=/bootstrap \
+            --env OPENUEM_DATABASE_TEST_PRIVATE_PKI=/private-pki \
+            --env OPENUEM_DATABASE_TEST_INITDB=/usr/lib/postgresql/17/bin/initdb \
+            --env OPENUEM_DATABASE_TEST_POSTGRES=/usr/lib/postgresql/17/bin/postgres \
+            --env OPENUEM_CONSOLE_TEST_BINARY=/console \
+            --env OPENUEM_DATABASE_TEST_BROKER=/broker \
+            --env OPENUEM_AUTH_SERVICE_TESTS=/auth.test --env OPENUEM_AUTH_SERVICE_TEST_BINARY=/auth \
+            --env OPENUEM_COMMAND_SERVICE_TESTS=/commands.test --env OPENUEM_COMMAND_SERVICE_TEST_BINARY=/commands \
+            --env OPENUEM_WORKER_TESTS=/worker.test --env OPENUEM_WORKER_TEST_BINARY=/worker \
+            --mount "type=bind,source=$RUNNER_TEMP/database-credentials.test,destination=/test,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/database-bootstrap,destination=/bootstrap,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/database-private-pki,destination=/private-pki,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/console,destination=/console,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/broker,destination=/broker,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/console-assets,destination=/assets,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-auth.test,destination=/auth.test,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-auth,destination=/auth,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-commands.test,destination=/commands.test,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-commands,destination=/commands,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-worker.test,destination=/worker.test,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/agent-worker,destination=/worker,readonly" \
+            --entrypoint /test \
+            postgres@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 \
+            -test.v -test.run '^TestInstallationSecretsDatabasePostgres' -test.timeout=4m
+      - name: Verify separate setup images and unprivileged offline commands
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in installation-secrets protocol-keys reference-probe database-credentials; do
+            docker build -f Dockerfile.setup --target "$target" -t "setup-$target:check" .
+          done
+          docker build -f Dockerfile.setup --target smoke -t setup-smoke:check .
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 128m \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m setup-smoke:check | tee setup-smoke.log
+          grep -q '^--- PASS: TestSetupContainerCommands ' setup-smoke.log
+          python3 - <<'PY'
+          import json, pathlib, re, subprocess, tarfile, tempfile
+          def call(*args):
+              return subprocess.check_output(args, text=True).strip()
+          for target in ('installation-secrets', 'protocol-keys', 'reference-probe', 'database-credentials', 'database-bootstrap'):
+              image = 'setup-' + target + ':check'
+              executable = 'openuem-' + target
+              config = json.loads(call('docker', 'image', 'inspect', '--format', '{{json .Config}}', image))
+              assert config['User'] == '65532:65532'
+              assert not config.get('ExposedPorts')
+              assert config['Entrypoint'] == ['/' + executable]
+              assert config['Cmd'] == ['--help']
+              help_text = call('docker', 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image, '--help')
+              assert 'Usage:' in help_text
+              container = call('docker', 'create', image, '--help')
+              try:
+                  with tempfile.TemporaryDirectory() as directory:
+                      archive = str(pathlib.Path(directory) / 'runtime.tar')
+                      subprocess.run(['docker', 'export', '-o', archive, container], check=True)
+                      with tarfile.open(archive) as stream:
+                          names = [entry.name.lstrip('./') for entry in stream if entry.isfile()]
+                      assert executable in names and 'licenses/openuem-console.LICENSE' in names
+                      assert [name for name in names if name.startswith('openuem-')] == [executable]
+                      forbidden = r'(^|/)(setup\.test|sh|bash|go\.mod|go\.sum|identity\.json|credentials\.json|secrets\.json|manifest\.json|.*\.(pem|key|seed|pfx|url))$'
+                      assert not any(re.search(forbidden, name) for name in names)
+              finally:
+                  subprocess.run(['docker', 'rm', '-f', container], check=True, stdout=subprocess.DEVNULL)
+              print(target + ': private runtime boundary verified')
+          PY
+      - name: Non-root setup and PostgreSQL ownership with private bind mounts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f .database-pki-source/Dockerfile.private-pki --target runtime \
+            -t database-private-pki:check .database-pki-source
+          python3 scripts/check-reference-database.py \
+            setup-installation-secrets:check setup-database-credentials:check \
+            database-private-pki:check setup-database-bootstrap:check
+      - name: Separate reference containers, administrator sources and live WSS revocation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=0 go test -mod=readonly -c -o "$RUNNER_TEMP/reference.test" ./internal/setup/reference
+          docker build -f Dockerfile.gateway --target runtime -t reference-gateway:check .
+          docker build -f Dockerfile.releases --target runtime -t reference-releases:check .
+          python3 scripts/check-release-image.py reference-releases:check
+          python3 scripts/check-reference-composition.py \
+            setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
+            database-private-pki:check setup-database-bootstrap:check \
+            private-console:check private-broker:check \
+            private-service-authorization:check private-service-commands:check \
+            individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
+            --maintenance-probe-image setup-reference-probe:check \
+            --release-image reference-releases:check --acme-publication
+      - name: Separate reference issuer account, publication and input preflight
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.acme --target runtime -t reference-acme:check .
+          docker build -f Dockerfile.acme --target smoke -t reference-acme-fixture:check .
+          python3 scripts/check-reference-public-tls.py reference-acme:check
+      - name: Reviewed reference installation and interrupted bootstrap recovery
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/setup/test_reference_installation.py
+          for scenario in fresh interrupted acme acme-interrupted; do
+            options=()
+            if [[ "$scenario" = *interrupted ]]; then options+=(--interrupt); fi
+            if [[ "$scenario" = acme* ]]; then options+=(--acme-image reference-acme:check --acme-fixture-image reference-acme-fixture:check); fi
+            python3 scripts/check-reference-installation.py \
+              setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
+              setup-database-bootstrap:check database-private-pki:check setup-reference-probe:check \
+              private-console:check private-broker:check \
+              private-service-authorization:check private-service-commands:check \
+              individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" "${options[@]}"
+          done
+      - name: Retained broker maintenance, interruption recovery and pending commands
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 tests/setup/test_reference_maintenance.py
+          docker build -f .legacy-broker-source/Dockerfile.private-pki --target runtime \
+            -t legacy-broker-initializer:check .legacy-broker-source
+          python3 scripts/check-reference-composition.py \
+            setup-installation-secrets:check setup-protocol-keys:check setup-database-credentials:check \
+            database-private-pki:check setup-database-bootstrap:check \
+            private-console:check private-broker:check \
+            private-service-authorization:check private-service-commands:check \
+            individual-worker:check reference-gateway:check "$RUNNER_TEMP/reference.test" \
+            --legacy-broker-image legacy-broker-initializer:check \
+            --maintenance-probe-image setup-reference-probe:check \
+            --release-image reference-releases:check --acme-publication

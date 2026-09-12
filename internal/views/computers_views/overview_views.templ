@@ -125,7 +125,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "antivirus.enabled") }</th>
-								if agent.Edges.Antivirus.IsActive {
+								if agent.Edges.Antivirus == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Antivirus.IsActive {
 									<td class="!align-middle"><uk-icon hx-history="false" icon="shield-check" custom-class="h-5 w-5 text-green-600" uk-cloack></uk-icon></td>
 								} else {
 									if len(agent.Edges.Antivirus.Name) == 0 {
@@ -137,7 +139,7 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "updates.title") }</th>
-								if len(agent.Edges.Systemupdate.SystemUpdateStatus) == 0 {
+								if agent.Edges.Systemupdate == nil || len(agent.Edges.Systemupdate.SystemUpdateStatus) == 0 {
 									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
 								} else {
 									<td class="!align-middle">{ i18n.T(ctx,agent.Edges.Systemupdate.SystemUpdateStatus) }</td>
@@ -217,7 +219,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "antivirus.updated") }</th>
-								if agent.Edges.Antivirus.IsUpdated {
+								if agent.Edges.Antivirus == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Antivirus.IsUpdated {
 									<td class="!align-middle"><uk-icon hx-history="false" icon="shield-check" custom-class="h-5 w-5 text-green-600" uk-cloack></uk-icon></td>
 								} else {
 									if len(agent.Edges.Antivirus.Name) == 0 {
@@ -229,7 +233,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "updates.pending_updates") }</th>
-								if agent.Edges.Systemupdate.PendingUpdates {
+								if agent.Edges.Systemupdate == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Systemupdate.PendingUpdates {
 									<td class="!align-middle">
 										<div class="flex gap-1 items-center uk-alert-description">
 											<uk-icon hx-history="false" icon="triangle-alert" custom-class="h-5 w-5 text-red-600" uk-cloack></uk-icon>
@@ -246,7 +252,7 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 									<td class="!align-middle">
 										<div class="flex items-center gap-2">
 											{ agent.Edges.Release.Version }
-											if semver.Compare("v" + agent.Edges.Release.Version, "v"+ higherReleaseApplied.Version) < 0 {
+											if higherReleaseApplied != nil && semver.Compare("v" + agent.Edges.Release.Version, "v"+ higherReleaseApplied.Version) < 0 {
 												@partials.AlertIcon(i18n.T(ctx, "admin.update.agents.outdated"))
 											}
 										</div>

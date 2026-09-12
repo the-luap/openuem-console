@@ -1,0 +1,118 @@
+package mdm_views
+
+import (
+	"fmt"
+	"strings"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ WindowsSoftwareApproval(c echo.Context, info *partials.CommonInfo, kind, requestID string) {
+	@layout.Base("devices",info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:"Approve Windows package",Url:partials.GetNavigationUrl(info,"/software/catalog/windows/new")}},info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Approve a Windows package</h1><p class="uk-text-muted mt-2">Record the exact package and how its installed state must be verified. After approval, prepare a device request and explicitly review supported MSI/EXE execution.</p>@Navigation(info)</div>
+			<form method="get" action={partials.GetNavigationUrl(info,"/software/catalog/windows/new")}>
+				<label>Package type<select class="uk-select" name="kind"><option value="windows-winget" selected?={kind=="windows-winget"}>WinGet standard package</option><option value="windows-msi" selected?={kind=="windows-msi"}>Custom MSI package</option><option value="windows-exe" selected?={kind=="windows-exe"}>Custom EXE package</option></select></label>
+				<button class="uk-button uk-button-default mt-4" type="submit">Choose package type</button>
+			</form>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-header"><h2 class="uk-card-title">{SoftwarePackageKind(kind)} approval</h2><p>Review all fields before approval. Later changes require a new immutable revision.</p></div>
+				<div class="uk-card-body">
+					<form method="post" action={partials.GetNavigationUrl(info,"/software/catalog/windows")}>
+						@CSRF(info)
+						<input type="hidden" name="kind" value={kind}/><input type="hidden" name="request_id" value={requestID}/>
+						<div class="software-fields">
+							<label>Name<input class="uk-input" name="name" maxlength="255" required/></label>
+							<label>Package identifier<input class="uk-input" name="identifier" placeholder="Vendor.Product" maxlength="255" required/></label>
+							<label>Exact package version<input class="uk-input" name="version" maxlength="128" required/></label>
+							<label>Architecture<select class="uk-select" name="architecture"><option value="x86_64">x64</option><option value="arm64">ARM64</option><option value="x86">x86</option></select></label>
+							<label>Minimum Windows kernel version<input class="uk-input" name="minimum_os" placeholder="10.0.26100" maxlength="18" required/></label>
+						</div>
+						<p class="uk-text-muted mt-2">Windows 10 and 11 both use kernel version 10.0; include the required build number.</p>
+						if kind=="windows-winget" {
+							<p class="mt-4">The source is fixed to winget. This approval identifies an exact package version and architecture; download integrity comes from that source's manifests.</p>
+						} else {
+							<label class="block mt-4">HTTPS installer URL<input class="uk-input" type="url" name="source_url" maxlength="8192" autocomplete="off" required/></label>
+							<label class="block mt-4">Installer SHA-256<input class="uk-input" name="sha256" pattern="[a-f0-9]{64}" maxlength="64" required/></label>
+							<p class="uk-text-muted mt-2">Verify the publisher, file contents and digest before approval. Source credentials are not shown on catalog pages.</p>
+						}
+						if kind=="windows-msi" {
+							<label class="block mt-4">MSI properties, one NAME=value per line<textarea class="uk-textarea" name="msi_properties" rows="4" maxlength="16384" autocomplete="off"></textarea></label>
+							<p class="uk-text-muted mt-2">Machine scope, quiet installation and suppressed automatic restart are fixed. Removal uses the exact MSI product code below.</p>
+						}
+						if kind=="windows-exe" {
+							<label class="block mt-4">Installation arguments, one argument per line<textarea class="uk-textarea" name="install_arguments" rows="4" maxlength="16384" autocomplete="off" required></textarea></label>
+							<label class="block mt-4">HTTPS uninstaller URL<input class="uk-input" type="url" name="uninstall_url" maxlength="8192" autocomplete="off" required/></label>
+							<label class="block mt-4">Uninstaller SHA-256<input class="uk-input" name="uninstall_sha256" pattern="[a-f0-9]{64}" maxlength="64" required/></label>
+							<label class="block mt-4">Removal arguments, one argument per line<textarea class="uk-textarea" name="uninstall_arguments" rows="4" maxlength="16384" autocomplete="off" required></textarea></label>
+							<p class="uk-text-muted mt-2">Enter each argument as literal data, without shell quoting. Verify that both executables support quiet operation and do not force a restart. Installer-specific arguments are preserved exactly.</p>
+						}
+						<fieldset class="mt-4"><legend class="font-semibold">Installed-state detection</legend>
+							<div class="software-fields">
+									if kind=="windows-msi" {
+										<input type="hidden" name="detection_kind" value="msi-product"/>
+									} else {
+										<label>Detection rule<select class="uk-select" name="detection_kind"><option value="msi-product">MSI product</option><option value="uninstall-key">Machine uninstall registration</option></select></label>
+									}
+								<label>Exact reported version<input class="uk-input" name="detection_version" maxlength="128" required/></label>
+								<label>MSI product code (MSI rule)<input class="uk-input" name="product_code" placeholder="{00000000-0000-4000-8000-000000000001}" maxlength="38" required?={kind=="windows-msi"}/></label>
+								if kind!="windows-msi" {
+									<label>Uninstall subkey (registration rule)<input class="uk-input" name="uninstall_key" maxlength="255"/></label>
+									<label>Registry view (registration rule)<select class="uk-select" name="registry_view"><option value="">Not applicable to MSI detection</option><option value="64">64-bit HKLM</option><option value="32">32-bit HKLM</option></select></label>
+								}
+							</div>
+							<p class="uk-text-muted mt-2">Fill only the fields for the selected rule. Registration rules use an exact subkey under the machine's Software\Microsoft\Windows\CurrentVersion\Uninstall branch.</p>
+							</fieldset>
+						if kind=="windows-exe" {
+							<div class="software-fields mt-4"><label>Successful exit codes<input class="uk-input" name="success_codes" value="0" maxlength="192" required/></label><label>Restart-required exit codes<input class="uk-input" name="reboot_codes" value="3010" maxlength="192"/></label></div>
+							<p class="uk-text-muted mt-2">Use comma-separated decimal codes or 0x-prefixed hexadecimal codes. These classify command results; installed-state detection remains required.</p>
+						} else {
+							<input type="hidden" name="success_codes" value="0"/>
+								if kind=="windows-msi" {
+									<input type="hidden" name="reboot_codes" value="3010"/><p class="mt-4">MSI code 0 records command success; 3010 requires a later restart. Other codes record failure.</p>
+								}
+						}
+						<label class="block mt-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>I approve this exact Windows package, detection rule, removal method and result codes for authorized deployment.</label>
+						<button class="uk-button uk-button-primary mt-4" type="submit">Approve Windows revision</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ WindowsSoftwareRequirements(v apple.SoftwareVersion) {
+	<p role="status" class="uk-alert mt-4">Windows approval recorded. Prepare a device request, then review and explicitly dispatch supported MSI/EXE execution to an eligible individual agent.</p>
+	<dl class="uk-description-list mt-4">
+		<dt>Detection rule</dt><dd>{v.Windows.Detection.Kind} · exact version {v.Windows.Detection.Version}</dd>
+			if v.Windows.Detection.Kind=="msi-product" {
+				<dt>MSI product code</dt><dd>{v.Windows.Detection.ProductCode}</dd>
+			} else {
+				<dt>Machine uninstall registration</dt><dd>{v.Windows.Detection.UninstallKey} · {v.Windows.Detection.RegistryView}-bit registry view</dd>
+			}
+		<dt>Installation parameters</dt><dd>{fmt.Sprintf("%d approved arguments",v.Windows.InstallArgumentCount)}</dd>
+			if len(v.Windows.MSIPropertyNames)>0 {
+				<dt>Approved MSI property names</dt><dd>{strings.Join(v.Windows.MSIPropertyNames,", ")}</dd>
+			}
+		<dt>Removal</dt><dd>
+				if v.Kind=="windows-winget" {
+					Exact WinGet package identity and version
+				} else if v.Kind=="windows-msi" {
+					Exact MSI product code
+				} else {
+					{fmt.Sprintf("Approved uninstaller with %d arguments",v.Windows.UninstallArgumentCount)}
+				}
+		</dd>
+			if v.Windows.UninstallSHA256!="" {
+				<dt>Uninstaller SHA-256</dt><dd><code>{v.Windows.UninstallSHA256}</code></dd>
+			}
+		<dt>Successful exit codes</dt><dd>{SoftwareExitCodes(v.Windows.SuccessCodes)}</dd><dt>Restart-required exit codes</dt><dd>{SoftwareExitCodes(v.Windows.RebootCodes)}</dd>
+	</dl>
+		if v.Kind=="windows-winget" {
+			<p class="mt-4">Package source: Microsoft community WinGet repository. Review its installers to approve a compatible machine MSI with an exact binary digest as a separate revision.</p>
+		}
+}

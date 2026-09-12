@@ -1,0 +1,16 @@
+**
+!go.mod
+!go.sum
+!LICENSE
+!cmd/
+!cmd/openuem-agent-auth/
+!cmd/openuem-agent-auth/*.go
+!cmd/openuem-agent-commands/
+!cmd/openuem-agent-commands/*.go
+!internal/
+!internal/desktop/
+!internal/desktop/authservice/
+!internal/desktop/authservice/*.go
+!internal/desktop/commandservice/
+!internal/desktop/commandservice/*.go
+**/*_test.go

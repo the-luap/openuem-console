@@ -1,0 +1,171 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+templ ADEPlatformSSOFields(info *partials.CommonInfo) {
+	<script src="/assets/js/apple-ade-platform-sso.js" defer></script>
+	<div class="ade-sso-options">
+		<label><input class="uk-checkbox" type="checkbox" name="enable_platform_sso" value="yes" data-sso-enable/> Require unattended Platform SSO setup (macOS 26 or later)</label>
+		<fieldset data-sso-fields hidden disabled>
+			<legend class="font-semibold">Platform SSO prerequisites</legend>
+			<p>Enable automatic advance and the Setup Assistant hold above. Configure a managed administrator and skip primary account creation. The selected profile must enable unattended setup, shared device keys and account creation at login.</p>
+			@ADEPlatformSSOProfilePicker(info, "/ios/ade/platform-sso/profiles", "sso_profile_revision")
+			<p>Select the approved application containing this profile's SSO extension. It is included in the limit of 16 required applications, so you do not need to select it again above.</p>
+			@ADEApplicationPicker(info, "sso_application_version", 1, "")
+			<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="sso_provider_confirmed" value="yes" required/> I verified that this application contains the configured extension and that the provider supports silent registration with this configuration.</label>
+			<label class="block mt-4">Reason for approving this provider configuration<input class="uk-input" name="sso_approval_reason" maxlength="1000" required/></label>
+			<p>Setup release waits for the exact profile and managed application revisions. Provider registration starts after release; these installation observations do not prove successful registration.</p>
+		</fieldset>
+		<noscript>Enable JavaScript to configure this optional Platform SSO requirement.</noscript>
+	</div>
+}
+
+templ ADEPlatformSSOPanel(info *partials.CommonInfo, detail Detail) {
+	if detail.ADEPlatformSSO!=nil && detail.ADE!=nil && info.Can(access.ReadProfiles) {
+		<section class="uk-card uk-card-default" aria-labelledby="ade-sso-title">
+			<div class="uk-card-header"><h2 class="uk-card-title" id="ade-sso-title">Platform SSO setup requirement</h2></div>
+			<div class="uk-card-body space-y-4">
+				@ADEPlatformSSORequirement(info, detail.ADEPlatformSSO)
+				<p role="status">{ adePlatformSSOMessage(detail.ADEPlatformSSO,detail.ADE.SetupState) }</p>
+				<p>Latest profile inventory:{ " " }
+					@Timestamp(detail.ADEPlatformSSO.ProfileObservedAt)
+				</p>
+				<p>Release also requires the exact provider application to be reported as installed and managed. Provider registration starts after release; profile and app inventory do not establish whether registration succeeded.</p>
+				<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/repairs")) }>Profile repair history</a></p>
+				<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/history")) }>Reviewed provider revision history</a></p>
+				if detail.ADEPlatformSSO.CanRepair && info.Can(access.ManageCertificates) && info.Can(access.EnrollDevices) && info.Can(access.AssignProfiles) && info.Can(access.AssignSoftware) {
+					<details>
+						<summary>Correct the profile and provider application revisions</summary>
+						<script src="/assets/js/apple-ade-platform-sso.js" defer></script>
+						<form class="ade-sso-options mt-4" method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/correct") }>
+							@CSRF(info)
+							<input type="hidden" name="expected_revision" value={ detail.ADEPlatformSSO.BindingRevisionID }/>
+							<p>Select the reviewed revision of this profile and an approved revision of its provider application. Both selections commit together for this enrollment. The original pair and every correction remain in history. Unresolved installer operations must be resolved before changing the app revision.</p>
+							@ADEPlatformSSOProfilePicker(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/profiles", "profile_revision")
+							@ADEApplicationPicker(info, "application_version", 1, detail.ADEPlatformSSO.PackageID)
+							<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="provider_confirmed" value="yes" required/> I verified that this application contains the configured extension and supports silent registration with the selected profile.</label>
+							<label class="block mt-4">Reason for correcting the provider configuration<input class="uk-input" name="reason" required maxlength="1000"/></label>
+							<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Apply this reviewed pair and request fresh verification while setup remains held.</label>
+							<button class="uk-button uk-button-primary mt-4" type="submit">Apply reviewed provider revisions</button>
+						</form>
+					</details>
+				}
+				if detail.ADEPlatformSSO.CanRepair && info.Can(access.ManageCertificates) && info.Can(access.EnrollDevices) && info.Can(access.AssignProfiles) {
+					<details>
+						<summary>Send the retained profile revision again</summary>
+						<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/setup/platform-sso/repair") }>
+							@CSRF(info)
+							<input type="hidden" name="binding_revision" value={ detail.ADEPlatformSSO.BindingRevisionID }/>
+							<p>This sends the reviewed profile revision and requests fresh inventory. Setup remains held until verification. The reason is retained in the repair history.</p>
+							<label>Reason for resending the profile<input class="uk-input" name="reason" required maxlength="1000"/></label>
+							<label class="block mt-4"><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Send this retained revision again while Setup Assistant is held.</label>
+							<button class="uk-button uk-button-primary mt-4" type="submit">Send retained profile revision</button>
+						</form>
+					</details>
+				}
+			</div>
+		</section>
+	}
+}
+
+templ ADEPlatformSSORevisions(c echo.Context, info *partials.CommonInfo, d *apple.Device, r *apple.ADEPlatformSSOStatus, items []apple.ADEPlatformSSORevision, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Reviewed provider revisions", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Reviewed provider revisions</h1><p>{ d.Name }</p><a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID)) }>Back to device</a></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body space-y-4">
+					@ADEPlatformSSORequirement(info, r)
+					<p>Each entry retains a reviewed profile and application pair for this enrollment. A correction keeps the published enrollment policy unchanged and does not prove successful provider registration.</p>
+					if len(items)==0 {
+						<p>No provider revisions on this page.</p>
+					}
+					for _,item:=range items {
+						<article class="software-revision">
+							<h2 class="font-semibold">
+								@Timestamp(&item.CreatedAt)
+ { " · " }{ item.Actor }</h2>
+							if item.PreviousID=="" {
+								<p>Original enrollment requirement</p>
+							} else {
+								<p>Reviewed correction</p>
+							}
+							if item.ID==r.BindingRevisionID {
+								<p>Current required pair</p>
+							}
+							<p>{ item.ProfileName } · Profile revision { Number(item.ProfileRevision) }</p>
+							if info.Can(access.ReadSoftware) {
+								<p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+item.ApplicationVersionID)) }>{ item.ApplicationName } · { item.ApplicationVersion }</a></p>
+							}
+							<p>{ item.Reason }</p>
+						</article>
+					}
+					if next!="" {
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/setup/platform-sso/history?before="+url.QueryEscape(next))) }>Older provider revisions</a>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ ADEPlatformSSORequirement(info *partials.CommonInfo, r *apple.ADEPlatformSSOStatus) {
+	<p>Profile: <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/configurations/"+r.ProfileID+"/history")) }>{ r.ProfileName } · Revision { Number(r.ProfileRevision) }</a><br/>{ r.ProfileIdentifier }</p>
+	if info.Can(access.ReadSoftware) {
+		<p>Provider application: <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog/"+r.ApplicationVersionID)) }>{ r.ApplicationName } · { r.ApplicationVersion }</a></p>
+	}
+	<p>Provider reviewed by { r.ApprovedBy }: { r.ApprovalReason }</p>
+}
+
+templ ADEPlatformSSORepairs(c echo.Context, info *partials.CommonInfo, d *apple.Device, r *apple.ADEPlatformSSOStatus, items []apple.ADEPlatformSSORepair, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Platform SSO profile repairs", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Platform SSO profile repairs</h1><p>{ d.Name }</p><a class="uk-button uk-button-default mt-4" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID)) }>Back to device</a></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body space-y-4">
+					@ADEPlatformSSORequirement(info, r)
+					<p>These records describe requests to resend the retained profile for this enrollment. They do not prove installation or successful provider registration.</p>
+					if len(items)==0 {
+						<p>No recorded profile repairs on this page.</p>
+					}
+					for _,item:=range items {
+						<article class="software-revision">
+							<h2 class="font-semibold">
+								@Timestamp(&item.CreatedAt)
+ { " · " }{ item.Actor }</h2>
+							<p>{ item.Reason }</p>
+							<p class="uk-text-muted">Retained revision: { item.ProfileRevisionID }</p>
+						</article>
+					}
+					if next!="" {
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/setup/platform-sso/repairs?before="+url.QueryEscape(next))) }>Older profile repairs</a>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ ADEPlatformSSOProfilePicker(info *partials.CommonInfo, source, name string) {
+	<fieldset class="ade-sso-picker" data-source={ partials.GetNavigationUrl(info, source) } data-input={ name }>
+		<legend class="font-semibold">Select the Platform SSO profile revision</legend>
+		<p>Search profile revisions by name or identifier. The selected revision is retained when the catalog changes.</p>
+		<label>Profile search<input class="uk-input" type="search" maxlength="128" data-sso-search autocomplete="off"/></label>
+		<button type="button" class="uk-button uk-button-default" data-sso-find>Search Platform SSO profiles</button>
+		<p role="status" aria-live="polite" data-sso-status>Search to view profile revisions.</p>
+		<ul class="ade-app-results" data-sso-results aria-label="Matching Platform SSO profiles"></ul>
+		<button type="button" class="uk-button uk-button-default" data-sso-next hidden>More matching profiles</button>
+		<p class="font-semibold">Selected profile revision</p>
+		<ul data-sso-selected aria-label="Selected Platform SSO profile"></ul>
+	</fieldset>
+}

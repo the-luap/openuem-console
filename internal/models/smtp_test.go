@@ -17,7 +17,8 @@ type SMTPTestSuite struct {
 }
 
 func (suite *SMTPTestSuite) SetupTest() {
-	client := enttest.Open(suite.t, "sqlite3", "file:ent?mode=memory&_fk=1")
+	client := enttest.Open(suite.T(), "sqlite3", "file:ent?mode=memory&_fk=1")
+	suite.T().Cleanup(func() { client.Close() })
 	suite.model = Model{Client: client}
 
 	settings, err := suite.model.Client.Settings.Create().Save(context.Background())
@@ -39,13 +40,14 @@ func (suite *SMTPTestSuite) TestGetSMTPSettings() {
 
 func (suite *SMTPTestSuite) TestUpdateSMTPSettings() {
 	newSettings := SMTPSettings{
-		ID:       suite.settingsId,
-		Server:   "smtp.example.com",
-		Auth:     "PLAIN",
-		Port:     465,
-		User:     "test",
-		Password: "test",
-		MailFrom: "test@example.com",
+		ID:             suite.settingsId,
+		Server:         "smtp.example.com",
+		Auth:           "PLAIN",
+		Port:           465,
+		User:           "test",
+		Password:       "test",
+		MailFrom:       "test@example.com",
+		EncryptionType: "smtps",
 	}
 
 	err := suite.model.UpdateSMTPSettings(&newSettings)
@@ -58,7 +60,8 @@ func (suite *SMTPTestSuite) TestUpdateSMTPSettings() {
 	assert.Equal(suite.T(), 465, settings.SMTPPort, "port should be 465")
 	assert.Equal(suite.T(), "test", settings.SMTPUser, "user should be test")
 	assert.Equal(suite.T(), "test", settings.SMTPPassword, "password should be test")
-	assert.Equal(suite.T(), "LOGIN", settings.SMTPAuth, "auth should be PLAIN")
+	assert.Equal(suite.T(), "PLAIN", settings.SMTPAuth, "auth should be PLAIN")
+	assert.Equal(suite.T(), "smtps", string(settings.SMTPEncryptionType), "encryption should be smtps")
 	assert.Equal(suite.T(), "test@example.com", settings.MessageFrom, "message from should be test@example.com")
 }
 

@@ -50,16 +50,6 @@ func (h *Handler) AuthenticationSettings(c echo.Context) error {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.at_least_one_auth_method"), true))
 		}
 
-		// if we explicitely don't want to use certs, override reenablecertauth option
-		if !useCertificates {
-			h.ReenableCertAuth = false
-		}
-
-		// if we explicitely don't want to use passwords, override reenablepasswdauth option
-		if !usePasswd {
-			h.ReenablePasswdAuth = false
-		}
-
 		if !useOIDC {
 			oidcProvider = ""
 			oidcServer = ""
@@ -85,6 +75,9 @@ func (h *Handler) AuthenticationSettings(c echo.Context) error {
 		if useOIDC && oidcServer == "" {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.oidc_url_is_required"), true))
 		}
+		if useOIDC && !oidcIssuer(oidcServer) {
+			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.oidc_url_https"), true))
+		}
 
 		if useOIDC && oidcClientID == "" {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.client_id_is_required"), true))
@@ -96,6 +89,14 @@ func (h *Handler) AuthenticationSettings(c echo.Context) error {
 
 		if err := h.Model.SaveAuthenticationSettings(useCertificates, allowRegister, useOIDC, oidcProvider, oidcServer, oidcClientID, oidcRole, autoCreate, autoApprove, usePasswd, h.EncryptionMasterKey); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "authentication.settings_not_saved", err.Error()), true))
+		}
+
+		// Update emergency authentication overrides only after a successful save.
+		if !useCertificates {
+			h.ReenableCertAuth = false
+		}
+		if !usePasswd {
+			h.ReenablePasswdAuth = false
 		}
 
 		successMessage = i18n.T(c.Request().Context(), "authentication.settings_saved")

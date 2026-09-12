@@ -1,6 +1,7 @@
 package authserver
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"log"
@@ -11,6 +12,8 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/open-uem/utils"
 )
 
@@ -45,6 +48,10 @@ func New(m *models.Model, s *sessions.SessionManager, caCert, server, consolePor
 		log.Fatal(err)
 	}
 
+	if _, err = sessiongeneration.ConfigureIssuer(context.Background(), m.DB, a.CACert); err != nil {
+		log.Fatal("could not configure console certificate issuer: ", err)
+	}
+
 	// Create Handlers and register its router
 	a.Handler = handlers.NewHandler(m, s, a.CACert, server, consolePort, reverseProxyAuthPort, encryptionMasterKey)
 	a.Handler.Register(a.Router)
@@ -53,17 +60,23 @@ func New(m *models.Model, s *sessions.SessionManager, caCert, server, consolePor
 }
 
 func (a *AuthServer) Serve(address, certFile, certKey string) error {
+	identity, err := clientidentity.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	a.Handler.ClientIdentity = identity
 	cp := x509.NewCertPool()
 	cp.AddCert(a.CACert)
 
 	a.Server = &http.Server{
 		Addr:    address,
-		Handler: a.Router,
+		Handler: identity.Protect(a.Router),
 		TLSConfig: &tls.Config{
 			ClientAuth: tls.RequestClientCert,
 			ClientCAs:  cp,
 		},
 	}
+	identity.ConfigureTLS(a.Server.TLSConfig)
 	return a.Server.ListenAndServeTLS(certFile, certKey)
 }
 

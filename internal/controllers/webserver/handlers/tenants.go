@@ -293,6 +293,11 @@ func (h *Handler) DeleteTenant(c echo.Context) error {
 	}
 
 	// Send a request to uninstall agents associated with this organization
+	if inUse, err := h.appleScopeInUse(c, tenantID, 0); err != nil {
+		return h.ListTenants(c, "", "Could not check Apple management records", false)
+	} else if inUse {
+		return h.ListTenants(c, "", "This organization contains Apple management settings or records and cannot be deleted.", false)
+	}
 	agents, err := h.Model.GetAgentsByTenant(tenantID)
 	if err != nil {
 		return h.ListTenants(c, "", i18n.T(c.Request().Context(), "tenants.could_not_get_agents"), false)

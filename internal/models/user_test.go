@@ -9,21 +9,23 @@ import (
 	openuem_ent "github.com/open-uem/ent"
 	"github.com/open-uem/ent/enttest"
 	openuem_nats "github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/views/admin_views"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
 type UserTestSuite struct {
 	suite.Suite
-	t     enttest.TestingT
 	model Model
 	p     partials.PaginationAndSort
 }
 
 func (suite *UserTestSuite) SetupTest() {
-	client := enttest.Open(suite.t, "sqlite3", "file:ent?mode=memory&_fk=1")
+	client := enttest.Open(suite.T(), "sqlite3", "file:ent?mode=memory&_fk=1")
+	suite.T().Cleanup(func() { client.Close() })
 	suite.model = Model{Client: client}
 
 	for i := 0; i <= 6; i++ {
@@ -285,17 +287,20 @@ func (suite *UserTestSuite) TestAddLocalUser() {
 }
 
 func (suite *UserTestSuite) TestAddOIDCUser() {
-	_, err := suite.model.AddUser("user7", "User7", "user7@example.com", "", "ES", "certificate")
-	assert.NoError(suite.T(), err, "should add a new user")
+	_, err := suite.model.AddUser("user7", "User7", "user7@example.com", "", "ES", admin_views.OIDC_AUTH)
+	require.NoError(suite.T(), err, "should add a new OpenID user")
 
 	user, err := suite.model.GetUserById("user7")
-	assert.NoError(suite.T(), err, "should get recently created user")
+	require.NoError(suite.T(), err, "should get recently created user")
 	assert.Equal(suite.T(), "user7", user.ID, "user should have user7 id")
 	assert.Equal(suite.T(), "User7", user.Name, "user should have User7 name")
 	assert.Equal(suite.T(), "user7@example.com", user.Email, "user should have user7@example.com email")
 	assert.Equal(suite.T(), "", user.Phone, "user should have empty phone")
 	assert.Equal(suite.T(), "ES", user.Country, "user should have ES country")
-	assert.Equal(suite.T(), "users.review_request", user.Register, "user should have users.review_request register status")
+	assert.True(suite.T(), user.Openid)
+	assert.False(suite.T(), user.Passwd)
+	assert.True(suite.T(), user.EmailVerified)
+	assert.Equal(suite.T(), openuem_nats.REGISTER_OIDC_FIRST_LOGIN, user.Register, "administrator-created OpenID account should await its first login")
 }
 
 func (suite *UserTestSuite) TestAddImportedUser() {
@@ -368,15 +373,24 @@ func (suite *UserTestSuite) TestGetUserById() {
 }
 
 func (suite *UserTestSuite) TestConfirmEmail() {
-	err := suite.model.ConfirmEmail("user4")
-	assert.NoError(suite.T(), err, "should confirm email")
+	pending, err := suite.model.AddUser("confirmation-user", "Confirmation user", "confirmation@example.test", "", "ES", admin_views.CERTIFICATES_AUTH)
+	require.NoError(suite.T(), err)
+	require.False(suite.T(), pending.EmailVerified)
+	require.Equal(suite.T(), "users.pending_email_confirmation", pending.Register)
 
-	user, err := suite.model.GetUserById("user4")
-	assert.NoError(suite.T(), err, "should get confirmed email user")
-	assert.Equal(suite.T(), "user4", user.ID, "user should have user4 id")
-	assert.Equal(suite.T(), "User 4", user.Name, "user should have User4 name")
-	assert.Equal(suite.T(), true, user.EmailVerified, "user should have email verified")
-	assert.Equal(suite.T(), openuem_nats.REGISTER_IN_REVIEW, user.Register)
+	require.NoError(suite.T(), suite.model.StageEmailConfirmation(suite.T().Context(), pending, "owned-confirmation-token"))
+	pending, err = suite.model.PendingEmailConfirmation(suite.T().Context(), pending.ID)
+	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), suite.model.ConfirmEmail(suite.T().Context(), pending), "should confirm email")
+	confirmed, err := suite.model.GetUserById(pending.ID)
+	require.NoError(suite.T(), err, "should get confirmed email user")
+	assert.Equal(suite.T(), pending.ID, confirmed.ID)
+	assert.Equal(suite.T(), pending.Name, confirmed.Name)
+	assert.Equal(suite.T(), pending.Email, confirmed.Email)
+	assert.True(suite.T(), confirmed.EmailVerified)
+	assert.False(suite.T(), confirmed.Openid)
+	assert.False(suite.T(), confirmed.Passwd)
+	assert.Equal(suite.T(), openuem_nats.REGISTER_SEND_CERTIFICATE, confirmed.Register, "email confirmation should queue the certificate request")
 }
 
 func (suite *UserTestSuite) TestUserSetRevokedCertificate() {
@@ -388,18 +402,6 @@ func (suite *UserTestSuite) TestUserSetRevokedCertificate() {
 	assert.Equal(suite.T(), "user4", user.ID, "user should have user4 id")
 	assert.Equal(suite.T(), "User 4", user.Name, "user should have User4 name")
 	assert.Equal(suite.T(), openuem_nats.REGISTER_REVOKED, user.Register)
-}
-
-func (suite *UserTestSuite) TestConfirmLogIn() {
-	err := suite.model.ConfirmLogIn("user5")
-	assert.NoError(suite.T(), err, "should confirm user log in")
-
-	user, err := suite.model.GetUserById("user5")
-	assert.NoError(suite.T(), err, "should get confirmed log in user")
-	assert.Equal(suite.T(), "user5", user.ID, "user should have user5 id")
-	assert.Equal(suite.T(), "User 5", user.Name, "user should have User 5 name")
-	assert.Equal(suite.T(), "", user.CertClearPassword, "user should have empty cert clear password")
-	assert.Equal(suite.T(), openuem_nats.REGISTER_COMPLETE, user.Register)
 }
 
 func (suite *UserTestSuite) TestDeleteUser() {
