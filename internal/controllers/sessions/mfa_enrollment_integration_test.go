@@ -17,11 +17,14 @@ import (
 	"github.com/alexedwards/argon2id"
 	"github.com/alexedwards/scs/v2"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	console "github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/utils"
 	"github.com/pquerna/otp/totp"
@@ -134,6 +137,45 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 				if err != nil {
 					t.Fatal(err)
 				}
+				stage, confirm, disable := f.model.SaveTOTPSecretKey, f.model.SaveRecoveryCodes, f.model.Disable2FA
+				if method == "OpenID" {
+					settings, err = settings.Update().SetOIDCIssuerURL("https://identity.example.test").SetOIDCClientID("owned-console").Save(t.Context())
+					if err != nil {
+						t.Fatal(err)
+					}
+					permissions, err := access.NewStore(f.model.DB)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err = permissions.Migrate(t.Context()); err != nil {
+						t.Fatal(err)
+					}
+					if err = permissions.Bootstrap(t.Context(), u.ID); err != nil {
+						t.Fatal(err)
+					}
+					accounts, err := oidcaccounts.NewStore(f.model.DB, permissions)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err = accounts.Migrate(t.Context()); err != nil {
+						t.Fatal(err)
+					}
+					if err = accounts.Change(t.Context(), u.ID, u.ID, settings.OIDCIssuerURL, settings.OIDCClientID, "owned-subject", "link", 0); err != nil {
+						t.Fatal(err)
+					}
+					identity, err := accounts.SessionFor(t.Context(), oidcaccounts.PolicyFrom(settings), u.ID, "owned-subject")
+					if err != nil {
+						t.Fatal(err)
+					}
+					authorization := oidcaccounts.AccountMFA(*identity)
+					stage = func(ctx context.Context, u *ent.User, secret string) error {
+						return f.model.StageOIDCTOTPSecret(ctx, u, secret, authorization)
+					}
+					confirm = func(ctx context.Context, u *ent.User, codes []string) error {
+						return f.model.ConfirmOIDCMFA(ctx, u, codes, authorization)
+					}
+					disable = func(ctx context.Context, u *ent.User) error { return f.model.DisableOIDCMFA(ctx, u, authorization) }
+				}
 				secret := "JBSWY3DPEHPK3PXP"
 				if encrypted {
 					secret, err = utils.EncryptSensitiveField(secret, f.key)
@@ -141,10 +183,10 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 						t.Fatal(err)
 					}
 				}
-				if err = f.model.SaveTOTPSecretKey(t.Context(), u, secret); err != nil {
+				if err = stage(t.Context(), u, secret); err != nil {
 					t.Fatal("stage secret", err)
 				}
-				if err = f.model.SaveTOTPSecretKey(t.Context(), u, "stale replacement"); !errors.Is(err, models.ErrMFAState) {
+				if err = stage(t.Context(), u, "stale replacement"); !errors.Is(err, models.ErrMFAState) {
 					t.Fatal("stale secret staging succeeded", err)
 				}
 				u, err = f.model.Client.User.Get(t.Context(), u.ID)
@@ -161,7 +203,7 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 				}
 				done := make(chan result, 2)
 				for i := range 2 {
-					go func() { done <- result{i, f.model.SaveRecoveryCodes(t.Context(), u, codes[i])} }()
+					go func() { done <- result{i, confirm(t.Context(), u, codes[i])} }()
 				}
 				winner := -1
 				for range 2 {
@@ -203,7 +245,7 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 						t.Fatal("published code set did not belong to the winner")
 					}
 				}
-				if err = f.model.SaveRecoveryCodes(t.Context(), u, ownedRecoveryCodes()); !errors.Is(err, models.ErrMFAState) {
+				if err = confirm(t.Context(), u, ownedRecoveryCodes()); !errors.Is(err, models.ErrMFAState) {
 					t.Fatal("old enrollment replayed", err)
 				}
 				sm := scs.New()
@@ -224,7 +266,7 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err = f.model.Disable2FA(t.Context(), current); err != nil {
+				if err = disable(t.Context(), current); err != nil {
 					t.Fatal("disable confirmed enrollment", err)
 				}
 				if _, _, err = sm.Commit(late); !errors.Is(err, sessions.ErrRevoked) {

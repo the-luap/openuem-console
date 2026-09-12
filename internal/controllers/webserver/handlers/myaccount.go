@@ -214,7 +214,16 @@ func (h *Handler) Enable2FA(c echo.Context) error {
 		}
 	}
 
-	if err := h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret); err != nil {
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StageOIDCTOTPSecret(c.Request().Context(), user, totpSecret, identity)
+	} else {
+		err = h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret)
+	}
+	if err != nil {
 		return mfaMutationError(err)
 	}
 
@@ -259,7 +268,16 @@ func (h *Handler) Enabled2FA(c echo.Context) error {
 	}
 
 	// Save recovery codes
-	if err := h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes); err != nil {
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmOIDCMFA(c.Request().Context(), user, codes, identity)
+	} else {
+		err = h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes)
+	}
+	if err != nil {
 		return mfaMutationError(err)
 	}
 
@@ -299,7 +317,16 @@ func (h *Handler) Disable2FA(c echo.Context) error {
 	}
 
 	// Remove 2FA from database
-	if err := h.Model.Disable2FA(c.Request().Context(), user); err != nil {
+	if user.Openid {
+		identity, authErr := h.oidcMFAAuthorization(c, user, false)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.DisableOIDCMFA(c.Request().Context(), user, identity)
+	} else {
+		err = h.Model.Disable2FA(c.Request().Context(), user)
+	}
+	if err != nil {
 		return mfaMutationError(err)
 	}
 

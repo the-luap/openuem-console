@@ -461,6 +461,13 @@ decoder; it preserves the stored ciphertext used by the transaction comparison.
 New recovery codes use unbiased random character selection and reject duplicates.
 Conflicting state returns HTTP 409; storage failure returns a generic HTTP 503.
 
+OpenID enrollment writes additionally lock the complete original identity policy
+and active binding revision before locking the account. Public enrollment binds
+the transaction to its original unexpired first-factor proof. Account settings
+capture the completed server-side identity, and unbound local model APIs reject
+OpenID accounts. See [OpenID sign-in](oidc-sign-in.md) for the exact authorization
+and retry boundaries.
+
 Both public sign-in and protected account settings mark authenticator setup and
 recovery-code confirmation responses `Cache-Control: no-store` before validation
 or rendering. The shared renderers preserve that policy; `no-cache` alone would

@@ -137,6 +137,19 @@ can confirm an unchanged pending-review account; it cannot undo review newly
 imposed on an approved account. Pending MFA and a newly confirmed enrollment remain
 valid stages of the normal sign-in flow.
 
+OpenID MFA staging, confirmation and account-settings disable operations now
+bind their writes to the original server-side identity. Their five-second,
+read-committed transaction locks the complete configuration, binding namespace,
+exact active binding/revision and account snapshot before changing enrollment.
+Binding changes and policy changes that commit before those locks are acquired
+reject the write; rollback and transient database failures preserve valid retries.
+Public enrollment additionally requires the original unexpired OpenID primary
+proof, bound to that identity, and rechecks its lifetime before committing.
+The model's unbound local MFA APIs reject OpenID accounts. The public and protected
+POST routes retain CSRF protection, and secret/code responses use `no-store`.
+A completed account session authorizes settings changes under these existing
+session rules; this does not add provider reauthentication or a new step-up policy.
+
 Completed OpenID MFA also consumes a unique primary-flow receipt and, for TOTP,
 advances the authenticator's sign-in counter in that transaction. Preloaded pending
 sessions and newly verified primary flows cannot reuse consumed evidence. See

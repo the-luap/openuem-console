@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,6 +30,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -262,7 +265,7 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	}
 	sm.Store = store
 	sm.Cookie.Secure = true
-	h := &Handler{Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport, EncryptionMasterKey: masterKey}
+	h := &Handler{AuthLogger: log.New(io.Discard, "", 0), Model: m, Access: permissions, OIDCAccounts: accounts, SessionManager: &sessions.SessionManager{Manager: sm, Pool: pool}, PublicOrigin: "https://console.test", ReverseProxyServer: "proxy.internal", oidcHTTPTransport: provider.server.Client().Transport, EncryptionMasterKey: masterKey}
 	e := router.New(h.SessionManager, "console.test", "443", "1M")
 	e.GET("/oidc", h.OIDCLogIn)
 	e.GET("/oidc/callback", h.OIDCCallback)
@@ -270,6 +273,12 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	e.GET("/myaccount", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) }, h.IsAuthenticated)
 	e.GET("/fixture/remove-identity", func(c echo.Context) error { sm.Remove(c.Request().Context(), oidcSessionKey); return c.NoContent(200) })
 	e.GET("/fixture/complete-mfa", h.LoginTOTPValidate)
+	e.GET("/fixture/csrf", func(c echo.Context) error { return c.String(200, c.Get("csrf").(string)) })
+	e.POST("/login/totpregister", h.Register2FA)
+	e.POST("/login/totpconfirm", h.LoginTOTPConfirm)
+	e.POST("/myaccount/enable2fa", h.Enable2FA, h.IsAuthenticated)
+	e.POST("/myaccount/register2fa", h.Enabled2FA, h.IsAuthenticated)
+	e.POST("/myaccount/disable2fa", h.Disable2FA, h.IsAuthenticated)
 	e.GET("/fixture/old-session", func(c echo.Context) error {
 		uid := "password-victim"
 		if c.QueryParam("same") == "yes" {
@@ -358,6 +367,107 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 		}
 	}
 	configure("authelia")
+
+	t.Run("MFA enrollment and account settings retain provider identity", func(t *testing.T) {
+		post := func(b browser, path string, form url.Values) *httptest.ResponseRecorder {
+			t.Helper()
+			req := httptest.NewRequest(http.MethodPost, "https://console.test"+path, strings.NewReader(form.Encode()))
+			req.Header.Set("Origin", "https://console.test")
+			req.Header.Set("Referer", "https://console.test/myaccount")
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			for _, cookie := range b {
+				req.AddCookie(cookie)
+			}
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			for _, cookie := range rec.Result().Cookies() {
+				if cookie.MaxAge < 0 {
+					delete(b, cookie.Name)
+				} else {
+					b[cookie.Name] = cookie
+				}
+			}
+			return rec
+		}
+		for _, pending := range []bool{true, false} {
+			if err := m.Client.User.UpdateOneID("oidc-reader").SetUse2fa(pending).SetTotpSecretConfirmed(false).SetTotpSecret("").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			b := browser{}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("cannot begin owned OpenID enrollment", rec.Code)
+			}
+			csrf := request(b, "/fixture/csrf").Body.String()
+			stage, confirm := "/myaccount/enable2fa", "/myaccount/register2fa"
+			if pending {
+				stage, confirm = "/login/totpregister", "/login/totpconfirm"
+			}
+			if rec := post(b, stage, url.Values{}); rec.Code != 403 {
+				t.Fatal("OpenID MFA accepted missing CSRF", rec.Code)
+			}
+			current, err := m.Client.User.Get(t.Context(), "oidc-reader")
+			if err != nil || current.TotpSecret != "" {
+				t.Fatal("rejected request staged a secret", err)
+			}
+			if rec := post(b, stage, url.Values{"csrf": {csrf}}); rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("OpenID secret staging failed", pending, rec.Code)
+			}
+			current, err = m.Client.User.Get(t.Context(), "oidc-reader")
+			if err != nil || current.TotpSecret == "" || current.TotpSecretConfirmed {
+				t.Fatal("OpenID staging changed confirmation", err)
+			}
+			secret, _, err := sessiontokens.Decode(current.TotpSecret, masterKey)
+			if err != nil {
+				t.Fatal(err)
+			}
+			code, err := totp.GenerateCode(secret, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec := post(b, confirm, url.Values{"csrf": {csrf}, "confirm-code": {code}})
+			if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("OpenID enrollment confirmation failed", pending, rec.Code)
+			}
+			current, err = m.Client.User.Get(t.Context(), "oidc-reader")
+			if err != nil || !current.Use2fa || !current.TotpSecretConfirmed {
+				t.Fatal("OpenID enrollment did not persist", err)
+			}
+			var count int
+			if err = m.DB.QueryRowContext(t.Context(), `SELECT count(*) FROM recovery_codes WHERE user_recoverycodes='oidc-reader'`).Scan(&count); err != nil || count != 10 {
+				t.Fatal("OpenID enrollment did not store exactly ten codes", count, err)
+			}
+			if !pending {
+				// Enabling MFA from a single-factor session requires a fresh provider flow
+				// and the new authenticator before the account may disable MFA again.
+				b = browser{}
+				if rec = request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+					t.Fatal("cannot begin required MFA", rec.Code)
+				}
+				if rec = request(b, "/fixture/complete-mfa?confirm-code="+url.QueryEscape(code)); rec.Code != 302 {
+					t.Fatal("new authenticator failed sign-in", rec.Code)
+				}
+			}
+			if rec = request(b, "/myaccount"); rec.Code != 200 {
+				t.Fatal("enrolled OpenID session lost protected access", rec.Code)
+			}
+			csrf = request(b, "/fixture/csrf").Body.String()
+			oldToken := b[sm.Cookie.Name].Value
+			if rec = post(b, "/myaccount/disable2fa", url.Values{"csrf": {csrf}}); rec.Code != 302 {
+				t.Fatal("OpenID account could not disable MFA", rec.Code)
+			}
+			current, err = m.Client.User.Get(t.Context(), "oidc-reader")
+			if err != nil || current.Use2fa || current.TotpSecret != "" || current.TotpSecretConfirmed {
+				t.Fatal("OpenID disable retained enrollment", err)
+			}
+			if err = m.DB.QueryRowContext(t.Context(), `SELECT count(*) FROM recovery_codes WHERE user_recoverycodes='oidc-reader'`).Scan(&count); err != nil || count != 0 {
+				t.Fatal("OpenID disable retained backup codes", count, err)
+			}
+			ctx, err := sm.Load(t.Context(), oldToken)
+			if err != nil || sm.GetString(ctx, "uid") != "" {
+				t.Fatal("OpenID disable retained completed session", err)
+			}
+		}
+	})
 	t.Run("MFA preserves only a currently valid OpenID identity", func(t *testing.T) {
 		const secret = "JBSWY3DPEHPK3PXP"
 		if err := m.Client.User.UpdateOneID("oidc-reader").SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret(secret).Exec(t.Context()); err != nil {

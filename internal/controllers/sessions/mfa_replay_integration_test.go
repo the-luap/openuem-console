@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,26 +92,44 @@ func TestMFAPrimaryAndTOTPReplayHaveOneWinner(t *testing.T) {
 						codes[i] = sharedTOTP
 					}
 				}
-				// All handlers finish verification and reach owner association before
-				// any is allowed to enter its final admission transaction.
-				if _, err = f.model.DB.ExecContext(t.Context(), `CREATE FUNCTION hold_mfa_completion() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock_shared(712036482); RETURN NEW; END $$; CREATE TRIGGER hold_mfa_completion AFTER UPDATE OF user_sessions ON sessions FOR EACH ROW EXECUTE FUNCTION hold_mfa_completion()`); err != nil {
-					t.Fatal(err)
-				}
-				tx, err := f.model.DB.BeginTx(t.Context(), nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				t.Cleanup(func() { _ = tx.Rollback() })
-				if _, err = tx.ExecContext(t.Context(), `SELECT pg_advisory_xact_lock(712036482)`); err != nil {
-					t.Fatal(err)
-				}
+				// Pause only after the first session write commits, before owner
+				// association. A SQL trigger inside association retains a user
+				// foreign-key lock and can block a later primary check itself.
+				barrier := &mfaAdmissionBarrierStore{PostgresStore: f.store, reached: make(chan struct{}, contenders), release: make(chan struct{})}
+				barrier.remaining.Store(contenders)
+				sm.Store = barrier
+				var releaseOnce sync.Once
+				release := func() { releaseOnce.Do(func() { close(barrier.release) }) }
+				var handlers sync.WaitGroup
+				t.Cleanup(func() { release(); handlers.Wait() })
 				type result struct {
 					admitted bool
 					err      error
 				}
 				done := make(chan result, contenders)
+				deadline, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+				defer cancel()
+				awaitArrival := func() {
+					t.Helper()
+					select {
+					case <-barrier.reached:
+					case early := <-done:
+						t.Fatal("MFA handler finished before admission barrier", early.err)
+					case <-deadline.Done():
+						t.Fatal("MFA handler did not reach admission barrier", deadline.Err())
+					}
+				}
 				for i := range contenders {
+					if i == contenders-1 {
+						// Deliberately delay the last primary check until all
+						// earlier handlers have reached the admission barrier.
+						for range contenders - 1 {
+							awaitArrival()
+						}
+					}
+					handlers.Add(1)
 					go func() {
+						defer handlers.Done()
 						c, _ := newRequest(contexts[i], codes[i])
 						var err error
 						if replay == "one primary with distinct backup codes" {
@@ -120,23 +140,8 @@ func TestMFAPrimaryAndTOTPReplayHaveOneWinner(t *testing.T) {
 						done <- result{sm.GetBool(contexts[i], "twofa"), err}
 					}()
 				}
-				deadline := time.Now().Add(4 * time.Second)
-				for {
-					var waiting int
-					if err = f.model.DB.QueryRowContext(t.Context(), `SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'UPDATE "sessions" SET%'`).Scan(&waiting); err != nil {
-						t.Fatal(err)
-					}
-					if waiting == contenders {
-						break
-					}
-					if time.Now().After(deadline) {
-						t.Fatal("MFA contenders did not reach the admission barrier", waiting)
-					}
-					time.Sleep(time.Millisecond)
-				}
-				if err = tx.Commit(); err != nil {
-					t.Fatal(err)
-				}
+				awaitArrival()
+				release()
 				winners := 0
 				for range contenders {
 					r := <-done
@@ -153,4 +158,28 @@ func TestMFAPrimaryAndTOTPReplayHaveOneWinner(t *testing.T) {
 			})
 		}
 	}
+}
+
+// The adapter retains the actual PostgreSQL persistence and context methods.
+// Its barrier holds no database transaction, row lock or authentication receipt.
+type mfaAdmissionBarrierStore struct {
+	*sessions.PostgresStore
+	remaining atomic.Int32
+	reached   chan struct{}
+	release   chan struct{}
+}
+
+func (s *mfaAdmissionBarrierStore) CommitCtx(ctx context.Context, token string, data []byte, expiry time.Time) error {
+	if err := s.PostgresStore.CommitCtx(ctx, token, data, expiry); err != nil {
+		return err
+	}
+	if s.remaining.Add(-1) >= 0 {
+		s.reached <- struct{}{}
+		select {
+		case <-s.release:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
 }

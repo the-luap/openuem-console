@@ -11,6 +11,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 var ErrMFAState = errors.New("MFA enrollment or account authorization changed")
@@ -24,19 +25,20 @@ type LocalMFAAuthorization struct {
 
 // SaveTOTPSecretKey stages an unconfirmed secret against the account snapshot
 // whose authorization was checked. Confirmed enrollment must be disabled first.
+// OpenID callers must use StageOIDCTOTPSecret with their server-side identity.
 func (m *Model) SaveTOTPSecretKey(ctx context.Context, expected *ent.User, secret string) error {
-	return m.stageMFASecret(ctx, expected, secret, nil)
+	return m.stageMFASecret(ctx, expected, secret, nil, nil)
 }
 
 func (m *Model) StagePrimaryTOTPSecret(ctx context.Context, expected *ent.User, secret string, primary LocalMFAAuthorization) error {
-	return m.stageMFASecret(ctx, expected, secret, &primary)
+	return m.stageMFASecret(ctx, expected, secret, &primary, nil)
 }
 
-func (m *Model) stageMFASecret(ctx context.Context, expected *ent.User, secret string, primary *LocalMFAAuthorization) error {
+func (m *Model) stageMFASecret(ctx context.Context, expected *ent.User, secret string, primary *LocalMFAAuthorization, identity *oidcaccounts.MFAAuthorization) error {
 	if expected == nil || expected.TotpSecretConfirmed || secret == "" || len(secret) > 4096 {
 		return ErrMFAState
 	}
-	return m.changeMFAState(ctx, expected, primary, func(ctx context.Context, tx *sql.Tx) error {
+	return m.changeMFAState(ctx, expected, primary, identity, func(ctx context.Context, tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE users SET totp_secret=$2,modified=clock_timestamp() WHERE uid=$1`, expected.ID, secret)
 		return err
 	})
@@ -44,15 +46,16 @@ func (m *Model) stageMFASecret(ctx context.Context, expected *ent.User, secret s
 
 // SaveRecoveryCodes confirms the exact staged secret and replaces the full code
 // set in one transaction. Hashing finishes before any database locks are held.
+// OpenID callers must use ConfirmOIDCMFA with their server-side identity.
 func (m *Model) SaveRecoveryCodes(parent context.Context, expected *ent.User, codes []string) error {
-	return m.confirmMFA(parent, expected, codes, nil)
+	return m.confirmMFA(parent, expected, codes, nil, nil)
 }
 
 func (m *Model) ConfirmPrimaryMFA(ctx context.Context, expected *ent.User, codes []string, primary LocalMFAAuthorization) error {
-	return m.confirmMFA(ctx, expected, codes, &primary)
+	return m.confirmMFA(ctx, expected, codes, &primary, nil)
 }
 
-func (m *Model) confirmMFA(parent context.Context, expected *ent.User, codes []string, primary *LocalMFAAuthorization) error {
+func (m *Model) confirmMFA(parent context.Context, expected *ent.User, codes []string, primary *LocalMFAAuthorization, identity *oidcaccounts.MFAAuthorization) error {
 	if expected == nil || expected.TotpSecret == "" || expected.TotpSecretConfirmed || len(codes) != 10 {
 		return ErrMFAState
 	}
@@ -76,7 +79,7 @@ func (m *Model) confirmMFA(parent context.Context, expected *ent.User, codes []s
 		}
 		hashes[i] = hash
 	}
-	return m.changeMFAState(ctx, expected, primary, func(ctx context.Context, tx *sql.Tx) error {
+	return m.changeMFAState(ctx, expected, primary, identity, func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM recovery_codes WHERE user_recoverycodes=$1`, expected.ID); err != nil {
 			return err
 		}
@@ -93,7 +96,23 @@ func (m *Model) confirmMFA(parent context.Context, expected *ent.User, codes []s
 // Disable2FA removes the secret and its codes together, and retires sessions in
 // the same transaction. Deletion receipts prevent old session writers returning.
 func (m *Model) Disable2FA(ctx context.Context, expected *ent.User) error {
-	return m.changeMFAState(ctx, expected, nil, func(ctx context.Context, tx *sql.Tx) error {
+	return m.disableMFA(ctx, expected, nil)
+}
+
+func (m *Model) StageOIDCTOTPSecret(ctx context.Context, expected *ent.User, secret string, identity oidcaccounts.MFAAuthorization) error {
+	return m.stageMFASecret(ctx, expected, secret, nil, &identity)
+}
+
+func (m *Model) ConfirmOIDCMFA(ctx context.Context, expected *ent.User, codes []string, identity oidcaccounts.MFAAuthorization) error {
+	return m.confirmMFA(ctx, expected, codes, nil, &identity)
+}
+
+func (m *Model) DisableOIDCMFA(ctx context.Context, expected *ent.User, identity oidcaccounts.MFAAuthorization) error {
+	return m.disableMFA(ctx, expected, &identity)
+}
+
+func (m *Model) disableMFA(ctx context.Context, expected *ent.User, identity *oidcaccounts.MFAAuthorization) error {
+	return m.changeMFAState(ctx, expected, nil, identity, func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM recovery_codes WHERE user_recoverycodes=$1`, expected.ID); err != nil {
 			return err
 		}
@@ -107,8 +126,8 @@ func (m *Model) Disable2FA(ctx context.Context, expected *ent.User) error {
 
 // Configuration, account and code/session rows use the same lock order as other
 // credential mutations. The supplied snapshot must include stored ciphertext.
-func (m *Model) changeMFAState(parent context.Context, expected *ent.User, primary *LocalMFAAuthorization, change func(context.Context, *sql.Tx) error) error {
-	if m.DB == nil || expected == nil || expected.ID == "" {
+func (m *Model) changeMFAState(parent context.Context, expected *ent.User, primary *LocalMFAAuthorization, identity *oidcaccounts.MFAAuthorization, change func(context.Context, *sql.Tx) error) error {
+	if m.DB == nil || expected == nil || expected.ID == "" || expected.Openid && identity == nil || primary != nil && identity != nil {
 		return ErrMFAState
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -124,6 +143,14 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, prima
 	}
 	if err != nil {
 		return err
+	}
+	if identity != nil {
+		if err = identity.Lock(ctx, tx, expected); err != nil {
+			if errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
+				return ErrMFAState
+			}
+			return err
+		}
 	}
 	var current ent.User
 	err = tx.QueryRowContext(ctx, `SELECT coalesce(passwd,false),coalesce(openid,false),coalesce(hash,''),coalesce(register,''),coalesce(use2fa,false),coalesce(totp_secret_confirmed,false),coalesce(totp_secret,'') FROM users WHERE uid=$1 FOR UPDATE`, expected.ID).Scan(&current.Passwd, &current.Openid, &current.Hash, &current.Register, &current.Use2fa, &current.TotpSecretConfirmed, &current.TotpSecret)
@@ -185,6 +212,11 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, prima
 	}
 	if primary != nil && primary.Certificate != nil && !primary.Certificate.NotAfter.After(time.Now()) {
 		return ErrLocalSignIn
+	}
+	if identity != nil {
+		if err = identity.Validate(expected, time.Now()); err != nil {
+			return ErrMFAState
+		}
 	}
 	return tx.Commit()
 }

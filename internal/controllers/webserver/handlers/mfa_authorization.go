@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 func mfaMutationError(err error) error {
@@ -19,6 +21,29 @@ func mfaMutationError(err error) error {
 		return echo.NewHTTPError(http.StatusConflict, "Account access or two-factor enrollment changed; sign in again.")
 	}
 	return echo.NewHTTPError(http.StatusServiceUnavailable, "Two-factor authentication could not be updated. Try again.")
+}
+
+func (h *Handler) oidcMFAAuthorization(c echo.Context, user *ent.User, pending bool) (oidcaccounts.MFAAuthorization, error) {
+	sm := h.SessionManager.Manager
+	ctx := c.Request().Context()
+	raw := sm.GetString(ctx, oidcSessionKey)
+	var identity oidcaccounts.Session
+	if len(raw) > 8192 || json.Unmarshal([]byte(raw), &identity) != nil || sm.GetString(ctx, "uid") != user.ID || sm.GetBool(ctx, "forgot") || sm.GetBool(ctx, "authentication-pending") != pending {
+		return oidcaccounts.MFAAuthorization{}, models.ErrMFAState
+	}
+	authorization := oidcaccounts.AccountMFA(identity)
+	if pending {
+		if sm.GetBool(ctx, "twofa") {
+			return oidcaccounts.MFAAuthorization{}, models.ErrMFAState
+		}
+		authorization = oidcaccounts.PrimaryMFA(identity, sm.GetString(ctx, loginproof.SessionKey))
+	} else if user.Use2fa && !sm.GetBool(ctx, "twofa") {
+		return oidcaccounts.MFAAuthorization{}, models.ErrMFAState
+	}
+	if err := authorization.Validate(user, time.Now()); err != nil {
+		return oidcaccounts.MFAAuthorization{}, models.ErrMFAState
+	}
+	return authorization, nil
 }
 
 func (h *Handler) localMFAAuthorization(c echo.Context, user *ent.User) (models.LocalMFAAuthorization, error) {

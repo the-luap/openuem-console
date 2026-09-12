@@ -270,7 +270,11 @@ func (h *Handler) Register2FA(c echo.Context) error {
 	}
 
 	if user.Openid {
-		err = h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret)
+		identity, authErr := h.oidcMFAAuthorization(c, user, true)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StageOIDCTOTPSecret(c.Request().Context(), user, totpSecret, identity)
 	} else {
 		primary, authErr := h.localMFAAuthorization(c, user)
 		if authErr != nil {
@@ -324,7 +328,11 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 
 	// Save recovery codes
 	if user.Openid {
-		err = h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes)
+		identity, authErr := h.oidcMFAAuthorization(c, user, true)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmOIDCMFA(c.Request().Context(), user, codes, identity)
 	} else {
 		primary, authErr := h.localMFAAuthorization(c, user)
 		if authErr != nil {

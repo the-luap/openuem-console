@@ -61,6 +61,29 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- OpenID MFA staging, confirmation and disable operations now check the full
+  original identity policy and active binding revision in the enrollment write
+  transaction, with configuration/binding/account locks in a consistent order.
+  Public enrollment also retains its unexpired primary-flow proof; unbound local
+  model APIs reject OpenID accounts. Six owned baseline cases changed MFA state
+  despite a changed binding revision or client policy. Twenty-seven mutation
+  regressions now deny those and the remaining policy changes. Actual source-lock
+  commit/rollback/cancellation, malformed/expired/mismatched primary evidence and
+  unavailable-source retry tests accompany the existing concurrent-confirmation,
+  encrypted-state and session-retirement checks. The owned TLS provider exercises
+  both public enrollment and protected account settings through CSRF-protected
+  POST routes in both storage modes. A full session race run also exposed an
+  existing replay-test barrier retaining an owner-association foreign-key lock
+  needed by a later primary check. Forced scheduling reproduced three blocked
+  associations and one blocked primary check. The test now pauses after the real
+  session write commits, holds no database locks and deliberately starts the last
+  contender later; the one-winner invariant remains unchanged. The final complete
+  PostgreSQL session race suite passes in 165.030 seconds; the full OpenID store
+  race suite, focused Linux session runtime, owned-provider Linux routes,
+  authentication/security/router race tests and complete Linux build also pass.
+  See [OpenID sign-in](oidc-sign-in.md) for the
+  separate session, policy restoration and production-provider boundaries.
+
 - The Windows WSTEP parser fuzzing CI step now uses a fixed 10,000-input budget,
   one-second minimization limit and two-minute overall timeout. The preceding
   time-window run stopped with `context deadline exceeded` after 54 executions;
