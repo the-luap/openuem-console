@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The Apple update form now resolves its heading, instructions, release/deadline
+  labels, empty-catalog help, catalog timestamp caption and action buttons through
+  the existing `updates` locale catalog. The missing-release validation uses the
+  request locale too. English copy and device-local deadline semantics are
+  preserved. Existing view/catalog race suites and Linux handler/view/catalog
+  race suites pass. Capability explanations and persisted policy diagnostics
+  remain separate localization work.
+
 - [Certificate-account email confirmation](account-email-confirmation.md) now
   uses a read-only GET preview and explicit CSRF-protected POST. The registered
   endpoint rejects other methods instead of reaching the protected fallback;

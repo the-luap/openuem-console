@@ -15,6 +15,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/agent"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
@@ -865,7 +866,7 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 	if c.FormValue("remove") != "true" {
 		version, build, selected := strings.Cut(c.FormValue("target_release"), "/")
 		if !selected || version == "" || build == "" {
-			return echo.NewHTTPError(400, "Select an available Apple release and build")
+			return echo.NewHTTPError(400, i18n.T(c.Request().Context(), "updates.invalid_release"))
 		}
 		deadline := c.FormValue("deadline")
 		if len(deadline) == 16 {

@@ -287,7 +287,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 				@MacUsers(info, detail.Device, detail.Users)
 			}
 			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">Operating system updates</h2><p>Set a target version and a deadline in the device's local time. Requires iOS/iPadOS 17 or later, or a supervised Mac running macOS 14 or later with update authorization. Apple also checks installation conditions on the device.</p></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx, "updates.apple_heading") }</h2><p>{ i18n.T(ctx, "updates.apple_description") }</p></div>
 				<div class="uk-card-body">
 					if reason:=detail.Device.Capabilities().UpdateReason; reason!="" {
 						<p role="status" class="uk-alert uk-alert-warning">{ reason }</p>
@@ -318,31 +318,31 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">
 								@CSRF(info)
 								<label>
-									Target OS release and build
+									{ i18n.T(ctx, "updates.release_label") }
 									<select class="uk-select" name="target_release" required>
-										<option value="">Select an available Apple release</option>
+										<option value="">{ i18n.T(ctx, "updates.select_release") }</option>
 										for _,release:=range detail.Releases {
 											<option value={ release.Version + "/" + release.Build } selected?={ release.Version==policyVersion(detail.Policy) && release.Build==policyBuild(detail.Policy) }>{ release.Version+" · "+release.Build }</option>
 										}
 									</select>
 								</label>
-								<p class="uk-text-muted">{ "Apple release catalog checked: " }
+								<p class="uk-text-muted">{ i18n.T(ctx, "updates.catalog_checked")+" " }
 									@Timestamp(detail.CatalogAt)
 								</p>
 								if len(detail.Releases)==0 {
-									<p role="status">No current releases are available for this device. Refresh its inventory and check the Apple catalog connection before setting a policy.</p>
+									<p role="status">{ i18n.T(ctx, "updates.no_releases") }</p>
 								}
-								<label>Installation deadline (device local time)<input class="uk-input" type="datetime-local" name="deadline" required value={ policyDeadline(detail.Policy) }/></label>
-								<label>Update information URL (optional)<input class="uk-input" type="url" name="details_url" placeholder="https://" value={ policyURL(detail.Policy) }/></label>
-								<p class="uk-text-muted">The target must be an Apple release available for this model. Offline devices and devices with insufficient battery cannot install immediately. Compliance is confirmed from fresh OS inventory.</p>
-								<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 || detail.Device.Capabilities().UpdateReason!="" }>Enforce update policy</button>
+								<label>{ i18n.T(ctx, "updates.deadline_label") }<input class="uk-input" type="datetime-local" name="deadline" required value={ policyDeadline(detail.Policy) }/></label>
+								<label>{ i18n.T(ctx, "updates.details_label") }<input class="uk-input" type="url" name="details_url" placeholder="https://" value={ policyURL(detail.Policy) }/></label>
+								<p class="uk-text-muted">{ i18n.T(ctx, "updates.enforcement_help") }</p>
+								<button class="uk-button uk-button-primary" type="submit" disabled?={ len(detail.Releases)==0 || detail.Device.Capabilities().UpdateReason!="" }>{ i18n.T(ctx, "updates.enforce_policy") }</button>
 							</form>
 						}
 						if detail.Policy!=nil {
 							if info.Can(access.ManageUpdates) {
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="mt-4">
 									@CSRF(info)
-									<input type="hidden" name="remove" value="true"/><button class="uk-button uk-button-default" type="submit">Remove update policy</button>
+									<input type="hidden" name="remove" value="true"/><button class="uk-button uk-button-default" type="submit">{ i18n.T(ctx, "updates.remove_policy") }</button>
 								</form>
 							}
 						}
