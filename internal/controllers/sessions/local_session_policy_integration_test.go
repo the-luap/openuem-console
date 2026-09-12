@@ -15,6 +15,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 )
 
@@ -168,7 +169,10 @@ func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {
 			f.manager.Put(ctx, "twofa", false)
 			f.manager.Put(ctx, "authentication-pending", true)
 			if valid {
-				f.manager.Put(ctx, loginproof.SessionKey, loginproof.New(f.user.ID, loginproof.Certificate, "owned verified certificate bytes", time.Now()))
+				_, credential := ownedConsoleCertificate(t, f.user.ID)
+				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+				f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
+				f.manager.Put(ctx, loginproof.SessionKey, loginproof.New(f.user.ID, loginproof.Certificate, string(credential.Leaf.Raw), time.Now()))
 			}
 			admitted, err := localSessionRequest(f, ctx)
 			if admitted {

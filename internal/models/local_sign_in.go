@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"errors"
 	"time"
@@ -28,17 +29,17 @@ const (
 // was checked. Configuration is locked before the account, so confirmation cannot
 // undo revocation or silently accept a changed password, mode or MFA requirement.
 func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage) error {
-	return m.admitLocalSignIn(parent, expected, method, stage, nil)
+	return m.admitLocalSignIn(parent, expected, method, stage, nil, nil)
 }
 
 func (m *Model) CompleteMFASignIn(parent context.Context, expected *ent.User, method string, evidence *mfaadmission.Evidence) error {
 	if evidence == nil {
 		return mfaadmission.ErrRejected
 	}
-	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence)
+	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence, nil)
 }
 
-func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence) error {
+func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate) error {
 	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInCurrentSession {
 		return ErrLocalSignIn
 	}
@@ -78,6 +79,11 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		if !certificates || passwd || expected.Passwd {
 			return ErrLocalSignIn
 		}
+		if stage == LocalSignInPendingMFA || stage == LocalSignInComplete {
+			if err = lockUserCertificate(ctx, tx, expected.ID, cert); err != nil {
+				return err
+			}
+		}
 	}
 	if stage == LocalSignInPasswordReplacement {
 		if method != loginproof.Password || register != nats.REGISTER_FORCE_PASSWORD_CHANGE {
@@ -102,6 +108,8 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			credential := ""
 			if method == loginproof.Password {
 				credential = loginproof.Digest(hash)
+			} else {
+				credential = loginproof.Digest(string(cert.Raw))
 			}
 			if err = mfaadmission.Consume(ctx, tx, expected.ID, method, credential, evidence); err != nil {
 				return err
@@ -112,6 +120,9 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		if _, err = tx.ExecContext(ctx, `UPDATE users SET register=$2,cert_clear_password='',modified=clock_timestamp() WHERE uid=$1`, expected.ID, nats.REGISTER_COMPLETE); err != nil {
 			return err
 		}
+	}
+	if cert != nil && !cert.NotAfter.After(time.Now()) {
+		return ErrLocalSignIn
 	}
 	return tx.Commit()
 }

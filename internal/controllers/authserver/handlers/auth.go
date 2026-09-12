@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent"
 )
 
 func (h *Handler) Auth(c echo.Context) error {
@@ -38,9 +40,14 @@ func (h *Handler) Auth(c echo.Context) error {
 	}
 
 	// Check if uid exists in database
-	user, err := h.Model.GetUserById(uid)
+	lookup, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+	user, err := h.Model.Client.User.Get(lookup, uid)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not check if user exists")
+		if ent.IsNotFound(err) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Access is denied")
+		}
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Certificate account verification is temporarily unavailable.")
 	}
 	if user == nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Access is denied")
@@ -53,6 +60,7 @@ func (h *Handler) Auth(c echo.Context) error {
 	if user.Use2fa {
 		values["authentication-pending"] = true
 		values[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.Certificate, string(cert.Raw), time.Now())
+		values[clientidentity.SessionCertificateKey] = clientidentity.EncodeSessionCertificate(cert)
 	}
 	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {
@@ -62,7 +70,7 @@ func (h *Handler) Auth(c echo.Context) error {
 		if user.Use2fa {
 			stage = models.LocalSignInPendingMFA
 		}
-		return h.Model.AdmitLocalSignIn(ctx, user, loginproof.Certificate, stage)
+		return h.Model.AdmitCertificateSignIn(ctx, user, cert, stage, nil)
 	}); err != nil {
 		if errors.Is(err, models.ErrLocalSignIn) {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Certificate account access or sign-in requirements changed.")

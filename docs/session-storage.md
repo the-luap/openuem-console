@@ -79,6 +79,54 @@ remains restricted and the protected administrator startup/password tests pass.
 New sign-in admission and request-time policy checks have distinct stages. The
 recovery/invitation checks below also apply to credential changes.
 
+## User certificate admission
+
+TLS chain/possession and signed OCSP verification are followed by a current
+registry check in the final local admission transaction. The certificate serial
+must identify a `user` certificate owned by the exact account, with the same
+expiry as the presented certificate and no local revocation entry. Missing,
+reassigned, non-user, deleted, expired or revoked records deny admission. The
+serial must be positive and fit the legacy signed 64-bit registry; native user
+issuers already generate within that range. Certificate records must exist before
+sign-in; trusted TLS credentials alone do not authorize creation of a registry
+entry or adoption of another user's record.
+
+Configuration and account locks precede the certificate checks. A short shared
+lock on the legacy revocation table serializes even an absent-record check against
+existing insert/delete writers, which have no common parent-row or advisory-lock
+protocol. A shared certificate-row lock protects owner, purpose and expiry.
+The five-second transaction deadline also bounds those waits. Confirmation and
+MFA evidence consumption follow only valid current state, and certificate expiry
+is checked again before commit. Invalid state cannot leave partial confirmation
+or consumed primary evidence. Revocation-table writers may wait for active
+admission checks; contention and production scale remain operational acceptance.
+
+Pending certificate MFA retains the already verified public DER certificate in
+the server-side session, bounded to 16 KiB. Its exact digest must match the
+primary proof; user identity, client-auth usage, serial and lifetime must remain
+valid. Public MFA authorization, the pending console challenge and final TOTP or
+backup-code admission recheck the registry. The final transaction also binds MFA
+evidence to the certificate digest. No private key is retained. The public
+certificate is discarded with pending state after successful completion.
+Older pending certificate sessions without this evidence must restart sign-in.
+All older console/authentication writers must stop before upgrade.
+
+Eight owned mutual-TLS/OCSP baseline cases admitted invalid registry state,
+including changes during session association. Regressions now deny all eight.
+Further tests replace ownership or add revocation after TOTP/backup verification
+in both storage modes, check committed/rolled-back/canceled registry waits and
+valid retries, and distinguish retired pending state from transient registry
+failure. Certificate parsing tests cover proof mismatch, malformed/oversized
+data, invalid serials and lifetime boundaries. Existing successful mutual-TLS,
+MFA and failure-cleanup fixtures now register their owned user certificates.
+
+These checks govern initial and pending/final MFA admission. Completed sessions
+still need original-certificate lifetime/revocation/rotation binding; the current
+local policy checks below do not retain the original certificate. The legacy
+registry also lacks issuer/key and account-generation identifiers. Certificate
+reissue, CA rotation and account deletion/recreation need those additional
+bindings before the full credential-lifecycle roadmap can be closed.
+
 ## Current local session policy
 
 Protected console requests now recheck the method recorded in the server session

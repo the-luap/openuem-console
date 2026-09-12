@@ -16,6 +16,7 @@ import (
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	console "github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/utils"
 	"github.com/pquerna/otp/totp"
@@ -74,7 +75,14 @@ func TestMFACompletionRejectsSecretReplacementDuringAdmission(t *testing.T) {
 					}
 					sm.Put(ctx, "uid", u.ID)
 					sm.Put(ctx, "authentication-pending", true)
-					sm.Put(ctx, loginproof.SessionKey, loginproof.New(u.ID, method, u.Hash, time.Now()))
+					primaryCredential := u.Hash
+					if method == loginproof.Certificate {
+						_, credential := ownedConsoleCertificate(t, u.ID)
+						registerOwnedConsoleCertificate(t, f, credential.Leaf)
+						primaryCredential = string(credential.Leaf.Raw)
+						sm.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
+					}
+					sm.Put(ctx, loginproof.SessionKey, loginproof.New(u.ID, method, primaryCredential, time.Now()))
 					token, _, err := sm.Commit(ctx)
 					if err != nil {
 						t.Fatal(err)

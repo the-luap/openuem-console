@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Certificate sign-in now requires the exact user/type/expiry registry record
+  and no current local revocation, in the final admission transaction. A short
+  shared revocation-table lock also observes insertions from existing writers;
+  certificate-row locks protect ownership and lifetime. Pending MFA retains the
+  bounded public certificate and binds it to the verified primary digest, then
+  repeats registry checks at authorization and final evidence consumption.
+  Eight owned mutual-TLS/OCSP baseline cases admitted invalid or changed records;
+  all are denied now. Further tests cover owner/revocation changes after TOTP and
+  backup verification, committed/rolled-back/canceled registry waits, missing
+  certificate evidence, pending-state retirement, transient failure/retry and
+  proof/serial/lifetime bounds. The focused session race suite passes in 15.726
+  seconds and the complete session race suite in 89.421 seconds;
+  certificate/proof/auth/router races, actual Linux ARM64 console/OpenID
+  and administrator routes and the full Linux build pass. Older pending
+  certificate flows must restart and registry records must precede sign-in.
+  Completed-session credential generations, issuer/key identity, rotation and
+  account recreation remain separate work. See
+  [user certificate admission](session-storage.md#user-certificate-admission).
+
 - Protected local sessions now recheck enabled authentication, their recorded
   password/certificate method, current account mode and registration, and MFA
   state. Missing method metadata and superseded policy return HTTP 401 and retire

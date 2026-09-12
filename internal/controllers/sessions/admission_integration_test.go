@@ -243,6 +243,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 					}
 				}
 				ca, credential := ownedConsoleCertificate(t, "certificate-user")
+				registerOwnedConsoleCertificate(t, f, credential.Leaf)
 				h := &certificate.Handler{Model: f.model, SessionManager: &sessions.SessionManager{Manager: sm, Pool: f.pool}, EncryptionMasterKey: f.key, CACert: ca, PublicOrigin: "https://console.test"}
 				server := httptest.NewUnstartedServer(sm.LoadAndSave(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					c := echo.New().NewContext(r, w)

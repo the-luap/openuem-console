@@ -10,6 +10,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 )
 
@@ -56,6 +57,16 @@ func (h *Handler) requirePrimaryAuthentication(c echo.Context) (*ent.User, error
 	case loginproof.Certificate:
 		if !settings.UseCertificates || user.Passwd || user.Openid {
 			return deny()
+		}
+		cert, err := clientidentity.ReadSessionCertificate(sm.GetString(ctx, clientidentity.SessionCertificateKey), uid, proof.Credential, time.Now())
+		if err != nil {
+			return deny()
+		}
+		if err = h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInPendingMFA, nil); err != nil {
+			if errors.Is(err, models.ErrLocalSignIn) {
+				return deny()
+			}
+			return nil, echo.NewHTTPError(http.StatusServiceUnavailable, "Certificate sign-in verification is temporarily unavailable.")
 		}
 	case loginproof.OpenID:
 		if !settings.UseOIDC || !user.Openid || user.Passwd {

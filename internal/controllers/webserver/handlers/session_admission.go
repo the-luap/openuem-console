@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
@@ -17,7 +19,7 @@ func sessionAdmissionError(err error, message string) error {
 	if errors.Is(err, mfaadmission.ErrRejected) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Two-factor sign-in expired or was already used. Sign in again with a new code.")
 	}
-	if errors.Is(err, models.ErrLocalSignIn) || errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
+	if errors.Is(err, models.ErrLocalSignIn) || errors.Is(err, clientidentity.ErrCertificateBinding) || errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Account access or sign-in requirements changed; sign in again.")
 	}
 	var response *echo.HTTPError
@@ -72,6 +74,18 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 		extra = map[string]any{oidcSessionKey: h.SessionManager.Manager.GetString(c.Request().Context(), oidcSessionKey)}
 		confirm = func(ctx context.Context) error {
 			return h.OIDCAccounts.AdmitSession(ctx, *identity, user, evidence)
+		}
+	} else if method == loginproof.Certificate {
+		proof, err := loginproof.Read(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, time.Now())
+		if err != nil || proof.Method != loginproof.Certificate {
+			return clientidentity.ErrCertificateBinding
+		}
+		cert, err := clientidentity.ReadSessionCertificate(h.SessionManager.Manager.GetString(c.Request().Context(), clientidentity.SessionCertificateKey), user.ID, proof.Credential, time.Now())
+		if err != nil {
+			return err
+		}
+		confirm = func(ctx context.Context) error {
+			return h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInComplete, evidence)
 		}
 	}
 	return h.establishUserSession(c, user, secondFactor, extra, confirm)
