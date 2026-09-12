@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Email-confirmation admission now requires the generated HS512 token purpose,
+  OpenUEM issuer, account ID, issue time and an unexpired lifetime of at most
+  24 hours. Empty signing configuration, malformed/oversized input and missing
+  expiry fail with fixed localized guidance. Responses prohibit storage and
+  referrer disclosure. CSRF metadata and registration settings are checked before
+  the account mutation. The model performs a guarded transaction that accepts
+  only an unverified certificate account awaiting email confirmation; concurrent
+  revocation, other authentication modes and replay cannot overwrite its state.
+  A baseline exposed nine accepted invalid proofs/states, two mutations despite
+  missing response prerequisites, and a missing-expiry panic. Twenty-one handler
+  cases and generated-notification compatibility pass with race checks. Real
+  PostgreSQL row-lock tests cover committed revocation, rollback, request deadline
+  and retry; they additionally reproduced and fixed an autocommit update that
+  persisted after client cancellation. Full Linux handler/model/locale race tests
+  pass without external network access. The current GET still performs the
+  confirmation; explicit POST confirmation and durable recipient/token binding
+  remain the next work, so this is not complete account-invitation acceptance.
+
 - Account confirmation and initial-password notifications now use the configured
   console origin for public, proxy and direct installations. Empty or foreign
   request `Origin` values cannot change those links. Initial-password creation

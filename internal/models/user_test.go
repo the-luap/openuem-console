@@ -378,7 +378,7 @@ func (suite *UserTestSuite) TestConfirmEmail() {
 	require.False(suite.T(), pending.EmailVerified)
 	require.Equal(suite.T(), "users.pending_email_confirmation", pending.Register)
 
-	require.NoError(suite.T(), suite.model.ConfirmEmail(pending.ID), "should confirm email")
+	require.NoError(suite.T(), suite.model.ConfirmEmail(suite.T().Context(), pending.ID), "should confirm email")
 	confirmed, err := suite.model.GetUserById(pending.ID)
 	require.NoError(suite.T(), err, "should get confirmed email user")
 	assert.Equal(suite.T(), pending.ID, confirmed.ID)

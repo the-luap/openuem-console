@@ -93,6 +93,8 @@ func TestAccountNotificationsUseConfiguredOriginAndRetainPasswordToken(t *testin
 							}
 						} else {
 							require.True(t, strings.HasPrefix(target.Path, "/auth/confirm/"))
+							_, err = h.parseEmailConfirmationToken(encoded)
+							require.NoError(t, err, "generated confirmation must satisfy its consumer")
 						}
 						claims := &jwt.RegisteredClaims{}
 						_, err = jwt.ParseWithClaims(encoded, claims, func(*jwt.Token) (any, error) { return []byte(h.JWTKey), nil }, jwt.WithValidMethods([]string{"HS512"}), jwt.WithExpirationRequired(), jwt.WithIssuer("OpenUEM"), jwt.WithSubject(subject))

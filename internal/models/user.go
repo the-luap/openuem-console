@@ -237,8 +237,27 @@ func (m *Model) GetUserById(uid string) (*ent.User, error) {
 	return m.Client.User.Get(context.Background(), uid)
 }
 
-func (m *Model) ConfirmEmail(uid string) error {
-	return m.Client.User.Update().SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE).Where(user.ID(uid)).Exec(context.Background())
+var ErrEmailConfirmationState = errors.New("account is not awaiting email confirmation")
+
+func (m *Model) ConfirmEmail(ctx context.Context, uid string) error {
+	tx, err := m.Client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	updated, err := tx.User.Update().
+		Where(user.ID(uid), user.EmailVerified(false), user.Openid(false), user.Passwd(false), user.Register("users.pending_email_confirmation")).
+		SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE).Save(ctx)
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return ErrEmailConfirmationState
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (m *Model) UserSetRevokedCertificate(uid string) error {

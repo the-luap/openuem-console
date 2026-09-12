@@ -450,7 +450,7 @@ func (h *Handler) AskForConfirmation(c echo.Context) error {
 }
 
 func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) error {
-	token, err := h.generateEmailToken(user.ID, "Email Confirmation", 24)
+	token, err := h.generateEmailToken(user.ID, emailConfirmationSubject, 24)
 	if err != nil {
 		return err
 	}

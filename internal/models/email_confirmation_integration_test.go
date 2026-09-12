@@ -1,0 +1,103 @@
+package models
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"net/url"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	openuem "github.com/open-uem/nats"
+	"github.com/stretchr/testify/require"
+)
+
+func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
+	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for account confirmation integration")
+	}
+	admin, err := sql.Open("pgx", dsn)
+	require.NoError(t, err)
+	defer admin.Close()
+	schema := "confirmation_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
+	require.NoError(t, err)
+	defer admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
+	u, err := url.Parse(dsn)
+	require.NoError(t, err)
+	query := u.Query()
+	query.Set("search_path", schema)
+	u.RawQuery = query.Encode()
+	t.Setenv("ENV", "test")
+	m, err := New(u.String(), "pgx", "example.test")
+	require.NoError(t, err)
+	defer m.Close()
+	for _, outcome := range []string{"commit", "rollback", "deadline"} {
+		t.Run(outcome, func(t *testing.T) {
+			uid := "confirmation-" + outcome
+			require.NoError(t, m.Client.User.Create().SetID(uid).SetName(uid).SetEmail(uid+"@example.test").Exec(t.Context()))
+			tx, err := m.DB.BeginTx(t.Context(), nil)
+			require.NoError(t, err)
+			defer tx.Rollback()
+			var holder int
+			require.NoError(t, tx.QueryRowContext(t.Context(), `SELECT pg_backend_pid()`).Scan(&holder))
+			_, err = tx.ExecContext(t.Context(), `UPDATE users SET register=$1 WHERE uid=$2`, openuem.REGISTER_REVOKED, uid)
+			require.NoError(t, err)
+			wait := 10 * time.Second
+			if outcome == "deadline" {
+				wait = 3 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), wait)
+			defer cancel()
+			result := make(chan error, 1)
+			go func() { result <- m.ConfirmEmail(ctx, uid) }()
+			// Observe the real row-lock wait before releasing or timing out the
+			// request. The result must use the state committed by the blocker.
+			var blocked int
+			for blocked == 0 && ctx.Err() == nil {
+				require.NoError(t, m.DB.QueryRowContext(ctx, `SELECT count(*) FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))`, holder).Scan(&blocked))
+				if blocked == 0 {
+					time.Sleep(5 * time.Millisecond)
+				}
+			}
+			require.Positive(t, blocked, "confirmation did not reach the owned account lock")
+			switch outcome {
+			case "commit":
+				require.NoError(t, tx.Commit())
+			case "rollback":
+				require.NoError(t, tx.Rollback())
+			}
+			select {
+			case err = <-result:
+			case <-time.After(12 * time.Second):
+				t.Fatal("confirmation did not release its database operation")
+			}
+			switch outcome {
+			case "commit":
+				require.ErrorIs(t, err, ErrEmailConfirmationState)
+			case "rollback":
+				require.NoError(t, err)
+			case "deadline":
+				require.Error(t, err)
+				require.True(t, errors.Is(ctx.Err(), context.DeadlineExceeded))
+				require.NoError(t, tx.Rollback())
+			}
+			after, err := m.Client.User.Get(t.Context(), uid)
+			require.NoError(t, err)
+			require.Equal(t, outcome == "rollback", after.EmailVerified)
+			if outcome == "commit" {
+				require.Equal(t, openuem.REGISTER_REVOKED, after.Register)
+			} else if outcome == "rollback" {
+				require.Equal(t, openuem.REGISTER_SEND_CERTIFICATE, after.Register)
+				require.ErrorIs(t, m.ConfirmEmail(t.Context(), uid), ErrEmailConfirmationState)
+			} else {
+				require.Equal(t, "users.pending_email_confirmation", after.Register)
+				require.NoError(t, m.ConfirmEmail(t.Context(), uid), "cancelled statement must leave confirmation retryable")
+			}
+		})
+	}
+}

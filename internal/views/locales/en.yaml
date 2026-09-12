@@ -1849,6 +1849,8 @@ en:
     could_not_find_site: "Could not find the site"
     could_not_find_tenant: "Could not find the organization"
   authentication:
+    email_confirmation_invalid: "This confirmation link is invalid or expired. Ask your administrator for a new confirmation email."
+    email_confirmation_unavailable: "Email confirmation is temporarily unavailable. Try again later."
     title: "Authentication"
     description: "Configure how OpenUEM console authenticates your users and several aspects related to user accounts"
     could_not_get_settings: "could not get authentication settings, reason: %s"
