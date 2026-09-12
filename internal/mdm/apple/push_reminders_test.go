@@ -115,16 +115,26 @@ func TestPushRemindersDurabilityScopeAndRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`UPDATE users SET email='new-org@example.test' WHERE uid='org'; UPDATE mdm_apple_push_reminder_deliveries SET next_attempt_at=now()`); err != nil {
+	// The delivery guard uses the application clock. Make this retry clearly due
+	// on that same clock instead of relying on exact host/database clock agreement.
+	if _, err = s.db.Exec(`UPDATE users SET email='new-org@example.test' WHERE uid='org'`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = s.db.Exec(`UPDATE mdm_apple_push_reminder_deliveries SET next_attempt_at=$1`, time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	retrySent := false
 	if err = restarted.deliverPushReminder(ctx, id, 1, func(_ context.Context, _ *sql.Tx, m PushExpiryMessage) error {
+		retrySent = true
 		if m.ID != original.ID || m.Recipient != "new-org@example.test" || m.TenantID != 1 || m.Fingerprint != history[0].Fingerprint {
 			t.Errorf("incorrect message %+v", m)
 		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if !retrySent {
+		t.Fatal("due retry did not reach the SMTP fixture")
 	}
 	if err = restarted.pushReminderCycle(ctx, func(_ context.Context, _ *sql.Tx, m PushExpiryMessage) error {
 		if m.Recipient != "admin@example.test" {
