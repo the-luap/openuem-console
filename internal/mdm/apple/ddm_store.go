@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"time"
+
+	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 func scanPolicy(row scanner) (*UpdatePolicy, error) {
@@ -26,7 +29,34 @@ func (s *Store) UpdatePolicy(ctx context.Context, scope Scope, id string) (*Upda
 	return scanPolicy(s.db.QueryRowContext(ctx, `SELECT `+policyColumns+` FROM mdm_apple_update_policies WHERE tenant_id=$1 AND device_id=$2`, scope.TenantID, id))
 }
 
+// SetUpdatePolicy is the trusted in-process entry point. Console actions use
+// SetUpdatePolicyWithAccess to hold current authority through commit.
 func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string) error {
+	return s.setUpdatePolicy(ctx, scope, ids, p, actor, nil)
+}
+
+// SetUpdatePolicyWithAccess requires the authenticated actor's current update
+// authority in the same bounded transaction as policy, notification and audit.
+func (s *Store) SetUpdatePolicyWithAccess(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string, permissions *access.Store) error {
+	if permissions == nil {
+		return access.ErrDenied
+	}
+	if len(ids) == 0 || len(ids) > 1000 {
+		return errors.New("select between 1 and 1000 devices")
+	}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if !profileRevisionUUID(id) || seen[id] {
+			return errors.New("select distinct canonical native Apple devices")
+		}
+		seen[id] = true
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return s.setUpdatePolicy(ctx, scope, ids, p, actor, permissions)
+}
+
+func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string, permissions *access.Store) error {
 	if err := scope.Validate(); err != nil {
 		return err
 	}
@@ -38,6 +68,15 @@ func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 		return err
 	}
 	defer tx.Rollback()
+	if permissions != nil {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageUpdates, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
+			return err
+		}
+		var tenant int
+		if err = tx.QueryRowContext(ctx, `SELECT id FROM tenants WHERE id=$1 FOR SHARE`, scope.TenantID).Scan(&tenant); err != nil {
+			return notFound(err)
+		}
+	}
 	// A consistent lock order avoids deadlocks between overlapping bulk actions.
 	ids = slices.Clone(ids)
 	slices.Sort(ids)
@@ -48,6 +87,12 @@ func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 		}
 		if d.Status != "enrolled" {
 			return errors.New("device must be enrolled")
+		}
+		if permissions != nil {
+			var site int
+			if err = tx.QueryRowContext(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant_sites=$2 FOR SHARE`, d.SiteID, scope.TenantID).Scan(&site); err != nil {
+				return notFound(err)
+			}
 		}
 		if p != nil {
 			if err = ValidateUpdatePolicy(*d, *p); err != nil {

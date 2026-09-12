@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple update policy admission](apple-update-policy-admission.md) now rechecks
+  current update authority inside the bounded policy/notification/audit
+  transaction, including original organization and current target-site ownership.
+  Both application and removal reject missing/revoked rights and moved sites.
+  Strict 8 KiB forms reject ambiguous actions, duplicate fields, query overrides
+  and unsupported body/CSRF inputs before mutation. Owned PostgreSQL/race tests
+  pass in 5.735 seconds; the broader update/declaration/Mac readiness regression
+  passes in 9.358 seconds. Registered Linux console routes, macOS/Linux
+  middleware/handler/locale race tests and the full Linux build pass. Reviewed
+  policy versions, immutable request replay and Apple group/ring targeting remain
+  subsequent work.
+
 - [Apple profile assignments from dynamic groups](apple-profile-groups.md) now
   preview current action eligibility, resolve canonical Mac records to current
   native MDM channels and require the exact reviewed profile/group revisions and

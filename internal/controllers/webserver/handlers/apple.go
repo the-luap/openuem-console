@@ -142,7 +142,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 			switch appleRoute(c.Path()) {
 			case "/ios/configurations/:id/assign":
 				limit = 64 << 10
-			case "/ios/configurations/:id/group-assignments":
+			case "/ios/configurations/:id/group-assignments", "/ios/:id/update":
 				limit = 8192
 			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
@@ -795,6 +795,7 @@ func (h *Handler) AppleDeleteProfile(c echo.Context) error {
 }
 
 func (h *Handler) AppleUpdate(c echo.Context) error {
+	adeHeaders(c)
 	info, scope, err := h.appleInfo(c)
 	if err != nil {
 		return err
@@ -806,19 +807,14 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	var policy *apple.UpdatePolicy
-	if c.FormValue("remove") != "true" {
-		version, build, selected := strings.Cut(c.FormValue("target_release"), "/")
-		if !selected || version == "" || build == "" {
-			return echo.NewHTTPError(400, i18n.T(c.Request().Context(), "updates.invalid_release"))
-		}
-		deadline := c.FormValue("deadline")
-		if len(deadline) == 16 {
-			deadline += ":00"
-		}
-		policy = &apple.UpdatePolicy{TargetVersion: version, TargetBuild: build, Deadline: deadline, DetailsURL: c.FormValue("details_url")}
+	policy, err := appleUpdateForm(c)
+	if err != nil {
+		return err
 	}
-	if err = h.Apple.SetUpdatePolicy(c.Request().Context(), scope, []string{id}, policy, h.appleActor(c)); err != nil {
+	if err = h.Apple.SetUpdatePolicyWithAccess(c.Request().Context(), scope, []string{id}, policy, h.appleActor(c), h.Access); err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "updates.permission_denied"))
+		}
 		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)

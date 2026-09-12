@@ -1083,6 +1083,8 @@ en:
     release_label: "Target OS release and build"
     select_release: "Select an available Apple release"
     invalid_release: "Select an available Apple release and build"
+    invalid_form: "Reload the device and submit one update action with the selected release, deadline and optional information URL."
+    permission_denied: "Your current permissions do not allow update policy changes in this scope."
     catalog_checked: "Apple release catalog checked:"
     no_releases: "No current releases are available for this device. Refresh its inventory and check the Apple catalog connection before setting a policy."
     deadline_label: "Installation deadline (device local time)"

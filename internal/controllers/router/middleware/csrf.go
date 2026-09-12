@@ -91,7 +91,7 @@ func scopedFormLimit(path string) int64 {
 	if route == "/ios/configurations/:id/assign" {
 		return 64 << 10
 	}
-	if route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
+	if route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/ios/:id/update" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
 		return 8192
 	}
 	return 0
