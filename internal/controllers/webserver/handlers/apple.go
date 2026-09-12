@@ -271,7 +271,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 			return e
 		}
 		for _, m := range macs {
-			state := "MDM: " + mdm_views.StateLabel(m.MDMStatus) + " · Agent: " + mdm_views.StateLabel(m.AgentStatus)
+			state := "MDM: " + mdm_views.StateLabel(c.Request().Context(), m.MDMStatus) + " · Agent: " + mdm_views.StateLabel(c.Request().Context(), m.AgentStatus)
 			seen := m.LastSeen
 			if m.AgentSeen != nil && (seen == nil || m.AgentSeen.After(*seen)) {
 				seen = m.AgentSeen

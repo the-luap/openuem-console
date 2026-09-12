@@ -54,7 +54,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 										<td>{ d.Platform }<br/><span class="uk-text-muted">{ Show(d.OSVersion) }</span></td>
 										<td>{ Show(d.Model) }</td>
 										<td>{ Show(d.Serial) }</td>
-										<td>{ StateLabel(d.Status) }</td>
+										<td>{ StateLabel(ctx, d.Status) }</td>
 										<td>
 											@Timestamp(d.LastSeen)
 										</td>
@@ -199,7 +199,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 		<main id="apple-device" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div>
 				<h1 class="text-2xl font-semibold">{ Show(detail.Device.Name) }</h1>
-				<p class="uk-text-muted">{ detail.Device.Platform()+" · "+StateLabel(detail.Device.Status) }</p>
+				<p class="uk-text-muted">{ detail.Device.Platform()+" · "+StateLabel(ctx, detail.Device.Status) }</p>
 				@Navigation(info)
 			</div>
 			if detail.Device.Family()==apple.PlatformMacOS {
@@ -249,7 +249,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						</dd>
 						<dt>Push status</dt>
 						<dd>
-							{ StateLabel(detail.Device.PushStatus) }
+							{ StateLabel(ctx, detail.Device.PushStatus) }
 							if detail.Device.PushError!="" {
 								<span role="status">{ " · "+pushErrorText(c, detail.Device.PushStatus) }</span>
 							}
@@ -299,8 +299,8 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								<p>{ i18n.T(ctx, "updates.target_version", Show(detail.Policy.TargetVersion)) }</p>
 								<p>{ i18n.T(ctx, "updates.target_build", Show(detail.Policy.TargetBuild)) }</p>
 								<p>{ i18n.T(ctx, "updates.deadline_local", Show(detail.Policy.Deadline)) }</p>
-								<p>{ i18n.T(ctx, "updates.compliance", StateLabel(detail.Compliance)) }</p>
-								<p>{ i18n.T(ctx, "updates.device_status", StateLabel(detail.Policy.Status)) }</p>
+								<p>{ i18n.T(ctx, "updates.compliance", StateLabel(ctx, detail.Compliance)) }</p>
+								<p>{ i18n.T(ctx, "updates.device_status", StateLabel(ctx, detail.Policy.Status)) }</p>
 								if detail.Policy.Error!="" {
 									<div role="alert" class="uk-alert uk-alert-warning">{ detail.Policy.Error }</div>
 								}
@@ -361,8 +361,8 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								<tr>
 									<td>{ a.Name }</td>
 									<td>{ Number(a.Revision) }</td>
-									<td>{ StateLabel(a.Desired) }</td>
-									<td>{ StateLabel(a.Status) }<br/>{ a.Error }</td>
+									<td>{ StateLabel(ctx, a.Desired) }</td>
+									<td>{ StateLabel(ctx, a.Status) }<br/>{ a.Error }</td>
 									<td>
 										if detail.Device.Status=="enrolled" {
 											if info.Can(access.AssignProfiles) {
@@ -427,7 +427,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 							for _,cmd:=range detail.Commands {
 								<tr>
 									<td>{ cmd.RequestType }</td>
-									<td>{ StateLabel(cmd.Status) }</td>
+									<td>{ StateLabel(ctx, cmd.Status) }</td>
 									<td>{ Number(cmd.Attempts) }</td>
 									<td>
 										@Timestamp(&cmd.CreatedAt)

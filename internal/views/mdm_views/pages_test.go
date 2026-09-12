@@ -12,6 +12,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats/enrollment"
@@ -755,6 +756,28 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("request-locale-state-labels", func(t *testing.T) {
+		dict := i18n.NewDict()
+		dict.Add("mdm", map[string]any{
+			"states":   map[string]any{"enrolled": "Owned <state> & locale", "update_required": "Owned compliance locale"},
+			"identity": map[string]any{"confirmed": "Owned identity locale"},
+		})
+		dict.Add("updates", map[string]any{"compliance": "Compliance: %s"})
+		localized := i18n.NewLocale("en", dict).WithContext(ctx)
+		var rendered bytes.Buffer
+		if err := DeviceDetails(c, info, detail).Render(localized, &rendered); err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"Owned &lt;state&gt; &amp; locale", "Owned compliance locale", "Owned identity locale"} {
+			if !strings.Contains(rendered.String(), want) {
+				t.Error("state or identity label ignored the render locale", want)
+			}
+		}
+		if strings.Contains(rendered.String(), "Owned <state>") {
+			t.Error("state translation bypassed HTML escaping")
+		}
+	})
 
 	for _, status := range []string{"failed", "invalid_token"} {
 		failedDevice := *d

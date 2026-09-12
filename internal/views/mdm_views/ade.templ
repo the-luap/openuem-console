@@ -34,9 +34,9 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
     <nav aria-label="Apple server connections" class="flex flex-wrap gap-4">
      for _,s:=range servers {
       if s.ID==selected {
-       <a class="uk-button uk-button-primary" aria-current="page" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(s.Status)}</a>
+       <a class="uk-button uk-button-primary" aria-current="page" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(ctx, s.Status)}</a>
       } else {
-       <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(s.Status)}</a>
+       <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,adePageURL(s.ID,"")))}>{s.Name} · {StateLabel(ctx, s.Status)}</a>
       }
      }
     </nav>
@@ -65,7 +65,7 @@ templ ADE(c echo.Context, info *partials.CommonInfo, servers []apple.ADEServer, 
         </form>
        </div>
        <dl class="ade-metadata">
-        <div><dt>Connection status</dt><dd>{StateLabel(s.Status)}</dd></div>
+        <div><dt>Connection status</dt><dd>{StateLabel(ctx, s.Status)}</dd></div>
         <div><dt>Apple organization</dt><dd>{Show(s.AppleOrganizationName)} · {Show(s.AppleOrganizationID)}</dd></div>
         <div><dt>Apple server</dt><dd>{Show(s.AppleServerName)} · {Show(s.AppleServerID)}</dd></div>
         <div><dt>Apple administrator</dt><dd>{Show(s.AppleAdministrator)}</dd></div>

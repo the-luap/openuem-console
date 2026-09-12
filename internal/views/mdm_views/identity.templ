@@ -10,7 +10,7 @@ templ DeviceIdentity(detail Detail) {
 			if detail.Device.Status=="enrolled" {
 				<p>Automatic renewal starts 30 days before expiry. The device must install the replacement enrollment profile and connect with its new identity to complete the change.</p>
 				if detail.Device.IdentityRenewalError!="" {
-					<div role="status" class="uk-alert uk-alert-warning">{ IdentityRenewalHelp(detail.Device.IdentityRenewalError) }</div>
+					<div role="status" class="uk-alert uk-alert-warning">{ IdentityRenewalHelp(ctx, detail.Device.IdentityRenewalError) }</div>
 				}
 			}
 			if len(detail.IdentityRenewals)==0 {
@@ -19,7 +19,7 @@ templ DeviceIdentity(detail Detail) {
 				<p class="uk-text-muted">Latest renewal attempts, newest first.</p>
 				for _,renewal:=range detail.IdentityRenewals {
 					<article class="border rounded p-4 grid gap-3 min-w-0">
-						<h3 class="font-medium">{ IdentityRenewalState(renewal) }</h3>
+						<h3 class="font-medium">{ IdentityRenewalState(ctx, renewal) }</h3>
 						<p>{ "Started: " }
 							@Timestamp(&renewal.CreatedAt)
 						</p>
@@ -39,7 +39,7 @@ templ DeviceIdentity(detail Detail) {
 							</p>
 						}
 						if renewal.Error!="" {
-							<p>{ IdentityRenewalHelp(renewal.Error) }</p>
+							<p>{ IdentityRenewalHelp(ctx, renewal.Error) }</p>
 						}
 						<details class="min-w-0">
 							<summary class="cursor-pointer">Certificate fingerprints and command reference</summary>

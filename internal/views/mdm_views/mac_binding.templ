@@ -13,8 +13,8 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
     <p>This Mac has one device identity with separately authorized MDM and agent channels.</p>
     <dl class="uk-description-list mt-4">
      <dt>Device identity</dt><dd class="break-all">{ detail.Mac.ID }</dd>
-     <dt>MDM channel</dt><dd>{ StateLabel(detail.Mac.MDMStatus) }</dd>
-     <dt>Agent channel</dt><dd>{ StateLabel(detail.Mac.AgentStatus)+" · "+Show(detail.Mac.AgentName) }</dd>
+     <dt>MDM channel</dt><dd>{ StateLabel(ctx, detail.Mac.MDMStatus) }</dd>
+     <dt>Agent channel</dt><dd>{ StateLabel(ctx, detail.Mac.AgentStatus)+" · "+Show(detail.Mac.AgentName) }</dd>
      <dt>Agent report received</dt><dd>
       @Timestamp(detail.Mac.AgentSeen)
      </dd>
@@ -36,7 +36,7 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
          } else {
           Agent
          }
-        </strong>{ " · "+StateLabel(channel.Status) }</p>
+        </strong>{ " · "+StateLabel(ctx, channel.Status) }</p>
         <p class="break-all uk-text-muted mt-2">{ channel.DeviceID }</p>
         <dl class="uk-description-list mt-2">
          <dt>Attached</dt><dd>
@@ -62,7 +62,7 @@ templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
    }
    if detail.MacBinding!=nil {
     <dl class="uk-description-list mt-4">
-     <dt>Verification</dt><dd>{ StateLabel(detail.MacBinding.Status) }</dd>
+     <dt>Verification</dt><dd>{ StateLabel(ctx, detail.MacBinding.Status) }</dd>
      <dt>Expires</dt><dd>
       @Timestamp(&detail.MacBinding.ExpiresAt)
      </dd>

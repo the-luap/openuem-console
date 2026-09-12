@@ -24,6 +24,15 @@ func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing
 		t.Fatal(err)
 	}
 	for _, language := range preferences.Languages() {
+		localized, err := locales.WithLocale(context.Background(), language.Code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for state, want := range map[string]string{"enrolled": "Managed", "consumed": "Channels verified", "verified": "Verified on device", "update_required": "Update required", "waiting": "Waiting", "": "—", "future_state": "future state", "MDM: Managed · Agent: Agent managed": "MDM: Managed · Agent: Agent managed"} {
+			if got := StateLabel(localized, state); got != want {
+				t.Errorf("state catalog fallback %s/%s = %q, want %q", language.Code, state, got, want)
+			}
+		}
 		for _, role := range []access.Role{access.Viewer, access.Operator, access.TenantAdmin, access.Administrator} {
 			ctx, err := locales.WithLocale(context.Background(), language.Code)
 			if err != nil {

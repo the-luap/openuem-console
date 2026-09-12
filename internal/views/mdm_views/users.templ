@@ -19,7 +19,7 @@ templ MacUsers(info *partials.CommonInfo, d *apple.Device, users []apple.UserCha
 				for _,u:=range users {
 					<article class="border rounded p-4">
 						<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/users/"+u.ID)) }>{ Show(u.ShortName) }</a></h3>
-						<p>{ Show(u.LongName)+" · "+StateLabel(u.Status) }</p>
+						<p>{ Show(u.LongName)+" · "+StateLabel(ctx, u.Status) }</p>
 						<p>{ "Console session: "+userConsole(u) }</p>
 						<p class="uk-text-muted">{ "User ID: "+u.UserID }</p>
 					</article>
@@ -51,7 +51,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 						<dt>User ID reported by macOS</dt>
 						<dd>{ detail.User.UserID }</dd>
 						<dt>Management state</dt>
-						<dd>{ StateLabel(detail.User.Status) }</dd>
+						<dd>{ StateLabel(ctx, detail.User.Status) }</dd>
 						<dt>Console session</dt>
 						<dd>{ userConsole(*detail.User) }</dd>
 						<dt>Last seen</dt>
@@ -59,7 +59,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 							@Timestamp(&detail.User.LastSeen)
 						</dd>
 						<dt>Push status</dt>
-						<dd>{ StateLabel(detail.User.PushStatus) }</dd>
+						<dd>{ StateLabel(ctx, detail.User.PushStatus) }</dd>
 						if detail.User.PushError!="" {
 							<dt>Push result</dt>
 							<dd>{ pushErrorText(c, detail.User.PushStatus) }</dd>
@@ -123,7 +123,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 					for _,a:=range detail.Assignments {
 						<article class="border rounded p-4 grid gap-4">
 							<h3 class="font-semibold">{ a.Name }</h3>
-							<p>{ "Revision "+Number(a.Revision)+" · Desired: "+StateLabel(a.Desired)+" · Result: "+StateLabel(a.Status) }</p>
+							<p>{ "Revision "+Number(a.Revision)+" · Desired: "+StateLabel(ctx, a.Desired)+" · Result: "+StateLabel(ctx, a.Status) }</p>
 							if a.Error!="" {
 								<p>{ a.Error }</p>
 							}
@@ -161,7 +161,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 				<div class="uk-card-body grid gap-4">
 					for _,command:=range detail.Commands {
 						<article class="border rounded p-4 grid gap-4">
-							<h3 class="font-semibold">{ command.RequestType+" · "+StateLabel(command.Status) }</h3>
+							<h3 class="font-semibold">{ command.RequestType+" · "+StateLabel(ctx, command.Status) }</h3>
 							<p>Created:{ " " }
 								@Timestamp(&command.CreatedAt)
 							{ " · Attempts: "+Number(command.Attempts) }</p>

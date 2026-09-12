@@ -190,7 +190,7 @@ templ ADEEnrollmentPanel(info *partials.CommonInfo, server apple.ADEServer, data
 									</td>
 									<td>
 										if t.DeviceID!="" {
-											<a class="uk-link" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+t.DeviceID)) }>{ StateLabel(t.DeviceStatus) }</a>
+											<a class="uk-link" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+t.DeviceID)) }>{ StateLabel(ctx, t.DeviceStatus) }</a>
 											<br/>
 											{ adeEnrollmentState(t.SetupState) }
 										} else {

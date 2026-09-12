@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Shared Apple state labels now resolve through `mdm.states` in the existing
+  locale catalog, including the previously raw waiting status. Device, profile,
+  command, user-channel, ADE and linked-Mac views pass their render context; the
+  combined-device handler uses the request locale. Sixteen identity-renewal
+  states and remediation messages also use catalog entries. English copy remains
+  the fallback, missing states retain the placeholder and unknown/composed values
+  retain their previous readable representation. Render tests verify request
+  locale selection and HTML escaping; all supported locale contexts keep the
+  expected fallback. View/locale race tests, the native Apple console route test
+  with PostgreSQL on Linux, and the full Linux build passed. This addresses the
+  shared `StateLabel` finding; other page-specific copy still needs migration.
+
 - The OpenID logout URL fixture now keeps handlers by pointer instead of copying
   their embedded mutex. The broker CI exposed the copy during `go vet`; the same
   check was reproduced locally. The full affected startup-path vet command now
