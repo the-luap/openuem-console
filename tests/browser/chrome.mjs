@@ -27,6 +27,7 @@ const fixtures = new Set([
  ...["new","active","expired","ended","inactive","no-notification","receipt-pause","receipt-resume","history","empty","long"].map(state=>`apple-update-exception-${state}`),
  ...["required","compliant","missing-build","stale","unmanaged","error","error-limited","no-policy","viewer","long","missing","deadline-pending", "deadline-elapsed", "deadline-stale", "deadline-future", "deadline-invalid", "deadline-gap", "deadline-fold","exception-active", "exception-expired", "exception-ended", "exception-viewer"].map(state=>`apple-device-update-${state}`),
  ...["choose","empty","preview","existing","excluded","assignment","history","empty-history","long"].map(state=>`apple-update-group-${state}`),
+ ...["choose","empty","preview","existing","excluded","assignment","history","progress","receipt-site-operator","preview-site-operator","long","reader"].map(state=>`apple-update-group-organization-${state}`),
  ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long"].map(state=>`apple-update-schedule-${state}`),
  ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long","deadline-elapsed","deadline-fold","deadline-stale","exception-active"].map(state=>`apple-update-progress-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`apple-update-plan-${state}`),

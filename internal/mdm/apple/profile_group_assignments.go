@@ -95,7 +95,7 @@ func (s *Store) readProfileGroupAssignment(row scanner) (*ProfileGroupAssignment
 		}
 		r.GroupScope = r.Scope
 	} else {
-		if intent.GroupScope == nil || !validProfileGroupSourceScope(*intent.GroupScope, r.Scope) {
+		if intent.GroupScope == nil || !validAppleGroupSourceScope(*intent.GroupScope, r.Scope) {
 			return nil, ErrProfileGroupIntegrity
 		}
 		r.GroupScope = *intent.GroupScope
@@ -115,7 +115,7 @@ func (s *Store) readProfileGroupAssignment(row scanner) (*ProfileGroupAssignment
 }
 
 func (s *Store) sealProfileGroupAssignment(r *ProfileGroupAssignment) ([]byte, error) {
-	if !validProfileGroupSourceScope(r.GroupScope, r.Scope) {
+	if !validAppleGroupSourceScope(r.GroupScope, r.Scope) {
 		return nil, ErrProfileGroupIntegrity
 	}
 	intent := profileGroupIntent{Version: 2, ProfileName: r.ProfileName, GroupScope: &r.GroupScope}
@@ -167,7 +167,7 @@ func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permis
 }
 
 func (s *Store) assignProfileFromGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, requestKey string, deviceIDs []string, desired string) (*ProfileGroupAssignment, error) {
-	if !validProfileGroupSourceScope(groupScope, scope) {
+	if !validAppleGroupSourceScope(groupScope, scope) {
 		return nil, ErrProfileGroup
 	}
 	if !sources.Apple || !profileRevisionUUID(profileID) || profileRevision < 1 || profileRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || (desired != "installed" && desired != "removed") || len(deviceIDs) < 1 || len(deviceIDs) > 100 {

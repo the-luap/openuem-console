@@ -14,14 +14,24 @@ func UpdatePlanGroupHistoryPath(id string) string {
 	return "/ios/update-plans/" + id + "/group-assignments"
 }
 func UpdatePlanGroupChoiceURL(info *partials.CommonInfo, plan apple.UpdatePlan, after string) string {
+	return UpdatePlanGroupSourceChoiceURL(info, plan, after, false)
+}
+func UpdatePlanGroupSourceChoiceURL(info *partials.CommonInfo, plan apple.UpdatePlan, after string, organization bool) string {
 	q := url.Values{"revision": {strconv.Itoa(plan.Revision)}}
+	if organization {
+		q.Set("source", "organization")
+	}
 	if after != "" {
 		q.Set("after", after)
 	}
 	return partials.GetNavigationUrl(info, "/ios/update-plans/"+plan.ID+"/groups") + "?" + q.Encode()
 }
 func updatePlanGroupPreviewURL(info *partials.CommonInfo, plan apple.UpdatePlan, group inventory.DeviceGroup) string {
-	return partials.GetNavigationUrl(info, "/ios/update-plans/"+plan.ID+"/groups/"+group.ID+"/preview") + "?" + url.Values{"revision": {strconv.Itoa(plan.Revision)}, "group_revision": {strconv.Itoa(group.Revision)}}.Encode()
+	q := url.Values{"revision": {strconv.Itoa(plan.Revision)}, "group_revision": {strconv.Itoa(group.Revision)}}
+	if group.Scope.TenantID > 0 && group.Scope.SiteID == 0 {
+		q.Set("source", "organization")
+	}
+	return partials.GetNavigationUrl(info, "/ios/update-plans/"+plan.ID+"/groups/"+group.ID+"/preview") + "?" + q.Encode()
 }
 func updatePlanGroupFields(preview apple.UpdatePlanGroupPreview) string {
 	fields := make([]string, len(preview.Targets))

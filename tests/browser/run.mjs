@@ -33,6 +33,7 @@ import appleProfileOrganizationGroups from "./apple-profile-organization-groups.
 import appleProfileGroups from "./apple-profile-groups.mjs";
 import appleUpdatePlans from "./apple-update-plans.mjs";
 import appleUpdateGroups from "./apple-update-groups.mjs";
+import appleUpdateOrganizationGroups from "./apple-update-organization-groups.mjs";
 import appleUpdateSchedules from "./apple-update-schedules.mjs";
 import appleUpdateRemovals from "./apple-update-removals.mjs";
 import appleUpdatePromotions from "./apple-update-promotions.mjs";
@@ -95,6 +96,7 @@ try {
         [appleProfileOrganizationGroups,30],
         [appleUpdatePlans,18],
         [appleUpdateGroups,27],
+        [appleUpdateOrganizationGroups,36],
         [appleUpdateSchedules,27],
         [appleUpdateProgress,39],
         [appleDeviceUpdates,66],

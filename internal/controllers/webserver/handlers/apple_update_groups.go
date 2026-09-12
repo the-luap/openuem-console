@@ -36,7 +36,7 @@ func (h *Handler) AppleUpdatePlanGroups(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	q, err := groupQuery(c, "revision", "after")
+	q, err := groupQuery(c, "revision", "source", "after")
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
@@ -48,25 +48,33 @@ func (h *Handler) AppleUpdatePlanGroups(c echo.Context) error {
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
-	groups, err := inventory.ListDeviceGroups(c.Request().Context(), h.Model.DB, h.Access, h.appleActor(c), access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, q.Get("after"))
+	organization, err := appleUpdateGroupSource(q.Get("source"))
+	if err != nil {
+		return appleUpdateGroupFailure(c, err)
+	}
+	groupScope := access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}
+	if organization {
+		groupScope.SiteID = 0
+	}
+	groups, err := inventory.ListDeviceGroups(c.Request().Context(), h.Model.DB, h.Access, h.appleActor(c), groupScope, q.Get("after"))
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
 	paging := mdm_views.DevicePagination{}
 	if q.Get("after") != "" {
-		paging.First = mdm_views.UpdatePlanGroupChoiceURL(info, *plan, "")
+		paging.First = mdm_views.UpdatePlanGroupSourceChoiceURL(info, *plan, "", organization)
 	}
 	if groups.Next != "" {
-		paging.Next = mdm_views.UpdatePlanGroupChoiceURL(info, *plan, groups.Next)
+		paging.Next = mdm_views.UpdatePlanGroupSourceChoiceURL(info, *plan, groups.Next, organization)
 	}
-	return renderApple(c, mdm_views.AppleUpdatePlanGroups(c, info, *plan, groups, paging))
+	return renderApple(c, mdm_views.AppleUpdatePlanGroups(c, info, *plan, groups, paging, organization))
 }
 func (h *Handler) ApplePreviewUpdatePlanGroup(c echo.Context) error {
 	info, scope, err := h.appleUpdatePlanContext(c)
 	if err != nil {
 		return err
 	}
-	q, err := groupQuery(c, "revision", "group_revision")
+	q, err := groupQuery(c, "revision", "group_revision", "source")
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
@@ -78,7 +86,15 @@ func (h *Handler) ApplePreviewUpdatePlanGroup(c echo.Context) error {
 	if err != nil || groupVersion == 0 {
 		return appleUpdateGroupFailure(c, apple.ErrUpdatePlanGroup)
 	}
-	preview, err := h.Apple.PreviewUpdatePlanGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, c.Param("group"), groupVersion)
+	organization, err := appleUpdateGroupSource(q.Get("source"))
+	if err != nil {
+		return appleUpdateGroupFailure(c, err)
+	}
+	previewGroup := h.Apple.PreviewUpdatePlanGroup
+	if organization {
+		previewGroup = h.Apple.PreviewUpdatePlanOrganizationGroup
+	}
+	preview, err := previewGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, c.Param("group"), groupVersion)
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
@@ -113,7 +129,7 @@ func (h *Handler) AppleAssignUpdatePlanGroup(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := boundedDeviceManagementForm(c, "apple_update_groups.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed"}, 16<<10)
+	f, err := boundedDeviceManagementForm(c, "apple_update_groups.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed"}, 16<<10)
 	if err != nil {
 		return err
 	}
@@ -121,7 +137,15 @@ func (h *Handler) AppleAssignUpdatePlanGroup(c echo.Context) error {
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
-	assignment, err := h.Apple.AssignUpdatePlanFromGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, f.Get("group_id"), groupVersion, f.Get("request_key"), selected)
+	organization, err := appleUpdateGroupSource(f.Get("group_source"))
+	if err != nil {
+		return appleUpdateGroupFailure(c, err)
+	}
+	assignGroup := h.Apple.AssignUpdatePlanFromGroup
+	if organization {
+		assignGroup = h.Apple.AssignUpdatePlanFromOrganizationGroup
+	}
+	assignment, err := assignGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, f.Get("group_id"), groupVersion, f.Get("request_key"), selected)
 	if err != nil {
 		return appleUpdateGroupFailure(c, err)
 	}
@@ -170,4 +194,15 @@ func (h *Handler) AppleUpdatePlanGroupAssignments(c echo.Context) error {
 		return appleUpdateGroupFailure(c, err)
 	}
 	return renderApple(c, mdm_views.AppleUpdatePlanGroupAssignments(c, info, c.Param("plan"), items, next))
+}
+
+func appleUpdateGroupSource(raw string) (bool, error) {
+	switch raw {
+	case "", "site":
+		return false, nil
+	case "organization":
+		return true, nil
+	default:
+		return false, apple.ErrUpdatePlanGroup
+	}
 }

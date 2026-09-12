@@ -43,7 +43,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
 | MAC-01 | Native manual Mac SCEP enrollment; persisted platform/version evidence; platform filters, device-channel system profiles and inventory; Mac instructions, profile lifecycle, minimal-inventory and scoped console tests; scoped agent hardware/proof RPC, protected Mac collection and transactional hashed evidence; encrypted MDM verification profiles, bounded cleanup, scoped canonical identity and history, conflict handling, re-enrollment continuity and permission-aware device grouping; per-user enrollment, separate encrypted push/command/profile state, capability-gated user profiles, renewal staging, pause/resume and scoped console controls | Mac template coverage, hardware-repair/cross-site merge workflows and real Mac acceptance |
 | MAC-02 | Native Mac GDMF/DDM compatibility; conservative supervision/security/bootstrap authorization gates; encrypted device-bound token escrow, renewal access transfer and immediate policy reconciliation; staged FileVault profiles, per-device encrypted recovery escrow/history, authenticated agent validation, journaled rotation, explicit uncertainty resolution and audited retrieval; opt-in native Recovery Lock with encrypted password history and conservative result reconciliation; PostgreSQL/HTTP/browser tests | Physical FileVault rotation/recovery acceptance, escrow certificate rotation, complete Mac security workflows and hardware update/reboot acceptance |
-| IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation; reviewed site/organization-group profile assignments within explicit sites; versioned update plans, exact group update admission and scheduled activation; current OS/deadline assessments, temporary exceptions and reviewed group removal; opt-in durable console incidents and acknowledgments; explicit all-original pilot readiness and atomic reviewed promotion with immutable encrypted evidence and PostgreSQL/router/browser coverage | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; continuous group reconciliation, automatic promotion and external escalation channels |
+| IOS-01 | Native iPhone/iPad protocol/profile/DDM foundation; reviewed site/organization-group profile assignments within explicit sites; versioned update plans, exact site/organization-source update admission and site-group scheduled activation; current OS/deadline assessments, temporary exceptions and reviewed group removal; opt-in durable console incidents and acknowledgments; explicit all-original pilot readiness and atomic reviewed promotion with immutable encrypted evidence and PostgreSQL/router/browser coverage | iPad filters/templates and separate hardware evidence; full template targeting/conflicts/rollback; continuous group reconciliation, automatic promotion and external escalation channels |
 | WIN-01 | Upstream deployment/model tests; exact WinGet arguments and owned native processes; immutable encrypted WinGet/MSI/EXE/Burn approvals and scoped device preparation; authenticated generation-bound MSI/EXE task delivery, current-certificate receipt proofs, immutable DPAPI admission/results and joined Windows service; private HTTPS/hash/Authenticode staging, native host/package preflight, exact state observations and conservative restart/interruption outcomes; native synthetic MSI install/property/removal, exact major upgrades and combined executor fixtures, service activation/recovery and cross-platform CI; fresh explicit console dispatch, atomic signed task linkage, verified scoped outcome history and pre-delivery cancellation; separate confirmed read-only reconciliation with protected later-boot evidence, signed durable observations and verified reservation release, retaining original execution outcomes; encrypted fixed-commit WinGet captures, explicit exact machine MSI approval, scoped immutable source evidence and source-bound encrypted dispatch; PostgreSQL/router/browser tests | Further WinGet installer formats; physical install/remove/offline/restart/hibernate acceptance; update rings/policies and broader Windows client/Server edition acceptance |
 | PKI-01 | Device-generated Apple SCEP enrollment and bounded CA/RA certificate lifetimes; automatic Apple identity replacement with candidate confirmation, legacy metadata recovery, scoped history and TLS/database tests; encrypted Apple secrets; documented/tested gateway leaf rotation; persistent Apple push expiry reminders with bounded SMTP, authorization rechecks and renewal supersession; audited native Windows certificate health with current/pending identity separation and CA issuance warnings; persistent Windows certificate/CA reminders with live recipient checks, protected outboxes and scoped delivery history; encrypted database backups with separately encrypted recovery keys/configuration, confirmed isolated restore and synthetic Apple/Windows/desktop identity continuity; shared desktop renewal preparation/confirmation with permanent key ownership, immutable generations and atomic FileVault key-processing acknowledgements; bound HTTPS renewal client and exact gateway/console routes with proof, retry, concurrency, audit rollback and recovery-coordination tests; native protected candidate/decision/activation journals, automatic installed-service scheduling, joined handoff/reconnect, stoppable startup recovery, authoritative cancellation and historical FileVault reconciliation with immutable receipt continuity | Physical-device renewal/disaster-recovery acceptance; production desktop release integration; CA/master-key rotation and cross-platform expiry health |
 | OPS-01 | Console CI builds and gateway/service CLIs; minimal unprivileged gateway image with pinned build inputs and isolated native process checks; signed installer manifest validation, persisted monotonic catalog, verified file descriptors, release-admission CLI and separately signed bootstrap configuration with PostgreSQL race tests | Native signing/notarization jobs, versioned agent/console distribution, secure update/rollback workflows, monitoring, released-distribution and restore runbooks |
@@ -60,6 +60,25 @@ These must receive their own implementation and evidence before full completion;
 the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
+
+- [Apple updates from organization groups](apple-update-organization-groups.md)
+  now admit the reviewed intersection within an explicit target site. Current
+  organization source read rights, target update authority, plan/group revisions,
+  complete native membership and existing policy tokens are checked atomically.
+  Version-2 encrypted receipts preserve source scope; legacy version-1 site
+  receipts remain readable. Historical progress, matching removal, monitoring
+  and use as an original pilot remain available after source archival.
+  Schedule and promotion destinations retain their site-only child contracts.
+  The 15.208-second PostgreSQL/race regression includes late-audit rollback,
+  held source/site/device/grant locks, exact replay without policy restoration,
+  source-version compatibility and substituted child rejection. Registered Linux
+  routes and 192 relevant Chrome cases pass, including 36 new organization-update
+  cases. Mobile preview and original receipt were visually inspected.
+  The full 1,206-case Chrome matrix passes, and the final 36 organization cases
+  pass after a progress fixture correction. Composed source-read/target-update
+  grants pass a separate 2.994-second PostgreSQL/race check. Linux/macOS package
+  race checks and the full Linux build pass.
+  The complete Apple PostgreSQL/race suite passes in 723.608 seconds.
 
 - [Apple profiles from organization groups](apple-profile-organization-groups.md)
   now intersect an explicitly selected organization source with an explicit
@@ -82,8 +101,9 @@ the table's package summaries do not remove any detail from the roadmap.
   The suite now has eight minutes, with ten minutes for the CI step and unchanged
   short startup/CDP/event limits. The complete Apple PostgreSQL/race suite
   passes in 723.216 seconds.
-  Organization-source update groups, software assignments, continuous group
-  reconciliation and physical-device acceptance remain separate work.
+  Organization-source updates are now documented in the increment above.
+  Software assignments, continuous group reconciliation and physical-device
+  acceptance remain separate work.
 
 - [Reviewed Apple pilot promotion](apple-update-promotions.md) now verifies
   every original pilot enrollment before admitting an explicitly reviewed

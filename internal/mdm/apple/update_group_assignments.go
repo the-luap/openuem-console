@@ -23,6 +23,7 @@ type UpdatePlanGroupCommand struct {
 	CommandID string                   `json:"-" xml:"-" yaml:"-"`
 }
 type UpdatePlanGroupAssignment struct {
+	GroupScope    Scope                    `json:"-" xml:"-" yaml:"-"`
 	ID            string                   `json:"-" xml:"-" yaml:"-"`
 	Scope         Scope                    `json:"-" xml:"-" yaml:"-"`
 	RequestKey    string                   `json:"-" xml:"-" yaml:"-"`
@@ -40,6 +41,7 @@ func (UpdatePlanGroupAssignment) String() string     { return "[protected Apple 
 func (v UpdatePlanGroupAssignment) GoString() string { return v.String() }
 
 type updateGroupIntent struct {
+	GroupScope    *Scope `json:",omitempty"`
 	Version       int
 	Plan          updatePlanWire
 	PlanActor     string
@@ -74,8 +76,19 @@ func (s *Store) scanUpdateGroupAssignment(row scanner) (*UpdatePlanGroupAssignme
 	var wire updateGroupIntent
 	decoder := json.NewDecoder(bytes.NewReader(plain))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&wire) != nil || decoder.Decode(new(any)) != io.EOF || wire.Version != 1 || wire.Plan.Version != 1 || wire.PlanCreatedAt.IsZero() || len(wire.PlanActor) < 1 || len(wire.PlanActor) > 255 || !profileRevisionUUID(wire.Group.ID) || wire.Group.Revision < 1 || wire.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: wire.Group.Name, Rule: wire.Group.Rule}).Valid() || len(wire.Targets) < 1 || len(wire.Targets) > 100 {
+	if decoder.Decode(&wire) != nil || decoder.Decode(new(any)) != io.EOF || (wire.Version != 1 && wire.Version != 2) || wire.Plan.Version != 1 || wire.PlanCreatedAt.IsZero() || len(wire.PlanActor) < 1 || len(wire.PlanActor) > 255 || !profileRevisionUUID(wire.Group.ID) || wire.Group.Revision < 1 || wire.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: wire.Group.Name, Rule: wire.Group.Rule}).Valid() || len(wire.Targets) < 1 || len(wire.Targets) > 100 {
 		return nil, ErrUpdatePlanGroupIntegrity
+	}
+	if wire.Version == 1 {
+		if wire.GroupScope != nil {
+			return nil, ErrUpdatePlanGroupIntegrity
+		}
+		r.GroupScope = r.Scope
+	} else {
+		if wire.GroupScope == nil || !validAppleGroupSourceScope(*wire.GroupScope, r.Scope) {
+			return nil, ErrUpdatePlanGroupIntegrity
+		}
+		r.GroupScope = *wire.GroupScope
 	}
 	r.Plan.Scope = r.Scope
 	r.Plan.Actor = wire.PlanActor
@@ -100,7 +113,10 @@ func (s *Store) scanUpdateGroupAssignment(row scanner) (*UpdatePlanGroupAssignme
 }
 func (s *Store) sealUpdateGroupAssignment(r *UpdatePlanGroupAssignment) ([]byte, error) {
 	d := r.Plan.Definition
-	wire := updateGroupIntent{Version: 1, PlanActor: r.Plan.Actor, PlanCreatedAt: r.Plan.CreatedAt, Plan: updatePlanWire{Version: 1, Name: d.Name, Description: d.Description, Platform: d.Platform, TargetVersion: d.TargetVersion, TargetBuild: d.TargetBuild, Deadline: d.Deadline, DetailsURL: d.DetailsURL, Archived: d.Archived}}
+	if !validAppleGroupSourceScope(r.GroupScope, r.Scope) {
+		return nil, ErrUpdatePlanGroupIntegrity
+	}
+	wire := updateGroupIntent{Version: 2, GroupScope: &r.GroupScope, PlanActor: r.Plan.Actor, PlanCreatedAt: r.Plan.CreatedAt, Plan: updatePlanWire{Version: 1, Name: d.Name, Description: d.Description, Platform: d.Platform, TargetVersion: d.TargetVersion, TargetBuild: d.TargetBuild, Deadline: d.Deadline, DetailsURL: d.DetailsURL, Archived: d.Archived}}
 	wire.Group.ID, wire.Group.Revision, wire.Group.Name, wire.Group.Rule = r.Group.ID, r.Group.Revision, r.Group.Name, r.Group.Rule
 	for _, target := range r.Commands {
 		wire.Targets = append(wire.Targets, struct{ DeviceID, PolicyToken, CommandID string }{target.Selection.DeviceID, target.Selection.PolicyToken, target.CommandID})
@@ -142,6 +158,10 @@ func canonicalUpdateGroupSelection(selection []UpdatePlanGroupSelection) ([]Upda
 // selection and its unchanged configured policies. Exact retry returns original
 // admission evidence before consulting mutable plan, group or device state.
 func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
+	return s.assignUpdatePlanFromGroupSource(ctx, actor, permissions, scope, scope, sources, planID, planRevision, groupID, groupRevision, requestKey, selection)
+}
+
+func (s *Store) assignUpdatePlanFromGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
 	if !sources.Apple || !profileRevisionUUID(planID) || planRevision < 1 || planRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || len(selection) < 1 || len(selection) > 100 {
 		return nil, ErrUpdatePlanGroup
 	}
@@ -156,7 +176,7 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 		return nil, err
 	}
 	defer tx.Rollback()
-	r, err := s.assignUpdatePlanGroupTransaction(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, requestKey, targets)
+	r, err := s.assignUpdatePlanGroupSourceTransaction(ctx, tx, actor, permissions, scope, groupScope, sources, planID, planRevision, groupID, groupRevision, requestKey, targets)
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +190,21 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 // transition and device admission in one transaction. Targets and source IDs
 // must already be canonical and validated by the caller.
 func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, targets []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
+	return s.assignUpdatePlanGroupSourceTransaction(ctx, tx, actor, permissions, scope, scope, sources, planID, planRevision, groupID, groupRevision, requestKey, targets)
+}
+
+func (s *Store) assignUpdatePlanGroupSourceTransaction(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, targets []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
 	var err error
 	if err = updatePlanAuthority(ctx, tx, permissions, actor, scope, access.ManageUpdates); err != nil {
 		return nil, err
+	}
+	if !validAppleGroupSourceScope(groupScope, scope) {
+		return nil, ErrUpdatePlanGroup
+	}
+	if groupScope != scope {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}); err != nil {
+			return nil, err
+		}
 	}
 	var actorRevision int64
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT revision FROM uem_access_revisions WHERE user_id=$1),0)`, actor).Scan(&actorRevision); err != nil {
@@ -187,7 +219,7 @@ func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx
 		for i, command := range previous.Commands {
 			original[i] = command.Selection
 		}
-		if previous.Actor != actor || previous.ActorRevision != actorRevision || previous.Plan.ID != planID || previous.Plan.Revision != planRevision || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(original, targets) {
+		if previous.GroupScope != groupScope || previous.Actor != actor || previous.ActorRevision != actorRevision || previous.Plan.ID != planID || previous.Plan.Revision != planRevision || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(original, targets) {
 			return nil, ErrConflict
 		}
 		if err = auditUpdatePlan(ctx, tx, scope, actor, "group.replayed", previous.ID, planRevision); err != nil {
@@ -198,7 +230,7 @@ func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx
 	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	preview, err := s.inspectUpdatePlanGroup(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, true)
+	preview, err := s.inspectUpdatePlanGroupSourceWithPilot(ctx, tx, actor, permissions, scope, groupScope, sources, planID, planRevision, groupID, groupRevision, true, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +250,7 @@ func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx
 // without re-reading an unrelated later membership snapshot.
 func (s *Store) writeUpdatePlanGroupAssignment(ctx context.Context, tx *sql.Tx, actor string, actorRevision int64, scope Scope, requestKey string, preview *UpdatePlanGroupPreview) (*UpdatePlanGroupAssignment, error) {
 	var err error
-	r := &UpdatePlanGroupAssignment{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, Plan: preview.Plan, Actor: actor, ActorRevision: actorRevision, Group: ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}}
+	r := &UpdatePlanGroupAssignment{GroupScope: Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}, ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, Plan: preview.Plan, Actor: actor, ActorRevision: actorRevision, Group: ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}}
 	policy := preview.Plan.Definition.Policy()
 	for _, target := range preview.Targets {
 		d, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2 AND id=$3`, scope.TenantID, scope.SiteID, target.Selection.DeviceID))

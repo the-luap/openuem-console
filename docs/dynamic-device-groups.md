@@ -87,6 +87,9 @@ the source and target scopes separately. Organization-wide source read authority
 is required; the complete bound applies to the site intersection.
 [Apple update plan assignments](apple-update-groups.md) additionally compare
 reviewed current policy values and explicitly confirm replacements.
+[Organization-source Apple updates](apple-update-organization-groups.md) apply
+that review to the selected site intersection and retain the original source
+scope for receipts, progress and later cohort actions.
 [Scheduled Apple update activation](apple-update-schedules.md) retains that review
 and rechecks it in an absolute UTC activation window.
 [Temporary update exceptions](apple-update-exceptions.md) now prevent new Apple

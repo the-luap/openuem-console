@@ -118,7 +118,7 @@ func (s *Store) validateUpdatePromotionSources(ctx context.Context, tx *sql.Tx, 
 	if err != nil {
 		return err
 	}
-	if assignment.RequestKey != r.activationKey || assignment.Actor != r.Actor || assignment.ActorRevision != r.ActorRevision || assignment.Plan.Revision != r.DestinationRevision || assignment.Group.ID != r.GroupID || assignment.Group.Revision != r.GroupRevision || assignment.CreatedAt.Before(r.Evidence.AssessedAt) || assignment.CreatedAt.After(r.CreatedAt) || !UpdatePromotionTargetMatches(pilot.Plan.Definition, assignment.Plan.Definition) || len(assignment.Commands) != len(r.Targets) {
+	if assignment.GroupScope != r.Scope || assignment.RequestKey != r.activationKey || assignment.Actor != r.Actor || assignment.ActorRevision != r.ActorRevision || assignment.Plan.Revision != r.DestinationRevision || assignment.Group.ID != r.GroupID || assignment.Group.Revision != r.GroupRevision || assignment.CreatedAt.Before(r.Evidence.AssessedAt) || assignment.CreatedAt.After(r.CreatedAt) || !UpdatePromotionTargetMatches(pilot.Plan.Definition, assignment.Plan.Definition) || len(assignment.Commands) != len(r.Targets) {
 		return ErrUpdatePromotionIntegrity
 	}
 	originalIDs := make(map[string]bool, len(pilot.Commands))

@@ -62,8 +62,9 @@ source is the recorded target site, as required by the original site-only
 workflow. No receipt or database schema is rewritten. Missing, foreign or invalid
 version-2 source scope is rejected, and authenticated encryption protects the
 source scope with the original intent. Console instances reading newly written
-version-2 receipts need this reader. The shared update group, schedule and
-pilot-promotion formats remain unchanged.
+version-2 receipts need this reader. [Organization-source updates](apple-update-organization-groups.md) now use their
+own version-2 group receipts. Schedule and pilot-promotion parent formats remain
+unchanged.
 
 History and detail retain the original organization group name, rule and revision
 while keeping target-site authorization. A site operator can read an assignment's

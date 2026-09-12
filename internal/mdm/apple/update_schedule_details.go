@@ -17,7 +17,7 @@ func matchesUpdateScheduleAssignment(r *updateStoredSchedule, receipt *UpdatePla
 	for i, command := range receipt.Commands {
 		targets[i] = command.Selection
 	}
-	return r.Phase == "activated" && r.AssignmentID == receipt.ID && r.Scope == receipt.Scope && r.activationKey == receipt.RequestKey && sameScheduledUpdatePlan(r.Plan, receipt.Plan) && r.Group == receipt.Group && r.Actor == receipt.Actor && r.ActorRevision == receipt.ActorRevision && slices.Equal(r.Targets, targets) && r.CompletedAt != nil && !receipt.CreatedAt.Before(r.CreatedAt) && !receipt.CreatedAt.Before(r.NotBefore) && !receipt.CreatedAt.After(*r.CompletedAt) && r.CompletedAt.Before(r.ExpiresAt)
+	return r.Phase == "activated" && r.AssignmentID == receipt.ID && r.Scope == receipt.Scope && receipt.GroupScope == r.Scope && r.activationKey == receipt.RequestKey && sameScheduledUpdatePlan(r.Plan, receipt.Plan) && r.Group == receipt.Group && r.Actor == receipt.Actor && r.ActorRevision == receipt.ActorRevision && slices.Equal(r.Targets, targets) && r.CompletedAt != nil && !receipt.CreatedAt.Before(r.CreatedAt) && !receipt.CreatedAt.Before(r.NotBefore) && !receipt.CreatedAt.After(*r.CompletedAt) && r.CompletedAt.Before(r.ExpiresAt)
 }
 func (s *Store) validateUpdateScheduleAssignment(ctx context.Context, tx *sql.Tx, r *updateStoredSchedule) error {
 	if r.Phase != "activated" {

@@ -74,6 +74,10 @@ func currentUpdateGroupPolicy(ctx context.Context, tx *sql.Tx, id string) (*Upda
 // without writing device work. Confirmation must retain both source revisions
 // and every eligible native target's current policy token.
 func (s *Store) PreviewUpdatePlanGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int) (*UpdatePlanGroupPreview, error) {
+	return s.previewUpdatePlanGroupSource(ctx, actor, permissions, scope, scope, sources, planID, planRevision, groupID, groupRevision)
+}
+
+func (s *Store) previewUpdatePlanGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int) (*UpdatePlanGroupPreview, error) {
 	if !sources.Apple || !profileRevisionUUID(planID) || planRevision < 1 || planRevision > 2147483647 {
 		return nil, ErrUpdatePlanGroup
 	}
@@ -87,7 +91,7 @@ func (s *Store) PreviewUpdatePlanGroup(ctx context.Context, actor string, permis
 	if err = updatePlanAuthority(ctx, tx, permissions, actor, scope, access.ManageUpdates); err != nil {
 		return nil, err
 	}
-	preview, err := s.inspectUpdatePlanGroup(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, false)
+	preview, err := s.inspectUpdatePlanGroupSourceWithPilot(ctx, tx, actor, permissions, scope, groupScope, sources, planID, planRevision, groupID, groupRevision, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +114,10 @@ func (s *Store) inspectUpdatePlanGroup(ctx context.Context, tx *sql.Tx, actor st
 // before assessing either cohort. The ordinary assignment path retains its
 // existing locking contract when there is no original pilot.
 func (s *Store) inspectUpdatePlanGroupWithPilot(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, admitting bool, pilotIDs []string) (*UpdatePlanGroupPreview, error) {
+	return s.inspectUpdatePlanGroupSourceWithPilot(ctx, tx, actor, permissions, scope, scope, sources, planID, planRevision, groupID, groupRevision, admitting, pilotIDs)
+}
+
+func (s *Store) inspectUpdatePlanGroupSourceWithPilot(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, admitting bool, pilotIDs []string) (*UpdatePlanGroupPreview, error) {
 	if len(pilotIDs) > 100 || !slices.IsSorted(pilotIDs) {
 		return nil, ErrUpdatePlanGroup
 	}
@@ -126,7 +134,7 @@ func (s *Store) inspectUpdatePlanGroupWithPilot(ctx context.Context, tx *sql.Tx,
 	if p.Revision != planRevision || p.Definition.Archived {
 		return nil, ErrConflict
 	}
-	group, err := inventory.DeviceGroupSnapshotTransaction(ctx, tx, permissions, actor, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, sources, groupID, groupRevision)
+	group, err := inventory.DeviceGroupIntersectionTransaction(ctx, tx, permissions, actor, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, sources, groupID, groupRevision)
 	if err != nil {
 		return nil, err
 	}

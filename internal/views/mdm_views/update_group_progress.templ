@@ -56,7 +56,7 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					@appleUpdatePlanDefinition(progress.Assignment.Plan)
-					@appleProfileGroupSource(info, progress.Assignment.Group)
+					@appleProfileAssignmentGroupSource(info, progress.Assignment.Group, progress.Assignment.GroupScope)
 					<p>Original admission (UTC): { progress.Assignment.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
 				</div>
 			</section>

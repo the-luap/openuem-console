@@ -4,16 +4,26 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
-templ AppleUpdatePlanGroups(c echo.Context, info *partials.CommonInfo, plan apple.UpdatePlan, page *inventory.DeviceGroupPage, paging DevicePagination) {
+templ AppleUpdatePlanGroups(c echo.Context, info *partials.CommonInfo, plan apple.UpdatePlan, page *inventory.DeviceGroupPage, paging DevicePagination, organization bool) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Choose a dynamic group", Url: UpdatePlanGroupChoiceURL(info, plan, "")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Choose a dynamic group", Url: UpdatePlanGroupSourceChoiceURL(info, plan, "", organization)}}, info)
 		<main id="device-management" data-update-groups="choose" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div style="overflow-wrap:anywhere;"><h1 class="text-2xl font-semibold">Choose a dynamic group</h1><p>{ plan.Definition.Name } · Revision { Number(plan.Revision) }</p><p>The next step checks every member, existing policy and exact release eligibility in this site.</p></div>
+			if organization {
+				<p data-update-organization-source>Organization groups are listed. The next step evaluates the group's current rule only within the selected target site. Devices from other sites are outside this action.</p>
+			}
+			<nav aria-label="Group source" class="flex flex-wrap gap-4">
+				<a class="underline" href={ templ.URL(UpdatePlanGroupSourceChoiceURL(info, plan, "", false)) }>Site groups</a>
+				if profileOrganizationGroupsAllowed(info) {
+					<a class="underline" href={ templ.URL(UpdatePlanGroupSourceChoiceURL(info, plan, "", true)) }>Organization groups</a>
+				}
+			</nav>
 			for _,group:=range page.Groups {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
@@ -28,9 +38,13 @@ templ AppleUpdatePlanGroups(c echo.Context, info *partials.CommonInfo, plan appl
 				</section>
 			}
 			if len(page.Groups)==0 {
-				<p>No dynamic groups in this site. Create a group before assigning this plan.</p>
+				if organization {
+					<p>No dynamic groups in this organization. Create an organization group or choose a site group.</p>
+				} else {
+					<p>No dynamic groups in this site. Create a group before assigning this plan.</p>
+				}
 			}
-			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups")) }>Manage dynamic groups</a>
+			<a class="underline" href={ templ.URL(profileGroupManageURL(info, organization)) }>Manage dynamic groups</a>
 			@GroupPaging(paging, "Dynamic group pages")
 		</main>
 	}
@@ -39,13 +53,13 @@ templ AppleUpdatePlanGroups(c echo.Context, info *partials.CommonInfo, plan appl
 templ AppleUpdatePlanGroupPreview(c echo.Context, info *partials.CommonInfo, preview apple.UpdatePlanGroupPreview, requestKey string) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Review group update", Url: UpdatePlanGroupChoiceURL(info, preview.Plan, "")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Review group update", Url: UpdatePlanGroupSourceChoiceURL(info, preview.Plan, "", profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}) == "organization")}}, info)
 		<main id="device-management" data-update-groups="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div><h1 class="text-2xl font-semibold">Review group update</h1><p>No device policy has changed. Confirmation rechecks the plan, group, eligible members and their existing policies.</p></div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4">
 					@appleUpdatePlanDefinition(preview.Plan)
-					@appleProfileGroupSource(info, apple.ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule})
+					@appleProfileAssignmentGroupSource(info, apple.ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}, apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID})
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
@@ -80,11 +94,12 @@ templ AppleUpdatePlanGroupPreview(c echo.Context, info *partials.CommonInfo, pre
 					}
 				</div>
 			</section>
-			if len(preview.Targets)>0 {
+			if len(preview.Targets)>0 && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) && (profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID})=="site" || profileOrganizationGroupsAllowed(info)) {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body">
 						<form method="post" action={ partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(preview.Plan.ID)) } class="grid gap-4" data-update-group-confirm>
 							@CSRF(info)
+							<input type="hidden" name="group_source" value={ profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}) }/>
 							<input type="hidden" name="expected_revision" value={ Number(preview.Plan.Revision) }/><input type="hidden" name="group_id" value={ preview.Group.ID }/><input type="hidden" name="group_revision" value={ Number(preview.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="devices" value={ updatePlanGroupFields(preview) }/>
 							<p>This applies the reviewed plan to the eligible devices once, including the replacements shown above. Later plan or group edits do not change this request. Device reports determine installation and compliance.</p>
 							<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Apply this plan revision to the exact eligible selection and replace the existing policies shown above.</label>
@@ -92,7 +107,11 @@ templ AppleUpdatePlanGroupPreview(c echo.Context, info *partials.CommonInfo, pre
 						</form>
 					</div>
 				</section>
-				@appleUpdateScheduleForm(info,preview,requestKey)
+				if profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID})=="site" {
+					@appleUpdateScheduleForm(info, preview, requestKey)
+				} else {
+					<p data-update-organization-immediate>Organization group updates apply immediately after confirmation. Scheduled assignments currently use site groups.</p>
+				}
 			}
 		</main>
 	}
@@ -107,16 +126,16 @@ templ AppleUpdatePlanGroupAssignment(c echo.Context, info *partials.CommonInfo, 
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					@appleUpdatePlanDefinition(assignment.Plan)
-					@appleProfileGroupSource(info, assignment.Group)
+					@appleProfileAssignmentGroupSource(info, assignment.Group, assignment.GroupScope)
 					<p>Confirmed by { assignment.Actor }</p>
 					<p>
-						Confirmed at:
+						{ "Confirmed at: " }
 						@Timestamp(&assignment.CreatedAt)
 					</p>
 					<p>Assignment ID: { assignment.ID }</p>
-					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupProgressPath(assignment.Plan.ID,assignment.ID)))}>Current cohort progress</a>
-					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupRemovalPreviewPath(assignment.Plan.ID,assignment.ID)))}>Review matching policy removal</a>
-					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupRemovalHistoryPath(assignment.Plan.ID,assignment.ID)))}>Policy removal history</a>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(assignment.Plan.ID, assignment.ID))) }>Current cohort progress</a>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalPreviewPath(assignment.Plan.ID, assignment.ID))) }>Review matching policy removal</a>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(assignment.Plan.ID, assignment.ID))) }>Policy removal history</a>
 					<p>Request ID: { assignment.RequestKey }</p>
 				</div>
 			</section>
@@ -143,6 +162,9 @@ templ AppleUpdatePlanGroupAssignments(c echo.Context, info *partials.CommonInfo,
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
 						<h2 class="uk-card-title">{ item.Plan.Definition.Name } · Revision { Number(item.Plan.Revision) }</h2>
 						<p>{ item.Group.Name } · Group revision { Number(item.Group.Revision) }</p>
+						if profileGroupSourceKind(item.GroupScope)=="organization" {
+							<p>Source: organization group · Target site: { info.SiteID }</p>
+						}
 						<p>{ Number(len(item.Commands)) } native Apple devices</p>
 						<p>
 							@Timestamp(&item.CreatedAt)

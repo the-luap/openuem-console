@@ -17,7 +17,7 @@ func TestAppleUpdateGroupFormFitsCompleteReviewedSelection(t *testing.T) {
 	for i := range targets {
 		targets[i] = fmt.Sprintf("10000000-0000-4000-8000-%012d:%s", i, strings.Repeat("a", 64))
 	}
-	fields := url.Values{"csrf": {"owned-csrf"}, "expected_revision": {"1"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"1"}, "request_key": {"30000000-0000-4000-8000-000000000001"}, "devices": {strings.Join(targets, "\n")}, "confirmed": {"yes"}}
+	fields := url.Values{"csrf": {"owned-csrf"}, "expected_revision": {"1"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"1"}, "group_source": {"organization"}, "request_key": {"30000000-0000-4000-8000-000000000001"}, "devices": {strings.Join(targets, "\n")}, "confirmed": {"yes"}}
 	body := fields.Encode()
 	require.Greater(t, len(body), 8192)
 	require.Less(t, len(body), 16384)
@@ -26,7 +26,7 @@ func TestAppleUpdateGroupFormFitsCompleteReviewedSelection(t *testing.T) {
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		c := echo.New().NewContext(r, httptest.NewRecorder())
 		c.Set("csrf", "owned-csrf")
-		f, err := boundedDeviceManagementForm(c, "apple_update_groups.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed"}, limit)
+		f, err := boundedDeviceManagementForm(c, "apple_update_groups.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed"}, limit)
 		if limit == 16384 {
 			require.NoError(t, err)
 			require.Equal(t, fields, f)

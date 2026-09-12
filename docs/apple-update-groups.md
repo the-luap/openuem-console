@@ -6,6 +6,8 @@ plan and group revisions, checks all members and shows eligible native Apple
 devices, current policies that would be replaced, and exclusions. An archived
 plan or group cannot start a new assignment. Original assignment history remains
 available after archival.
+[Organization-group sources](apple-update-organization-groups.md) can also be
+reviewed within the explicit target site for immediate assignments.
 
 ## Review and atomic confirmation
 
@@ -38,9 +40,9 @@ commit together. A late failure rolls back every target.
 
 The submitted request is limited to 100 unique canonical native IDs and 64-character
 lowercase policy tokens. Its strict URL-encoded form has a 16 KiB wire/parsed bound,
-which accommodates the complete 100-device selection. Only the seven declared
-fields are accepted: body CSRF, expected plan revision, group ID/revision, request
-UUID, target lines and explicit confirmation. Duplicate fields, query overrides,
+which accommodates the complete 100-device selection. Only the eight declared
+fields are accepted: body CSRF, expected plan revision, group ID/revision, optional
+source kind, request UUID, target lines and explicit confirmation. Duplicate fields, query overrides,
 unsupported encoding and header-only CSRF credentials are rejected. Global CSRF
 extraction applies this wire limit before normalizing either token path. Existing
 small console forms retain their 8 KiB limit.
@@ -95,8 +97,10 @@ matching policies from an original receipt's complete eligible selection, with
 its own immutable replay evidence. Manual device policy removal also remains
 available. Only eligible target state is
 retained; excluded members are not a frozen historical snapshot. New plan revisions
-and later group edits do not change already assigned policies. Organization-group
-intersections and richer predicates remain separate work.
+and later group edits do not change already assigned policies. [Organization-group
+intersections](apple-update-organization-groups.md) now support immediate
+assignments; organization-source schedules and richer predicates remain separate
+work.
 
 Owned PostgreSQL 17/race tests cover preview preservation, exact configured-policy
 tokens, progress-only changes, platform/prerequisite/release exclusions, complete
