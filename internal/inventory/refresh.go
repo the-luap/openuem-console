@@ -43,8 +43,11 @@ func NewRefreshStore(db *sql.DB, permissions *access.Store, individual bool, pub
 //go:embed migrations/*.sql
 var refreshMigrations embed.FS
 
-func (s *RefreshStore) Migrate(ctx context.Context) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+func (s *RefreshStore) Migrate(ctx context.Context) error { return Migrate(ctx, s.db) }
+
+// Migrate installs shared inventory state without starting the refresh worker.
+func Migrate(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

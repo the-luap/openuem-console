@@ -33,6 +33,7 @@ import (
 	"github.com/open-uem/ent/agent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -150,6 +151,9 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = audits.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = inventory.Migrate(ctx, m.DB); err != nil {
 		t.Fatal(err)
 	}
 	h := &Handler{Access: permissions, Model: m, Apple: store, SessionManager: &sessions.SessionManager{Manager: sm}, Version: "0.11.0", ServerReleasesFolder: releases}

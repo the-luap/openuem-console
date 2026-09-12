@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Dynamic device groups](dynamic-device-groups.md) now persist exact-scope
+  platform/search rules with numbered history, archive/reactivation and current
+  membership previews. Current permissions, the definition lock, scoped query
+  and read/change audit share a bounded transaction. Stale forms and member or
+  history pages reject changed definitions; organization URLs cannot inherit the
+  console's site fallback. Lists, membership and history use 25-entry pages;
+  creation has a serialized 1,000-group scope limit. The shared SQL projection
+  retains canonical Macs and native source controls while excluding ambiguous
+  desktop assignments for every group reader. Owned PostgreSQL inventory/audit
+  race suites, registered Linux routes, Linux handler/view/access/catalog checks
+  and the full build pass. Forty-two Chrome cases cover the eighteen new group
+  states and existing inventory/navigation behavior. Group-based assignments,
+  reviewed target sets, exceptions, conflict checks, rings and production-scale
+  acceptance remain open.
+
 - Unified device CSV/JSON exports now prepare all filtered rows in the selected
   order within one authorized, audited transaction. Preparation is limited to
   5,000 devices, 16 MiB, bounded metadata and two active exports per process.

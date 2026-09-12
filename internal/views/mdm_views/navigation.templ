@@ -14,6 +14,7 @@ templ Navigation(info *partials.CommonInfo) {
 				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/software/catalog")) }>{ i18n.T(ctx,"management_navigation.software") }</a>
 			}
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/devices")) }>{ i18n.T(ctx,"management_navigation.devices") }</a>
+			<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,"/device-groups"))}>{i18n.T(ctx,"mdm.groups.title")}</a>
 			if info.Principal.IsAdministrator() {
 				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/deploy")) }>{ i18n.T(ctx,"management_navigation.windows_deployment") }</a>
 				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) }>{ i18n.T(ctx,"management_navigation.windows_profiles") }</a>

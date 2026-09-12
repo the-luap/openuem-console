@@ -50,31 +50,7 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 						<button class="uk-button uk-button-default" type="submit" name="format" value="json">{ i18n.T(ctx, "mdm.devices.export_json") }</button>
 						<p class="uk-text-muted w-full">{ i18n.T(ctx, "mdm.devices.export_help") }</p>
 					</form>
-					<div class="overflow-x-auto">
-						<table class="uk-table uk-table-divider uk-table-hover">
-							<thead><tr><th>{ i18n.T(ctx, "mdm.devices.device") }</th><th>{ i18n.T(ctx, "mdm.devices.platform_os") }</th><th>{ i18n.T(ctx, "mdm.devices.model") }</th><th>{ i18n.T(ctx, "mdm.devices.serial") }</th><th>{ i18n.T(ctx, "mdm.devices.management") }</th><th>{ i18n.T(ctx, "mdm.devices.last_contact") }</th></tr></thead>
-							<tbody>
-								for _,d:=range rows {
-									<tr>
-										<td>
-											if d.URL!="" {
-												<a class="underline font-medium" href={ templ.URL(d.URL) }>{ Show(d.Name) }</a>
-											} else {
-												{ Show(d.Name) }
-											}
-										</td>
-										<td>{ d.Platform }<br/><span class="uk-text-muted">{ Show(d.OSVersion) }</span></td>
-										<td>{ Show(d.Model) }</td>
-										<td>{ Show(d.Serial) }</td>
-										<td>{ StateLabel(ctx, d.Status) }</td>
-										<td>
-											@Timestamp(d.LastSeen)
-										</td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					</div>
+					@DeviceTable(rows)
 					if paging.Next!="" || paging.First!="" {
 						<nav class="flex flex-wrap gap-4 mt-4" aria-label={ i18n.T(ctx, "mdm.devices.pagination") }>
 							if paging.First!="" {
@@ -633,4 +609,32 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 
 templ RestrictionField(name, label string) {
 	<label>{ label }<select class="uk-select" name={ name }><option value="">Not configured</option><option value="true">Allow</option><option value="false">Disallow</option></select></label>
+}
+
+templ DeviceTable(rows []DeviceRow) {
+					<div class="overflow-x-auto">
+						<table class="uk-table uk-table-divider uk-table-hover">
+							<thead><tr><th>{ i18n.T(ctx, "mdm.devices.device") }</th><th>{ i18n.T(ctx, "mdm.devices.platform_os") }</th><th>{ i18n.T(ctx, "mdm.devices.model") }</th><th>{ i18n.T(ctx, "mdm.devices.serial") }</th><th>{ i18n.T(ctx, "mdm.devices.management") }</th><th>{ i18n.T(ctx, "mdm.devices.last_contact") }</th></tr></thead>
+							<tbody>
+								for _,d:=range rows {
+									<tr>
+										<td>
+											if d.URL!="" {
+												<a class="underline font-medium" href={ templ.URL(d.URL) }>{ Show(d.Name) }</a>
+											} else {
+												{ Show(d.Name) }
+											}
+										</td>
+										<td>{ d.Platform }<br/><span class="uk-text-muted">{ Show(d.OSVersion) }</span></td>
+										<td>{ Show(d.Model) }</td>
+										<td>{ Show(d.Serial) }</td>
+										<td>{ StateLabel(ctx, d.Status) }</td>
+										<td>
+											@Timestamp(d.LastSeen)
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
 }

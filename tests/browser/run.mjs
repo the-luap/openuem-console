@@ -26,6 +26,7 @@ import shares from "./desktop-shares.mjs";
 import security from "./desktop-security.mjs";
 import managementNavigation from "./management-navigation.mjs";
 import deviceList from "./device-list.mjs";
+import deviceGroups from "./device-groups.mjs";
 import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
@@ -74,6 +75,7 @@ try {
         [security, 36],
         [managementNavigation,12],
         [deviceList,12],
+        [deviceGroups,18],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -64,6 +65,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/setup/platform-sso/correct", h.CorrectADEPlatformSSO)
 		g.POST("/ios/:id/applications/:assignment/action", h.ChangeMacApp)
 		g.GET("/devices", h.UnifiedDevices)
+		g.GET("/device-groups", h.DeviceGroups)
+		g.POST("/device-groups", h.SaveDeviceGroup)
+		g.GET("/device-groups/:group", h.DeviceGroup)
+		g.POST("/device-groups/:group", h.SaveDeviceGroup)
 		g.Any("/devices/export", h.ExportDeviceInventory)
 		g.GET("/ios", h.UnifiedDevices)
 		g.GET("/ios/setup", h.AppleSettings)
@@ -123,14 +128,14 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 
 func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if appleRoute(c.Path()) == "/devices/export" {
+		if appleRoute(c.Path()) == "/devices/export" || strings.HasPrefix(appleRoute(c.Path()), "/device-groups") {
 			c.Response().Header().Set("Cache-Control", "no-store")
 			c.Response().Header().Set("X-Content-Type-Options", "nosniff")
 		}
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/devices/export", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
+			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
 			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
 				limit = 8192
@@ -266,26 +271,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 	case err != nil:
 		return echo.NewHTTPError(http.StatusServiceUnavailable, i18n.T(c.Request().Context(), "mdm.devices.unavailable"))
 	}
-	rows := make([]mdm_views.DeviceRow, 0, len(page.Entries))
-	for _, d := range page.Entries {
-		path := "/computers/" + url.PathEscape(d.ID)
-		state := d.Status
-		switch d.Kind {
-		case "apple":
-			path = "/ios/" + d.ID
-		case "mac":
-			path = "/mac/" + d.ID
-			state = i18n.T(c.Request().Context(), "mdm.devices.mac_channels", mdm_views.StateLabel(c.Request().Context(), d.Status), mdm_views.StateLabel(c.Request().Context(), d.AgentStatus))
-		case "windows":
-			path = "/windows/" + d.ID
-			state = i18n.T(c.Request().Context(), "mdm.devices."+d.Status)
-		}
-		platform := i18n.T(c.Request().Context(), "mdm.devices.platform_"+d.Platform)
-		if d.Kind == "apple" && d.Platform == "unknown" {
-			platform = i18n.T(c.Request().Context(), "mdm.devices.platform_apple_unknown")
-		}
-		rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: platform, OSVersion: d.OSVersion, Model: d.Model, Serial: d.Serial, Status: state, LastSeen: d.LastSeen, URL: fmt.Sprintf("/tenant/%d/site/%d%s", d.TenantID, d.SiteID, path)})
-	}
+	rows := deviceViewRows(c.Request().Context(), page.Entries)
 	pageURL := func(after string) string {
 		q := url.Values{"q": {filter.Search}, "platform": {filter.Platform}, "sort": {filter.Sort}}
 		if after != "" {
@@ -858,4 +844,28 @@ func (h *Handler) AppleRetryCommand(c echo.Context) error {
 		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
+}
+
+func deviceViewRows(ctx context.Context, entries []inventory.DeviceEntry) []mdm_views.DeviceRow {
+	rows := make([]mdm_views.DeviceRow, 0, len(entries))
+	for _, d := range entries {
+		path := "/computers/" + url.PathEscape(d.ID)
+		state := d.Status
+		switch d.Kind {
+		case "apple":
+			path = "/ios/" + d.ID
+		case "mac":
+			path = "/mac/" + d.ID
+			state = i18n.T(ctx, "mdm.devices.mac_channels", mdm_views.StateLabel(ctx, d.Status), mdm_views.StateLabel(ctx, d.AgentStatus))
+		case "windows":
+			path = "/windows/" + d.ID
+			state = i18n.T(ctx, "mdm.devices."+d.Status)
+		}
+		platform := i18n.T(ctx, "mdm.devices.platform_"+d.Platform)
+		if d.Kind == "apple" && d.Platform == "unknown" {
+			platform = i18n.T(ctx, "mdm.devices.platform_apple_unknown")
+		}
+		rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: platform, OSVersion: d.OSVersion, Model: d.Model, Serial: d.Serial, Status: state, LastSeen: d.LastSeen, URL: fmt.Sprintf("/tenant/%d/site/%d%s", d.TenantID, d.SiteID, path)})
+	}
+	return rows
 }

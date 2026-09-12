@@ -18,7 +18,7 @@ export default async function run(browser, record) {
       check(opened.open && opened.focus,'Keyboard could not open native management navigation');
       check(opened.outline!=='none' && opened.width>0,'Keyboard disclosure focus is not visible');
       const expected={
-        'Approved software':'/software/catalog','All devices':'/devices','Apple profiles':'/ios/configurations',
+        'Approved software':'/software/catalog','All devices':'/devices','Dynamic device groups':'/device-groups','Apple profiles':'/ios/configurations',
         'Apple setup & enrollment':'/ios/setup','Desktop enrollment':'/desktop/enrollment','Native Windows management':'/windows',
       };
       if(role==='administrator'){

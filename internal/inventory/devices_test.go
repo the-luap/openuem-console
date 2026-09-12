@@ -122,6 +122,16 @@ func TestDeviceListSearchesNativeWindowsBeyondFirstHundred(t *testing.T) {
 		require.NoError(t, err)
 	}
 	sources := inventory.DeviceSources{Windows: true}
+
+	group, err := inventory.SaveDeviceGroup(ctx, f.db, f.permissions, "operator", f.scope, "", 0, inventory.DeviceGroupDefinition{Name: "Old native Windows", Rule: inventory.DeviceGroupRule{Platform: "windows", Search: "oldest"}})
+	require.NoError(t, err)
+	preview, err := inventory.InspectDeviceGroup(ctx, f.db, f.permissions, "viewer", f.scope, sources, group.ID, inventory.DeviceGroupPosition{})
+	require.NoError(t, err)
+	require.Len(t, preview.Members.Entries, 1)
+	require.Equal(t, "windows", preview.Members.Entries[0].Kind)
+	preview, err = inventory.InspectDeviceGroup(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, group.ID, inventory.DeviceGroupPosition{})
+	require.NoError(t, err)
+	require.Empty(t, preview.Members.Entries)
 	for _, search := range []string{"oldest", "26100"} {
 		page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, sources, inventory.DeviceFilter{Platform: "windows", Search: search})
 		require.NoError(t, err)
@@ -247,6 +257,12 @@ func TestDeviceListApplePlatformProjection(t *testing.T) {
 	for _, platform := range []string{"ios", "ipados", "macos", "unknown", "apple"} {
 		page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{Apple: true}, inventory.DeviceFilter{Platform: platform})
 		require.NoError(t, err)
+
+		group, err := inventory.SaveDeviceGroup(ctx, f.db, f.permissions, "operator", f.scope, "", 0, inventory.DeviceGroupDefinition{Name: "Apple " + platform, Rule: inventory.DeviceGroupRule{Platform: platform}})
+		require.NoError(t, err)
+		preview, err := inventory.InspectDeviceGroup(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{Apple: true}, group.ID, inventory.DeviceGroupPosition{})
+		require.NoError(t, err)
+		require.Equal(t, page.Entries, preview.Members.Entries)
 		if platform == "apple" {
 			require.Len(t, page.Entries, 4)
 		} else {

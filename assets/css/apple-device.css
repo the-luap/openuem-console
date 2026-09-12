@@ -1,6 +1,6 @@
 /* Keep device metadata and renewal evidence within the available viewport. */
 #apple-device,
-#device-management {
+:is(#device-management, #device-groups, #device-group) {
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
   color: hsl(var(--foreground));
@@ -9,9 +9,9 @@
 #apple-device > *,
 #apple-device form,
 #apple-device article,
-#device-management > *,
-#device-management form,
-#device-management label {
+:is(#device-management, #device-groups, #device-group) > *,
+:is(#device-management, #device-groups, #device-group) form,
+:is(#device-management, #device-groups, #device-group) label {
   min-width: 0;
 }
 
@@ -20,32 +20,32 @@
 #apple-device label,
 #apple-device h3,
 #apple-device summary,
-#device-management p,
-#device-management label {
+:is(#device-management, #device-groups, #device-group) p,
+:is(#device-management, #device-groups, #device-group) label {
   overflow-wrap: anywhere;
 }
 
-#device-management dd,
-#device-management code,
-#device-management h2,
-#device-management h3 {
+:is(#device-management, #device-groups, #device-group) dd,
+:is(#device-management, #device-groups, #device-group) code,
+:is(#device-management, #device-groups, #device-group) h2,
+:is(#device-management, #device-groups, #device-group) h3 {
   overflow-wrap: anywhere;
 }
 
-#device-management .software-fields {
+:is(#device-management, #device-groups, #device-group) .software-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 1rem;
 }
 
-#device-management .software-revision + .software-revision {
+:is(#device-management, #device-groups, #device-group) .software-revision + .software-revision {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid hsl(var(--border));
 }
 
 #apple-device .uk-button,
-#device-management .uk-button {
+:is(#device-management, #device-groups, #device-group) .uk-button {
   height: auto;
   min-height: 2.25rem;
   padding-top: 0.4rem;
@@ -55,8 +55,8 @@
 
 #apple-device input:not([type="checkbox"]),
 #apple-device select,
-#device-management input,
-#device-management select {
+:is(#device-management, #device-groups, #device-group) input,
+:is(#device-management, #device-groups, #device-group) select {
   min-width: 0;
   max-width: 100%;
 }

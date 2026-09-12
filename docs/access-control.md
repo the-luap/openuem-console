@@ -64,6 +64,13 @@ cannot select **All sites**. Explicit foreign organization/site URLs are rejecte
 object lookups are additionally scoped on the server. Invitation and bulk-action
 form fields cannot expand the selected URL scope.
 
+[Dynamic device groups](dynamic-device-groups.md) use `devices.read` for scoped
+lists, history and current membership. `devices.groups.manage` permits operators
+and administrators to create, revise, archive and reactivate definitions within
+their grants. Group changes use a current-revision check and transactional audit;
+organization URLs require whole-organization authority. Defining a group does
+not authorize device commands or assignments.
+
 The [individual desktop enrollment page](desktop-console.md) allows scoped
 metadata reads, operator invitation revocation, and organization-administrator
 authority setup and identity revocation. Its action routes are explicitly mapped

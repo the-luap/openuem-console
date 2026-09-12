@@ -32,6 +32,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 		t.Fatal(err)
 	}
 	exerciseDeviceExports(t, tenant, site, otherTenant, otherSite, request)
+	exerciseDeviceGroups(t, tenant, site, sibling, otherTenant, otherSite, request)
 	for _, row := range []struct {
 		id      string
 		sites   []int

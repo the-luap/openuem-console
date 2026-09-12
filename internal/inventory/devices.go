@@ -73,19 +73,6 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	if !filter.Valid() {
 		return nil, ErrReportFilter
 	}
-	binding := deviceFilterBinding(scope, sources, filter)
-	cursor := deviceCursor{Binding: binding}
-	if filter.After != "" {
-		decoded, err := base64.RawURLEncoding.DecodeString(filter.After)
-		if err != nil || json.Unmarshal(decoded, &cursor) != nil || cursor.Binding != binding || cursor.ID == "" || len(cursor.ID) > 255 || len(cursor.Name) > 4096 {
-			return nil, ErrReportFilter
-		}
-		switch cursor.Kind {
-		case "desktop", "apple", "mac", "windows":
-		default:
-			return nil, ErrReportFilter
-		}
-	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	tx, err := db.BeginTx(ctx, nil)
@@ -101,6 +88,40 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	var administrator bool
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_access_grants WHERE user_id=$1 AND role='administrator')`, actor).Scan(&administrator); err != nil {
 		return nil, err
+	}
+	page, err := queryDevices(ctx, tx, administrator, scope, sources, filter, pageSize, prepare != nil, deviceFilterBinding(scope, sources, filter))
+	if err != nil {
+		return nil, err
+	}
+	if prepare != nil {
+		if err = prepare(ctx, page); err != nil {
+			return nil, err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,$4,'devices')`, scope.TenantID, scope.SiteID, actor, auditAction); err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
+// queryDevices shares the caller's permission and definition locks. Binding is
+// supplied by that caller so a group page also binds its immutable revision.
+func queryDevices(ctx context.Context, tx *sql.Tx, administrator bool, scope access.Scope, sources DeviceSources, filter DeviceFilter, pageSize int, bounded bool, binding string) (*DevicePage, error) {
+	var err error
+	cursor := deviceCursor{Binding: binding}
+	if filter.After != "" {
+		decoded, err := base64.RawURLEncoding.DecodeString(filter.After)
+		if err != nil || json.Unmarshal(decoded, &cursor) != nil || cursor.Binding != binding || cursor.ID == "" || len(cursor.ID) > 255 || len(cursor.Name) > 4096 {
+			return nil, ErrReportFilter
+		}
+		switch cursor.Kind {
+		case "desktop", "apple", "mac", "windows":
+		default:
+			return nil, ErrReportFilter
+		}
 	}
 	linked := false
 	if sources.Apple {
@@ -144,7 +165,7 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 		args = append(args, cursor.Seen)
 	}
 	projection := "kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid,sort_name,true"
-	if prepare != nil {
+	if bounded {
 		projection = boundedExportDeviceColumns
 	}
 	args = append(args, pageSize+1)
@@ -163,15 +184,15 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	metadataBytes := 0
 	for rows.Next() {
 		var d DeviceEntry
-		var valid, bounded bool
-		if err = rows.Scan(&d.Kind, &d.ID, &d.TenantID, &d.SiteID, &d.Name, &d.Platform, &d.OSVersion, &d.Serial, &d.Model, &d.Status, &d.AgentStatus, &d.LastSeen, &valid, &d.sortName, &bounded); err != nil {
+		var valid, metadataBounded bool
+		if err = rows.Scan(&d.Kind, &d.ID, &d.TenantID, &d.SiteID, &d.Name, &d.Platform, &d.OSVersion, &d.Serial, &d.Model, &d.Status, &d.AgentStatus, &d.LastSeen, &valid, &d.sortName, &metadataBounded); err != nil {
 			return nil, err
 		}
 		if !valid {
 			return nil, errors.New("device inventory lifecycle evidence is inconsistent")
 		}
 		metadataBytes += len(d.ID) + len(d.Name) + len(d.OSVersion) + len(d.Serial) + len(d.Model)
-		if prepare != nil && (!bounded || metadataBytes > 16<<20) {
+		if bounded && (!metadataBounded || metadataBytes > 16<<20) {
 			return nil, ErrDeviceExportTooLarge
 		}
 		page.Entries = append(page.Entries, d)
@@ -180,7 +201,7 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 		return nil, err
 	}
 	if len(page.Entries) > pageSize {
-		if prepare != nil {
+		if bounded {
 			return nil, ErrDeviceExportTooLarge
 		}
 		page.Entries = page.Entries[:pageSize]
@@ -193,17 +214,6 @@ func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 		if len(page.Next) > 8192 {
 			return nil, errors.New("device inventory cursor exceeds supported metadata bounds")
 		}
-	}
-	if prepare != nil {
-		if err = prepare(ctx, page); err != nil {
-			return nil, err
-		}
-	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,$4,'devices')`, scope.TenantID, scope.SiteID, actor, auditAction); err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
-		return nil, err
 	}
 	return page, nil
 }

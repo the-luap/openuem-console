@@ -1,0 +1,145 @@
+package mdm_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ GroupDefinitionForm(info *partials.CommonInfo, g inventory.DeviceGroup) {
+	<form method="post" action={ partials.GetNavigationUrl(info, "/device-groups"+groupSuffix(g.ID)) } class="grid gap-4" aria-label={ i18n.T(ctx, "mdm.groups.edit") }>
+		@CSRF(info)
+		if g.Revision>0 {
+			<input type="hidden" name="revision" value={ Number(g.Revision) }/>
+		}
+		<label>{ i18n.T(ctx,"mdm.groups.name") }<input class="uk-input" name="name" required maxlength="120" value={ g.Name }/></label>
+		<label>{ i18n.T(ctx,"mdm.groups.description") }<input class="uk-input" name="description" maxlength="1024" value={ g.Description }/></label>
+		<label>
+			{ i18n.T(ctx,"mdm.devices.platform") }
+			<select class="uk-select" name="platform">
+				for _,platform:=range []string{"","windows","linux","macos","ios","ipados","apple","unknown"} {
+					<option value={ platform } selected?={ platform==g.Rule.Platform }>{ groupPlatform(ctx,platform) }</option>
+				}
+			</select>
+		</label>
+		<label>{ i18n.T(ctx,"mdm.devices.search") }<input class="uk-input" name="q" maxlength="256" value={ g.Rule.Search }/></label>
+		<p class="uk-text-muted">{ i18n.T(ctx,"mdm.groups.rule_help") }</p>
+		if g.ID!="" {
+			<label><input type="checkbox" name="archived" value="true" checked?={ g.Archived }/> { i18n.T(ctx,"mdm.groups.archive") }</label>
+		}
+		<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"mdm.groups.save") }</button>
+	</form>
+}
+
+templ GroupPaging(paging DevicePagination, label string) {
+	if paging.First!="" || paging.Next!="" {
+		<nav class="flex flex-wrap gap-4 mt-4" aria-label={ label }>
+			if paging.First!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(paging.First) }>{ i18n.T(ctx,"mdm.devices.first_page") }</a>
+			}
+			if paging.Next!="" {
+				<a class="uk-button uk-button-default" rel="next" href={ templ.URL(paging.Next) }>{ i18n.T(ctx,"mdm.devices.next_page") }</a>
+			}
+		</nav>
+	}
+}
+
+templ DeviceGroups(c echo.Context, info *partials.CommonInfo, page *inventory.DeviceGroupPage, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "mdm.groups.title"), Url: partials.GetNavigationUrl(info, "/device-groups")}}, info)
+		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="device-groups">
+			<div>
+				<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"mdm.groups.title") }</h1>
+				<p class="uk-text-muted mt-2">{ i18n.T(ctx,"mdm.groups.scope_help") }</p>
+				@Navigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"mdm.groups.page_count",len(page.Groups)) }</h2>
+					for _,g:=range page.Groups {
+						<article class="border-b pb-4" style="overflow-wrap:anywhere;">
+							<h3 class="font-semibold"><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups/"+g.ID)) }>{ g.Name }</a></h3>
+							<p>{ g.Description }</p>
+							<p>{ groupPlatform(ctx,g.Rule.Platform) } · { Show(g.Rule.Search) }</p>
+							<p>{ i18n.T(ctx,"mdm.groups.revision",g.Revision) } · { groupState(ctx,g.Archived) }</p>
+						</article>
+					}
+					if len(page.Groups)==0 {
+						<p>{ i18n.T(ctx,"mdm.groups.empty") }</p>
+					}
+					@GroupPaging(paging, i18n.T(ctx, "mdm.groups.list_pages"))
+				</div>
+			</section>
+			if info.Can(access.ManageDeviceGroups) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title mb-4">{ i18n.T(ctx,"mdm.groups.create") }</h2>
+						@GroupDefinitionForm(info, inventory.DeviceGroup{})
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ DeviceGroup(c echo.Context, info *partials.CommonInfo, data *inventory.DeviceGroupInspection, rows []DeviceRow, paging, history DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "mdm.groups.title"), Url: partials.GetNavigationUrl(info, "/device-groups")}}, info)
+		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="device-group">
+			<div style="overflow-wrap:anywhere;">
+				<h1 class="text-2xl font-semibold">{ data.Group.Name }</h1>
+				<p class="mt-2">{ data.Group.Description }</p>
+				<p>{ i18n.T(ctx,"mdm.groups.revision",data.Group.Revision) } · { groupState(ctx,data.Group.Archived) }</p>
+				<p>{ groupPlatform(ctx,data.Group.Rule.Platform) } · { Show(data.Group.Rule.Search) }</p>
+				<p class="uk-text-muted mt-2">{ i18n.T(ctx,"mdm.groups.scope_help") }</p>
+				@Navigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"mdm.groups.members",len(rows)) }</h2>
+					<p class="uk-text-muted my-4">{ i18n.T(ctx,"mdm.groups.preview_help") }</p>
+					if data.Group.Archived {
+						<p role="status">{ i18n.T(ctx,"mdm.groups.archived_help") }</p>
+					} else {
+						@DeviceTable(rows)
+						if len(rows)==0 {
+							<p class="my-4">{ i18n.T(ctx,"mdm.devices.empty") }</p>
+						}
+						@GroupPaging(paging, i18n.T(ctx, "mdm.groups.member_pages"))
+					}
+				</div>
+			</section>
+			if info.Can(access.ManageDeviceGroups) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<h2 class="uk-card-title mb-4">{ i18n.T(ctx,"mdm.groups.edit") }</h2>
+						@GroupDefinitionForm(info, data.Group)
+					</div>
+				</section>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" id="group-history">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"mdm.groups.history") }</h2>
+					for _,g:=range data.History {
+						<article class="border-b pb-4" style="overflow-wrap:anywhere;">
+							<h3 class="font-semibold">{ i18n.T(ctx,"mdm.groups.revision",g.Revision) } · { groupState(ctx,g.Archived) }</h3>
+							<p>{ g.Name }</p>
+							<p>{ g.Description }</p>
+							<p>{ groupPlatform(ctx,g.Rule.Platform) } · { Show(g.Rule.Search) }</p>
+							<p>
+								{ i18n.T(ctx,"mdm.groups.changed_by",g.Actor) } · 
+								@Timestamp(&g.CreatedAt)
+							</p>
+						</article>
+					}
+					@GroupPaging(history, i18n.T(ctx, "mdm.groups.history_pages"))
+				</div>
+			</section>
+		</main>
+	}
+}

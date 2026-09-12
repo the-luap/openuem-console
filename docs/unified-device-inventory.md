@@ -82,5 +82,7 @@ tests cover all matching rows, exact JSON values, CSV cell protection, UTC/null
 times, current role/scope checks, failed audit, cancellation, concurrent capacity,
 encoded-size limits, oversized metadata and the 5,000/5,001-entry boundary.
 
-Bulk actions, dynamic groups and
-production-scale database performance acceptance remain separate roadmap work.
+[Dynamic device groups](dynamic-device-groups.md) now persist scoped platform/search
+rules and evaluate current membership with revision history. Group-based actions,
+bulk actions and production-scale database performance acceptance remain separate
+roadmap work.

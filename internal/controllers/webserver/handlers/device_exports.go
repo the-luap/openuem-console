@@ -15,8 +15,12 @@ import (
 )
 
 func deviceExportForm(c echo.Context) (url.Values, error) {
+	return deviceManagementForm(c, "mdm.devices.export_invalid", []string{"csrf", "format", "q", "platform", "sort"})
+}
+
+func deviceManagementForm(c echo.Context, errorKey string, allowed []string) (url.Values, error) {
 	failure := func(status int) (url.Values, error) {
-		return nil, echo.NewHTTPError(status, i18n.T(c.Request().Context(), "mdm.devices.export_invalid"))
+		return nil, echo.NewHTTPError(status, i18n.T(c.Request().Context(), errorKey))
 	}
 	r := c.Request()
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -38,7 +42,14 @@ func deviceExportForm(c echo.Context) (url.Values, error) {
 		return failure(http.StatusRequestEntityTooLarge)
 	}
 	for key, values := range f {
-		if len(values) != 1 || key != "csrf" && key != "format" && key != "q" && key != "platform" && key != "sort" {
+		known := false
+		for _, field := range allowed {
+			if key == field {
+				known = true
+				break
+			}
+		}
+		if len(values) != 1 || !known {
 			return failure(http.StatusBadRequest)
 		}
 	}

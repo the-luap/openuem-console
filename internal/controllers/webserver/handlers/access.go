@@ -57,7 +57,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadSoftware, true
 		case "/software/catalog/:version/windows-requests/:request/dispatch":
 			return access.AssignSoftware, true
-		case "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
+		case "/device-groups", "/device-groups/:group", "/devices", "/ios", "/ios/setup", "/ios/:id", "/mac/:id", "/ios/:id/users/:user":
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
@@ -71,6 +71,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/device-groups", "/device-groups/:group":
+			return access.ManageDeviceGroups, true
 		case "/devices/export":
 			return access.ReadDevices, true
 		case "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
