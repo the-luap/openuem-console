@@ -61,6 +61,12 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The OpenID logout URL fixture now keeps handlers by pointer instead of copying
+  their embedded mutex. The broker CI exposed the copy during `go vet`; the same
+  check was reproduced locally. The full affected startup-path vet command now
+  passes for Linux ARM64, Linux AMD64 and Windows AMD64, and the logout URL race
+  tests pass. This changes only test ownership, not logout behavior.
+
 - The Apple update summary now shows the configured target version and build
   separately from the device's last reported OS version, build and inventory
   timestamp. The deadline remains in device-local time; report timestamps use

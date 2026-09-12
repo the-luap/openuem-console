@@ -11,12 +11,12 @@ import (
 func TestOIDCLogoutURLPreservesConfigurationAndEscapesParameters(t *testing.T) {
 	for _, origin := range []struct {
 		name string
-		h    Handler
+		h    *Handler
 		want string
 	}{
-		{"public", Handler{PublicOrigin: "https://console.example.test:8443", ReverseProxyServer: "proxy.internal"}, "https://console.example.test:8443"},
-		{"proxy", Handler{ReverseProxyServer: "proxy.example.test:8443"}, "https://proxy.example.test:8443"},
-		{"direct", Handler{ServerName: "console.internal", ConsolePort: "1323"}, "https://console.internal:1323"},
+		{"public", &Handler{PublicOrigin: "https://console.example.test:8443", ReverseProxyServer: "proxy.internal"}, "https://console.example.test:8443"},
+		{"proxy", &Handler{ReverseProxyServer: "proxy.example.test:8443"}, "https://proxy.example.test:8443"},
+		{"direct", &Handler{ServerName: "console.internal", ConsolePort: "1323"}, "https://console.internal:1323"},
 	} {
 		for provider, endpoint := range map[string]string{"authelia": "logout", "authentik": "end-session/", "keycloak": "protocol/openid-connect/logout", "zitadel": "oidc/v1/end_session"} {
 			for _, slash := range []string{"", "/"} {
