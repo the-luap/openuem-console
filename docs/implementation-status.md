@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Organization tag administration](organization-tags.md) now provides bounded
+  whole-organization catalog reads and separately authorized definition changes.
+  Existing Ent writers participate in durable revision checks; stale edits,
+  restored values and recreated IDs cannot reuse an earlier review. Deletion
+  requires explicit confirmation and no device, profile, task or hierarchy
+  assignments. Permission, source and foreign-key locks last through the audit
+  commit. The complete inventory PostgreSQL/race suite passes in 35.128 seconds;
+  tag concurrency and rollback regressions pass in 4.245 seconds, with the
+  additional task-reference check passing in 2.127 seconds. The complete audit
+  suite passes in 8.187 seconds. Registered Apple/OIDC console routes, macOS/Linux
+  package race checks, view/catalog checks and the full Linux build pass.
+  Browser checks cover keyboard forms, revision/CSRF retention, used/read-only
+  states, scoped navigation, long text and theme foreground. All 24 new tag
+  browser cases and the complete 1,308-case Chrome matrix pass; the final full
+  run takes 87.628 seconds. Mobile editor and administrator navigation were
+  inspected visually. Separate legacy
+  tag-assignment workflows retain their administrator boundary.
+
 - [Console certificate issuer trust](certificate-session-issuers.md) now binds
   initial authentication, pending MFA and completed sessions to the configured
   public CA and its durable UUID. Current chain validity and the retained issuer

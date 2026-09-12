@@ -58,6 +58,9 @@ func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing
 				t.Fatal(err)
 			}
 			html := body.String()
+			if strings.Contains(html, `/tenant/1/admin/tags"`) != (role == access.TenantAdmin || role == access.Administrator) {
+				t.Fatal("tag navigation lost whole-organization authority", language.Code, role)
+			}
 			if !strings.Contains(html, "Management pages") || !strings.Contains(html, `aria-label="Management pages"`) || strings.Contains(html, "management_navigation.") {
 				t.Fatal("navigation catalog fallback missing", language.Code, role)
 			}

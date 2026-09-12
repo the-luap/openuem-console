@@ -52,7 +52,7 @@ func (info *CommonInfo) Can(capability access.Capability) bool {
 	if site < 0 {
 		site = 0
 	}
-	if capability == access.ManageProfiles || capability == access.ManageCertificates || capability == access.ManageSoftware {
+	if capability == access.ManageProfiles || capability == access.ManageCertificates || capability == access.ManageSoftware || capability == access.ManageTags {
 		site = 0
 	}
 	return info.Principal.Can(capability, access.Scope{TenantID: tenant, SiteID: site})
@@ -108,7 +108,7 @@ templ Header(c echo.Context, breadcrumbs []Breadcrumb, commonInfo *CommonInfo) {
 					></uk-icon>
 				</span>
 				<select class="w-48 uk-select border-green-700" title={ i18n.T(ctx, "Organization") } aria-label={ i18n.T(ctx, "Organization") } name="tenant" _="on change set window.location to my.value">
-					if commonInfo.IsAdmin {
+					if commonInfo.IsAdmin && commonInfo.Principal.IsAdministrator() {
 						<option
 							class="!align-middle"
 							value="/admin"

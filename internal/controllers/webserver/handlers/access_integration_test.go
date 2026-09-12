@@ -173,6 +173,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		return rec
 	}
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenantID, siteID)
+	t.Run("organization tag administration", func(t *testing.T) {
+		exerciseOrganizationTags(t, h, ctx, tenantID, otherTenant.ID, request)
+	})
 	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
 		var before, after int
 		if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, profileID).Scan(&before); err != nil {

@@ -82,6 +82,13 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 	}
+	var tagGuard bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid=pg_catalog.to_regclass('tags') AND tgname='uem_tag_revision' AND tgtype=23 AND tgenabled IN ('O','A') AND tgfoid=pg_catalog.to_regprocedure('uem_tag_revision()')) AND EXISTS(SELECT 1 FROM pg_catalog.pg_attribute WHERE attrelid=pg_catalog.to_regclass('tags') AND attname='uem_revision' AND attnotnull AND NOT attisdropped AND atttypid='uuid'::regtype)`).Scan(&tagGuard); err != nil {
+		return err
+	}
+	if !tagGuard {
+		return errors.New("tag revision protection is incomplete")
+	}
 	return tx.Commit()
 }
 

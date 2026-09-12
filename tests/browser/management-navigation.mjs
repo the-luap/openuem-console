@@ -26,7 +26,8 @@ export default async function run(browser, record) {
         expected['Windows software deployment']='/deploy';expected['Windows profiles']='/profiles';
       }
       if(role==='administrator'||role==='organization_admin')expected['Automated Device Enrollment']='/ios/ade';
-      check(opened.links.length===Object.keys(expected).length && opened.links.every(a=>a.visible && a.path==='/tenant/1/site/1'+expected[a.text]),'Management links changed permission, visibility or scope: '+JSON.stringify(opened.links));
+      if(role==='administrator'||role==='organization_admin')expected['Organization tags']='/admin/tags';
+      check(opened.links.length===Object.keys(expected).length && opened.links.every(a=>a.visible && a.path===(a.text==='Organization tags'?'/tenant/1':'/tenant/1/site/1')+expected[a.text]),'Management links changed permission, visibility or scope: '+JSON.stringify(opened.links));
       await tab();
       check(await evaluate('document.activeElement===navigation.querySelector("a")'),'Expanded navigation is not reachable with Tab');
       check(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Expanded management navigation or device table overflow');

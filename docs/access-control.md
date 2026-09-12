@@ -71,6 +71,14 @@ their grants. Group changes use a current-revision check and transactional audit
 organization URLs require whole-organization authority. Defining a group does
 not authorize device commands or assignments.
 
+[Organization tags](organization-tags.md) require a whole-organization
+`devices.read` grant to inspect definitions. `tags.manage` permits only
+organization or server administrators to create, edit and delete unused tags.
+Each operation rechecks permissions and commits an inventory audit event;
+mutations retain source and permission locks through commit. A current revision
+is mandatory for editing/deletion. Existing assignment workflows retain their
+separate administrator boundary.
+
 The [individual desktop enrollment page](desktop-console.md) allows scoped
 metadata reads, operator invitation revocation, and organization-administrator
 authority setup and identity revocation. Its action routes are explicitly mapped

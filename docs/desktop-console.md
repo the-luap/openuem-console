@@ -95,6 +95,11 @@ event before responding. See [access control](access-control.md) for the exact
 scope and field boundaries. Other legacy desktop details and actions retain
 their server-administrator boundary.
 
+[Organization tag administration](organization-tags.md) now permits whole-organization
+readers to inspect bounded tag definitions and organization administrators to
+manage them with revision checks and committed audit events. Used tags cannot
+be deleted. Separate legacy assignment workflows retain their existing boundary.
+
 Operators can use [Request fresh inventory](desktop-inventory-refresh.md) from
 the dedicated computer inventory page. The request is persisted, audited and
 checked again before delivery. The displayed state distinguishes delivery
