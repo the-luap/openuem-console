@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Local MFA completion now compares the exact stored TOTP secret inside the
+  final account-lock transaction. A secret replaced after verification cannot
+  authorize a password/certificate session, including backup-code completion.
+  The eight-case owned baseline reproduced admitted stale factors in both storage
+  modes; replacement during owner association now clears authority and issues no
+  cookie while preserving the newer enrollment. Positive MFA lifecycles and the
+  full PostgreSQL/session race suite pass in 60.992 seconds; auth/router races and
+  the full Linux ARM64 build pass. Equivalent final OpenID admission checks,
+  durable primary-proof consumption and TOTP replay counters remain open.
+
 - MFA secret staging, confirmation and removal now use transactions bound to
   the full verified account snapshot. Current method configuration, credentials,
   registration and exact stored MFA state are rechecked under locks. Confirmation

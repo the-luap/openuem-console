@@ -109,6 +109,11 @@ certificate digest; OpenID proofs match and revalidate the admitted identity.
 MFA admission also checks current account registration, authentication mode,
 enabled method and MFA configuration. Missing/expired proofs, password changes,
 mode changes, revoked/review accounts and disabled methods or MFA deny the step.
+Password/certificate completion rechecks the exact stored TOTP secret while
+holding the account lock. A secret replaced after TOTP or backup-code verification
+cannot authorize the final session. The owned eight-case baseline reproduced
+this gap for both methods and storage modes; regressions inject replacement
+during owner association and require cleared authority with no new cookie.
 An existing confirmed TOTP enrollment cannot be overwritten through the public
 login enrollment endpoints. TOTP/backup-code login requires confirmed enrollment.
 Successful MFA creates a fresh session and removes the pending primary proof.

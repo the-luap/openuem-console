@@ -41,8 +41,8 @@ func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, met
 		return err
 	}
 	var passwd, openid, mfa, confirmed bool
-	var hash, register string
-	err = tx.QueryRowContext(ctx, `SELECT coalesce(passwd,false),coalesce(openid,false),coalesce(hash,''),coalesce(register,''),coalesce(use2fa,false),coalesce(totp_secret_confirmed,false) FROM users WHERE uid=$1 FOR UPDATE`, expected.ID).Scan(&passwd, &openid, &hash, &register, &mfa, &confirmed)
+	var hash, register, secret string
+	err = tx.QueryRowContext(ctx, `SELECT coalesce(passwd,false),coalesce(openid,false),coalesce(hash,''),coalesce(register,''),coalesce(use2fa,false),coalesce(totp_secret_confirmed,false),coalesce(totp_secret,'') FROM users WHERE uid=$1 FOR UPDATE`, expected.ID).Scan(&passwd, &openid, &hash, &register, &mfa, &confirmed, &secret)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrLocalSignIn
 	}
@@ -73,7 +73,9 @@ func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, met
 		return ErrLocalSignIn
 	}
 	if stage == LocalSignInComplete {
-		if mfa && !confirmed {
+		// TOTP and backup-code verification must still refer to the same
+		// enrollment when admission commits. Handlers retain stored ciphertext.
+		if mfa && (!confirmed || secret != expected.TotpSecret) {
 			return ErrLocalSignIn
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE users SET register=$2,cert_clear_password='',modified=clock_timestamp() WHERE uid=$1`, expected.ID, nats.REGISTER_COMPLETE); err != nil {
