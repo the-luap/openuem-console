@@ -47,6 +47,9 @@ Definition edits preserve assignments. [Desktop tag assignments](desktop-tag-ass
 now check the device/tag organization and commit current authority, membership
 and audit together. Their separate creation/removal workflows retain their
 existing administrator boundary.
+The corresponding [legacy profile tag actions](profile-tag-assignments.md) now
+check the profile's complete global, organization or site audience and commit
+membership, assignment mode and audit atomically.
 
 ## Authorization, audit and upgrade
 

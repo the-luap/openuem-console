@@ -29,32 +29,8 @@ func exerciseDesktopTagAssignments(t *testing.T, h *Handler, e *echo.Echo, ctx c
 	foreign, err := h.Model.Client.Tag.Create().SetTag("Private route membership tag").SetColor("red").SetTenantID(foreignTenant).Save(ctx)
 	require.NoError(t, err)
 	defer h.Model.Client.Tag.DeleteOneID(foreign.ID).Exec(ctx)
-	// The shared role fixture supplies a fixed form token. Wrap these HTMX
-	// requests with the production header/cookie middleware as well.
-	outer := echo.New()
-	gate := routerMiddleware.CSRF()(func(c echo.Context) error {
-		e.ServeHTTP(c.Response(), c.Request())
-		return nil
-	})
-	request := func(actor, method, path string, form url.Values, token string) *httptest.ResponseRecorder {
-		t.Helper()
-		stampOwnedConsoleSession(t, h, ctx, actor)
-		r := httptest.NewRequest(method, path, strings.NewReader(form.Encode())).WithContext(ctx)
-		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		cookie := strings.Repeat("t", 32)
-		if token == "console-test-token" {
-			token = cookie
-		}
-		r.AddCookie(&http.Cookie{Name: "__Host-openuem-csrf", Value: cookie})
-		r.Header.Set("X-CSRF-Token", token)
-		r.Header.Set("HX-Request", "true")
-		w := httptest.NewRecorder()
-		c := outer.NewContext(r, w)
-		if err := gate(c); err != nil {
-			outer.HTTPErrorHandler(err, c)
-		}
-		return w
-	}
+	request := ownedTagHTTPRequest(t, h, e, ctx)
+
 	form := url.Values{"agentId": {device}, "tagId": {strconv.Itoa(tag.ID)}, "page": {"1"}, "pageSize": {"5"}, "sortBy": {"hostname"}, "sortOrder": {"asc"}}
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenant, site)
 	count := func() int {
@@ -101,4 +77,34 @@ func exerciseDesktopTagAssignments(t *testing.T, h *Handler, e *echo.Echo, ctx c
 	var events int
 	require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_inventory_audit WHERE action IN ('inventory.tags.assign','inventory.tags.unassign') AND tenant_id=$1 AND site_id=$2 AND resource_id LIKE $3`, tenant, site, device+"/%").Scan(&events))
 	require.Equal(t, 6, events)
+}
+
+func ownedTagHTTPRequest(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context) func(string, string, string, url.Values, string) *httptest.ResponseRecorder {
+	t.Helper()
+	// The shared role fixture supplies a fixed form token. Wrap these HTMX
+	// requests with the production header/cookie middleware as well.
+	outer := echo.New()
+	gate := routerMiddleware.CSRF()(func(c echo.Context) error {
+		e.ServeHTTP(c.Response(), c.Request())
+		return nil
+	})
+	return func(actor, method, path string, form url.Values, token string) *httptest.ResponseRecorder {
+		t.Helper()
+		stampOwnedConsoleSession(t, h, ctx, actor)
+		r := httptest.NewRequest(method, path, strings.NewReader(form.Encode())).WithContext(ctx)
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		cookie := strings.Repeat("t", 32)
+		if token == "console-test-token" {
+			token = cookie
+		}
+		r.AddCookie(&http.Cookie{Name: "__Host-openuem-csrf", Value: cookie})
+		r.Header.Set("X-CSRF-Token", token)
+		r.Header.Set("HX-Request", "true")
+		w := httptest.NewRecorder()
+		c := outer.NewContext(r, w)
+		if err := gate(c); err != nil {
+			outer.HTTPErrorHandler(err, c)
+		}
+		return w
+	}
 }

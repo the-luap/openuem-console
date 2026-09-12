@@ -1,4 +1,9 @@
 en:
+  profile_tags:
+    invalid: "Choose one tag from the current profile. Reopen the profile if the form is out of date."
+    not_found: "Profile or tag not found in the selected scope."
+    denied: "Only a server administrator can change legacy profile tag assignments."
+    unavailable: "The profile tag assignment could not be saved. Reopen the profile and try again."
   desktop_tags:
     invalid: "Choose one device and one tag from the current list."
     not_found: "Device or tag not found in this organization and site."

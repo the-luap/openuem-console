@@ -35,7 +35,7 @@ func TestDesktopTagFormRetainsHTMXProtocolAndRejectsAmbiguousIdentity(t *testing
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, "/tenant/1/site/2/agents"+tc.query, strings.NewReader(tc.body))
 			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			device, id, change, err := desktopTagForm(echo.New().NewContext(r, httptest.NewRecorder()))
+			device, id, change, err := tagMembershipForm(echo.New().NewContext(r, httptest.NewRecorder()))
 			require.Equal(t, tc.invalid, err != nil)
 			require.Equal(t, tc.change, change)
 			if change {

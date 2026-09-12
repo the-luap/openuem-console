@@ -97,7 +97,7 @@ try {
         [deviceGroups,18],
         [organizationTags,27],
         [tagColors,3],
-        [desktopTags,9],
+        [desktopTags,18],
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
         [appleProfileGroups,30],

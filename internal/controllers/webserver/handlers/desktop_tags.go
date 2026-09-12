@@ -29,7 +29,7 @@ func desktopTagFailure(c echo.Context, err error) error {
 
 // HTMX uses a POST form to add and DELETE query parameters to remove a tag.
 // Never merge the two sources when deciding which membership to change.
-func desktopTagForm(c echo.Context) (device string, id int64, change bool, err error) {
+func tagMembershipForm(c echo.Context) (device string, id int64, change bool, err error) {
 	r := c.Request()
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
 		return
@@ -92,7 +92,7 @@ func (h *Handler) changeDesktopTag(c echo.Context, info *partials.CommonInfo, de
 }
 
 func (h *Handler) applyDesktopTagForm(c echo.Context, info *partials.CommonInfo) error {
-	device, id, change, err := desktopTagForm(c)
+	device, id, change, err := tagMembershipForm(c)
 	if err != nil {
 		return desktopTagFailure(c, err)
 	}

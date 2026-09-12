@@ -184,44 +184,6 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, "", successMessage, confirmDelete, false, itemsPerPage, commonInfo), commonInfo))
 }
 
-func (h *Handler) ProfileTags(c echo.Context) error {
-	id := c.Param("uuid")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.empty_id"), true))
-	}
-
-	tag := c.FormValue("tagId")
-	if tag == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.empty_tag_id"), true))
-	}
-
-	profileId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.invalid_task"), true))
-	}
-
-	tagId, err := strconv.Atoi(tag)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.tag_id_invalid"), true))
-	}
-
-	if c.Request().Method == "POST" {
-		if err := h.Model.AddTagToProfile(profileId, tagId); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.could_not_add_tag"), true))
-		}
-		return h.EditProfile(c, "GET", id, i18n.T(c.Request().Context(), "profiles.edit.tag_added"))
-	}
-
-	if c.Request().Method == "DELETE" {
-		if err := h.Model.RemoveTagFromProfile(profileId, tagId); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.could_not_remove_tag"), true))
-		}
-		return h.EditProfile(c, "GET", id, i18n.T(c.Request().Context(), "profiles.edit.tag_removed"))
-	}
-
-	return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.wrong_method"), true))
-}
-
 func (h *Handler) ConfirmDeleteProfile(c echo.Context) error {
 	var err error
 

@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile tag assignments](profile-tag-assignments.md) now require the
+  complete current global, organization or site audience and server authority
+  through the audit commit. Scoped profiles reject foreign tags; global profiles
+  retain cross-organization tag targeting. Existing foreign or unscoped links
+  remain removable without changing other memberships. Adding a tag and leaving
+  apply-to-all mode commit together; removal preserves the current mode. The
+  original foreign-organization write was reproduced. The full inventory
+  PostgreSQL/race suite passes in 46.716 seconds, including concurrent changes,
+  audit rollback, current-source waits, final authority locks and global audit
+  isolation. The complete audit suite passes in 9.671 seconds. Registered
+  Apple/OIDC console routes with production CSRF checks, macOS/Linux package
+  race checks and the full Linux build pass. Eighteen focused real-HTMX browser
+  cases cover desktop and profile target identities across all route scopes.
+  The complete 1,332-case Chrome matrix passes in 83.116 seconds. Profile
+  definition/task mutations and audience moves remain separate legacy work.
+
 - [Desktop tag assignments](desktop-tag-assignments.md) now use current server
   authority, exact device scope and the tag's organization in one audited
   transaction. The original foreign-organization assignment was reproduced and

@@ -22,12 +22,16 @@ func TestDesktopTagHTMXForms(t *testing.T) {
 	info := &partials.CommonInfo{TenantID: "1", SiteID: "2"}
 	p := partials.PaginationAndSort{CurrentPage: 2, PageSize: 25, SortBy: "hostname", SortOrder: "asc"}
 	tag := &ent.Tag{ID: 42, Tag: "Owned membership tag", Color: "blue"}
-	for i, path := range []string{"/tenant/1/site/2/agents", "/tenant/1/site/2/computers", "/tenant/1/admin/update-agents"} {
-		fmt.Fprintf(&body, `<section id="tag-action-%d">`, i)
-		if i < 2 {
-			require.NoError(t, partials.AddTagButton(p, []*ent.Tag{tag}, nil, "owned-agent", path, "post", "#main", "outerHTML", info).Render(ctx, &body))
+	for i, path := range []string{"/tenant/1/site/2/agents", "/tenant/1/site/2/computers", "/tenant/1/admin/update-agents", "/profiles/17/tags", "/tenant/1/profiles/17/tags", "/tenant/1/site/2/profiles/17/tags"} {
+		target := "owned-agent"
+		if i >= 3 {
+			target = "17"
 		}
-		require.NoError(t, partials.ShowAppliedTags([]*ent.Tag{tag}, "owned-agent", p, path, "#main", "outerHTML").Render(ctx, &body))
+		fmt.Fprintf(&body, `<section id="tag-action-%d">`, i)
+		if i != 2 {
+			require.NoError(t, partials.AddTagButton(p, []*ent.Tag{tag}, nil, target, path, "post", "#main", "outerHTML", info).Render(ctx, &body))
+		}
+		require.NoError(t, partials.ShowAppliedTags([]*ent.Tag{tag}, target, p, path, "#main", "outerHTML").Render(ctx, &body))
 		body.WriteString(`</section>`)
 	}
 	body.WriteString(`</main></body></html>`)

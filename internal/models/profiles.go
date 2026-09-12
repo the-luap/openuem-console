@@ -132,22 +132,6 @@ func (m *Model) DeleteProfile(profileID int, c *partials.CommonInfo) error {
 	return nil
 }
 
-func (m *Model) AddTagToProfile(profileId int, tagId int) error {
-	_, err := m.Client.Profile.UpdateOneID(profileId).SetApplyToAll(false).AddTagIDs(tagId).Save(context.Background())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *Model) RemoveTagFromProfile(profileId int, tagId int) error {
-	_, err := m.Client.Profile.UpdateOneID(profileId).RemoveTagIDs(tagId).Save(context.Background())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (m *Model) CountAllProfileIssues(profileID int) (int, error) {
 	// Remove issues that has no agents associated
 	nDeleted, err := m.Client.ProfileIssue.Delete().Where(profileissue.Not(profileissue.HasAgents())).Exec(context.Background())
