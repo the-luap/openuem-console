@@ -176,6 +176,60 @@ func TestCompletedCertificateSessionRejectsExpiredOriginal(t *testing.T) {
 	}
 }
 
+func TestCompletedCertificateSessionCannotReviveAfterRegistryRestoration(t *testing.T) {
+	for _, encrypted := range []bool{false, true} {
+		for _, factor := range []string{"none", "TOTP", "backup"} {
+			for _, mutation := range []string{"owner", "purpose", "revocation", "recreation", "serial", "expiry"} {
+				t.Run(sessionMode(encrypted)+"/"+factor+"/"+mutation, func(t *testing.T) {
+					f, ctx, cert := completedOwnedCertificateSession(t, encrypted, factor)
+					tx, err := f.model.DB.BeginTx(t.Context(), nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer tx.Rollback()
+					var statements []string
+					switch mutation {
+					case "owner":
+						statements = []string{`UPDATE certificates SET uid='other-owned-user' WHERE serial=$1`, `UPDATE certificates SET uid='owner' WHERE serial=$1`}
+					case "purpose":
+						statements = []string{`UPDATE certificates SET type='agent' WHERE serial=$1`, `UPDATE certificates SET type='user' WHERE serial=$1`}
+					case "revocation":
+						statements = []string{`INSERT INTO revocations(serial,revoked,expiry) SELECT serial,clock_timestamp(),expiry FROM certificates WHERE serial=$1`, `DELETE FROM revocations WHERE serial=$1`}
+					case "recreation":
+						statements = []string{`CREATE TEMP TABLE owned_original_certificate ON COMMIT DROP AS SELECT * FROM certificates WHERE serial=$1`, `DELETE FROM certificates WHERE serial=$1`, `INSERT INTO certificates SELECT * FROM owned_original_certificate WHERE serial=$1`}
+					case "serial":
+						statements = []string{`UPDATE certificates SET serial=$1+1 WHERE serial=$1`, `UPDATE certificates SET serial=$1 WHERE serial=$1+1`}
+					case "expiry":
+						statements = []string{`UPDATE certificates SET expiry=expiry+interval '1 minute' WHERE serial=$1`, `UPDATE certificates SET expiry=expiry-interval '1 minute' WHERE serial=$1`}
+					}
+					for _, statement := range statements {
+						if _, err = tx.ExecContext(t.Context(), statement, cert.SerialNumber.Int64()); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if err = tx.Commit(); err != nil {
+						t.Fatal(err)
+					}
+					admitted, err := localSessionRequest(f, ctx)
+					var denied *echo.HTTPError
+					if admitted || !errors.As(err, &denied) || denied.Code != http.StatusUnauthorized || f.manager.GetString(ctx, "uid") != "" {
+						t.Fatal("restored certificate registry revived an earlier session", admitted, err)
+					}
+					if factor == "none" {
+						stamp, err := f.model.CompleteLocalSession(t.Context(), f.user, loginproof.Certificate, cert, nil)
+						if err != nil {
+							t.Fatal("restored valid certificate could not establish a new session", err)
+						}
+						if err = f.model.CheckCertificateSession(t.Context(), f.user, cert, stamp); err != nil {
+							t.Fatal("new certificate generation was not authorized", err)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestCompletedCertificateSessionRegistryWaits(t *testing.T) {
 	for _, source := range []string{"owner", "revocation"} {
 		for _, outcome := range []string{"commit", "rollback", "cancel"} {
@@ -313,6 +367,9 @@ func TestCompletedCertificateSessionStorageRetryAndFreshProcess(t *testing.T) {
 			}
 			child(false)
 			if _, err = f.model.DB.ExecContext(t.Context(), `INSERT INTO revocations(serial,revoked,expiry) SELECT serial,clock_timestamp(),expiry FROM certificates WHERE serial=$1`, cert.SerialNumber.Int64()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = f.model.DB.ExecContext(t.Context(), `DELETE FROM revocations WHERE serial=$1`, cert.SerialNumber.Int64()); err != nil {
 				t.Fatal(err)
 			}
 			child(true)

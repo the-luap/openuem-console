@@ -47,7 +47,6 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 	}
 	h.SessionManager.Manager.Put(ctx, "uid", uid)
 	h.SessionManager.Manager.Put(ctx, "usepasswd", u.Passwd)
-	h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 	if !u.Passwd {
 		public, private, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
@@ -72,9 +71,14 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 			t.Fatal(err)
 		}
 		h.SessionManager.Manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(parsed))
+		stamp.Certificate, err = sessiongeneration.CurrentCertificate(ctx, h.Model.DB, serial.Int64())
+		if err != nil {
+			t.Fatal(err)
+		}
 	} else {
 		h.SessionManager.Manager.Remove(ctx, clientidentity.SessionCertificateKey)
 	}
+	h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 }
 
 // This runs on the complete real console router and the real Ent/Apple schemas,

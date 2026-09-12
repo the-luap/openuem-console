@@ -18,11 +18,12 @@ const SessionKey = "local-generation"
 var ErrChanged = errors.New("local authentication generation changed")
 
 type Stamp struct {
-	Version int    `json:"version"`
-	UserID  string `json:"user"`
-	Method  string `json:"method"`
-	Account string `json:"account"`
-	Policy  string `json:"policy"`
+	Version     int    `json:"version"`
+	UserID      string `json:"user"`
+	Method      string `json:"method"`
+	Account     string `json:"account"`
+	Policy      string `json:"policy"`
+	Certificate string `json:"certificate,omitempty"`
 }
 
 type Queryer interface {
@@ -48,6 +49,20 @@ func (s Stamp) Encode() string {
 	return string(raw)
 }
 
+// CurrentCertificate must run after locking the source certificate and
+// revocation registry. A serial alone is not proof of certificate authority.
+func CurrentCertificate(ctx context.Context, q Queryer, serial int64) (string, error) {
+	if serial <= 0 {
+		return "", ErrChanged
+	}
+	var generation string
+	err := q.QueryRowContext(ctx, `SELECT generation::text FROM uem_session_certificate_generations WHERE serial=$1`, serial).Scan(&generation)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrChanged
+	}
+	return generation, err
+}
+
 func Read(raw, uid, method string) (Stamp, error) {
 	var s Stamp
 	if raw == "" || len(raw) > 2048 || uid == "" {
@@ -58,7 +73,13 @@ func Read(raw, uid, method string) (Stamp, error) {
 	if decoder.Decode(&s) != nil || decoder.Decode(new(any)) != io.EOF || s.Version != 1 || s.UserID != uid || s.Method != method || (method != loginproof.Password && method != loginproof.Certificate) {
 		return Stamp{}, ErrChanged
 	}
-	for _, value := range []string{s.Account, s.Policy} {
+	identifiers := []string{s.Account, s.Policy}
+	if method == loginproof.Certificate {
+		identifiers = append(identifiers, s.Certificate)
+	} else if s.Certificate != "" {
+		return Stamp{}, ErrChanged
+	}
+	for _, value := range identifiers {
 		parsed, err := uuid.Parse(value)
 		if err != nil || parsed.String() != value || parsed.Version() != 4 || parsed.Variant() != uuid.RFC4122 {
 			return Stamp{}, ErrChanged

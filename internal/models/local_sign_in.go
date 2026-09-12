@@ -120,6 +120,15 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		if previous.Account != current.Account || previous.Policy != current.Policy {
 			return ErrLocalSignIn
 		}
+		if method == loginproof.Certificate {
+			certificate, err := sessiongeneration.CurrentCertificate(ctx, tx, cert.SerialNumber.Int64())
+			if err != nil {
+				return err
+			}
+			if previous.Certificate != certificate {
+				return ErrLocalSignIn
+			}
+		}
 	}
 	if stage == LocalSignInPendingMFA && !mfa {
 		return ErrLocalSignIn
@@ -152,6 +161,12 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		stamp, err = sessiongeneration.Current(ctx, tx, expected.ID, method)
 		if err != nil {
 			return err
+		}
+		if method == loginproof.Certificate {
+			stamp.Certificate, err = sessiongeneration.CurrentCertificate(ctx, tx, cert.SerialNumber.Int64())
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if cert != nil && !cert.NotAfter.After(time.Now()) {

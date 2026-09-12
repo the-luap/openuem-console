@@ -163,6 +163,15 @@ func stampOwnedLocalCertificateSession(t *testing.T, f accountPasswordFixture, c
 	_, credential := ownedConsoleCertificate(t, f.user.ID)
 	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
 	f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
+	stamp, err := sessiongeneration.Current(ctx, f.model.DB, f.user.ID, loginproof.Certificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp.Certificate, err = sessiongeneration.CurrentCertificate(ctx, f.model.DB, credential.Leaf.SerialNumber.Int64())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 }
 
 func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {

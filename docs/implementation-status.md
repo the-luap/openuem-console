@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Certificate registry generations now invalidate completed sessions even when
+  ownership, purpose, serial, expiry or revocation is restored before the next
+  request. A random UUID follows each registry record; exact deletion/recreation
+  receives a new UUID. Source triggers rotate it atomically, and completed
+  admission/request checks capture and compare it under existing source locks.
+  Twenty-four owned TLS/OCSP baseline cases reproduced restored authority; the
+  expanded thirty-six cases are denied while valid fresh admission still works.
+  Tests cover harmless descriptions, other-record isolation, source rollback,
+  injected generation failure, caller schema isolation, disabled triggers,
+  repeated startup, preceding-schema upgrade and fresh-process rejection after
+  revocation removal. Focused races pass in 54.656 seconds; the full session race
+  suite, including the added upgrade and restart cases, passes in 154.399 seconds.
+  The complete session suite also passes under Linux ARM64, alongside actual
+  console/OpenID, administrator and startup routes, auth/security/router races and
+  the full Linux build. Existing certificate sessions without the new generation
+  must sign in again. Pending-primary generation binding, issuer/key identity,
+  periodic OCSP and CA rotation remain broader work. See
+  [certificate registry generations](session-storage.md#certificate-registry-generations).
+
 - Authenticator setup and recovery-code confirmation responses now use
   `Cache-Control: no-store` in public sign-in and protected account settings.
   The policy is set before validation and survives rendering. Eight real handler

@@ -122,8 +122,8 @@ data, invalid serials and lifetime boundaries. Existing successful mutual-TLS,
 MFA and failure-cleanup fixtures now register their owned user certificates.
 
 Completed sessions repeat these registry checks as described below. The legacy
-registry still lacks issuer/key and certificate-generation identifiers. Certificate
-reissue, CA rotation and lifecycle identity remain broader work; completed local
+registry still lacks issuer/key identifiers. Certificate reissue, CA rotation
+and issuer identity remain broader work; completed local
 account deletion/recreation is separately covered by account generations.
 
 ## Completed certificate sessions
@@ -158,10 +158,44 @@ storage and retry, fresh-process validation and permanent session retirement.
 Actual role/router fixtures explicitly retain owned certificate evidence too.
 
 These request checks use the local revocation registry; they do not periodically
-refresh OCSP or reverify the current issuer trust chain. Issuer/key identity,
-CA rotation, certificate-record generations and a registry change fully restored
-before any request remain separate lifecycle work. An already admitted domain
-operation still needs authorization inside its own transaction.
+refresh OCSP or reverify the current issuer trust chain. Issuer/key identity and
+CA rotation remain separate lifecycle work. The generation binding below also
+rejects a registry change fully restored before any request. An already admitted
+domain operation still needs authorization inside its own transaction.
+
+## Certificate registry generations
+
+Completed certificate sessions also record a random UUID for the exact registry
+record used during admission. Schema-bound database triggers rotate that UUID
+when ownership, purpose, serial or expiry changes, and when a local revocation is
+inserted, updated or deleted. Deleting a certificate removes its generation;
+recreating the same complete record gives it a new UUID. Reversing a change cannot
+restore the earlier generation, even when both writes occur within one committed
+transaction and no request observes the intermediate values.
+
+Admission captures this UUID under the certificate and revocation source locks.
+Protected requests compare it with the retained value under those same locks.
+Description-only edits and changes to other certificates preserve access. Trigger
+updates commit or roll back with their source mutation; generation write failure
+cannot partially change the registry. Restoring valid registry state permits a
+new sign-in while previously issued sessions remain retired.
+
+The second generation migration seeds existing certificate rows while holding
+source-table locks, installs the certificate/revocation triggers and preserves
+existing account/method UUIDs. Repeated startup preserves certificate UUIDs and
+rejects disabled or missing triggers and incomplete rows. Certificate/revocation
+writers must retain database access to the generation table and must not disable
+these triggers. All older console/auth writers must stop before upgrade; completed
+certificate sessions without the new generation must sign in again.
+
+Twenty-four owned baseline cases reproduced revival after owner, purpose,
+revocation and exact-record restoration in both storage modes and all three factor
+paths. Expanded tests also cover serial/expiry restoration, valid fresh admission,
+rollback and injected trigger failure, caller schema isolation, harmless edits,
+other-record isolation, repeated startup, disabled triggers, preceding-schema
+upgrade and fresh-process rejection after a revocation is removed. Pending
+certificate primary flows still perform their current certificate-registry checks;
+their initial evidence is not yet bound to these certificate generations.
 
 ## Current local session policy
 
@@ -260,8 +294,8 @@ This stamps completed local sessions. Pending primary proofs still use their
 existing credential, lifetime and certificate-registry checks; they do not yet
 carry independent account/method generation stamps. OpenID uses its separate
 live policy and binding-revision checks. Completed certificate sessions also check
-their original lifetime and current registry; issuer/key identity, certificate
-generations and rotation remain open.
+their original lifetime, current registry and certificate generation; issuer/key
+identity and rotation remain open.
 
 ## Password replacement policy
 

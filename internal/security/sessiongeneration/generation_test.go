@@ -31,3 +31,21 @@ func TestGenerationStampRejectsMissingOrMixedIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestCertificateStampRequiresItsOwnGeneration(t *testing.T) {
+	s := Stamp{Version: 1, UserID: "owned-user", Method: loginproof.Certificate, Account: uuid.NewString(), Policy: uuid.NewString(), Certificate: uuid.NewString()}
+	if got, err := Read(s.Encode(), s.UserID, s.Method); err != nil || got != s {
+		t.Fatal("valid certificate stamp rejected", err)
+	}
+	for _, value := range []string{"", "invalid", "00000000-0000-0000-0000-000000000000"} {
+		invalid := s
+		invalid.Certificate = value
+		if _, err := Read(invalid.Encode(), s.UserID, s.Method); !errors.Is(err, ErrChanged) {
+			t.Fatal("missing or malformed certificate generation accepted", err)
+		}
+	}
+	s.Method = loginproof.Password
+	if _, err := Read(s.Encode(), s.UserID, s.Method); !errors.Is(err, ErrChanged) {
+		t.Fatal("password stamp inherited certificate metadata", err)
+	}
+}

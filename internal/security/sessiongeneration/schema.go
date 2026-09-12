@@ -4,7 +4,9 @@ package sessiongeneration
 // their search path to this application schema, independently of later writers.
 // The installation marker preserves UUIDs and avoids replacing active triggers
 // during an ordinary repeated startup migration.
-const Schema = `
+const Schema = accountSchema + certificateSchema
+
+const accountSchema = `
 SELECT pg_advisory_xact_lock(712036490);
 CREATE TABLE IF NOT EXISTS uem_session_account_generations (
  user_id text PRIMARY KEY REFERENCES users(uid) ON UPDATE CASCADE ON DELETE CASCADE,
