@@ -61,6 +61,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
+		case "/ios/update-plans", "/ios/update-plans/:plan":
+			return access.ReadDevices, true
 		case "/ios/configurations", "/ios/configurations/history", "/ios/configurations/:id/history", "/ios/:id/setup/platform-sso/repairs", "/ios/:id/setup/platform-sso/history":
 			return access.ReadProfiles, true
 		case "/ios/configurations/:id/groups", "/ios/configurations/:id/groups/:group/preview", "/ios/configurations/:id/group-assignments", "/ios/configurations/:id/group-assignments/:assignment":
@@ -107,7 +109,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/:id/filevault/keys/:key/reveal", "/ios/:id/recovery-lock/passwords/:key/reveal":
 			return access.RetrieveRecoveryKeys, true
-		case "/ios/:id/update":
+		case "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
 			return access.ManageUpdates, true
 		// A retry can redeliver a previously authorized configuration or update.
 		case "/ios/:id/commands/:command/retry":

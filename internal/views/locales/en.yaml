@@ -146,6 +146,15 @@ en:
       candidate_expired: "The issued certificate expired before the device confirmed it. Check the current identity expiry and enroll the device again if needed."
       enrollment_inactive: "Renewal stopped because this enrollment is no longer active."
       attention: "Identity renewal needs attention. Review the enrollment and command status."
+  apple_update_plans:
+    title: "Apple update plans"
+    invalid: "Reload the plan and review its name, platform, exact release, build and device-local deadline."
+    permission: "Your current permissions do not allow this update plan action in this site."
+    missing: "The update plan is unavailable in this site."
+    changed: "This plan changed. Reload its current revision before saving."
+    limit: "This site already has 1,000 update plans. Revise an existing plan."
+    unavailable: "The update plan could not be read or saved. Reload its history before retrying."
+    site: "Select a concrete site to manage Apple update plans."
   apple_groups:
     invalid: "Review a current System profile and dynamic group, then confirm its exact Apple device selection."
     changed: "The profile, group or eligible devices changed. Start a new review before assigning."

@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple update plans](apple-update-plans.md) now provide an exact-site catalog of
+  versioned platform/release/deadline definitions. Immutable encrypted revisions,
+  a retained current pointer, archive/reactivation, bounded history and current
+  read/manage authority protect the reviewed source. Saving changes no device
+  policy or command. Targeted PostgreSQL 17/race tests pass in 6.240 seconds;
+  registered Linux console routes and macOS/Linux handler, middleware, view and
+  locale race tests pass. The complete Apple PostgreSQL/race suite passes in
+  476.388 seconds, and the full Linux build passes. Eighteen plan browser cases and twelve navigation cases
+  pass at all three widths. Group assignment, scheduling, exceptions, promotion
+  and cohort result evidence remain separate work.
+
 - [Apple update policy admission](apple-update-policy-admission.md) now rechecks
   current update authority inside the bounded policy/notification/audit
   transaction, including original organization and current target-site ownership.

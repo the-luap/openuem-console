@@ -122,6 +122,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/mac-binding/cancel", h.AppleMacBinding)
 		g.POST("/ios/:id/refresh", h.AppleRefresh)
 		g.POST("/ios/:id/revoke", h.AppleRevoke)
+		g.GET("/ios/update-plans", h.AppleUpdatePlans)
+		g.POST("/ios/update-plans", h.AppleSaveUpdatePlan)
+		g.GET("/ios/update-plans/:plan", h.AppleUpdatePlan)
+		g.POST("/ios/update-plans/:plan", h.AppleSaveUpdatePlan)
 		g.POST("/ios/:id/update", h.AppleUpdate)
 		g.POST("/ios/:id/filevault", h.AppleFileVault)
 		g.POST("/ios/:id/filevault/keys/:key/reveal", h.AppleFileVaultKey)
@@ -142,7 +146,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 			switch appleRoute(c.Path()) {
 			case "/ios/configurations/:id/assign":
 				limit = 64 << 10
-			case "/ios/configurations/:id/group-assignments", "/ios/:id/update":
+			case "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
 				limit = 8192
 			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
