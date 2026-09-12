@@ -1,4 +1,9 @@
 en:
+  desktop_tags:
+    invalid: "Choose one device and one tag from the current list."
+    not_found: "Device or tag not found in this organization and site."
+    denied: "Only a server administrator can change desktop tag assignments."
+    unavailable: "The tag assignment could not be saved. Refresh the list and try again."
   organization_tags:
     title: "Organization tags"
     settings: "Organization settings"
@@ -1486,6 +1491,7 @@ en:
         success: "A request to update the OpenUEM agent version has been sent"
         higher_version: "OpenUEM Agent's version currently deployed: "
         new_version_available: "There's a new version available: "
+        installed_versions_unknown: "Installed agent versions have not been reported. Available release: "
         no_new_version_available: "You're using the latest available version for this channel: "
         get_version_error: "Could not retrieve information from OpenUEM update service API"
         outdated: "This agent seems to have a version that doesn't match the current deployed version"

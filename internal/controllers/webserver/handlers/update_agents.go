@@ -168,6 +168,12 @@ func (h *Handler) ShowUpdateAgentList(c echo.Context, r *openuem_ent.Release, su
 		return err
 	}
 
+	if c.Request().Method == "DELETE" {
+		if err := h.applyDesktopTagForm(c, commonInfo); err != nil {
+			return err
+		}
+	}
+
 	itemsPerPage, err := h.Model.GetDefaultItemsPerPage()
 	if err != nil {
 		log.Println("[ERROR]: could not get items per page from database")
@@ -246,15 +252,6 @@ func (h *Handler) ShowUpdateAgentList(c echo.Context, r *openuem_ent.Release, su
 	lastExecutionTo := c.FormValue("filterByLastExecutionDateTo")
 	if lastExecutionTo != "" {
 		f.TaskLastExecutionTo = lastExecutionTo
-	}
-
-	tagId := c.FormValue("tagId")
-	agentId := c.FormValue("agentId")
-	if c.Request().Method == "DELETE" && tagId != "" && agentId != "" {
-		err := h.Model.RemoveTagFromAgent(agentId, tagId, commonInfo)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(err.Error(), false))
-		}
 	}
 
 	p.NItems, err = h.Model.CountAllUpdateAgents(f, commonInfo)

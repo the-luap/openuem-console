@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Desktop tag assignments](desktop-tag-assignments.md) now use current server
+  authority, exact device scope and the tag's organization in one audited
+  transaction. The original foreign-organization assignment was reproduced and
+  rejected; existing invalid associations remain removable. Independent
+  memberships survive concurrent changes, while permission and source locks
+  last through final audit. All six former model-action callers now use the
+  shared operation, including default admission tags and update-page removal.
+  The complete inventory PostgreSQL/race suite passes in 41.162 seconds; final
+  assignment and exact-reference export regressions pass in 7.393 seconds. The
+  final complete audit suite passes in 10.804 seconds. Registered Apple/OIDC
+  console routes with production CSRF checks, affected macOS/Linux package race
+  checks and the full Linux build pass. Route testing also reproduced and fixed
+  update-page rendering without installed-release evidence, both with and
+  without a catalog. Nine real-HTMX browser cases verify keyboard-triggered
+  method, query/body source, target, CSRF and retained filters. The complete
+  1,323-case Chrome matrix passes in 90.791 seconds. Broader legacy admission,
+  device moves and profile mutations remain separate authorization work.
+
 - [Tag color compatibility](organization-tags.md) preserves the original 19
   palette names and existing hexadecimal colors without changing stored values
   or no-op revisions. Shared device badges and picker swatches now resolve

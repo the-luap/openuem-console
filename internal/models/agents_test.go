@@ -373,22 +373,6 @@ func (suite *AgentsTestSuite) TestCountDisabledAgents() {
 	assert.Equal(suite.T(), 2, count, "should count 3 disabled agents")
 }
 
-func (suite *AgentsTestSuite) TestAddTagToAgent() {
-	err := suite.model.AddTagToAgent("agent0", strconv.Itoa(suite.tags[1]), &partials.CommonInfo{TenantID: "1", SiteID: "1"})
-	assert.NoError(suite.T(), err, "should add tag to agent")
-	count, err := suite.model.CountAllAgents(filters.AgentFilter{Tags: []int{suite.tags[0], suite.tags[1]}}, false, &partials.CommonInfo{TenantID: "1", SiteID: "1"})
-	assert.NoError(suite.T(), err, "should count all agents")
-	assert.Equal(suite.T(), 1, count, "should count 1 agents")
-}
-
-func (suite *AgentsTestSuite) TestRemoveTagFromAgent() {
-	err := suite.model.RemoveTagFromAgent("agent0", strconv.Itoa(suite.tags[0]), suite.commonInfo)
-	assert.NoError(suite.T(), err, "should remove tag from agent")
-	count, err := suite.model.CountAllAgents(filters.AgentFilter{Tags: []int{suite.tags[0]}}, false, suite.commonInfo)
-	assert.NoError(suite.T(), err, "should count all agents")
-	assert.Equal(suite.T(), 0, count, "should count 0 agents")
-}
-
 func (suite *AgentsTestSuite) TestCountDisabledAntivirusAgents() {
 	count, err := suite.model.CountDisabledAntivirusAgents(suite.commonInfo)
 	assert.NoError(suite.T(), err, "should count disabled antivirus")

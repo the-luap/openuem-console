@@ -25,18 +25,21 @@ type Filter struct {
 	Until    time.Time    `json:"until"`
 }
 
-func textFilter(value string) bool {
-	return len(value) <= 255 && utf8.ValidString(value) && strings.IndexFunc(value, unicode.IsControl) < 0
+func textFilter(value string, limit int) bool {
+	return len(value) <= limit && utf8.ValidString(value) && strings.IndexFunc(value, unicode.IsControl) < 0
 }
 
 func (f Filter) Validate() error {
 	if f.Scope.TenantID < 0 || f.Scope.SiteID < 0 || (f.Scope.TenantID == 0 && f.Scope.SiteID != 0) || f.From.IsZero() || f.Until.IsZero() || !f.From.Before(f.Until) {
 		return ErrInvalid
 	}
-	for _, value := range []string{f.Actor, f.Action, f.Resource} {
-		if !textFilter(value) {
+	for _, value := range []string{f.Actor, f.Action} {
+		if !textFilter(value, 255) {
 			return ErrInvalid
 		}
+	}
+	if !textFilter(f.Resource, 320) {
+		return ErrInvalid
 	}
 	if f.Source != "" && !validSource(f.Source) {
 		return ErrInvalid

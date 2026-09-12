@@ -671,6 +671,12 @@ func (h *Handler) ComputersList(c echo.Context, successMessage string, comesFrom
 		return err
 	}
 
+	if !comesFromDialog {
+		if err := h.applyDesktopTagForm(c, commonInfo); err != nil {
+			return err
+		}
+	}
+
 	currentPage := c.FormValue("page")
 	pageSize := c.FormValue("pageSize")
 	sortBy := c.FormValue("sortBy")
@@ -878,22 +884,6 @@ func (h *Handler) ComputersList(c echo.Context, successMessage string, comesFrom
 			if c.FormValue(fmt.Sprintf("filterByTag%d", tag.ID)) != "" {
 				f.Tags = append(f.Tags, tag.ID)
 			}
-		}
-	}
-
-	tagId := c.FormValue("tagId")
-	agentId := c.FormValue("agentId")
-	if c.Request().Method == "POST" && tagId != "" && agentId != "" {
-		err := h.Model.AddTagToAgent(agentId, tagId, commonInfo)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(err.Error(), false))
-		}
-	}
-
-	if c.Request().Method == "DELETE" && tagId != "" && agentId != "" {
-		err := h.Model.RemoveTagFromAgent(agentId, tagId, commonInfo)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(err.Error(), false))
 		}
 	}
 

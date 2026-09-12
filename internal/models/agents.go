@@ -543,50 +543,6 @@ func (m *Model) DisableAgent(agentId string, c *partials.CommonInfo) error {
 	return nil
 }
 
-func (m *Model) AddTagToAgent(agentId, tagId string, c *partials.CommonInfo) error {
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return err
-	}
-
-	id, err := strconv.Atoi(tagId)
-	if err != nil {
-		return err
-	}
-
-	if siteID == -1 {
-		return m.Client.Agent.UpdateOneID(agentId).Where(agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID)))).AddTagIDs(id).Exec(context.Background())
-	} else {
-		return m.Client.Agent.UpdateOneID(agentId).Where(agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID)))).AddTagIDs(id).Exec(context.Background())
-	}
-}
-
-func (m *Model) RemoveTagFromAgent(agentId, tagId string, c *partials.CommonInfo) error {
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return err
-	}
-
-	id, err := strconv.Atoi(tagId)
-	if err != nil {
-		return err
-	}
-
-	if siteID == -1 {
-		return m.Client.Agent.UpdateOneID(agentId).Where(agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID)))).RemoveTagIDs(id).Exec(context.Background())
-	} else {
-		return m.Client.Agent.UpdateOneID(agentId).Where(agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID)))).RemoveTagIDs(id).Exec(context.Background())
-	}
-}
-
 func (m *Model) CountPendingUpdateAgents(c *partials.CommonInfo) (int, error) {
 	siteID, err := strconv.Atoi(c.SiteID)
 	if err != nil {

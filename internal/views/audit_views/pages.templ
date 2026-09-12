@@ -108,7 +108,7 @@ templ Log(c echo.Context, info *partials.CommonInfo, f audit.Filter, page *audit
 					</label>
 					<label>Actor (exact)<input class="uk-input" name="actor" maxlength="255" value={ f.Actor }/></label>
 					<label>Action (exact)<input class="uk-input" name="action" maxlength="255" value={ f.Action } placeholder="apple.command.failed"/></label>
-					<label>Target ID (exact)<input class="uk-input" name="target" maxlength="255" value={ f.Resource }/></label>
+					<label>Target ID (exact)<input class="uk-input" name="target" maxlength="320" value={ f.Resource }/></label>
 					<div class="audit-actions"><button type="submit" class="uk-button uk-button-primary">Apply filters</button><a class="underline" href={ templ.URL(BaseURL(f.Scope)) }>Reset</a></div>
 				</form>
 			</section>

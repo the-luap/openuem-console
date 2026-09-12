@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+  "desktop-tag-actions",
  ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),
  ...["plans", "empty-plans", "groups", "empty-groups", "ready", "overlap", "unknown", "stale", "error", "exception", "post-exception", "different-policy", "unavailable", "incompatible", "pilot-only", "viewer", "receipt", "history", "empty-history", "long"].map(state=>`apple-update-promotion-${state}`),
  ...["new","watching","attention","awaiting","acknowledged","paused","blocked-authority","blocked-source","viewer","history","event-configured","event-acknowledged","event-cleared","event-attention","event-blocked","list","empty","long"].map(state=>`apple-update-escalation-${state}`),

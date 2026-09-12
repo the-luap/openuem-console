@@ -43,8 +43,10 @@ profile, task and parent/child tag associations block deletion. The final
 transaction locks the tag before checking those associations; new foreign-key
 references cannot race the check and be silently removed by cascade. The
 interface explains existing usage without disclosing assignment identities.
-Definition edits preserve assignments. Their separate creation/removal workflows
-retain their existing administrator boundary.
+Definition edits preserve assignments. [Desktop tag assignments](desktop-tag-assignments.md)
+now check the device/tag organization and commit current authority, membership
+and audit together. Their separate creation/removal workflows retain their
+existing administrator boundary.
 
 ## Authorization, audit and upgrade
 
