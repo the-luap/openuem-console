@@ -6,26 +6,10 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
-	"unicode"
-)
 
-// Use a visible text marker for formula-looking cells. Spreadsheet programs can
-// strip apostrophe escapes when saving CSV again. JSON retains exact field data.
-func spreadsheetText(value string) string {
-	trimmed := strings.TrimLeftFunc(value, func(r rune) bool { return unicode.IsSpace(r) || unicode.Is(unicode.Cf, r) })
-	for _, first := range trimmed {
-		if strings.ContainsRune("=+-@＝＋－＠", first) {
-			return "[text] " + value
-		}
-		break
-	}
-	if strings.ContainsAny(value, "\r\n\t") {
-		return "[text] " + value
-	}
-	return value
-}
+	"github.com/open-uem/openuem-console/internal/security/exporttext"
+)
 
 func encodeCSV(events []Event) ([]byte, error) {
 	var b bytes.Buffer
@@ -36,7 +20,7 @@ func encodeCSV(events []Event) ([]byte, error) {
 	for _, e := range events {
 		row := []string{e.CreatedAt.UTC().Format(time.RFC3339Nano), e.Source, strconv.FormatInt(e.ID, 10), strconv.Itoa(e.TenantID), strconv.Itoa(e.SiteID), e.Actor, e.Action, e.Resource, e.Result}
 		for i := range row {
-			row[i] = spreadsheetText(row[i])
+			row[i] = exporttext.SpreadsheetCell(row[i])
 		}
 		if err := w.Write(row); err != nil {
 			return nil, err

@@ -71,6 +71,8 @@ func appleCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/devices/export":
+			return access.ReadDevices, true
 		case "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 			return access.ManageSoftware, true
 		case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":

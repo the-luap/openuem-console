@@ -12,8 +12,8 @@ devices with a known time. PostgreSQL applies the filter and order before
 returning 25 rows; name, source and identity resolve contact-time ties. Equal
 names do not collapse identities or repeat entries on an unchanged dataset.
 **Next page** retains the scope, filters and sorting; **First page** restarts the
-query. Submitting the filter form also
-restarts pagination. The count describes the displayed page, not the entire
+query. Submitting the filter form also restarts pagination. The count describes
+the displayed page, not the entire
 inventory. Native Windows search includes older enrollments beyond the former
 100-entry preview.
 
@@ -40,11 +40,35 @@ suppression. Native Windows and desktop identities remain separate without a
 verified association. Native Windows status uses the current certificate after
 confirmed renewal and checks disconnection/revocation consistency.
 
-Audit migration 11 adds the list action to the existing inventory source. Site
-zero is allowed only for organization-wide list events; other inventory actions
-still require a positive site. These events use the existing scoped viewer,
-export and explicit retention workflow. List searches themselves are not copied
-into audit records.
+**Download CSV** and **Download JSON** export all matching devices in the selected
+order, including matches beyond the visible page. A CSRF-protected POST supplies
+the filters and format; query parameters, repeated fields and page cursors are
+rejected. The export uses the same safe projection and current read permission
+as the list. File preparation and the audit share one transaction, so an audit
+failure returns no file. The response is an attachment with caching and MIME
+sniffing disabled.
+
+Exports are limited to 5,000 entries and 16 MiB, with two preparations per console
+process and the same ten-second transaction deadline. Individual metadata fields
+are bounded to 4 KiB before database delivery; IDs are bounded to 255 bytes.
+Oversized results fail without partial output or silent truncation. Narrow the
+filters when a result exceeds these bounds.
+
+Both formats include the management source, device/organization/site IDs, name,
+platform, OS version, serial, model, management status, separate Mac agent status
+and last contact. Source/platform/status values are stable codes. Contact times
+use UTC with retained subsecond precision; missing times are blank in CSV and
+`null` in JSON. JSON is an array of objects and preserves original field values.
+CSV adds a visible `[text] ` prefix to formula-shaped or multiline text, using
+the same cell protection as audit exports.
+
+Audit migrations 11 and 12 add list and export actions to the existing inventory
+source. Site zero is allowed for organization-wide list/export events; other
+inventory actions still require a positive site. Successful export preparation
+records `inventory.devices.export_csv` or `inventory.devices.export_json`; this
+does not assert that a browser finished downloading the file. These events use
+the existing scoped viewer, export and explicit retention workflow. Search text
+is not copied into audit records.
 
 Owned PostgreSQL evidence covers 55 equal-name entries, 105 native Windows
 enrollments plus a separate agent, literal wildcard/injection-shaped searches,
@@ -53,7 +77,10 @@ hidden assignments, current permissions, audit failure
 and organization scope. Existing registered console routes cover linked Macs,
 native Windows lifecycle and scope boundaries. Chrome cases cover first, next,
 empty and long-metadata pages at 390, 768 and 1440 pixels, keyboard activation,
-retained filter links and page overflow.
+retained filter links, keyboard export submission and page overflow. Export
+tests cover all matching rows, exact JSON values, CSV cell protection, UTC/null
+times, current role/scope checks, failed audit, cancellation, concurrent capacity,
+encoded-size limits, oversized metadata and the 5,000/5,001-entry boundary.
 
-Shared device exports, bulk actions, dynamic groups and
+Bulk actions, dynamic groups and
 production-scale database performance acceptance remain separate roadmap work.

@@ -31,6 +31,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 	if err = h.Model.Client.Agent.UpdateOneID("windows-fixture").SetNotes("private-inventory-notes").SetDescription("private-inventory-description").SetUpdateTaskResult("private-inventory-task-output").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
+	exerciseDeviceExports(t, tenant, site, otherTenant, otherSite, request)
 	for _, row := range []struct {
 		id      string
 		sites   []int

@@ -41,6 +41,15 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 						</select></label>
 						<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx, "mdm.devices.filter") }</button>
 					</form>
+					<form method="post" action={ partials.GetNavigationUrl(info, "/devices/export") } class="flex flex-wrap gap-4 mb-4" aria-label={ i18n.T(ctx, "mdm.devices.export_heading") }>
+						@CSRF(info)
+						<input type="hidden" name="q" value={ search }/>
+						<input type="hidden" name="platform" value={ platform }/>
+						<input type="hidden" name="sort" value={ sort }/>
+						<button class="uk-button uk-button-default" type="submit" name="format" value="csv">{ i18n.T(ctx, "mdm.devices.export_csv") }</button>
+						<button class="uk-button uk-button-default" type="submit" name="format" value="json">{ i18n.T(ctx, "mdm.devices.export_json") }</button>
+						<p class="uk-text-muted w-full">{ i18n.T(ctx, "mdm.devices.export_help") }</p>
+					</form>
 					<div class="overflow-x-auto">
 						<table class="uk-table uk-table-divider uk-table-hover">
 							<thead><tr><th>{ i18n.T(ctx, "mdm.devices.device") }</th><th>{ i18n.T(ctx, "mdm.devices.platform_os") }</th><th>{ i18n.T(ctx, "mdm.devices.model") }</th><th>{ i18n.T(ctx, "mdm.devices.serial") }</th><th>{ i18n.T(ctx, "mdm.devices.management") }</th><th>{ i18n.T(ctx, "mdm.devices.last_contact") }</th></tr></thead>

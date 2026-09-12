@@ -64,6 +64,7 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/setup/platform-sso/correct", h.CorrectADEPlatformSSO)
 		g.POST("/ios/:id/applications/:assignment/action", h.ChangeMacApp)
 		g.GET("/devices", h.UnifiedDevices)
+		g.Any("/devices/export", h.ExportDeviceInventory)
 		g.GET("/ios", h.UnifiedDevices)
 		g.GET("/ios/setup", h.AppleSettings)
 		g.GET("/ios/ade", h.AppleADE)
@@ -122,10 +123,14 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 
 func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		if appleRoute(c.Path()) == "/devices/export" {
+			c.Response().Header().Set("Cache-Control", "no-store")
+			c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+		}
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
+			case "/devices/export", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
 			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":
 				limit = 8192

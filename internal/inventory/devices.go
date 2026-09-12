@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -62,6 +63,10 @@ func deviceFilterBinding(scope access.Scope, sources DeviceSources, f DeviceFilt
 // 25 safe rows. Current grants and the read audit share the transaction. A cursor
 // is only a position within this query; it never carries permission to read data.
 func ReadDevices(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, sources DeviceSources, filter DeviceFilter) (*DevicePage, error) {
+	return readDevices(ctx, db, permissions, actor, scope, sources, filter, 25, "inventory.devices.list", nil)
+}
+
+func readDevices(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, sources DeviceSources, filter DeviceFilter, pageSize int, auditAction string, prepare func(context.Context, *DevicePage) error) (*DevicePage, error) {
 	if db == nil || permissions == nil || scope.TenantID <= 0 || scope.SiteID < 0 {
 		return nil, access.ErrDenied
 	}
@@ -138,35 +143,48 @@ func ReadDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 		order = `last_seen ` + direction + ` NULLS LAST,` + identityOrder
 		args = append(args, cursor.Seen)
 	}
+	projection := "kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid,sort_name,true"
+	if prepare != nil {
+		projection = boundedExportDeviceColumns
+	}
+	args = append(args, pageSize+1)
 	query := `WITH devices(kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid) AS (` + strings.Join(branches, " UNION ALL ") + `),
  filtered AS (SELECT *,lower(name) COLLATE "C" AS sort_name FROM devices
  WHERE ($4='' OR platform=$4 OR ($4='apple' AND kind IN ('apple','mac')))
  AND position(lower($3) in lower(name||' '||serial||' '||model||' '||os_version))>0)
- SELECT kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid,sort_name FROM filtered
- WHERE NOT $8::boolean OR ` + position + ` ORDER BY ` + order + ` LIMIT 26`
+ SELECT ` + projection + ` FROM filtered
+ WHERE NOT $8::boolean OR ` + position + ` ORDER BY ` + order + ` LIMIT $` + strconv.Itoa(len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	page := &DevicePage{Entries: []DeviceEntry{}}
+	metadataBytes := 0
 	for rows.Next() {
 		var d DeviceEntry
-		var valid bool
-		if err = rows.Scan(&d.Kind, &d.ID, &d.TenantID, &d.SiteID, &d.Name, &d.Platform, &d.OSVersion, &d.Serial, &d.Model, &d.Status, &d.AgentStatus, &d.LastSeen, &valid, &d.sortName); err != nil {
+		var valid, bounded bool
+		if err = rows.Scan(&d.Kind, &d.ID, &d.TenantID, &d.SiteID, &d.Name, &d.Platform, &d.OSVersion, &d.Serial, &d.Model, &d.Status, &d.AgentStatus, &d.LastSeen, &valid, &d.sortName, &bounded); err != nil {
 			return nil, err
 		}
 		if !valid {
 			return nil, errors.New("device inventory lifecycle evidence is inconsistent")
+		}
+		metadataBytes += len(d.ID) + len(d.Name) + len(d.OSVersion) + len(d.Serial) + len(d.Model)
+		if prepare != nil && (!bounded || metadataBytes > 16<<20) {
+			return nil, ErrDeviceExportTooLarge
 		}
 		page.Entries = append(page.Entries, d)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	if len(page.Entries) > 25 {
-		page.Entries = page.Entries[:25]
-		last := page.Entries[24]
+	if len(page.Entries) > pageSize {
+		if prepare != nil {
+			return nil, ErrDeviceExportTooLarge
+		}
+		page.Entries = page.Entries[:pageSize]
+		last := page.Entries[pageSize-1]
 		encoded, err := json.Marshal(deviceCursor{Binding: binding, Name: last.sortName, Kind: last.Kind, ID: last.ID, Seen: last.LastSeen})
 		if err != nil || len(last.sortName) > 4096 || len(last.ID) > 255 {
 			return nil, errors.New("device inventory cursor exceeds supported metadata bounds")
@@ -176,7 +194,12 @@ func ReadDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 			return nil, errors.New("device inventory cursor exceeds supported metadata bounds")
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,'inventory.devices.list','devices')`, scope.TenantID, scope.SiteID, actor); err != nil {
+	if prepare != nil {
+		if err = prepare(ctx, page); err != nil {
+			return nil, err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,$4,'devices')`, scope.TenantID, scope.SiteID, actor, auditAction); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(); err != nil {

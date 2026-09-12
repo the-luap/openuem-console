@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Unified device CSV/JSON exports now prepare all filtered rows in the selected
+  order within one authorized, audited transaction. Preparation is limited to
+  5,000 devices, 16 MiB, bounded metadata and two active exports per process.
+  Oversized results and failed audits return no file. Explicit POST forms retain
+  filters/sorting and reject page cursors, query arguments and repeated fields.
+  JSON preserves exact values and UTC/null contact times; CSV uses the shared
+  spreadsheet cell protection already used by audit exports. Migration 12 adds
+  format-specific inventory audit events, including organization-wide exports.
+  Owned PostgreSQL inventory/audit race suites and browser checks cover the
+  boundary cases, download forms and existing list navigation. Registered Linux
+  routes pass for the four reader roles and foreign-scope/form rejection; Linux
+  handler/inventory/audit/view/catalog race checks and the full build also pass.
+
 - The unified device list now supports ascending/descending names and newest/
   oldest contact times. Missing reports sort last in both time orders. The
   database cursor preserves timestamp precision, name/source/identity ties and
@@ -83,7 +96,7 @@ the table's package summaries do not remove any detail from the roadmap.
   use the existing catalog. PostgreSQL inventory/audit race suites and registered
   Linux console routes pass, along with Linux handler/view/catalog race checks
   and the complete Linux build. Twenty-four Chrome cases cover new pagination
-  and existing management navigation. Exports, bulk actions and production
+  and existing management navigation. Bulk actions and production
   load acceptance remain open.
 
 - The Apple update form now resolves its heading, instructions, release/deadline

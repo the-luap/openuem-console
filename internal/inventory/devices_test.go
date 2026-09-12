@@ -2,6 +2,7 @@ package inventory_test
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -155,6 +156,17 @@ func TestDeviceListSearchesNativeWindowsBeyondFirstHundred(t *testing.T) {
 	page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, inventory.DeviceFilter{Search: "oldest"})
 	require.NoError(t, err)
 	require.Empty(t, page.Entries, "disabled source became visible")
+	data, err := inventory.ExportDevices(ctx, f.db, f.permissions, "viewer", f.scope, sources, inventory.DeviceFilter{Sort: "recent"}, "json")
+	require.NoError(t, err)
+	var exported []map[string]any
+	require.NoError(t, json.Unmarshal(data, &exported))
+	require.Len(t, exported, 106)
+	for _, d := range exported {
+		if d["management_source"] == "windows" {
+			require.Equal(t, "native_issued", d["management_status"])
+			require.Nil(t, d["last_contact"])
+		}
+	}
 }
 
 func TestDeviceListSortOrdersAcrossContactTimeTies(t *testing.T) {
