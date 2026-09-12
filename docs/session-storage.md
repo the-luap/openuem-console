@@ -122,9 +122,11 @@ failure. Certificate parsing tests cover proof mismatch, malformed/oversized
 data, invalid serials and lifetime boundaries. Existing successful mutual-TLS,
 MFA and failure-cleanup fixtures now register their owned user certificates.
 
-Completed sessions repeat these registry checks as described below. The legacy
-registry still lacks issuer/key identifiers. Certificate reissue, CA rotation
-and issuer identity remain broader work; completed local
+Completed sessions repeat these registry checks as described below. Shared
+[issuer trust and generations](certificate-session-issuers.md) also bind initial,
+pending and completed certificate authorization to the configured public CA.
+The legacy per-certificate registry still lacks issuer/key identifiers. Automated
+reissue and coordinated CA rollout remain broader lifecycle work; completed local
 account deletion/recreation is separately covered by account generations.
 
 ## Completed certificate sessions
@@ -140,8 +142,10 @@ Every protected certificate-session request decodes the bounded evidence and
 checks its account, client-auth purpose, serial and validity. The same local
 policy transaction then verifies account/method generations and the original
 certificate's exact current owner, purpose, expiry and local revocation state.
-Configuration/account locks precede the short revocation-table and certificate-row
-locks. The certificate lifetime is checked again before the transaction commits.
+It also verifies the current client-auth chain against the configured CA and
+compares the retained issuer UUID. Configuration/account locks precede the issuer,
+short revocation-table and certificate-row locks. Chain validity and the original
+issuer generation are checked again before the transaction commits.
 The generic local-session model call cannot authorize a certificate session
 without its certificate.
 
@@ -158,9 +162,9 @@ evidence, committed/rolled-back/canceled ownership and revocation waits, unavail
 storage and retry, fresh-process validation and permanent session retirement.
 Actual role/router fixtures explicitly retain owned certificate evidence too.
 
-These request checks use the local revocation registry; they do not periodically
-refresh OCSP or reverify the current issuer trust chain. Issuer/key identity and
-CA rotation remain separate lifecycle work. The generation binding below also
+These request checks use the local revocation registry and current issuer chain;
+they do not periodically refresh OCSP. Per-certificate issuer/key identity and
+automated CA rollout remain separate lifecycle work. The generation binding below also
 rejects a registry change fully restored before any request. An already admitted
 domain operation still needs authorization inside its own transaction.
 
@@ -302,14 +306,15 @@ processes and failed final session persistence with a valid retry.
 These stamps identify completed local sessions; pending local primary proofs use
 the independent account generation described below. OpenID uses its separate
 live policy and binding-revision checks. Completed certificate sessions also check
-their original lifetime, current registry and certificate generation; issuer/key
-identity and rotation remain open.
+their original lifetime, current registry, certificate generation and
+[current issuer trust and generation](certificate-session-issuers.md).
+Per-certificate issuer/key identity and automated CA rollout remain open.
 
 ## Pending local authentication generations
 
 Password and certificate first-factor admission now capture a separate pending
 account UUID, the current method UUID and, for certificates, the current registry
-UUID. These identifiers enter the new primary proof only after source-locked
+and issuer UUIDs. These identifiers enter the new primary proof only after source-locked
 admission commits; session publication persists that proof before sending its
 cookie. The proof retains its own one-use flow UUID, credential digest and short
 lifetime. A completed-session generation cannot substitute for a pending one.

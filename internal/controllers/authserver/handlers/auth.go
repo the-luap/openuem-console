@@ -36,6 +36,13 @@ func (h *Handler) Auth(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Certificate did not pass verification")
 	}
+	issuerGeneration, err := sessiongeneration.CaptureIssuer(c.Request().Context(), h.Model.DB, cert)
+	if errors.Is(err, sessiongeneration.ErrChanged) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Certificate issuer trust changed.")
+	}
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Certificate issuer verification is temporarily unavailable.")
+	}
 	if err := checkRevocation(c.Request().Context(), cert, issuer); err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Certificate revocation status could not be verified")
 	}
@@ -67,13 +74,13 @@ func (h *Handler) Auth(c echo.Context) error {
 			return err
 		}
 		if user.Use2fa {
-			generation, err := h.Model.BeginLocalMFA(ctx, user, loginproof.Certificate, cert)
+			generation, err := h.Model.BeginCertificateMFA(ctx, user, cert, issuerGeneration)
 			if err == nil {
 				h.SessionManager.Manager.Put(ctx, loginproof.SessionKey, loginproof.NewLocal(user.ID, loginproof.Certificate, string(cert.Raw), generation, time.Now()))
 			}
 			return err
 		}
-		generation, err := h.Model.CompleteLocalSession(ctx, user, loginproof.Certificate, cert, nil)
+		generation, err := h.Model.CompleteCertificateSession(ctx, user, cert, issuerGeneration)
 		if err == nil {
 			h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, generation)
 		}

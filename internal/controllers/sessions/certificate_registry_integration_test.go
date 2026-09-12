@@ -22,11 +22,15 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/pquerna/otp/totp"
 )
 
-func registerOwnedConsoleCertificate(t *testing.T, f sessionFixture, cert *x509.Certificate) {
+func registerOwnedConsoleCertificate(t *testing.T, f sessionFixture, cert, issuer *x509.Certificate) {
 	t.Helper()
+	if _, err := sessiongeneration.ConfigureIssuer(t.Context(), f.model.DB, issuer); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.model.Client.Certificate.Create().SetID(cert.SerialNumber.Int64()).SetType(certificate.TypeUser).SetUID(cert.Subject.CommonName).SetExpiry(cert.NotAfter).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +42,8 @@ func TestCertificateMFARechecksRegistryAfterFactorVerification(t *testing.T) {
 			for _, mutation := range []string{"owner", "revocation"} {
 				t.Run(sessionMode(encrypted)+"/"+factor+"/"+mutation, func(t *testing.T) {
 					f, ctx := prepareLocalSession(t, false, encrypted, true)
-					_, credential := ownedConsoleCertificate(t, f.user.ID)
-					registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+					ca, credential := ownedConsoleCertificate(t, f.user.ID)
+					registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
 					f.manager.Put(ctx, "twofa", false)
 					f.manager.Put(ctx, "authentication-pending", true)
 					f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
@@ -96,8 +100,9 @@ func TestCertificateAdmissionRechecksRegistryWaits(t *testing.T) {
 		for _, outcome := range []string{"commit", "rollback", "cancel"} {
 			t.Run(source+"/"+outcome, func(t *testing.T) {
 				f, _ := prepareLocalSession(t, false, true, false)
-				_, credential := ownedConsoleCertificate(t, f.user.ID)
-				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+				ca, credential := ownedConsoleCertificate(t, f.user.ID)
+				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
+				issuer := ownedCertificateIssuer(t, f.model, credential.Leaf)
 				if err := f.model.AdmitLocalSignIn(t.Context(), f.user, loginproof.Certificate, models.LocalSignInComplete); !errors.Is(err, models.ErrLocalSignIn) {
 					t.Fatal("certificate confirmation succeeded without its verified certificate", err)
 				}
@@ -118,7 +123,7 @@ func TestCertificateAdmissionRechecksRegistryWaits(t *testing.T) {
 				defer cancel()
 				done := make(chan error, 1)
 				go func() {
-					done <- f.model.AdmitCertificateSignIn(ctx, f.user, credential.Leaf, models.LocalSignInComplete, nil)
+					done <- f.model.AdmitCertificateSignIn(ctx, f.user, credential.Leaf, models.LocalSignInComplete, nil, issuer)
 				}()
 				query := "SELECT uid,type,expiry FROM certificates%FOR SHARE"
 				if source == "revocation" {
@@ -153,7 +158,7 @@ func TestCertificateAdmissionRechecksRegistryWaits(t *testing.T) {
 					t.Fatal(err)
 				}
 				if outcome == "cancel" {
-					err = f.model.AdmitCertificateSignIn(t.Context(), f.user, credential.Leaf, models.LocalSignInComplete, nil)
+					err = f.model.AdmitCertificateSignIn(t.Context(), f.user, credential.Leaf, models.LocalSignInComplete, nil, issuer)
 				} else {
 					err = <-done
 				}
@@ -169,8 +174,8 @@ func TestCertificatePendingSessionRechecksRegistry(t *testing.T) {
 	for _, unavailable := range []bool{false, true} {
 		t.Run(map[bool]string{false: "revoked certificate", true: "unavailable registry"}[unavailable], func(t *testing.T) {
 			f, ctx := prepareLocalSession(t, false, true, true)
-			_, credential := ownedConsoleCertificate(t, f.user.ID)
-			registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+			ca, credential := ownedConsoleCertificate(t, f.user.ID)
+			registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
 			f.manager.Put(ctx, "twofa", false)
 			f.manager.Put(ctx, "authentication-pending", true)
 			f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
@@ -232,6 +237,9 @@ func TestCertificateSignInRequiresCurrentUserCertificateRegistry(t *testing.T) {
 				t.Fatal(err)
 			}
 			ca, credential := ownedConsoleCertificate(t, uid)
+			if _, err := sessiongeneration.ConfigureIssuer(t.Context(), f.model.DB, ca); err != nil {
+				t.Fatal(err)
+			}
 			if invalid != "missing record" {
 				record := f.model.Client.Certificate.Create().SetID(credential.Leaf.SerialNumber.Int64()).SetType(certificate.TypeUser).SetUID(uid).SetExpiry(credential.Leaf.NotAfter)
 				switch invalid {

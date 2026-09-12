@@ -48,7 +48,7 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 	h.SessionManager.Manager.Put(ctx, "uid", uid)
 	h.SessionManager.Manager.Put(ctx, "usepasswd", u.Passwd)
 	if !u.Passwd {
-		public, private, err := ed25519.GenerateKey(rand.Reader)
+		public, _, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +59,23 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 		serial.Add(serial, big.NewInt(1))
 		now := time.Now()
 		leaf := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: uid}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
-		der, err := x509.CreateCertificate(rand.Reader, leaf, leaf, public, private)
+		// A deterministic, public test-only issuer keeps independently seeded
+		// role sessions under one owned CA without rotating trust per request.
+		issuerKey := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x37}, ed25519.SeedSize))
+		issuerTemplate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Owned route fixture CA"}, NotBefore: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), NotAfter: time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+		issuerDER, err := x509.CreateCertificate(rand.Reader, issuerTemplate, issuerTemplate, issuerKey.Public(), issuerKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issuer, err := x509.ParseCertificate(issuerDER)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stamp.Issuer, err = sessiongeneration.ConfigureIssuer(ctx, h.Model.DB, issuer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		der, err := x509.CreateCertificate(rand.Reader, leaf, issuer, public, issuerKey)
 		if err != nil {
 			t.Fatal(err)
 		}

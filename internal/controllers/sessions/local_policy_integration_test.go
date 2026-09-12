@@ -204,7 +204,7 @@ func TestCertificateSignInHonorsLocalAccountAndMethodPolicy(t *testing.T) {
 					t.Fatal(err)
 				}
 				ca, credential := ownedConsoleCertificate(t, "certificate-user")
-				registerOwnedConsoleCertificate(t, f, credential.Leaf)
+				registerOwnedConsoleCertificate(t, f, credential.Leaf, ca)
 				h := &certificate.Handler{Model: f.model, SessionManager: &sessions.SessionManager{Manager: sm, Pool: f.pool}, EncryptionMasterKey: f.key, CACert: ca, PublicOrigin: "https://console.test"}
 				req := httptest.NewRequest("GET", "https://console.test/fixture/certificate", nil).WithContext(ctx)
 				req.TLS = &tls.ConnectionState{HandshakeComplete: true, PeerCertificates: []*x509.Certificate{credential.Leaf}}

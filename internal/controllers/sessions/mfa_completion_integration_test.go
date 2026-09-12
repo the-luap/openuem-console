@@ -78,8 +78,8 @@ func TestMFACompletionRejectsSecretReplacementDuringAdmission(t *testing.T) {
 					sm.Put(ctx, "authentication-pending", true)
 					var primaryCertificate *x509.Certificate
 					if method == loginproof.Certificate {
-						_, credential := ownedConsoleCertificate(t, u.ID)
-						registerOwnedConsoleCertificate(t, f, credential.Leaf)
+						ca, credential := ownedConsoleCertificate(t, u.ID)
+						registerOwnedConsoleCertificate(t, f, credential.Leaf, ca)
 						primaryCertificate = credential.Leaf
 						sm.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 					}

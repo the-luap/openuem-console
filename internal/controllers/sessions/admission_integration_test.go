@@ -243,7 +243,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 					}
 				}
 				ca, credential := ownedConsoleCertificate(t, "certificate-user")
-				registerOwnedConsoleCertificate(t, f, credential.Leaf)
+				registerOwnedConsoleCertificate(t, f, credential.Leaf, ca)
 				h := &certificate.Handler{Model: f.model, SessionManager: &sessions.SessionManager{Manager: sm, Pool: f.pool}, EncryptionMasterKey: f.key, CACert: ca, PublicOrigin: "https://console.test"}
 				server := httptest.NewUnstartedServer(sm.LoadAndSave(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					c := echo.New().NewContext(r, w)
@@ -340,6 +340,9 @@ func ownedConsoleCertificate(t *testing.T, uid string, expires ...time.Time) (*x
 	}
 	now := time.Now()
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Owned console CA"}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature}
+	if len(expires) > 1 {
+		template.NotAfter = expires[1]
+	}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	if err != nil {
 		t.Fatal(err)

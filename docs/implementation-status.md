@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Console certificate issuer trust](certificate-session-issuers.md) now binds
+  initial authentication, pending MFA and completed sessions to the configured
+  public CA and its durable UUID. Current chain validity and the retained issuer
+  generation are checked under transaction locks through final confirmation;
+  CA expiry, replacement or restoration cannot preserve earlier authority.
+  Unavailable trust permits a bounded retry, while committed repair requires a
+  fresh sign-in. Migration preserves current generations and rejects missing
+  state or guards. Legacy certificate evidence requires a coordinated upgrade
+  and fresh authentication. The full owned session PostgreSQL/race suite passes
+  in 190.049 seconds; the final issuer/MFA regression passes in 56.508 seconds,
+  including a reproduced final-confirmation generation defect and rollback of
+  MFA receipts/counters. The complete OIDC account regression passes in 30.850
+  seconds. Registered Linux Apple/OIDC routes, macOS/Linux package race checks
+  and the full Linux build pass. Periodic OCSP refresh, per-certificate issuer/key
+  registry identifiers and automatic CA rollout remain separate lifecycle work.
+
 - [Durable OpenID policy generations](oidc-policy-generations.md) prevent a
   changed-then-restored OIDC configuration from reviving earlier browser flows,
   pending MFA or completed sessions. A transactional UUID follows the original

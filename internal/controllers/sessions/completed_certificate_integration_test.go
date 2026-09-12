@@ -42,7 +42,7 @@ func completedOwnedCertificateSession(t *testing.T, encrypted bool, factor strin
 		t.Fatal(err)
 	}
 	ca, credential := ownedConsoleCertificate(t, f.user.ID, expires...)
-	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
 	h := &auth.Handler{Model: f.model, SessionManager: f.handler.SessionManager, EncryptionMasterKey: f.key, CACert: ca, PublicOrigin: "https://console.test"}
 	server := httptest.NewUnstartedServer(f.manager.LoadAndSave(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := echo.New().NewContext(r, w)
@@ -244,7 +244,7 @@ func TestCompletedCertificateSessionCannotReviveAfterRegistryRestoration(t *test
 						t.Fatal("restored certificate registry revived an earlier session", admitted, err)
 					}
 					if factor == "none" {
-						stamp, err := f.model.CompleteLocalSession(t.Context(), f.user, loginproof.Certificate, cert, nil)
+						stamp, err := f.model.CompleteCertificateSession(t.Context(), f.user, cert, ownedCertificateIssuer(t, f.model, cert))
 						if err != nil {
 							t.Fatal("restored valid certificate could not establish a new session", err)
 						}

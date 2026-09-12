@@ -12,6 +12,7 @@ import (
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 var ErrMFAState = errors.New("MFA enrollment or account authorization changed")
@@ -180,6 +181,7 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, prima
 	if current.Register != nats.REGISTER_COMPLETE && current.Register != nats.REGISTER_APPROVED && !(!current.Passwd && !current.Openid && current.Register == nats.REGISTER_CERTIFICATE_SENT) {
 		return ErrMFAState
 	}
+	var issuer string
 	if primary != nil {
 		proof, err := loginproof.Read(primary.Proof, expected.ID, time.Now())
 		if err != nil || !current.Use2fa || current.Openid {
@@ -197,6 +199,10 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, prima
 			if err = lockUserCertificate(ctx, tx, expected.ID, primary.Certificate); err != nil {
 				return err
 			}
+			issuer, err = sessiongeneration.CurrentIssuer(ctx, tx)
+			if err != nil {
+				return err
+			}
 			if proof.Credential != loginproof.Digest(string(primary.Certificate.Raw)) {
 				return ErrLocalSignIn
 			}
@@ -209,6 +215,11 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, prima
 	}
 	if err = change(ctx, tx); err != nil {
 		return err
+	}
+	if primary != nil && primary.Certificate != nil {
+		if _, err = lockConsoleCertificateIssuer(ctx, tx, primary.Certificate, issuer); err != nil {
+			return err
+		}
 	}
 	if primary != nil && primary.Certificate != nil && !primary.Certificate.NotAfter.After(time.Now()) {
 		return ErrLocalSignIn

@@ -24,6 +24,7 @@ type Stamp struct {
 	Account     string `json:"account"`
 	Policy      string `json:"policy"`
 	Certificate string `json:"certificate,omitempty"`
+	Issuer      string `json:"issuer,omitempty"`
 }
 
 type Queryer interface {
@@ -85,8 +86,8 @@ func Read(raw, uid, method string) (Stamp, error) {
 	}
 	identifiers := []string{s.Account, s.Policy}
 	if method == loginproof.Certificate {
-		identifiers = append(identifiers, s.Certificate)
-	} else if s.Certificate != "" {
+		identifiers = append(identifiers, s.Certificate, s.Issuer)
+	} else if s.Certificate != "" || s.Issuer != "" {
 		return Stamp{}, ErrChanged
 	}
 	for _, value := range identifiers {

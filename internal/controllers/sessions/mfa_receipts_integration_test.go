@@ -16,6 +16,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/open-uem/utils"
 	"github.com/pquerna/otp/totp"
 )
@@ -28,7 +29,13 @@ func ownedLocalPrimary(t *testing.T, m *models.Model, user *ent.User, cert *x509
 	if cert != nil {
 		method, credential = loginproof.Certificate, string(cert.Raw)
 	}
-	generation, err := m.BeginLocalMFA(t.Context(), user, method, cert)
+	var generation string
+	var err error
+	if cert != nil {
+		generation, err = m.BeginCertificateMFA(t.Context(), user, cert, ownedCertificateIssuer(t, m, cert))
+	} else {
+		generation, err = m.BeginLocalMFA(t.Context(), user, method, nil)
+	}
 	if err != nil {
 		t.Fatal("owned primary admission failed", err)
 	}
@@ -342,4 +349,13 @@ func TestMFAReceiptRestartChild(t *testing.T) {
 			t.Fatal("fresh process accepted used MFA evidence", err)
 		}
 	}
+}
+
+func ownedCertificateIssuer(t *testing.T, m *models.Model, cert *x509.Certificate) string {
+	t.Helper()
+	issuer, err := sessiongeneration.CaptureIssuer(t.Context(), m.DB, cert)
+	if err != nil {
+		t.Fatal("owned certificate issuer capture failed", err)
+	}
+	return issuer
 }

@@ -162,7 +162,7 @@ DELETE FROM uem_session_generation_migrations WHERE version=2`); err != nil {
 	if err = f.model.CheckCertificateSession(t.Context(), f.user, cert, old.Encode()); !errors.Is(err, models.ErrLocalSignIn) {
 		t.Fatal("upgrade admitted a session without certificate generation", err)
 	}
-	current, err := f.model.CompleteLocalSession(t.Context(), f.user, loginproof.Certificate, cert, nil)
+	current, err := f.model.CompleteCertificateSession(t.Context(), f.user, cert, ownedCertificateIssuer(t, f.model, cert))
 	if err != nil {
 		t.Fatal("migrated certificate could not establish a new session", err)
 	}

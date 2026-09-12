@@ -30,31 +30,31 @@ const (
 // was checked. Configuration is locked before the account, so confirmation cannot
 // undo revocation or silently accept a changed password, mode or MFA requirement.
 func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage) error {
-	return m.admitLocalSignIn(parent, expected, method, stage, nil, nil, "", nil)
+	return m.admitLocalSignIn(parent, expected, method, stage, nil, nil, "", nil, "")
 }
 
 func (m *Model) CompleteMFASignIn(parent context.Context, expected *ent.User, method string, evidence *mfaadmission.Evidence) error {
 	if evidence == nil {
 		return mfaadmission.ErrRejected
 	}
-	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence, nil, "", nil)
+	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence, nil, "", nil, "")
 }
 
 // CompleteLocalSession returns generation metadata only after final admission
 // commits. The session publisher must save it before issuing the new cookie.
 func (m *Model) CompleteLocalSession(ctx context.Context, expected *ent.User, method string, cert *x509.Certificate, evidence *mfaadmission.Evidence) (string, error) {
 	var issued string
-	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInComplete, evidence, cert, "", &issued)
+	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInComplete, evidence, cert, "", &issued, "")
 	return issued, err
 }
 
 func (m *Model) CheckLocalSession(ctx context.Context, expected *ent.User, method, generation string) error {
-	return m.admitLocalSignIn(ctx, expected, method, LocalSignInCurrentSession, nil, nil, generation, nil)
+	return m.admitLocalSignIn(ctx, expected, method, LocalSignInCurrentSession, nil, nil, generation, nil, "")
 }
 
 func (m *Model) BeginLocalMFA(ctx context.Context, expected *ent.User, method string, cert *x509.Certificate) (string, error) {
 	var issued string
-	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, "", &issued)
+	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, "", &issued, "")
 	return issued, err
 }
 
@@ -62,11 +62,14 @@ func (m *Model) CheckLocalPrimary(ctx context.Context, expected *ent.User, metho
 	if generation == "" {
 		return ErrLocalSignIn
 	}
-	return m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, generation, nil)
+	return m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, generation, nil, "")
 }
 
-func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate, generation string, issued *string) error {
+func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate, generation string, issued *string, issuer string) error {
 	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInCurrentSession {
+		return ErrLocalSignIn
+	}
+	if method == loginproof.Certificate && (stage == LocalSignInComplete && evidence == nil || stage == LocalSignInPendingMFA && generation == "") && issuer == "" {
 		return ErrLocalSignIn
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -109,6 +112,17 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			if err = lockUserCertificate(ctx, tx, expected.ID, cert); err != nil {
 				return err
 			}
+			if issuer == "" {
+				issuer, err = sessiongeneration.CurrentIssuer(ctx, tx)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if method == loginproof.Certificate && issuer != "" {
+		if _, err = lockConsoleCertificateIssuer(ctx, tx, cert, issuer); err != nil {
+			return err
 		}
 	}
 	if stage == LocalSignInPasswordReplacement {
@@ -138,7 +152,11 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			if err != nil {
 				return err
 			}
-			if previous.Certificate != certificate {
+			issuer, err := sessiongeneration.CurrentIssuer(ctx, tx)
+			if err != nil {
+				return err
+			}
+			if previous.Certificate != certificate || previous.Issuer != issuer {
 				return ErrLocalSignIn
 			}
 		}
@@ -196,6 +214,15 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			if err != nil {
 				return err
 			}
+			stamp.Issuer, err = sessiongeneration.CurrentIssuer(ctx, tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if cert != nil {
+		if _, err = lockConsoleCertificateIssuer(ctx, tx, cert, issuer); err != nil {
+			return err
 		}
 	}
 	if cert != nil && !cert.NotAfter.After(time.Now()) {
@@ -230,7 +257,11 @@ func checkPrimaryGeneration(ctx context.Context, tx *sql.Tx, uid, method string,
 		if err != nil {
 			return err
 		}
-		if previous.Certificate != certificate {
+		issuer, err := sessiongeneration.CurrentIssuer(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if previous.Certificate != certificate || previous.Issuer != issuer {
 			return ErrLocalSignIn
 		}
 	}

@@ -1,6 +1,7 @@
 package authserver
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/open-uem/utils"
 )
 
@@ -44,6 +46,10 @@ func New(m *models.Model, s *sessions.SessionManager, caCert, server, consolePor
 	a.CACert, err = utils.ReadPEMCertificate(caCert)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if _, err = sessiongeneration.ConfigureIssuer(context.Background(), m.DB, a.CACert); err != nil {
+		log.Fatal("could not configure console certificate issuer: ", err)
 	}
 
 	// Create Handlers and register its router

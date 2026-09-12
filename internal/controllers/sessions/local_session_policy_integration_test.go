@@ -160,8 +160,8 @@ func localSessionRequest(f accountPasswordFixture, ctx context.Context) (bool, e
 
 func stampOwnedLocalCertificateSession(t *testing.T, f accountPasswordFixture, ctx context.Context) {
 	t.Helper()
-	_, credential := ownedConsoleCertificate(t, f.user.ID)
-	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+	ca, credential := ownedConsoleCertificate(t, f.user.ID)
+	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
 	f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 	stamp, err := sessiongeneration.Current(ctx, f.model.DB, f.user.ID, loginproof.Certificate)
 	if err != nil {
@@ -171,6 +171,7 @@ func stampOwnedLocalCertificateSession(t *testing.T, f accountPasswordFixture, c
 	if err != nil {
 		t.Fatal(err)
 	}
+	stamp.Issuer = ownedCertificateIssuer(t, f.model, credential.Leaf)
 	f.manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 }
 
@@ -206,8 +207,8 @@ func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {
 			f.manager.Put(ctx, "twofa", false)
 			f.manager.Put(ctx, "authentication-pending", true)
 			if valid {
-				_, credential := ownedConsoleCertificate(t, f.user.ID)
-				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+				ca, credential := ownedConsoleCertificate(t, f.user.ID)
+				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf, ca)
 				f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 				f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
 			}
