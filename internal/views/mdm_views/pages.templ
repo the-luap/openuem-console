@@ -2,6 +2,7 @@ package mdm_views
 
 import (
 	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -291,14 +292,27 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 					if reason:=detail.Device.Capabilities().UpdateReason; reason!="" {
 						<p role="status" class="uk-alert uk-alert-warning">{ reason }</p>
 					}
-					if detail.Policy!=nil {
-						<p class="font-medium">{ "Compliance: "+StateLabel(detail.Compliance) }</p>
-						<p>{ "Target: "+detail.Policy.TargetVersion+" · Deadline: "+detail.Policy.Deadline+" (device local time)" }</p>
-						<p>{ "Device update status: "+StateLabel(detail.Policy.Status) }</p>
-						if detail.Policy.Error!="" {
-							<div role="alert" class="uk-alert uk-alert-warning">{ detail.Policy.Error }</div>
+					<div class="grid gap-4 md:grid-cols-2">
+						if detail.Policy!=nil {
+							<div>
+								<h3 class="font-medium">{ i18n.T(ctx, "updates.policy_heading") }</h3>
+								<p>{ i18n.T(ctx, "updates.target_version", Show(detail.Policy.TargetVersion)) }</p>
+								<p>{ i18n.T(ctx, "updates.target_build", Show(detail.Policy.TargetBuild)) }</p>
+								<p>{ i18n.T(ctx, "updates.deadline_local", Show(detail.Policy.Deadline)) }</p>
+								<p>{ i18n.T(ctx, "updates.compliance", StateLabel(detail.Compliance)) }</p>
+								<p>{ i18n.T(ctx, "updates.device_status", StateLabel(detail.Policy.Status)) }</p>
+								if detail.Policy.Error!="" {
+									<div role="alert" class="uk-alert uk-alert-warning">{ detail.Policy.Error }</div>
+								}
+							</div>
 						}
-					}
+						<div>
+							<h3 class="font-medium">{ i18n.T(ctx, "updates.reported_heading") }</h3>
+							<p>{ i18n.T(ctx, "updates.reported_version", Show(detail.Device.OSVersion)) }</p>
+							<p>{ i18n.T(ctx, "updates.reported_build", Show(detail.Device.BuildVersion)) }</p>
+							<p>{ i18n.T(ctx, "updates.reported_at")+" " }@Timestamp(detail.Device.InventoryAt)</p>
+						</div>
+					</div>
 					if detail.Device.Status=="enrolled" {
 						if info.Can(access.ManageUpdates) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">

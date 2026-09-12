@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The Apple update summary now shows the configured target version and build
+  separately from the device's last reported OS version, build and inventory
+  timestamp. The deadline remains in device-local time; report timestamps use
+  the existing locale/zone formatter. New labels use the English locale catalog,
+  missing values retain the shared placeholder, and readers can inspect both
+  states without receiving mutation controls. Render/locale race tests passed;
+  nine isolated Chrome checks covered iPhone, Mac and reader views at 390, 768
+  and 1440 px with distinct target/reported builds and no document overflow.
+  This closes the summary finding in roadmap section 9; it does not establish
+  physical update installation or change policy reconciliation.
+
 - Apple management now also redacts failures outside the shared HTTP error page.
   The generic Apple adapter and setup banner no longer display unknown exception
   text. Stable push-setting validation identities retain specific organization,
