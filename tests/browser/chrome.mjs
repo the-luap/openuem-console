@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+  "profile-audience-actions",
   "profile-status-actions",
   "desktop-tag-actions",
  ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),

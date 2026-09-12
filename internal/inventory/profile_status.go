@@ -15,6 +15,10 @@ var ErrProfileInvalid = errors.New("invalid legacy profile")
 // The caller supplies a bounded action context. The returned transaction holds
 // current server authority and the complete profile audience until completion.
 func beginLegacyProfileTransaction(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, profileID int64) (*sql.Tx, error) {
+	return beginLegacyProfileAudienceTransaction(ctx, db, permissions, actor, scope, profileID, false)
+}
+
+func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, profileID int64, writeAudience bool) (*sql.Tx, error) {
 	if profileID <= 0 {
 		return nil, ErrProfileInvalid
 	}
@@ -36,7 +40,13 @@ func beginLegacyProfileTransaction(ctx context.Context, db *sql.DB, permissions 
 		return fail(err)
 	}
 	// Count all audience edges, including associations hidden by the route.
-	if _, err = tx.ExecContext(ctx, `LOCK TABLE tenant_profiles,site_profiles IN SHARE MODE`); err != nil {
+	lock := `LOCK TABLE tenant_profiles,site_profiles IN SHARE MODE`
+	if writeAudience {
+		// Acquire the write-compatible lock before reading the audience. Upgrading
+		// two concurrent SHARE holders during deletion would deadlock.
+		lock = `LOCK TABLE tenant_profiles,site_profiles IN SHARE ROW EXCLUSIVE MODE`
+	}
+	if _, err = tx.ExecContext(ctx, lock); err != nil {
 		return fail(err)
 	}
 	var current int64

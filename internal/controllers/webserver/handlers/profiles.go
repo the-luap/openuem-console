@@ -489,56 +489,6 @@ func (h *Handler) ProfileTaskDefinition(c echo.Context) error {
 	return nil
 }
 
-func (h *Handler) SetProfileAsGlobal(c echo.Context) error {
-	var err error
-
-	id := c.Param("uuid")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.issues.empty_id"), true))
-	}
-
-	profileId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.invalid_profile"), true))
-	}
-
-	if err := h.Model.SetProfileAsGlobal(profileId); err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.set_global_error", err), true))
-	}
-
-	return h.Profiles(c, i18n.T(c.Request().Context(), "profiles.set_global_success"))
-}
-
-func (h *Handler) SetProfileAsTenantProfile(c echo.Context) error {
-	var err error
-
-	id := c.Param("uuid")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.issues.empty_id"), true))
-	}
-
-	profileID, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.invalid_profile"), true))
-	}
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	tenantID, err := strconv.Atoi(commonInfo.TenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-	}
-
-	if err := h.Model.SetProfileAsTenantProfile(profileID, tenantID); err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.set_tenant_error", err), true))
-	}
-
-	return h.Profiles(c, i18n.T(c.Request().Context(), "profiles.set_tenant_success"))
-}
-
 func (h *Handler) CloneProfile(c echo.Context) error {
 	var err error
 

@@ -158,14 +158,6 @@ func (m *Model) GetProfileIssuesByPage(p partials.PaginationAndSort, profileID i
 		Offset((p.CurrentPage - 1) * p.PageSize).All(context.Background())
 }
 
-func (m *Model) SetProfileAsGlobal(profiledID int) error {
-	return m.Client.Profile.Update().ClearSite().ClearTenant().Where(profile.ID(profiledID)).Exec(context.Background())
-}
-
-func (m *Model) SetProfileAsTenantProfile(profiledID int, tenantID int) error {
-	return m.Client.Profile.Update().AddTenantIDs(tenantID).ClearSite().Where(profile.ID(profiledID)).Exec(context.Background())
-}
-
 // TODO-Steve we should check which profiles can be listed based on user's role
 func (m *Model) GetAllProfiles() ([]*ent.Profile, error) {
 	return m.Client.Profile.Query().All(context.Background())

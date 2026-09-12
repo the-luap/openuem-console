@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile audience moves](profile-audience.md) now verify the complete
+  source audience and current server authority before moving a site profile to
+  its organization or a scoped profile to global. Actual registered route tests
+  reproduced both former foreign-organization moves and now reject them. Tasks,
+  tags, metadata and enabled/assignment state are preserved. Source and
+  destination audit receipts commit atomically with the move; concurrent audience
+  writers acquire their write lock before reading, and final audit tests cover
+  permission, profile, audience and site changes. The complete inventory
+  PostgreSQL/race suite passes in 55.023 seconds and the complete audit suite in
+  13.620 seconds. Registered Apple/OIDC routes, macOS/Linux package race checks
+  and the full Linux build pass. Native buttons explain the wider audience and
+  support keyboard confirmation/cancellation with strict forms and CSRF. All 36
+  focused audience/status browser cases pass; the complete 1,368-case Chrome
+  matrix passes in 88.977 seconds. Mobile labels and visible focus were inspected.
+  Definition editing, cloning, deletion and task lifecycle work remain separate.
+
 - [Legacy profile status](profile-status.md) now shares exact audience and
   transaction-bound server authorization with profile tag actions. The real
   console route test reproduced activation of a foreign-organization profile

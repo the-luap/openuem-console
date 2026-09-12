@@ -1,4 +1,13 @@
 en:
+  profile_audience:
+    invalid: "Reopen the profile list and choose an available audience action."
+    not_found: "Profile not found in the selected scope. Refresh the list if it has moved."
+    denied: "Only a server administrator can move legacy profiles."
+    unavailable: "The profile could not be moved. Refresh the list and try again."
+    global: "Make global"
+    organization: "Move to organization"
+    confirm_global: "Make this profile global? Its existing tasks and assignment rules will apply across all organizations when enabled."
+    confirm_organization: "Move this profile to the organization? Its existing tasks and assignment rules will apply across every site in this organization when enabled."
   profile_status:
     invalid: "Reopen the profile list and choose the status action again."
     not_found: "Profile not found in the selected scope."

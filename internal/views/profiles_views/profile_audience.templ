@@ -1,0 +1,42 @@
+package profiles_views
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ProfileAudienceAction(profile *ent.Profile, p partials.PaginationAndSort, info *partials.CommonInfo, global bool) {
+	<form>
+		<input type="hidden" name="page" value={ strconv.Itoa(p.CurrentPage) }/>
+		<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
+		<input type="hidden" name="sortBy" value={ p.SortBy }/>
+		<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
+		<button
+			type="button"
+			class="flex w-full items-center px-4 py-2 text-left"
+			hx-post={ profileAudiencePath(profile, info, global) }
+			hx-confirm={ i18n.T(ctx, "profile_audience.confirm_"+profileAudienceKey(global)) }
+			hx-target="#main"
+			hx-swap="outerHTML"
+			hx-push-url="false"
+		>
+			<uk-icon hx-history="false" icon="copy" custom-class="h-6 w-6 pr-2" uk-cloak></uk-icon>
+			{ i18n.T(ctx, "profile_audience."+profileAudienceKey(global)) }
+		</button>
+	</form>
+}
+
+func profileAudienceKey(global bool) string {
+	if global { return "global" }
+	return "organization"
+}
+
+func profileAudiencePath(profile *ent.Profile, info *partials.CommonInfo, global bool) string {
+	action := "settenant"
+	if global { action = "setglobal" }
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/%s", profile.ID, action))
+}

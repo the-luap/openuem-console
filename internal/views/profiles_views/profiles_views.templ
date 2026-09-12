@@ -131,22 +131,12 @@ templ Profiles(c echo.Context, p partials.PaginationAndSort, profiles []*ent.Pro
 											</li>
 											if commonInfo.TenantID != "-1" {
 												<li>
-													<a
-														hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d/setglobal", profile.ID)))) }
-														hx-target="#main"
-														hx-swap="outerHTML"
-														hx-push-url="false"
-													><uk-icon hx-history="false" icon="copy" custom-class="h-6 w-6 pr-2" uk-cloack></uk-icon>{ i18n.T(ctx, "profiles.set_global") }</a>
+													@ProfileAudienceAction(profile, p, commonInfo, true)
 												</li>
 											}
 											if commonInfo.SiteID != "-1" {
 												<li>
-													<a
-														hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d/settenant", profile.ID)))) }
-														hx-target="#main"
-														hx-swap="outerHTML"
-														hx-push-url="false"
-													><uk-icon hx-history="false" icon="copy" custom-class="h-6 w-6 pr-2" uk-cloack></uk-icon>{ i18n.T(ctx, "profiles.set_tenant") }</a>
+													@ProfileAudienceAction(profile, p, commonInfo, false)
 												</li>
 											}
 											<li>
