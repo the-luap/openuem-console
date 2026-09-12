@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Apple device-profile assignment forms now carry the displayed current catalog
+  revision. Transactional admission rejects a changed revision before creating
+  commands; device history labels the current source separately from its older
+  assigned revision. Missing catalog sources expose no assignment action.
+  Strict 64 KiB URL-encoded POSTs require body CSRF, unique source/action fields
+  and 1–1000 distinct canonical native targets. PostgreSQL tests and registered
+  Linux routes cover real source edits, stale forms, duplicate/missing fields,
+  scope and unchanged queues after rejection. Nine Chrome cases cover exact
+  keyboard apply/removal and missing-source behavior at all three widths.
+  Apple group provenance, previewed eligibility/conflicts and durable cohort
+  request replay remain further work.
+
 - [Apple profile assignment](apple-profile-revisions.md#current-assignment-authority)
   now rechecks current console assignment permissions inside the command/audit
   transaction and holds the permission/account locks until commit. Organization
@@ -70,9 +82,8 @@ the table's package summaries do not remove any detail from the roadmap.
   site changes and rollback after the final device's audit failure. The broader
   profile/certificate/ACME/SSO/VPN/policy regression selection passes in 65.932
   seconds. Registered Linux console routes, handler/catalog race checks on
-  Linux and macOS and the full Linux build pass. Reviewed manual source
-  revisions and Apple group provenance remain
-  separate implementation work.
+  Linux and macOS and the full Linux build pass. Reviewed manual source revisions
+  are added above; Apple group provenance remains separate implementation work.
 
 - [Scheduled Windows group assignments](native-windows-update-groups.md) now
   capture the reviewed site group revision, exact native Windows targets and

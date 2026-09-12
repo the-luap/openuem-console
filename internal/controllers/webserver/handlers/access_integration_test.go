@@ -85,6 +85,10 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 // rather than a route mock or a test-only authorization schema.
 func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, tenantID, siteID int, profileID string) {
 	t.Helper()
+	profile, err := h.Apple.Profile(ctx, tenantID, profileID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	adminID := "apple-console-admin"
 	defer stampOwnedConsoleSession(t, h, ctx, adminID)
 	otherTenant, err := h.Model.Client.Tenant.Create().SetDescription("Private organization").Save(ctx)
@@ -153,6 +157,39 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		return rec
 	}
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenantID, siteID)
+	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
+		var before, after int
+		if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, profileID).Scan(&before); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"changed-revision", "missing-revision", "duplicate-revision", "duplicate-device", "query"} {
+			form := url.Values{"expected_revision": {strconv.Itoa(profile.Revision)}, "device_id": {devices[0].DeviceID}, "desired": {"installed"}}
+			path := base + "/ios/configurations/" + profileID + "/assign"
+			want := 400
+			switch name {
+			case "changed-revision":
+				form.Set("expected_revision", strconv.Itoa(profile.Revision+1))
+				want = 409
+			case "missing-revision":
+				form.Del("expected_revision")
+			case "duplicate-revision":
+				form.Add("expected_revision", form.Get("expected_revision"))
+			case "duplicate-device":
+				form.Add("device_id", form.Get("device_id"))
+			case "query":
+				path += "?desired=removed"
+			}
+			if rec := request("scoped-operator", "POST", path, form); rec.Code != want {
+				t.Errorf("profile assignment %s: got %d, want %d", name, rec.Code, want)
+			}
+		}
+		if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, profileID).Scan(&after); err != nil {
+			t.Fatal(err)
+		}
+		if before != after {
+			t.Fatal("rejected profile assignment created commands")
+		}
+	})
 	t.Run("scoped desktop inventory", func(t *testing.T) {
 		exerciseDesktopInventoryPermissions(t, h, ctx, tenantID, siteID, sibling.ID, otherTenant.ID, otherSite.ID, request)
 	})
@@ -262,7 +299,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		if rec.Code != 403 {
 			t.Fatal("organization alias escaped site grant", rec.Code)
 		}
-		rec = request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"device_id": {devices[0].DeviceID, devices[1].DeviceID}, "desired": {"installed"}})
+		rec = request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"expected_revision": {strconv.Itoa(profile.Revision)}, "device_id": {devices[0].DeviceID, devices[1].DeviceID}, "desired": {"installed"}})
 		if rec.Code != 404 {
 			t.Fatal("mixed-scope assignment accepted", rec.Code, rec.Body.String())
 		}
@@ -279,7 +316,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		if rec.Code != 303 {
 			t.Fatal("operator refresh denied", rec.Code, rec.Body.String())
 		}
-		rec = request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"device_id": {devices[0].DeviceID}, "desired": {"installed"}})
+		rec = request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"expected_revision": {strconv.Itoa(profile.Revision)}, "device_id": {devices[0].DeviceID}, "desired": {"installed"}})
 		if rec.Code != 303 {
 			t.Fatal("operator profile assignment denied", rec.Code, rec.Body.String())
 		}

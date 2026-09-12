@@ -42,6 +42,8 @@ const fixtures = new Set([
  ...["install","remove","empty","pending","delivered","observed","drifted","unknown","waiting","unavailable","cancelled","expired","reader","paged"].map(state=>"windows-check-"+state),
  ...["install","remove","pending","delivered","observed","restart","uncertain","reader","cancelled","expired","failed","not-started"].map(state=>"windows-dispatch-"+state),
   "profiles",
+  "device-stale-assignment",
+  "device-unavailable-source",
   "wifi-eap-profiles",
   "wifi-eap-reader",
   "ikev2-profiles",

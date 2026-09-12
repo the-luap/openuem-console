@@ -54,6 +54,10 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	acmeReviewed.State, acmeReviewed.ReviewedBy, acmeReviewed.Reason, acmeReviewed.ReviewedAt = "reviewed", "Administrator <reviewer>", "Original <approved> archive from the configuration repository", &now
 	policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
 	detail := Detail{Device: d, Profiles: []apple.Profile{p}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 2, Desired: "installed", Status: "verified"}}, Policy: policy, Compliance: "update_required", CatalogAt: &now, Releases: []apple.OSRelease{{Version: "18.7.1", Build: "22H100"}, {Version: "18.7.1", Build: "22H6100"}}}
+	staleAssignment := detail
+	staleAssignment.Assignments = []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 1, Desired: "installed", Status: "verified"}}
+	missingAssignmentSource := staleAssignment
+	missingAssignmentSource.Profiles = nil
 	detail.IdentityRenewals = []apple.IdentityRenewal{{ID: "40000000-0000-0000-0000-000000000001", Status: "issued", CommandID: "50000000-0000-0000-0000-000000000001", PreviousFingerprint: strings.Repeat("1a", 32), Fingerprint: strings.Repeat("2b", 32), CreatedAt: now, CertificateExpiresAt: &vendorExpires, TokenUpdatedAt: &now}, {ID: "40000000-0000-0000-0000-000000000002", Status: "confirmed", CommandID: "50000000-0000-0000-0000-000000000002", PreviousFingerprint: strings.Repeat("3c", 32), Fingerprint: strings.Repeat("1a", 32), CreatedAt: now.AddDate(-1, 0, 0), ConfirmedAt: &now}}
 	identityExpires := now.AddDate(1, 0, 0)
 	d.CertificateExpiresAt = now.Add(20 * 24 * time.Hour)
@@ -476,6 +480,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"profile-history-migrated", ProfileRevisionHistory(c, info, p.ID, []apple.ProfileRevision{profileMigrated}, "", true), []string{"Existing revision captured during migration", "Earlier versions and their authors were not retained"}},
 		{"profile-history-reader", ProfileRevisionHistory(c, &reader, p.ID, []apple.ProfileRevision{profileRevision}, "", false), []string{"Profile revision history", "Identity &lt;configuration&gt;"}},
 		{"profile-history-empty", ProfileRevisionHistory(c, info, "", nil, "", true), []string{"No stored profile revisions"}},
+		{"device-stale-assignment", DeviceDetails(c, info, staleAssignment), []string{"Current profile revision: 2", `name="expected_revision" value="2"`}},
+		{"device-unavailable-source", DeviceDetails(c, info, missingAssignmentSource), []string{"Configuration profiles", "Company Wi-Fi"}},
 		{"acme-history-unresolved", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeHistory}, acmeHistory.ID, "unresolved", true), []string{"com.example.&lt;identity&gt;", "Record historical archive review", "More historical profiles", `enctype="multipart/form-data"`, `value="7"`, "test-csrf-token"}},
 		{"acme-history-reviewed", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeReviewed}, "", "reviewed", true), []string{"Original &lt;approved&gt; archive", "Administrator &lt;reviewer&gt;", "separate review evidence"}},
 		{"acme-history-manager", ACMEHistory(c, info, []apple.ACMELegacyProfile{acmeHistory}, "", "unresolved", false), []string{"assignment permissions are required"}},

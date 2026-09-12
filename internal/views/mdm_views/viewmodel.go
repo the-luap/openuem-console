@@ -61,6 +61,15 @@ func (d Detail) DevicePath() string {
 	return "/ios/" + d.Device.ID
 }
 
+func (d Detail) CurrentProfileRevision(id string) int {
+	for _, p := range d.Profiles {
+		if p.ID == id {
+			return p.Revision
+		}
+	}
+	return 0
+}
+
 func When(t *time.Time) string {
 	if t == nil {
 		return "Never reported"

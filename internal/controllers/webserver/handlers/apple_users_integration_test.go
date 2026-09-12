@@ -91,7 +91,7 @@ func exerciseAppleUsers(t *testing.T, h *Handler, ctx context.Context, tenantID,
 	if rec := request("scoped-operator", "POST", path+"/profiles", url.Values{"profile_id": {profileID}, "desired": {"installed"}}); rec.Code != 303 {
 		t.Fatal("user assignment", rec.Code, rec.Body.String())
 	}
-	if rec := request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"device_id": {invite.DeviceID}, "desired": {"installed"}}); rec.Code != 400 {
+	if rec := request("scoped-operator", "POST", base+"/ios/configurations/"+profileID+"/assign", url.Values{"expected_revision": {"1"}, "device_id": {invite.DeviceID}, "desired": {"installed"}}); rec.Code != 400 {
 		t.Fatal("user profile entered device assignment", rec.Code)
 	}
 	rec := request("scoped-operator", "GET", path, nil)

@@ -364,9 +364,11 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 									<td>{ StateLabel(ctx, a.Status) }<br/>{ a.Error }</td>
 									<td>
 										if detail.Device.Status=="enrolled" {
-											if info.Can(access.AssignProfiles) {
+											if info.Can(access.AssignProfiles) && detail.CurrentProfileRevision(a.ProfileID)>0 {
 												<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+a.ProfileID+"/assign") }>
 													@CSRF(info)
+													<input type="hidden" name="expected_revision" value={ Number(detail.CurrentProfileRevision(a.ProfileID)) }/>
+													<p>{ "Current profile revision: "+Number(detail.CurrentProfileRevision(a.ProfileID)) }</p>
 													<input type="hidden" name="device_id" value={ detail.Device.ID }/><button class="uk-button uk-button-default" name="desired" value="installed" type="submit">Apply again</button><button class="uk-button uk-button-default" name="desired" value="removed" type="submit">Remove</button>
 												</form>
 											}
@@ -567,6 +569,7 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 						if p.Scope!="User" && info.Can(access.AssignProfiles) {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations/"+p.ID+"/assign") } class="grid gap-4">
 								@CSRF(info)
+								<input type="hidden" name="expected_revision" value={ Number(p.Revision) }/>
 								<label>
 									Target devices
 									<select class="uk-select" name="device_id" multiple required size="5">

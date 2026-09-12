@@ -148,6 +148,7 @@ en:
       attention: "Identity renewal needs attention. Review the enrollment and command status."
   apple_errors:
     assignment_permission: "Your current permissions do not allow profile assignment in this scope."
+    assignment_form: "Reload the profile, select 1–1000 distinct devices and choose whether to apply or remove the displayed revision."
     push_problem: "Review the current push status and Apple push settings."
     push_failed: "Wake-up notification failed. Check outbound network access and Apple push settings."
     push_invalid: "The push token is no longer valid. Wait for a new token update from the device."

@@ -38,7 +38,7 @@ func TestProfileAssignmentCurrentAuthorityAndScope(t *testing.T) {
 	s, permissions, p, d := profileAssignmentAccessFixture(t)
 	scope := Scope{TenantID: 1, SiteID: 1}
 	assign := func(actor string, scope Scope, authority *access.Store) error {
-		return s.AssignProfileWithAccess(t.Context(), scope, p.ID, []string{d.ID}, "installed", actor, authority)
+		return s.AssignProfileWithAccess(t.Context(), scope, p.ID, p.Revision, []string{d.ID}, "installed", actor, authority)
 	}
 	for _, actor := range []string{"viewer", "missing"} {
 		require.ErrorIs(t, assign(actor, scope, permissions), access.ErrDenied)
@@ -68,7 +68,7 @@ func TestProfileAssignmentWaitsForCurrentPermissionAndRollsBackAuditFailure(t *t
 	require.NoError(t, err)
 	done := make(chan error, 1)
 	go func() {
-		done <- s.AssignProfileWithAccess(ctx, scope, p.ID, []string{d.ID}, "installed", "operator", permissions)
+		done <- s.AssignProfileWithAccess(ctx, scope, p.ID, p.Revision, []string{d.ID}, "installed", "operator", permissions)
 	}()
 	select {
 	case err := <-done:
@@ -92,13 +92,13 @@ func TestProfileAssignmentWaitsForCurrentPermissionAndRollsBackAuditFailure(t *t
 	drainCommands(t, s, second, nil)
 	targets := []string{d.ID, second.ID}
 	slices.Sort(targets)
-	require.NoError(t, s.AssignProfileWithAccess(ctx, scope, p.ID, targets, "installed", "admin", permissions))
+	require.NoError(t, s.AssignProfileWithAccess(ctx, scope, p.ID, p.Revision, targets, "installed", "admin", permissions))
 	// Reject the last device's audit after earlier device work has been staged.
 	_, err = s.db.Exec(`CREATE TABLE owned_profile_audit_rejection(resource TEXT); CREATE FUNCTION owned_profile_assignment_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.action='apple.profile.removed' AND EXISTS(SELECT 1 FROM owned_profile_audit_rejection WHERE resource=NEW.resource_id) THEN RAISE EXCEPTION 'owned profile assignment audit failure'; END IF; RETURN NEW; END$$; CREATE TRIGGER owned_profile_assignment_audit_failure BEFORE INSERT ON mdm_apple_audit FOR EACH ROW EXECUTE FUNCTION owned_profile_assignment_audit_failure()`)
 	require.NoError(t, err)
 	_, err = s.db.Exec(`INSERT INTO owned_profile_audit_rejection VALUES($1)`, p.ID+"/"+targets[1])
 	require.NoError(t, err)
-	err = s.AssignProfileWithAccess(ctx, scope, p.ID, targets, "removed", "admin", permissions)
+	err = s.AssignProfileWithAccess(ctx, scope, p.ID, p.Revision, targets, "removed", "admin", permissions)
 	require.Error(t, err)
 	require.False(t, errors.Is(err, access.ErrDenied))
 	for _, target := range targets {
@@ -120,7 +120,7 @@ func TestProfileAssignmentRechecksSiteMoveBeforeAdmission(t *testing.T) {
 	require.NoError(t, err)
 	done := make(chan error, 1)
 	go func() {
-		done <- s.AssignProfileWithAccess(t.Context(), Scope{TenantID: 1}, p.ID, []string{d.ID}, "installed", "admin", permissions)
+		done <- s.AssignProfileWithAccess(t.Context(), Scope{TenantID: 1}, p.ID, p.Revision, []string{d.ID}, "installed", "admin", permissions)
 	}()
 	select {
 	case err := <-done:
@@ -137,4 +137,24 @@ func TestProfileAssignmentRechecksSiteMoveBeforeAdmission(t *testing.T) {
 	var count int
 	require.NoError(t, s.db.QueryRow(`SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, p.ID).Scan(&count))
 	require.Zero(t, count)
+}
+
+func TestProfileAssignmentRejectsChangedReviewedRevision(t *testing.T) {
+	s, permissions, p, d := profileAssignmentAccessFixture(t)
+	ctx := t.Context()
+	scope := Scope{TenantID: 1, SiteID: 1}
+	current, err := s.SaveProfile(ctx, 1, p.ID, p.Revision, revisionWiFi(t, "Revised owned Wi-Fi", "owned-revised-secret"), "admin")
+	require.NoError(t, err)
+	for _, desired := range []string{"installed", "removed"} {
+		require.ErrorIs(t, s.AssignProfileWithAccess(ctx, scope, p.ID, p.Revision, []string{d.ID}, desired, "operator", permissions), ErrConflict)
+	}
+	require.ErrorIs(t, s.AssignProfileWithAccess(ctx, scope, p.ID, 0, []string{d.ID}, "installed", "operator", permissions), ErrProfileRevision)
+	var count int
+	require.NoError(t, s.db.QueryRow(`SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, p.ID).Scan(&count))
+	require.Zero(t, count)
+	require.NoError(t, s.AssignProfileWithAccess(ctx, scope, p.ID, current.Revision, []string{d.ID}, "installed", "operator", permissions))
+	assignments, err := s.Assignments(ctx, scope, d.ID)
+	require.NoError(t, err)
+	require.Len(t, assignments, 1)
+	require.Equal(t, current.Revision, assignments[0].Revision)
 }

@@ -738,20 +738,8 @@ func (h *Handler) AppleDownloadProfile(c echo.Context) error {
 	return c.Blob(200, "application/x-apple-aspen-config", p.Payload)
 }
 
-func selectedAppleIDs(c echo.Context) ([]string, error) {
-	if err := c.Request().ParseForm(); err != nil {
-		return nil, err
-	}
-	ids := c.Request().PostForm["device_id"]
-	for _, id := range ids {
-		if _, err := uuid.Parse(id); err != nil {
-			return nil, errors.New("invalid selected device")
-		}
-	}
-	return ids, nil
-}
-
 func (h *Handler) AppleAssignProfile(c echo.Context) error {
+	adeHeaders(c)
 	info, scope, err := h.appleInfo(c)
 	if err != nil {
 		return err
@@ -763,11 +751,11 @@ func (h *Handler) AppleAssignProfile(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	ids, err := selectedAppleIDs(c)
+	revision, ids, desired, err := appleProfileAssignmentForm(c)
 	if err != nil {
-		return appleFailure(c, err)
+		return err
 	}
-	if err = h.Apple.AssignProfileWithAccess(c.Request().Context(), scope, id, ids, c.FormValue("desired"), h.appleActor(c), h.Access); err != nil {
+	if err = h.Apple.AssignProfileWithAccess(c.Request().Context(), scope, id, revision, ids, desired, h.appleActor(c), h.Access); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, appleErrorText(c, "apple_errors.assignment_permission"))
 		}

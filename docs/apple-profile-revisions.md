@@ -64,7 +64,7 @@ provider tokens and other credentials before restoring them.
 ## Current assignment authority
 
 The console's device-channel apply/remove actions use
-`AssignProfileWithAccess`. This entry point rechecks the authenticated actor's
+`AssignProfileWithAccess` with the displayed catalog revision. This entry point rechecks the authenticated actor's
 current `profiles.assign` authority inside the same transaction that changes
 assignments, commands and audits. Shared permission and account locks remain
 held until commit. A pending permission replacement completes before admission
@@ -81,9 +81,38 @@ ten-second deadline.
 Owned PostgreSQL/race cases cover all four roles, missing authority, organization
 and site scope, pending permission replacement, concurrent site movement and
 rollback after the final device's audit fails. The existing profile, certificate,
-ACME, SSO, VPN and policy regression selection also passes. This change covers
-current admission; it does not bind the existing manual form to a reviewed
-profile revision or add group provenance. Those controls are subsequent work.
+ACME, SSO, VPN and policy regression selection also passes. Group provenance
+remains subsequent work.
+
+## Reviewed assignment source
+
+Both catalog and device-detail forms submit the current catalog revision with
+the exact selected native device IDs and apply/removal action. Device details
+retain the assigned revision as historical evidence and separately label the
+current catalog revision beside the action. If the current catalog source is
+unavailable, its assignment actions are withheld.
+
+Admission locks the profile and requires that exact revision before changing
+any target. A catalog edit or restoration makes an older form return 409; the
+operator must reload the current source. Missing/noncanonical revision fields
+are rejected. This applies to removal as well as application. Existing active
+assignments still follow explicitly saved/restored profile revisions through
+the established catalog update behavior.
+
+Assignment POSTs accept only URL-encoded body fields: one `csrf`, one
+`expected_revision`, one `desired` and 1–1000 distinct canonical `device_id`
+values. The body and parsed form are bounded to 64 KiB, including already parsed
+requests. Unknown/duplicate singleton fields, repeated devices, query arguments,
+content encoding and header-only CSRF proofs are rejected. Older forms need a
+reload. Invalid requests create no commands.
+
+PostgreSQL tests cover a real source edit, both stale actions, unchanged queues
+on rejection and successful application of the newly reviewed revision.
+Registered Linux routes cover stale/missing/repeated revision fields, repeated
+targets and query/body conflicts, alongside current scope and role checks.
+Nine Chrome cases exercise catalog assignment, an older assigned revision and
+an unavailable source at 390/768/1440 pixels, including keyboard apply/removal
+with exact revision, device and CSRF fields.
 
 ## Validation and remaining integration
 
