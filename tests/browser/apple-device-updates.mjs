@@ -8,7 +8,7 @@ export default async function run(browser, record) {
           evidence:main.querySelector('[data-device-update-evidence]').textContent,
           policy:main.querySelector('[data-device-update-policy]')?.textContent,
           scripts:main.querySelectorAll('script').length,
-          forms:[...main.querySelectorAll('form')].map(f=>({action:f.getAttribute('action'),csrf:f.elements.csrf?.value}))};
+          forms:[...main.querySelectorAll('form')].map(f=>({action:f.getAttribute('action'),csrf:f.elements.csrf?.value,expected:f.elements.expected_policy?.value,fields:f.querySelectorAll('[name="expected_policy"]').length}))};
       })()`);
       browser.check(view.width <= view.viewport + 1, 'Device update assessment overflows viewport');
       browser.check(!view.evidence.includes('22F999') && !view.evidence.includes('18.5'), 'Update evidence borrowed merged inventory');
@@ -27,6 +27,23 @@ export default async function run(browser, record) {
       if (state === 'viewer') browser.check(view.forms.length === 0, 'Read-only viewer can submit update changes');
       else if (state !== 'unmanaged') browser.check(view.forms.length === (state === 'no-policy' ? 1 : 2), 'Update action availability changed');
       browser.check(view.forms.every(f => f.action === '/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update' && f.csrf === 'owned-csrf'), 'Update form lost scope or CSRF');
+      browser.check(view.forms.every(f => f.expected === 'a'.repeat(64) && f.fields === 1), 'Update form lost its exact reviewed configured policy');
+      if (view.forms.length) {
+        await browser.evaluate(`(() => {
+          window.updateSubmissions=[];
+          for(const f of document.querySelectorAll('[data-device-update-assessment] form')) {
+            f.addEventListener('submit',event=>{event.preventDefault();window.updateSubmissions.push(Object.fromEntries(new FormData(f,event.submitter)));});
+            if(f.elements.target_release) f.elements.target_release.value='18.7.1/22H100';
+            if(f.elements.deadline) f.elements.deadline.value='2026-10-01T18:00';
+          }
+        })()`);
+        for (let index=0;index<view.forms.length;index++) {
+          await browser.evaluate(`document.querySelectorAll('[data-device-update-assessment] form')[${index}].querySelector('button[type="submit"]').focus()`);
+          await browser.enter();
+        }
+        const submissions = await browser.evaluate('window.updateSubmissions');
+        browser.check(submissions.length === view.forms.length && submissions.every(f => f.expected_policy === 'a'.repeat(64) && f.csrf === 'owned-csrf'), 'Keyboard submission lost its reviewed policy or CSRF');
+      }
       if (width === 390) {
         await browser.evaluate("document.querySelector('[data-device-update-assessment]').scrollIntoView({block:'start'})");
         await browser.capture('apple-device-update-' + state + '-390');

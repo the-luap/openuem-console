@@ -34,7 +34,7 @@ func TestAppleDeviceUpdateAssessmentPages(t *testing.T) {
 			now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
 			d := &apple.Device{ID: "10000000-0000-0000-0000-000000000001", Name: "Owned update phone", Model: "iPhone16,1", OSVersion: "18.5", BuildVersion: "22F999", Status: "enrolled", Supervised: true, CertificateExpiresAt: now.AddDate(1, 0, 0), InventoryAt: &now}
 			policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
-			a := &apple.UpdateAssessment{DeviceID: d.ID, Availability: "available", Observation: &apple.OSObservation{Version: "18.7.1", Build: "22H100", Source: "declarative_status", RecordedAt: now.Add(-time.Hour)}, Policy: policy, Compliance: "compliant", AssessedAt: now}
+			a := &apple.UpdateAssessment{PolicyToken: strings.Repeat("a", 64), DeviceID: d.ID, Availability: "available", Observation: &apple.OSObservation{Version: "18.7.1", Build: "22H100", Source: "declarative_status", RecordedAt: now.Add(-time.Hour)}, Policy: policy, Compliance: "compliant", AssessedAt: now}
 			switch state {
 			case "required":
 				a.Compliance, a.Observation.Version, a.Observation.Build = "update_required", "18.6.2", "22G100"

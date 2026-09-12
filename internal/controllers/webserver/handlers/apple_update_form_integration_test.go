@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -33,9 +34,23 @@ func exerciseAppleUpdateForms(t *testing.T, h *Handler, ctx context.Context, ten
 	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_software_catalog SET document=$1,fetched_at=clock_timestamp() WHERE singleton=true`, catalog)
 	require.NoError(t, err)
 	path := fmt.Sprintf("/tenant/%d/site/%d/ios/%s/update", tenant, site, invite.DeviceID)
-	valid := url.Values{"target_release": {"18.7.1/22H100"}, "deadline": {"2026-10-01T18:00"}, "details_url": {"https://example.test/update"}}
+	reviewToken := func() string {
+		t.Helper()
+		response := request("scoped-operator", "GET", strings.TrimSuffix(path, "/update"), nil)
+		require.Equal(t, 200, response.Code)
+		matches := regexp.MustCompile(`name="expected_policy" value="([0-9a-f]{64})"`).FindAllStringSubmatch(response.Body.String(), -1)
+		require.NotEmpty(t, matches)
+		for _, match := range matches {
+			require.Equal(t, matches[0][1], match[1])
+		}
+		return matches[0][1]
+	}
+	valid := url.Values{"expected_policy": {reviewToken()}, "target_release": {"18.7.1/22H100"}, "deadline": {"2026-10-01T18:00"}, "details_url": {"https://example.test/update"}}
 	require.Equal(t, 403, request("scoped-viewer", "POST", path, valid).Code)
 	require.Equal(t, 303, request("scoped-operator", "POST", path, valid).Code)
+	require.Equal(t, 409, request("scoped-operator", "POST", path, valid).Code)
+	require.Equal(t, 409, request("scoped-operator", "POST", path, url.Values{"expected_policy": {valid.Get("expected_policy")}, "remove": {"true"}}).Code)
+	configuredToken := reviewToken()
 	stored, err := h.Apple.UpdatePolicy(ctx, scope, invite.DeviceID)
 	require.NoError(t, err)
 	require.Equal(t, "18.7.1", stored.TargetVersion)
@@ -89,14 +104,16 @@ func exerciseAppleUpdateForms(t *testing.T, h *Handler, ctx context.Context, ten
 		{"target_release": {"18.7.1/22H100"}, "deadline": {"2026-10-01T18:00", "2026-11-01T18:00"}},
 		{"target_release": {"18.7.1/22H100"}},
 	} {
+		bad.Set("expected_policy", configuredToken)
 		require.Equal(t, 400, request("scoped-operator", "POST", path, bad).Code)
 	}
+	require.Equal(t, 400, request("scoped-operator", "POST", path, url.Values{"remove": {"true"}}).Code)
 	require.Equal(t, 400, request("scoped-operator", "POST", path+"?remove=true", valid).Code)
 	var count int
 	require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE device_id=$1 AND request_type='DeclarativeManagement' AND status='queued'`, invite.DeviceID).Scan(&count))
 	require.Equal(t, 1, count)
 	require.Equal(t, 403, request("scoped-viewer", "POST", path, url.Values{"remove": {"true"}}).Code)
-	require.Equal(t, 303, request("scoped-operator", "POST", path, url.Values{"remove": {"true"}}).Code)
+	require.Equal(t, 303, request("scoped-operator", "POST", path, url.Values{"remove": {"true"}, "expected_policy": {configuredToken}}).Code)
 	_, err = h.Apple.UpdatePolicy(ctx, scope, invite.DeviceID)
 	require.ErrorIs(t, err, apple.ErrNotFound)
 	section = readAssessment()

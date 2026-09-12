@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Manual Apple update forms now bind application and removal to the
+  [reviewed configured policy](apple-update-policy-admission.md). Current
+  read/update authority, native-device locking and scope-bound value comparison
+  prevent stale tabs from overwriting changed policies. Independent device status
+  does not invalidate a review, and failed final audits roll back all work.
+  The PostgreSQL 17/race update, review, group, schedule and observation regression
+  passes in 57.595 seconds. Registered Linux routes, macOS/Linux package race
+  tests and the full Linux build pass. All 153 relevant Chrome cases pass,
+  including keyboard submission of the reviewed value for both device actions.
+
 - [Apple device update assessments](apple-update-assessment.md) now use audited
   current policy and packet OS evidence under retained device-read authority.
   Missing builds, unrelated status deltas, stale/future observations and inactive
@@ -133,7 +143,7 @@ the table's package summaries do not remove any detail from the roadmap.
   passes in 9.358 seconds. Registered Linux console routes, macOS/Linux
   middleware/handler/locale race tests and the full Linux build pass. Reviewed
   policy versions and immutable group request replay are recorded above;
-  manual device forms still have no current-policy revision precondition.
+  manual device forms now compare reviewed configured values as recorded above.
 
 - [Apple profile assignments from dynamic groups](apple-profile-groups.md) now
   preview current action eligibility, resolve canonical Mac records to current

@@ -1098,6 +1098,7 @@ en:
     an_email_should_be_provided: "An email address must be provided"
   updates:
     assessment_permission: "Your current permissions do not allow reading this device's update assessment."
+    review_changed: "The configured update policy or device site changed. Reload the device, review its current policy and submit again."
     assessment_unavailable: "The current device update assessment is unavailable. Reload the device before retrying."
     error_limited: "The current policy has error details that exceed the display limit."
     evidence_recorded: "Version recorded:"

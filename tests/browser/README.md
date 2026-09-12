@@ -25,7 +25,7 @@ headless Chrome session. The runner covers 915 cases:
 | Apple update plans | List, empty, detail, archived, viewer and long metadata × three widths; exact revisions, retained history and keyboard saving | 18 |
 | Apple update groups | Chooser, empty chooser, new/replacement previews, exclusions, original receipt, populated/empty history and long metadata × three widths; exact policy tokens and keyboard confirmation | 27 |
 | Apple update schedules | Six lifecycle states, populated/empty history and long metadata × three widths; original targets, UTC timing, receipt links and keyboard cancellation | 27 |
-| Apple device update assessment | Eleven OS/policy states × three widths; packet evidence, error limits, scoped forms and read-only permissions | 33 |
+| Apple device update assessment | Eleven OS/policy states × three widths; packet evidence, error limits, scoped forms, keyboard submission of reviewed policy values and read-only permissions | 33 |
 | Apple update cohort progress | Reported, required, unverified, different/removed policy, unavailable, attention, mixed and long states × three widths; separate OS/configuration evidence and original scoped selection | 27 |
 | OpenID account identities | Unlinked/active/disabled/ineligible/long/disabled provider × three widths; explicit keyboard confirmation | 18 |
 | Account language | Seven catalogs, browser default, unavailable storage and long profile × three widths | 30 |

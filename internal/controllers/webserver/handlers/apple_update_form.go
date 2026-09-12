@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"net/http"
 	"strings"
 
@@ -9,19 +10,31 @@ import (
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 )
 
-func appleUpdateForm(c echo.Context) (*apple.UpdatePolicy, error) {
-	f, err := deviceManagementForm(c, "updates.invalid_form", []string{"csrf", "remove", "target_release", "deadline", "details_url"})
+type appleUpdateSubmission struct {
+	policy         *apple.UpdatePolicy
+	expectedPolicy string
+}
+
+func appleUpdateForm(c echo.Context) (*appleUpdateSubmission, error) {
+	f, err := deviceManagementForm(c, "updates.invalid_form", []string{"csrf", "expected_policy", "remove", "target_release", "deadline", "details_url"})
 	if err != nil {
 		return nil, err
 	}
-	invalid := func() (*apple.UpdatePolicy, error) {
+	invalid := func() (*appleUpdateSubmission, error) {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "updates.invalid_form"))
 	}
+	expected := f.Get("expected_policy")
+	if len(expected) != 64 || expected != strings.ToLower(expected) {
+		return invalid()
+	}
+	if _, err := hex.DecodeString(expected); err != nil {
+		return invalid()
+	}
 	if _, removing := f["remove"]; removing {
-		if f.Get("remove") != "true" || len(f) != 2 {
+		if f.Get("remove") != "true" || len(f) != 3 {
 			return invalid()
 		}
-		return nil, nil
+		return &appleUpdateSubmission{expectedPolicy: expected}, nil
 	}
 	version, build, selected := strings.Cut(f.Get("target_release"), "/")
 	if !selected || version == "" || build == "" || strings.Contains(build, "/") || f.Get("deadline") == "" {
@@ -31,5 +44,5 @@ func appleUpdateForm(c echo.Context) (*apple.UpdatePolicy, error) {
 	if len(deadline) == 16 {
 		deadline += ":00"
 	}
-	return &apple.UpdatePolicy{TargetVersion: version, TargetBuild: build, Deadline: deadline, DetailsURL: f.Get("details_url")}, nil
+	return &appleUpdateSubmission{expectedPolicy: expected, policy: &apple.UpdatePolicy{TargetVersion: version, TargetBuild: build, Deadline: deadline, DetailsURL: f.Get("details_url")}}, nil
 }

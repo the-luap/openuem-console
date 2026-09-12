@@ -12,18 +12,26 @@ import (
 )
 
 func TestAppleUpdateFormBoundary(t *testing.T) {
-	for _, name := range []string{"apply", "remove", "duplicate-release", "duplicate-deadline", "duplicate-remove", "duplicate-csrf", "missing-release", "missing-build", "extra-build", "missing-deadline", "mixed-action", "false-remove", "unknown", "missing-csrf", "wrong-csrf", "header-only", "query", "empty-query", "json", "encoding", "duplicate-content-type", "oversized", "chunked-oversized", "parsed-oversized", "malformed"} {
+	for _, name := range []string{"apply", "remove", "missing-policy", "duplicate-policy", "invalid-policy", "uppercase-policy", "duplicate-release", "duplicate-deadline", "duplicate-remove", "duplicate-csrf", "missing-release", "missing-build", "extra-build", "missing-deadline", "mixed-action", "false-remove", "unknown", "missing-csrf", "wrong-csrf", "header-only", "query", "empty-query", "json", "encoding", "duplicate-content-type", "oversized", "chunked-oversized", "parsed-oversized", "malformed"} {
 		t.Run(name, func(t *testing.T) {
-			f := url.Values{"csrf": {"owned-csrf"}, "target_release": {"18.7.1/22H100"}, "deadline": {"2026-10-01T18:00"}, "details_url": {"https://example.test/update"}}
+			f := url.Values{"csrf": {"owned-csrf"}, "expected_policy": {strings.Repeat("a", 64)}, "target_release": {"18.7.1/22H100"}, "deadline": {"2026-10-01T18:00"}, "details_url": {"https://example.test/update"}}
 			switch name {
 			case "remove":
-				f = url.Values{"csrf": {"owned-csrf"}, "remove": {"true"}}
+				f = url.Values{"csrf": {"owned-csrf"}, "expected_policy": {strings.Repeat("a", 64)}, "remove": {"true"}}
+			case "missing-policy":
+				f.Del("expected_policy")
+			case "duplicate-policy":
+				f.Add("expected_policy", strings.Repeat("a", 64))
+			case "invalid-policy":
+				f.Set("expected_policy", strings.Repeat("g", 64))
+			case "uppercase-policy":
+				f.Set("expected_policy", strings.Repeat("A", 64))
 			case "duplicate-release":
 				f.Add("target_release", "18.8/22I100")
 			case "duplicate-deadline":
 				f.Add("deadline", "2026-11-01T18:00")
 			case "duplicate-remove":
-				f = url.Values{"csrf": {"owned-csrf"}, "remove": {"true", "true"}}
+				f = url.Values{"csrf": {"owned-csrf"}, "expected_policy": {strings.Repeat("a", 64)}, "remove": {"true", "true"}}
 			case "duplicate-csrf":
 				f.Add("csrf", "owned-csrf")
 			case "missing-release":
@@ -37,7 +45,7 @@ func TestAppleUpdateFormBoundary(t *testing.T) {
 			case "mixed-action":
 				f.Set("remove", "true")
 			case "false-remove":
-				f = url.Values{"csrf": {"owned-csrf"}, "remove": {"false"}}
+				f = url.Values{"csrf": {"owned-csrf"}, "expected_policy": {strings.Repeat("a", 64)}, "remove": {"false"}}
 			case "unknown":
 				f.Set("tenant_id", "2")
 			case "missing-csrf", "header-only":
@@ -81,12 +89,13 @@ func TestAppleUpdateFormBoundary(t *testing.T) {
 			p, err := appleUpdateForm(c)
 			if name == "apply" {
 				require.NoError(t, err)
-				require.Equal(t, "18.7.1", p.TargetVersion)
-				require.Equal(t, "22H100", p.TargetBuild)
-				require.Equal(t, "2026-10-01T18:00:00", p.Deadline)
+				require.Equal(t, "18.7.1", p.policy.TargetVersion)
+				require.Equal(t, "22H100", p.policy.TargetBuild)
+				require.Equal(t, "2026-10-01T18:00:00", p.policy.Deadline)
 			} else if name == "remove" {
 				require.NoError(t, err)
-				require.Nil(t, p)
+				require.Equal(t, strings.Repeat("a", 64), p.expectedPolicy)
+				require.Nil(t, p.policy)
 			} else {
 				require.Error(t, err)
 				require.Nil(t, p)

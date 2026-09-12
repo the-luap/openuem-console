@@ -49,7 +49,10 @@ only the presence of an error. Observation and assessment models suppress
 accidental JSON/XML/YAML serialization and formatted diagnostic output.
 
 Existing [policy application/removal](apple-update-policy-admission.md) forms
-retain their current permission and scope requirements. Loading this assessment
+retain their current permission and scope requirements and submit the same
+configured-policy comparison value produced by this audited assessment. A changed
+configuration or device site requires another review before submission.
+Loading this assessment
 does not queue device work. The older `UpdateCompliance` function remains an
 in-process inventory helper; the console update section uses the audited packet
 assessment.

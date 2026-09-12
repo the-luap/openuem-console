@@ -30,9 +30,10 @@ func (s *Store) UpdatePolicy(ctx context.Context, scope Scope, id string) (*Upda
 }
 
 // SetUpdatePolicy is the trusted in-process entry point. Console actions use
-// SetUpdatePolicyWithAccess to hold current authority through commit.
+// SetReviewedDeviceUpdatePolicy to hold current authority and compare reviewed
+// configured values before mutation.
 func (s *Store) SetUpdatePolicy(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string) error {
-	return s.setUpdatePolicy(ctx, scope, ids, p, actor, nil)
+	return s.setUpdatePolicy(ctx, scope, ids, p, actor, nil, nil)
 }
 
 // SetUpdatePolicyWithAccess requires the authenticated actor's current update
@@ -53,10 +54,10 @@ func (s *Store) SetUpdatePolicyWithAccess(ctx context.Context, scope Scope, ids 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return s.setUpdatePolicy(ctx, scope, ids, p, actor, permissions)
+	return s.setUpdatePolicy(ctx, scope, ids, p, actor, permissions, nil)
 }
 
-func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string, permissions *access.Store) error {
+func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, p *UpdatePolicy, actor string, permissions *access.Store, expected map[string]string) error {
 	if err := scope.Validate(); err != nil {
 		return err
 	}
@@ -71,6 +72,11 @@ func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 	if permissions != nil {
 		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageUpdates, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
 			return err
+		}
+		if expected != nil {
+			if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
+				return err
+			}
 		}
 		var tenant int
 		if err = tx.QueryRowContext(ctx, `SELECT id FROM tenants WHERE id=$1 FOR SHARE`, scope.TenantID).Scan(&tenant); err != nil {
@@ -92,6 +98,16 @@ func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 			var site int
 			if err = tx.QueryRowContext(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant_sites=$2 FOR SHARE`, d.SiteID, scope.TenantID).Scan(&site); err != nil {
 				return notFound(err)
+			}
+		}
+		if expected != nil {
+			current, err := currentUpdateGroupPolicy(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			actualScope := Scope{TenantID: d.TenantID, SiteID: d.SiteID}
+			if expected[id] != updatePolicyGroupToken(actualScope, id, current) {
+				return ErrUpdatePolicyReview
 			}
 		}
 		if err = s.setDeviceUpdatePolicy(ctx, tx, d, p); err != nil {

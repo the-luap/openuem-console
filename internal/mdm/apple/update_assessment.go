@@ -21,6 +21,7 @@ type UpdateAssessment struct {
 	Availability         string         `json:"-" xml:"-" yaml:"-"`
 	Observation          *OSObservation `json:"-" xml:"-" yaml:"-"`
 	Policy               *UpdatePolicy  `json:"-" xml:"-" yaml:"-"`
+	PolicyToken          string         `json:"-" xml:"-" yaml:"-"`
 	PolicyHasError       bool           `json:"-" xml:"-" yaml:"-"`
 	PolicyErrorTruncated bool           `json:"-" xml:"-" yaml:"-"`
 	Compliance           string         `json:"-" xml:"-" yaml:"-"`
@@ -121,6 +122,7 @@ func (s *Store) AssessDeviceUpdate(ctx context.Context, actor string, permission
 	if assessment.Policy != nil && (!versionPattern.MatchString(assessment.Policy.TargetVersion) || (assessment.Policy.TargetBuild != "" && !updatePlanBuild.MatchString(assessment.Policy.TargetBuild))) {
 		return nil, ErrUpdatePlanGroupIntegrity
 	}
+	assessment.PolicyToken = updatePolicyGroupToken(assessment.Scope, id, assessment.Policy)
 	observation := &OSObservation{}
 	err = tx.QueryRowContext(ctx, `SELECT version,build,source,recorded_at FROM mdm_apple_os_observations WHERE device_id=$1`, id).Scan(&observation.Version, &observation.Build, &observation.Source, &observation.RecordedAt)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

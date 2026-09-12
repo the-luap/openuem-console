@@ -54,7 +54,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	acmeReviewed.State, acmeReviewed.ReviewedBy, acmeReviewed.Reason, acmeReviewed.ReviewedAt = "reviewed", "Administrator <reviewer>", "Original <approved> archive from the configuration repository", &now
 	policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
 	detail := Detail{Device: d, Profiles: []apple.Profile{p}, Assignments: []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 2, Desired: "installed", Status: "verified"}}, Policy: policy, Compliance: "update_required", CatalogAt: &now, Releases: []apple.OSRelease{{Version: "18.7.1", Build: "22H100"}, {Version: "18.7.1", Build: "22H6100"}}}
-	detail.UpdateAssessment = &apple.UpdateAssessment{Observation: &apple.OSObservation{Version: d.OSVersion, Build: d.BuildVersion, Source: "device_information", RecordedAt: now}, Policy: policy, Compliance: detail.Compliance, AssessedAt: now}
+	detail.UpdateAssessment = &apple.UpdateAssessment{PolicyToken: strings.Repeat("a", 64), Observation: &apple.OSObservation{Version: d.OSVersion, Build: d.BuildVersion, Source: "device_information", RecordedAt: now}, Policy: policy, Compliance: detail.Compliance, AssessedAt: now}
 	staleAssignment := detail
 	staleAssignment.Assignments = []apple.Assignment{{ProfileID: p.ID, Name: p.Name, Revision: 1, Desired: "installed", Status: "verified"}}
 	missingAssignmentSource := staleAssignment
@@ -71,7 +71,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 	mac.SoftwareUpdateDeviceID = "J313AP"
 	mac.SecurityInventory = map[string]any{"ManagementStatus": map[string]any{"UserApprovedEnrollment": true}, "BootstrapTokenAllowedForAuthentication": "allowed", "BootstrapTokenRequiredForSoftwareUpdate": true}
 	macDetail := Detail{Device: &mac, CatalogAt: &now, Releases: []apple.OSRelease{{Version: "15.1", Build: "24B1"}}, Policy: &apple.UpdatePolicy{TargetVersion: "15.1", TargetBuild: "24B1", Deadline: "2026-10-01T18:00:00", Status: "unavailable"}}
-	macDetail.UpdateAssessment = &apple.UpdateAssessment{Observation: &apple.OSObservation{Version: mac.OSVersion, Build: mac.BuildVersion, Source: "device_information", RecordedAt: now}, Policy: macDetail.Policy, AssessedAt: now}
+	macDetail.UpdateAssessment = &apple.UpdateAssessment{PolicyToken: strings.Repeat("a", 64), Observation: &apple.OSObservation{Version: mac.OSVersion, Build: mac.BuildVersion, Source: "device_information", RecordedAt: now}, Policy: macDetail.Policy, AssessedAt: now}
 	macDetail.MacBindingReady = true
 	linked := macDetail
 	linked.Mac = &apple.MacDevice{ID: "70000000-0000-4000-8000-000000000001", MDMID: mac.ID, AgentID: "80000000-0000-4000-8000-000000000001", MDMStatus: "enrolled", AgentStatus: "enrolled", AgentName: "Design agent", AgentSeen: &now, AgentExpiresAt: now.AddDate(1, 0, 0), History: []apple.MacChannelHistory{{Kind: "mdm", DeviceID: mac.ID, Status: "enrolled", AttachedAt: now}, {Kind: "agent", DeviceID: "80000000-0000-4000-8000-000000000001", Status: "enrolled", AttachedAt: now}, {Kind: "agent", DeviceID: "80000000-0000-4000-8000-000000000002", Status: "revoked", AttachedAt: now.AddDate(-1, 0, 0), RetiredAt: &now}}}

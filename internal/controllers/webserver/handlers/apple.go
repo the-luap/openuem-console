@@ -827,13 +827,19 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	policy, err := appleUpdateForm(c)
+	submission, err := appleUpdateForm(c)
 	if err != nil {
 		return err
 	}
-	if err = h.Apple.SetUpdatePolicyWithAccess(c.Request().Context(), scope, []string{id}, policy, h.appleActor(c), h.Access); err != nil {
+	if err = h.Apple.SetReviewedDeviceUpdatePolicy(c.Request().Context(), scope, id, submission.expectedPolicy, submission.policy, h.appleActor(c), h.Access); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "updates.permission_denied"))
+		}
+		if errors.Is(err, apple.ErrUpdatePolicyReview) {
+			return echo.NewHTTPError(http.StatusConflict, i18n.T(c.Request().Context(), "updates.review_changed"))
+		}
+		if errors.Is(err, apple.ErrUpdatePlanGroupIntegrity) {
+			return echo.NewHTTPError(http.StatusServiceUnavailable, i18n.T(c.Request().Context(), "updates.assessment_unavailable"))
 		}
 		return appleFailure(c, err)
 	}

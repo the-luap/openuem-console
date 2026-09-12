@@ -328,9 +328,10 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						</div>
 					</div>
 					if detail.Device.Status=="enrolled" {
-						if info.Can(access.ManageUpdates) {
+						if info.Can(access.ManageUpdates) && detail.UpdateAssessment!=nil && detail.UpdateAssessment.PolicyToken!="" {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">
 								@CSRF(info)
+								<input type="hidden" name="expected_policy" value={ detail.UpdateAssessment.PolicyToken }/>
 								<label>
 									{ i18n.T(ctx, "updates.release_label") }
 									<select class="uk-select" name="target_release" required>
@@ -353,9 +354,10 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 							</form>
 						}
 						if detail.Policy!=nil {
-							if info.Can(access.ManageUpdates) {
+							if info.Can(access.ManageUpdates) && detail.UpdateAssessment!=nil && detail.UpdateAssessment.PolicyToken!="" {
 								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="mt-4">
 									@CSRF(info)
+								<input type="hidden" name="expected_policy" value={ detail.UpdateAssessment.PolicyToken }/>
 									<input type="hidden" name="remove" value="true"/><button class="uk-button uk-button-default" type="submit">{ i18n.T(ctx, "updates.remove_policy") }</button>
 								</form>
 							}
