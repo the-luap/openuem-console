@@ -188,6 +188,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("profile moves match current audience", func(t *testing.T) {
 		exerciseProfileAudienceScope(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
 	})
+	t.Run("profile metadata matches current audience", func(t *testing.T) {
+		exerciseProfileMetadataScope(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
+	})
 	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
 		var before, after int
 		if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, profileID).Scan(&before); err != nil {

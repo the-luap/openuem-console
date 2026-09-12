@@ -1,4 +1,9 @@
 en:
+  profile_metadata:
+    invalid: "Enter a profile name, shorten it if necessary, and choose one assignment mode. Reopen the editor if the form is out of date."
+    not_found: "Profile not found in the selected scope. Refresh the list if it has moved."
+    denied: "Only a server administrator can edit legacy profiles."
+    unavailable: "The profile could not be saved. Reopen the editor and try again."
   profile_audience:
     invalid: "Reopen the profile list and choose an available audience action."
     not_found: "Profile not found in the selected scope. Refresh the list if it has moved."

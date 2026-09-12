@@ -144,21 +144,6 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 		method = c.Request().Method
 	}
 
-	if method == "POST" {
-		description := c.FormValue("profile-description")
-		if description == "" {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.empty"), true))
-		}
-
-		applyToAll := c.FormValue("profile-assignment")
-
-		if err := h.Model.UpdateProfile(profileId, description, applyToAll, commonInfo); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.could_not_save"), true))
-		}
-
-		return h.EditProfile(c, "GET", id, i18n.T(c.Request().Context(), "profiles.edit.saved"))
-	}
-
 	if method == "DELETE" {
 		if err := h.Model.DeleteProfile(profileId, commonInfo); err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.could_not_delete"), true))

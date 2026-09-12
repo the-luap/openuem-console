@@ -102,17 +102,6 @@ func (m *Model) AddProfile(siteID int, tenantID int, description string) (*ent.P
 	return profile, nil
 }
 
-func (m *Model) UpdateProfile(profileID int, description string, apply string, c *partials.CommonInfo) error {
-
-	switch apply {
-	case "applyToAll":
-		return m.Client.Profile.Update().Where(profile.ID(profileID)).SetName(description).ClearTags().SetApplyToAll(true).Exec(context.Background())
-	case "useTags":
-		return m.Client.Profile.Update().Where(profile.ID(profileID)).SetName(description).SetApplyToAll(false).Exec(context.Background())
-	}
-	return m.Client.Profile.Update().Where(profile.ID(profileID)).SetName(description).ClearTags().SetApplyToAll(false).Exec(context.Background())
-}
-
 func (m *Model) GetProfileById(profileId int, c *partials.CommonInfo) (*ent.Profile, error) {
 
 	return m.Client.Profile.Query().WithTags().WithTasks().WithIssues().Where(profile.ID(profileId)).First(context.Background())

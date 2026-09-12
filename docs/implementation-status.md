@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile metadata](profile-metadata.md) now saves the name, explicit
+  assignment mode, tag removals and audit in one transaction with current server
+  authority and the complete selected audience. The actual route test reproduced
+  the former foreign-organization edit and now rejects it. Unknown or omitted
+  modes no longer silently clear assignments; tasks, type, status and audience
+  are preserved. The complete inventory PostgreSQL/race suite passes in 52.152
+  seconds and the complete audit suite in 9.991 seconds. Registered Apple/OIDC
+  routes, macOS/Linux package race checks and the full Linux build pass. Real
+  editor components display exactly one stored assignment mode, including legacy
+  apply-to-all profiles with tags, and retain Unicode/multiline names. The full
+  1,404-case Chrome matrix passes in 88.378 seconds. A final 36-case editor run
+  also verifies the application's default theme and keyboard focus; the mobile
+  rendering was inspected. Revision conflict detection, editor reads, creation,
+  cloning, deletion and task lifecycle work remain separate.
+
 - [Legacy profile audience moves](profile-audience.md) now verify the complete
   source audience and current server authority before moving a site profile to
   its organization or a scoped profile to global. Actual registered route tests

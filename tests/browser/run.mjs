@@ -32,6 +32,7 @@ import tagColors from "./tag-colors.mjs";
 import desktopTags from "./desktop-tags.mjs";
 import profileStatus from "./profile-status.mjs";
 import profileAudience from "./profile-audience.mjs";
+import profileMetadata from "./profile-metadata.mjs";
 import windowsUpdateGroups from "./windows-update-groups.mjs";
 import appleProfileAssignments from "./apple-profile-assignments.mjs";
 import appleProfileOrganizationGroups from "./apple-profile-organization-groups.mjs";
@@ -102,6 +103,7 @@ try {
         [desktopTags,18],
         [profileStatus,18],
         [profileAudience,18],
+        [profileMetadata,36],
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
         [appleProfileGroups,30],
