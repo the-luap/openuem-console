@@ -134,7 +134,7 @@ func TestCSRFLimitsWindowsFormsBeforeTokenExtraction(t *testing.T) {
 }
 
 func TestCSRFSmallFormsRejectWirePaddingWithEitherTokenPath(t *testing.T) {
-	for _, route := range []string{"/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments/:assignment/removals", "/tenant/:tenant/site/:site/ios/update-plans/:plan/schedules", "/tenant/:tenant/site/:site/ios/update-plans/:plan/schedules/:schedule/cancel", "/login/new", "/ios/:id/update", "/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments", "/tenant/:tenant/site/:site/ios/update-plans", "/devices/export", "/device-groups", "/tenant/:tenant/site/:site/device-groups/:group", "/tenant/:tenant/site/:site/ios/configurations/:id/assign", "/tenant/:tenant/site/:site/ios/configurations/:id/group-assignments"} {
+	for _, route := range []string{"/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments/:assignment/promotions", "/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments/:assignment/removals", "/tenant/:tenant/site/:site/ios/update-plans/:plan/schedules", "/tenant/:tenant/site/:site/ios/update-plans/:plan/schedules/:schedule/cancel", "/login/new", "/ios/:id/update", "/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments", "/tenant/:tenant/site/:site/ios/update-plans", "/devices/export", "/device-groups", "/tenant/:tenant/site/:site/device-groups/:group", "/tenant/:tenant/site/:site/ios/configurations/:id/assign", "/tenant/:tenant/site/:site/ios/configurations/:id/group-assignments"} {
 		for _, header := range []bool{false, true} {
 			e := echo.New()
 			e.Use(CSRF())

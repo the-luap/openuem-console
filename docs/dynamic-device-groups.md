@@ -84,8 +84,11 @@ targets and retain immutable original request evidence.
 [Apple update plan assignments](apple-update-groups.md) additionally compare
 reviewed current policy values and explicitly confirm replacements.
 [Scheduled Apple update activation](apple-update-schedules.md) retains that review
-and rechecks it in an absolute UTC activation window. Software assignments, Apple
-profile scheduling, exceptions, broader conflict previews, pilot
-promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
+and rechecks it in an absolute UTC activation window.
+[Temporary update exceptions](apple-update-exceptions.md) now prevent new Apple
+update admission, and [reviewed pilot promotion](apple-update-promotions.md)
+retains original-pilot evidence with an explicitly approved destination group.
+Software assignments, Apple profile scheduling, broader conflict previews,
+automatic promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale
 database acceptance and physical-device acceptance remain separate.

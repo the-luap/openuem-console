@@ -14,8 +14,9 @@ for a UTC activation window. [Current cohort progress](apple-update-progress.md)
 assesses original targets and their current OS/policy evidence.
 [Temporary exceptions](apple-update-exceptions.md) pause new policy admission.
 [Opt-in console monitoring](apple-update-escalations.md) retains original-cohort
-assessments, incidents and acknowledgments. Automatic promotion, continuous group
-reconciliation and general historical reporting remain separate work. The
+assessments, incidents and acknowledgments. [Reviewed pilot promotion](apple-update-promotions.md)
+checks every original pilot and saves its evidence with an explicit destination
+assignment. Automatic promotion, continuous group reconciliation and general historical reporting remain separate work. The
 existing device action continues to use
 [transaction-bound update policy admission](apple-update-policy-admission.md).
 Saving, revising or archiving a plan creates no device policy or notification.

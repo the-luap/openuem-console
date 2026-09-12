@@ -209,6 +209,15 @@ func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx
 	if !slices.Equal(current, targets) {
 		return nil, ErrConflict
 	}
+	return s.writeUpdatePlanGroupAssignment(ctx, tx, actor, actorRevision, scope, requestKey, preview)
+}
+
+// The caller owns current action authority, source locks and exclusive locks on
+// every reviewed native target, and has compared the complete canonical selection.
+// A promotion can keep its pilot proof and this admission in one transaction
+// without re-reading an unrelated later membership snapshot.
+func (s *Store) writeUpdatePlanGroupAssignment(ctx context.Context, tx *sql.Tx, actor string, actorRevision int64, scope Scope, requestKey string, preview *UpdatePlanGroupPreview) (*UpdatePlanGroupAssignment, error) {
+	var err error
 	r := &UpdatePlanGroupAssignment{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, Plan: preview.Plan, Actor: actor, ActorRevision: actorRevision, Group: ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}}
 	policy := preview.Plan.Definition.Policy()
 	for _, target := range preview.Targets {
@@ -235,10 +244,10 @@ func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx
 	if err != nil {
 		return nil, err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_update_group_assignments(id,tenant_id,site_id,request_key,plan_id,plan_revision,actor,actor_revision,created_at,encrypted_intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, r.ID, scope.TenantID, scope.SiteID, requestKey, planID, planRevision, actor, actorRevision, r.CreatedAt, encrypted); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_update_group_assignments(id,tenant_id,site_id,request_key,plan_id,plan_revision,actor,actor_revision,created_at,encrypted_intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, r.ID, scope.TenantID, scope.SiteID, requestKey, r.Plan.ID, r.Plan.Revision, actor, actorRevision, r.CreatedAt, encrypted); err != nil {
 		return nil, err
 	}
-	if err = auditUpdatePlan(ctx, tx, scope, actor, "group.created", r.ID, planRevision); err != nil {
+	if err = auditUpdatePlan(ctx, tx, scope, actor, "group.created", r.ID, preview.Plan.Revision); err != nil {
 		return nil, err
 	}
 	return r, nil

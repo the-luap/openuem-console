@@ -22,6 +22,7 @@ const assetRoot = realpathSync(
 );
 const fixtures = new Set([
  ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),
+ ...["plans", "empty-plans", "groups", "empty-groups", "ready", "overlap", "unknown", "stale", "error", "exception", "post-exception", "different-policy", "unavailable", "incompatible", "pilot-only", "viewer", "receipt", "history", "empty-history", "long"].map(state=>`apple-update-promotion-${state}`),
  ...["new","watching","attention","awaiting","acknowledged","paused","blocked-authority","blocked-source","viewer","history","event-configured","event-acknowledged","event-cleared","event-attention","event-blocked","list","empty","long"].map(state=>`apple-update-escalation-${state}`),
  ...["new","active","expired","ended","inactive","no-notification","receipt-pause","receipt-resume","history","empty","long"].map(state=>`apple-update-exception-${state}`),
  ...["required","compliant","missing-build","stale","unmanaged","error","error-limited","no-policy","viewer","long","missing","deadline-pending", "deadline-elapsed", "deadline-stale", "deadline-future", "deadline-invalid", "deadline-gap", "deadline-fold","exception-active", "exception-expired", "exception-ended", "exception-viewer"].map(state=>`apple-device-update-${state}`),

@@ -85,6 +85,9 @@ This workflow applies one reviewed plan immediately.
 a future UTC window and rechecks it before admission. Neither workflow continuously
 recalculates membership, promotes pilot cohorts, performs
 automatic group removal or provides aggregate historical compliance.
+[Reviewed pilot promotion](apple-update-promotions.md) provides a separate explicit
+action that verifies every original pilot enrollment before admitting another
+reviewed group and retaining the pilot evidence with its destination receipt.
 [Temporary device exceptions](apple-update-exceptions.md) exclude paused
 enrollments from new previews and block their admission through both workflows.
 [Reviewed removal](apple-update-group-removals.md) can now remove the current

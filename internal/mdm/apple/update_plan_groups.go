@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/open-uem/openuem-console/internal/inventory"
@@ -102,6 +103,22 @@ func (s *Store) PreviewUpdatePlanGroup(ctx context.Context, actor string, permis
 // inspectUpdatePlanGroup keeps the plan, group, catalog and current device/policy
 // inputs stable within one transaction. Admission uses exclusive device locks.
 func (s *Store) inspectUpdatePlanGroup(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, admitting bool) (*UpdatePlanGroupPreview, error) {
+	return s.inspectUpdatePlanGroupWithPilot(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, admitting, nil)
+}
+
+// Promotion must lock the canonical union of pilot and destination native IDs
+// before assessing either cohort. The ordinary assignment path retains its
+// existing locking contract when there is no original pilot.
+func (s *Store) inspectUpdatePlanGroupWithPilot(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, admitting bool, pilotIDs []string) (*UpdatePlanGroupPreview, error) {
+	if len(pilotIDs) > 100 || !slices.IsSorted(pilotIDs) {
+		return nil, ErrUpdatePlanGroup
+	}
+	for i, id := range pilotIDs {
+		if !profileRevisionUUID(id) || (i > 0 && id == pilotIDs[i-1]) {
+			return nil, ErrUpdatePlanGroup
+		}
+	}
+
 	p, err := s.scanUpdatePlan(tx.QueryRowContext(ctx, `SELECT `+updatePlanColumns+` FROM `+updatePlanCurrentJoin+` WHERE p.tenant_id=$1 AND p.site_id=$2 AND p.id=$3 FOR SHARE OF p`, scope.TenantID, scope.SiteID, planID))
 	if err != nil {
 		return nil, err
@@ -135,6 +152,25 @@ func (s *Store) inspectUpdatePlanGroup(ctx context.Context, tx *sql.Tx, actor st
 	lock := " FOR SHARE"
 	if admitting {
 		lock = " FOR UPDATE"
+	}
+	if len(pilotIDs) > 0 {
+		union := slices.Clone(pilotIDs)
+		for _, candidate := range candidates {
+			union = append(union, candidate.DeviceID)
+		}
+		slices.Sort(union)
+		union = slices.Compact(union)
+		if len(union) > 200 {
+			return nil, ErrUpdatePlanGroup
+		}
+		for _, id := range union {
+			var locked string
+			err := tx.QueryRowContext(ctx, `SELECT id FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2 AND id=$3`+lock, scope.TenantID, scope.SiteID, id).Scan(&locked)
+			// Missing enrollments remain explicit exclusions or blocked pilot evidence.
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+		}
 	}
 	for _, candidate := range candidates {
 		d, err := scanDevice(tx.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM mdm_apple_devices WHERE tenant_id=$1 AND site_id=$2 AND id=$3`+lock, scope.TenantID, scope.SiteID, candidate.DeviceID))

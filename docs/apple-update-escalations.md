@@ -133,7 +133,9 @@ pass, as does the full Linux build. All 318 relevant Chrome cases pass, includin
 source-blocked pages were inspected visually. Full-suite evidence is recorded in
 [implementation status](implementation-status.md).
 
-Automatic pilot promotion, continuous group membership reconciliation, email or
+[Reviewed pilot promotion](apple-update-promotions.md) now provides a separate
+explicit action with all-original readiness checks and a retained admission
+receipt. Automatic pilot promotion, continuous group membership reconciliation, email or
 webhook escalation channels and physical-device acceptance remain separate work.
 These saved snapshots belong to enabled original-assignment monitors; they are
 not a general device compliance or historical reporting service.

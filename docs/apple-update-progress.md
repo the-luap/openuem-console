@@ -115,6 +115,8 @@ in [implementation status](implementation-status.md).
 
 [Opt-in update monitoring](apple-update-escalations.md) now retains encrypted
 original-cohort assessments and immutable console incident history with explicit
-operator acknowledgments. General historical reporting, automatic promotion
-gates, external escalation channels and physical-device acceptance remain
+operator acknowledgments. [Reviewed pilot promotion](apple-update-promotions.md)
+now requires qualifying fresh evidence for every original enrollment before
+admitting an explicitly reviewed destination group. General historical reporting,
+automatic promotion and external escalation channels and physical-device acceptance remain
 separate work.

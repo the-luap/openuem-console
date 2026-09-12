@@ -1,0 +1,270 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"slices"
+)
+
+templ appleUpdatePilotReadiness(info *partials.CommonInfo, p apple.UpdatePilotReadiness) {
+	<section class="uk-card uk-card-default" data-pilot-readiness>
+		<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+			<h2 class="uk-card-title">Original pilot readiness</h2>
+			@appleUpdateRemovalPlan(p.Progress.Assignment.Plan)
+			<p>Original assignment: <code>{ p.Progress.Assignment.ID }</code></p>
+			<p>Original admission (UTC): { p.Progress.Assignment.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+			<p>Assessed at (UTC): { p.Progress.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+			<p>Ready: <strong>{ Number(p.Ready) }</strong> · Blocked: <strong>{ Number(p.Blocked) }</strong></p>
+			if p.AllReady {
+				<p data-pilot-ready>Every original pilot enrollment currently meets the readiness checks.</p>
+			} else {
+				<p role="status" data-pilot-blocked>The original pilot is not ready for promotion. Every original enrollment must pass; later group changes do not remove pilot devices from this check.</p>
+			}
+			<p>Readiness requires an active enrollment, matching policy values without a reported error, no active exception, and an OS report after admission within the last 24 hours. The exact target version requires its matching build in the same report. After an exception ends, a new OS report is required.</p>
+			<p>Notification acknowledgments and deadline timing do not determine readiness. This evidence does not establish which assignment caused an OS installation.</p>
+			for _,d:=range p.Progress.Devices {
+				<article class="grid gap-2" data-pilot-device={ d.DeviceID }>
+					<h3 class="font-semibold">{ Show(d.Name) }</h3>
+					<p>Original native enrollment: <code>{ d.DeviceID }</code></p>
+					<p>{ updatePilotReason(updatePilotDecision(p,d.DeviceID)) }</p>
+					if d.Reason!="" {
+						<p>{ updateGroupProgressReason(d.Reason) }</p>
+					}
+					if d.RecordedAt!=nil {
+						<p>Reported OS: { Show(d.ReportedVersion) } · Build: { Show(d.ReportedBuild) }</p>
+						<p>OS report recorded (UTC): { d.RecordedAt.UTC().Format("2006-01-02 15:04:05") } · { updateGroupReportSource(d.ReportSource) }</p>
+					}
+					@appleUpdateExceptionSummary(d.Exception, d.ExceptionActive)
+					if d.Availability=="available" {
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.DeviceID)) }>Open current device state</a>
+					}
+				</article>
+			}
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID))) }>Open current cohort progress</a>
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(p.Progress.Assignment.Plan.ID, p.Progress.Assignment.ID))) }>Open pilot promotion history</a>
+		</div>
+	</section>
+}
+
+templ AppleUpdatePromotionPlans(c echo.Context, info *partials.CommonInfo, pilot apple.UpdatePilotReadiness, plans []apple.UpdatePlan, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(pilot.Progress.Assignment.Plan.ID, pilot.Progress.Assignment.ID))}}, info)
+		<main id="device-management" data-update-promotion-page="plans" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="grid gap-3"><h1 class="text-2xl font-semibold">Review pilot promotion</h1><p>Choose the next rollout plan and dynamic group. Promotion requires verified readiness for every original pilot device and at least one eligible device outside that pilot.</p><p>The destination must use the same platform, target version and build. Its deadline and information URL may differ. No policy changes until the final confirmation succeeds.</p></div>
+			@appleUpdatePilotReadiness(info, pilot)
+			<h2 class="text-xl font-semibold">Choose the destination plan</h2>
+			for _,plan:=range plans {
+				<section class="uk-card uk-card-default" data-promotion-plan={ plan.ID }>
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						@appleUpdatePlanDefinition(plan)
+						if plan.Definition.Archived {
+							<p>Archived; unavailable for new promotions.</p>
+						} else if !apple.UpdatePromotionTargetMatches(pilot.Progress.Assignment.Plan.Definition,plan.Definition) {
+							<p>The platform, target version or build differs from the original pilot.</p>
+						} else {
+							<a class="uk-button uk-button-default" href={ templ.URL(UpdatePromotionGroupChoiceURL(info, pilot.Progress.Assignment, plan, "")) }>Choose a destination group</a>
+						}
+					</div>
+				</section>
+			}
+			if len(plans)==0 {
+				<p>No update plans on this page. Create a destination plan with the original pilot target to continue.</p>
+			}
+			@GroupPaging(paging, "Destination plan pages")
+		</main>
+	}
+}
+
+templ AppleUpdatePromotionGroups(c echo.Context, info *partials.CommonInfo, pilot apple.UpdatePilotReadiness, plan apple.UpdatePlan, page *inventory.DeviceGroupPage, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(pilot.Progress.Assignment.Plan.ID, pilot.Progress.Assignment.ID))}, {Title: "Destination group", Url: UpdatePromotionGroupChoiceURL(info, pilot.Progress.Assignment, plan, "")}}, info)
+		<main id="device-management" data-update-promotion-page="groups" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Choose the destination group</h1><p>The next step reviews all current members, policy replacements and any overlap with the original pilot.</p></div>
+			@appleUpdatePilotReadiness(info, pilot)
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+					<h2 class="uk-card-title">Destination plan</h2>
+					@appleUpdatePlanDefinition(plan)
+				</div>
+			</section>
+			for _,group:=range page.Groups {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ group.Name } · Revision { Number(group.Revision) }</h2>
+						<p>{ group.Description }</p>
+						if group.Archived {
+							<p>Archived; unavailable for new promotions.</p>
+						} else {
+							<a class="uk-button uk-button-default" href={ templ.URL(updatePromotionReviewURL(info, pilot.Progress.Assignment, plan, group)) }>Review pilot and destination</a>
+						}
+					</div>
+				</section>
+			}
+			if len(page.Groups)==0 {
+				<p>No dynamic groups on this page. Create a destination group before promoting this pilot.</p>
+			}
+			@GroupPaging(paging, "Destination group pages")
+		</main>
+	}
+}
+
+templ AppleUpdatePromotionPreview(c echo.Context, info *partials.CommonInfo, p apple.UpdatePromotionPreview, requestKey string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(p.Pilot.Progress.Assignment.Plan.ID, p.Pilot.Progress.Assignment.ID))}, {Title: "Review destination", Url: UpdatePromotionGroupChoiceURL(info, p.Pilot.Progress.Assignment, p.Destination.Plan, "")}}, info)
+		<main id="device-management" data-update-promotion-page="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Review pilot promotion</h1><p>Confirmation rechecks every original pilot device, the destination plan, group, complete eligible selection and current policies.</p></div>
+			@appleUpdatePilotReadiness(info, p.Pilot)
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+					<h2 class="uk-card-title">Destination rollout</h2>
+					@appleUpdatePlanDefinition(p.Destination.Plan)
+					@appleProfileGroupSource(info, apple.ProfileGroupSource{ID: p.Destination.Group.ID, Revision: p.Destination.Group.Revision, Name: p.Destination.Group.Name, Rule: p.Destination.Group.Rule})
+					<p>Eligible native devices: { Number(len(p.Destination.Targets)) } · Outside the original pilot: { Number(p.NewTargets) } · Original pilot overlap: { Number(len(p.PilotOverlap)) }</p>
+					if !p.CompatibleTarget {
+						<p role="status">Promotion is blocked: the destination must use the original pilot's platform, target version and build.</p>
+					}
+					if p.NewTargets==0 {
+						<p role="status">Promotion is blocked: at least one eligible destination device must be outside the original pilot.</p>
+					}
+					if len(p.PilotOverlap)>0 {
+						<p data-promotion-overlap>Overlapping pilot devices are included in this destination selection. They receive the reviewed destination policy again, including its deadline and any replacement shown below.</p>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-promotion-targets>
+					<h2 class="uk-card-title">Eligible destination devices</h2>
+					for _,target:=range p.Destination.Targets {
+						<article class="grid gap-2" style="overflow-wrap:anywhere;" data-promotion-target={ target.Selection.DeviceID }>
+							<h3 class="font-semibold">{ Show(target.Entry.Name) }</h3>
+							<p>{ target.Entry.Platform+" "+target.Entry.OSVersion }</p>
+							<p>Native Apple enrollment: <code>{ target.Selection.DeviceID }</code></p>
+							if slices.Contains(p.PilotOverlap,target.Selection.DeviceID) {
+								<p>This device belongs to the original pilot and is included again.</p>
+							}
+							if target.CurrentPolicy==nil {
+								<p>No existing update policy.</p>
+							} else {
+								<p>Existing policy will be replaced: { target.CurrentPolicy.TargetVersion } · { target.CurrentPolicy.TargetBuild }</p>
+								<p>Current device-local deadline: { target.CurrentPolicy.Deadline }</p>
+								if target.CurrentPolicy.DetailsURL!="" {
+									<p>Current information URL: { target.CurrentPolicy.DetailsURL }</p>
+								}
+							}
+						</article>
+					}
+					if len(p.Destination.Targets)==0 {
+						<p>No members can receive this plan. Review the exclusions or choose another group.</p>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-promotion-exclusions>
+					<h2 class="uk-card-title">Excluded members ({ Number(len(p.Destination.Excluded)) })</h2>
+					for _,target:=range p.Destination.Excluded {
+						<article style="overflow-wrap:anywhere;"><h3 class="font-semibold">{ Show(target.Entry.Name) }</h3><p>{ updatePlanGroupExclusion(target.Reason) }</p><p>{ target.Entry.Platform } · <code>{ target.Entry.ID }</code></p></article>
+					}
+				</div>
+			</section>
+			if p.Ready && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) {
+				<form method="post" action={ partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(p.Pilot.Progress.Assignment.Plan.ID, p.Pilot.Progress.Assignment.ID)) } class="uk-card uk-card-default" data-promotion-confirm>
+					<div class="uk-card-body grid gap-4">
+						@CSRF(info)
+						<input type="hidden" name="destination_plan" value={ p.Destination.Plan.ID }/><input type="hidden" name="expected_revision" value={ Number(p.Destination.Plan.Revision) }/><input type="hidden" name="group_id" value={ p.Destination.Group.ID }/><input type="hidden" name="group_revision" value={ Number(p.Destination.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="devices" value={ updatePlanGroupFields(p.Destination) }/>
+						<p>This saves the verified pilot evidence and applies the reviewed destination policy once to every eligible device shown above. Device notifications are queued; destination installation requires subsequent device reports.</p>
+						<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Promote this pilot to the complete destination selection, including overlapping pilot devices and all policy replacements shown above.</label>
+						<button class="uk-button uk-button-primary" type="submit">Confirm pilot promotion</button>
+					</div>
+				</form>
+			}
+		</main>
+	}
+}
+
+templ AppleUpdatePromotion(c echo.Context, info *partials.CommonInfo, r apple.UpdatePromotion) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion history", Url: partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(r.PilotPlanID, r.PilotAssignmentID))}}, info)
+		<main id="device-management" data-update-promotion-page="receipt" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Original pilot promotion</h1><p>This immutable receipt records the pilot evidence and destination assignment accepted together. Saved evidence describes admission and may differ from current device state. It does not establish destination installation.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+					<p>Confirmed by { r.Actor }</p>
+					<p>Confirmed at (UTC): { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					<p>Promotion ID: <code>{ r.ID }</code></p>
+					<p>Request ID: <code>{ r.RequestKey }</code></p>
+					if r.Pilot!=nil {
+						<h2 class="uk-card-title">Original pilot plan</h2>
+						@appleUpdateRemovalPlan(r.Pilot.Plan)
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(r.PilotPlanID)+"/"+r.PilotAssignmentID)) }>Open original pilot assignment</a>
+					}
+					if r.Assignment!=nil {
+						<h2 class="uk-card-title">Admitted destination plan</h2>
+						@appleUpdateRemovalPlan(r.Assignment.Plan)
+						@appleProfileGroupSource(info, r.Assignment.Group)
+						<p>Admitted native devices: { Number(len(r.Assignment.Commands)) }. Original notifications are recorded with the destination assignment.</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(r.DestinationPlanID)+"/"+r.AssignmentID)) }>Open original destination assignment</a>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(r.DestinationPlanID, r.AssignmentID))) }>Open current destination progress</a>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionPath(r.DestinationPlanID, r.AssignmentID))) }>Review this destination as the next pilot</a>
+					}
+				</div>
+			</section>
+			if r.Evidence!=nil {
+				<section class="uk-card uk-card-default" data-promotion-evidence>
+					<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">Saved original pilot evidence</h2>
+						<p>Assessed at (UTC): { r.Evidence.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+						<p>Every original pilot identity was active at admission, with matching policy values, no active exception or reported policy error, and a qualifying fresh OS report.</p>
+						for _,d:=range r.Evidence.Devices {
+							<article class="grid gap-2" data-promotion-proof={ d.DeviceID }>
+								<h3 class="font-semibold">Original native enrollment: { d.DeviceID }</h3>
+								<p>Reported OS: { d.Observation.Version } · Build: { d.Observation.Build }</p>
+								<p>OS report recorded (UTC): { d.Observation.RecordedAt.UTC().Format("2006-01-02 15:04:05") } · { updateGroupReportSource(d.Observation.Source) }</p>
+								<p>Identity expiry recorded at admission (UTC): { d.IdentityExpiresAt.UTC().Format("2006-01-02 15:04:05") }</p>
+								if d.ExceptionEndedAt!=nil {
+									<p>Latest exception ended (UTC): { d.ExceptionEndedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+								}
+							</article>
+						}
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ AppleUpdatePromotions(c echo.Context, info *partials.CommonInfo, plan, assignment string, items []apple.UpdatePromotion, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Original cohort", Url: partials.GetNavigationUrl(info, UpdateGroupProgressPath(plan, assignment))}, {Title: "Pilot promotion history", Url: partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(plan, assignment))}}, info)
+		<main id="device-management" data-update-promotion-page="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Pilot promotion history</h1><p>Original confirmed promotions from this pilot in this site. Later policy changes do not rewrite saved evidence. Repeating a successful request does not restore an earlier policy.</p></div>
+			for _,r:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						if r.Assignment!=nil {
+							<h2 class="uk-card-title">{ r.Assignment.Plan.Definition.Name } · Revision { Number(r.DestinationRevision) }</h2>
+							<p>{ r.Assignment.Group.Name } · Group revision { Number(r.GroupRevision) }</p>
+							<p>{ Number(len(r.Assignment.Commands)) } native Apple devices</p>
+						}
+						<p>Confirmed by { r.Actor } · { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") } UTC</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(plan, assignment)+"/"+r.ID)) }>Open original promotion</a>
+					</div>
+				</section>
+			}
+			if len(items)==0 {
+				<p>No confirmed promotions from this pilot in this site.</p>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(plan, assignment)) + "?before=" + next) }>Older promotions</a>
+			}
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionPath(plan, assignment))) }>Review a new pilot promotion</a>
+		</main>
+	}
+}

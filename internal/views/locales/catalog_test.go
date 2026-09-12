@@ -112,3 +112,19 @@ func TestEmbeddedCatalogsAreConcurrentAndKeepLanguageSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestApplePromotionCatalogFallback(t *testing.T) {
+	for _, code := range []string{"en", "de", "es", "fr", "ca", "pt", "no"} {
+		ctx, err := WithLocale(context.Background(), code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"permission", "missing", "not_ready", "changed", "large", "invalid", "unavailable"} {
+			full := "apple_update_promotions." + key
+			got := i18n.T(ctx, full)
+			if got == full || strings.Contains(got, "MISSING") || got == "" {
+				t.Errorf("missing %s fallback for %s", full, code)
+			}
+		}
+	}
+}

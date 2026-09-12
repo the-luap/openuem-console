@@ -2505,3 +2505,12 @@ en:
     invalid: Review the update alert form and confirm the requested action.
     full: This site has reached its limit of 256 enabled update monitors. Pause an existing monitor before enabling another.
     unavailable: Apple update alerts are temporarily unavailable. No result can be confirmed.
+
+  apple_update_promotions:
+    permission: You do not have permission to review or promote Apple updates in this site.
+    missing: The original pilot, destination plan or promotion was not found in this site.
+    not_ready: The pilot or destination is no longer ready. Review all pilot devices and the destination selection again.
+    changed: The reviewed plan, group, policies or permissions changed. Review the promotion again.
+    large: This group exceeds the supported limit of 100 members. Choose a smaller rollout group.
+    invalid: Review the pilot promotion form and confirm the complete destination selection.
+    unavailable: Apple update promotion evidence is temporarily unavailable. No result can be confirmed.

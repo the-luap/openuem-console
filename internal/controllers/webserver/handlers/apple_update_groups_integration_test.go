@@ -105,6 +105,7 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.Contains(t, currentPage.Body.String(), `data-update-deadline="pending"`)
 
 	exerciseAppleUpdateEscalations(t, h, ctx, scope, plan, location, invite.DeviceID, request)
+	exerciseAppleUpdatePromotions(t, h, ctx, scope, plan, group, location, invite.DeviceID, request)
 
 	definition := plan.Definition
 	definition.Archived = true

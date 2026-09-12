@@ -37,8 +37,12 @@ confirmed target set. An empty eligible selection has no confirmation form.
 Only the reviewed eligible selection is fixed by confirmation. Excluded members
 are not captured as a retained snapshot. Group membership and device reports can
 change after confirmation; this is an immediate assignment, not ongoing dynamic
-group reconciliation. Organization groups, scheduled Apple assignments, update
-rings, exceptions, pilot promotion and richer rule predicates remain separate work.
+group reconciliation. Organization groups, scheduled Apple profile assignments,
+profile exceptions and richer rule predicates remain separate work.
+[Apple update groups](apple-update-groups.md), [scheduled updates](apple-update-schedules.md),
+[temporary update exceptions](apple-update-exceptions.md) and
+[reviewed pilot promotion](apple-update-promotions.md) now provide separate update
+workflows; they do not schedule or exempt these profile assignments.
 
 ## Original request and device results
 
