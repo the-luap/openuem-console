@@ -39,6 +39,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
 		sm.Put(ctx, "uid", user)
+		sm.Put(ctx, "usepasswd", false)
 		if form == nil {
 			form = url.Values{}
 		}

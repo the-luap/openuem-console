@@ -31,6 +31,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/agent"
+	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
@@ -74,6 +75,13 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if _, err = m.Client.Settings.Create().Save(ctx); err != nil {
 		t.Fatal(err)
 	}
+	settings, err := m.GetAuthenticationSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = settings.Update().SetUseCertificates(true).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err = m.CreateDefaultTenantAndSite(); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +93,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = m.Client.User.Create().SetID("apple-console-admin").SetName("Console Admin").SetEmail("admin@example.test").SetUse2fa(false).Save(ctx); err != nil {
+	if _, err = m.Client.User.Create().SetID("apple-console-admin").SetName("Console Admin").SetEmail("admin@example.test").SetUse2fa(false).SetRegister(nats.REGISTER_COMPLETE).Save(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = m.Client.Agent.Create().SetID("windows-fixture").SetHostname("Finance-PC").SetNickname("Finance Windows").SetOs("windows").SetAgentStatus(agent.AgentStatusEnabled).AddSiteIDs(site.ID).SetLastContact(time.Now()).Save(ctx); err != nil {
@@ -117,6 +125,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	sm.Put(ctx, "uid", "apple-console-admin")
+	sm.Put(ctx, "usepasswd", false)
 	releases := t.TempDir()
 	if err = os.WriteFile(filepath.Join(releases, "latest.json"), []byte(`{"Version":"0.11.0"}`), 0600); err != nil {
 		t.Fatal(err)

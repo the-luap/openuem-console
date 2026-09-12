@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
@@ -42,7 +43,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		t.Fatal(err)
 	}
 	for _, id := range []string{"scoped-viewer", "scoped-operator", "organization-admin", "unassigned-user", "openuem"} {
-		if _, err = h.Model.Client.User.Create().SetID(id).SetName(id).SetEmail(id + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+		if _, err = h.Model.Client.User.Create().SetID(id).SetName(id).SetEmail(id + "@example.test").SetUse2fa(false).SetRegister(nats.REGISTER_COMPLETE).Save(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -79,6 +80,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
 		sm.Put(ctx, "uid", user)
+		sm.Put(ctx, "usepasswd", false)
 		if form == nil {
 			form = url.Values{}
 		}

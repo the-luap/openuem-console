@@ -331,6 +331,7 @@ func newAccountPasswordFixture(t *testing.T, encrypted bool) accountPasswordFixt
 	}
 	sm.Put(ctx, "uid", u.ID)
 	sm.Put(ctx, "twofa", true)
+	sm.Put(ctx, "usepasswd", true)
 	token, _, err := sm.Commit(ctx)
 	if err != nil {
 		t.Fatal(err)

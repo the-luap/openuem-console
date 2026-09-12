@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"golang.org/x/time/rate"
 )
@@ -652,21 +654,28 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			return h.Login(c)
 		}
 
-		// get user from database
-		user, err := h.Model.GetUserById(username)
-		if err != nil {
+		// Recovery sessions cannot authorize protected routes.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot") {
 			return h.Login(c)
 		}
-		if user.Openid || h.SessionManager.Manager.Exists(c.Request().Context(), oidcSessionKey) {
+
+		// Bound both account lookup and local policy verification. A transient
+		// database failure must not destroy an otherwise valid session.
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+		defer cancel()
+		user, err := h.Model.Client.User.Get(ctx, username)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return h.rejectLocalSession(c)
+			}
+			return echo.NewHTTPError(http.StatusServiceUnavailable, "Session verification is temporarily unavailable.")
+		}
+		if h.SessionManager.Manager.Exists(c.Request().Context(), oidcSessionKey) {
 			if err = h.validateOIDCSession(c, username); err != nil {
 				return err
 			}
-		}
-
-		// if sessions includes forgot
-		forgot := h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot")
-		if forgot {
-			return h.Login(c)
+		} else if err = h.validateLocalSession(ctx, c, user); err != nil {
+			return err
 		}
 
 		// A pending first factor cannot silently become a full session if the

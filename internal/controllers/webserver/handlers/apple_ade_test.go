@@ -41,6 +41,7 @@ func exerciseADERoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Conte
 		request := func(user, method, path, contentType string, body []byte) *httptest.ResponseRecorder {
 			t.Helper()
 			h.SessionManager.Manager.Put(ctx, "uid", user)
+			h.SessionManager.Manager.Put(ctx, "usepasswd", false)
 			req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(ctx)
 			req.Header.Set("Content-Type", contentType)
 			rec := httptest.NewRecorder()

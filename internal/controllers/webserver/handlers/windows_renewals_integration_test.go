@@ -36,7 +36,7 @@ func exerciseWindowsRenewals(t *testing.T, h *Handler, ctx context.Context, requ
 		scope := access.Scope{TenantID: tenant.ID, SiteID: site.ID}
 		admin := "renewal-organization-admin"
 		for user, grant := range map[string]access.Grant{admin: {Role: access.TenantAdmin, Scope: access.Scope{TenantID: tenant.ID}}, "renewal-viewer": {Role: access.Viewer, Scope: scope}, "renewal-operator": {Role: access.Operator, Scope: scope}} {
-			if _, err = h.Model.Client.User.Create().SetID(user).SetName(user).SetEmail(user + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+			if _, err = h.Model.Client.User.Create().SetID(user).SetName(user).SetEmail(user + "@example.test").SetUse2fa(false).SetRegister("users.completed").Save(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if err = h.Access.ReplaceGrants(ctx, "apple-console-admin", user, 0, []access.Grant{grant}); err != nil {

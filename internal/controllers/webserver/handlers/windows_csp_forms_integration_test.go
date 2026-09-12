@@ -174,7 +174,7 @@ func exerciseWindowsCSPForms(t *testing.T, h *Handler, ctx context.Context, scop
 			t.Fatal("valid large command could not be admitted", w.Code)
 		}
 		actor := "windows-csp-create-admin"
-		if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+		if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).SetRegister("users.completed").Save(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.Access.ReplaceGrants(ctx, "apple-console-admin", actor, 0, []access.Grant{{Role: access.TenantAdmin, Scope: access.Scope{TenantID: scope.TenantID}}}); err != nil {

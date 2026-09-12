@@ -165,7 +165,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 func exerciseInventoryPermissionTransaction(t *testing.T, h *Handler, ctx context.Context, tenant, site int) {
 	t.Helper()
 	const actor = "inventory-revocation-reader"
-	if err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).Exec(ctx); err != nil {
+	if err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).SetRegister("users.completed").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	scope := access.Scope{TenantID: tenant, SiteID: site}

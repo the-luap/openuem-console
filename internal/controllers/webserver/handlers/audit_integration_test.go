@@ -47,6 +47,7 @@ func exerciseAuditConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.Co
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
 		sm.Put(ctx, "uid", user)
+		sm.Put(ctx, "usepasswd", false)
 		req := httptest.NewRequest(method, path, strings.NewReader(form.Encode())).WithContext(ctx)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()

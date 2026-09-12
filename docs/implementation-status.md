@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Protected local sessions now recheck enabled authentication, their recorded
+  password/certificate method, current account mode and registration, and MFA
+  state. Missing method metadata and superseded policy return HTTP 401 and retire
+  the token with durable receipts. The five-second lookup/transaction deadline
+  observes committed changes after lock waits; generic HTTP 503 preserves valid
+  sessions during temporary storage failure. The check uses shared account locks
+  and does not change registration. Pending certificate MFA still requires its
+  fresh primary proof. Eighteen owned baseline cases admitted invalid sessions;
+  expanded tests cover twenty-four denials, valid factor combinations, pending
+  flows, rollback/retry and actual registered HTTP retirement in both storage
+  modes. The focused race suite passes in 16.291 seconds and the complete session
+  race suite in 83.845 seconds; actual Linux ARM64
+  console/OpenID and administrator routes, authentication/router races and the
+  full Linux build pass. Older role/browser fixtures now supply valid completed
+  accounts and the method flag real sign-in writes. Original password/MFA/account
+  generation binding and certificate lifetime/revocation checks remain open.
+  See [current local policy](session-storage.md#current-local-session-policy).
+
 - Account-settings password changes now bind the current-password verification
   to the locked credential and MFA snapshot. The shared replacement transaction
   rechecks enabled password authentication, account mode and registration, clears

@@ -76,9 +76,53 @@ A canceled row-lock wait cannot partially confirm an account; a later valid firs
 login clears its temporary certificate password. The forced-password lifecycle
 remains restricted and the protected administrator startup/password tests pass.
 
-These checks govern new local sign-in admission. They do not yet provide complete
-request-time local credential revalidation; the recovery/invitation checks below
-also apply to credential changes.
+New sign-in admission and request-time policy checks have distinct stages. The
+recovery/invitation checks below also apply to credential changes.
+
+## Current local session policy
+
+Protected console requests now recheck the method recorded in the server session
+against current password/certificate configuration and account mode. The account
+must still be approved or completed. Revoked/review, forced-password, invitation
+and newly issued-certificate states cannot retain a completed session. A local
+session cannot become an OpenID session when the account mode changes. Missing
+or malformed stored method flags require a new sign-in. A previously completed
+second factor cannot authorize removed or unconfirmed MFA.
+
+The account lookup and local policy transaction share a five-second request
+deadline. Configuration and account are read under shared locks in Read Committed
+isolation; concurrent valid requests may coexist, and a policy writer is observed
+after its lock is released. Verification does not confirm registration or modify
+credentials. The exact snapshot read for this request is checked again under the
+lock. The endpoint runs after these locks are released; its domain transaction
+must still enforce current permissions and mutation-specific authorization.
+
+An invalid local session loses in-memory authority before its stored token is
+deleted, with a separate two-second cleanup deadline. Successful deletion creates
+a permanent receipt, so a preloaded writer or a replayed cookie cannot return,
+even if account policy is later restored. A transient account/configuration read
+failure instead returns generic HTTP 503 and retains the session for retry.
+Deleted accounts are retired. An OpenID account without its bound identity cannot
+fall back to local authentication.
+
+A pending certificate login can still present its MFA challenge, including the
+issued-certificate state, but only with a fresh matching primary proof. It cannot
+reach the protected endpoint. Recovery sessions remain excluded. The existing
+password/certificate/OpenID MFA completion checks still apply separately.
+
+The owned baseline admitted all eighteen invalid policy cases. The expanded
+regressions cover both methods, valid single-factor/MFA sessions, missing method
+state, OpenID mode changes, pending proof checks, transient lookup/configuration
+failure, retry and committed/rolled-back account waits. Registered HTTP routes
+with production CSRF/session middleware verify cookie deletion and durable
+retirement in both storage modes. Synthetic role/browser fixtures now declare
+completed certificate accounts and the same method flag written by real sign-in.
+
+This is live policy validation, not a credential-generation binding to the
+original local sign-in. Binding completed sessions to their original password,
+account creation and MFA generations, and certificate expiry/revocation/rotation,
+remains necessary. Checks also cannot recall a domain action already admitted
+before a later policy change. These boundaries remain open roadmap work.
 
 ## Password replacement policy
 

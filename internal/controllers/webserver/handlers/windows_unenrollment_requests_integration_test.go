@@ -97,7 +97,7 @@ func exerciseWindowsUnenrollmentRequests(t *testing.T, h *Handler, ctx context.C
 
 		// A preview does not preserve permission to create after a grant change.
 		changing := "disconnection-admin-" + uuid.NewString()
-		if _, err := h.Model.Client.User.Create().SetID(changing).SetName("Synthetic disconnection administrator").SetEmail(changing + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+		if _, err := h.Model.Client.User.Create().SetID(changing).SetName("Synthetic disconnection administrator").SetEmail(changing + "@example.test").SetUse2fa(false).SetRegister("users.completed").Save(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.Access.ReplaceGrants(ctx, "apple-console-admin", changing, 0, []access.Grant{{Role: access.TenantAdmin, Scope: access.Scope{TenantID: scope.TenantID}}}); err != nil {

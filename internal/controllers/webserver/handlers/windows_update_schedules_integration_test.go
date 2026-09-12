@@ -257,7 +257,7 @@ func exerciseWindowsScheduleConsole(t *testing.T, h *Handler, ctx context.Contex
 		// Permission replacement retires a due plan's original authority, while an
 		// authorized administrator can still read why it became blocked.
 		actor := "windows-schedule-review-operator"
-		if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+		if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).SetRegister("users.completed").Save(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.Access.ReplaceGrants(ctx, "apple-console-admin", actor, 0, []access.Grant{{Role: access.Operator, Scope: scope}}); err != nil {

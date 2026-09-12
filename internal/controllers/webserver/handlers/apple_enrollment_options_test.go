@@ -90,7 +90,7 @@ func exerciseAppleEnrollmentOptions(t *testing.T, h *Handler, ctx context.Contex
 	// The public store entry point rechecks persisted grants instead of trusting
 	// a principal previously loaded into the console session.
 	actor := "revoked-enrollment-security"
-	if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).Save(ctx); err != nil {
+	if _, err := h.Model.Client.User.Create().SetID(actor).SetName(actor).SetEmail(actor + "@example.test").SetUse2fa(false).SetRegister("users.completed").Save(ctx); err != nil {
 		t.Fatal(err)
 	}
 	grant := access.Grant{Role: access.TenantAdmin, Scope: access.Scope{TenantID: tenant}}

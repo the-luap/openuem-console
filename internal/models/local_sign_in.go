@@ -21,6 +21,7 @@ const (
 	LocalSignInPendingMFA
 	LocalSignInComplete
 	LocalSignInPasswordReplacement
+	LocalSignInCurrentSession
 )
 
 // AdmitLocalSignIn binds admission to the account snapshot whose first factor
@@ -38,7 +39,7 @@ func (m *Model) CompleteMFASignIn(parent context.Context, expected *ent.User, me
 }
 
 func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence) error {
-	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInPasswordReplacement {
+	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInCurrentSession {
 		return ErrLocalSignIn
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -54,7 +55,11 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 	}
 	var passwd, openid, mfa, confirmed bool
 	var hash, register, secret string
-	err = tx.QueryRowContext(ctx, `SELECT coalesce(passwd,false),coalesce(openid,false),coalesce(hash,''),coalesce(register,''),coalesce(use2fa,false),coalesce(totp_secret_confirmed,false),coalesce(totp_secret,'') FROM users WHERE uid=$1 FOR UPDATE`, expected.ID).Scan(&passwd, &openid, &hash, &register, &mfa, &confirmed, &secret)
+	lock := "FOR UPDATE"
+	if stage == LocalSignInCurrentSession {
+		lock = "FOR SHARE"
+	}
+	err = tx.QueryRowContext(ctx, `SELECT coalesce(passwd,false),coalesce(openid,false),coalesce(hash,''),coalesce(register,''),coalesce(use2fa,false),coalesce(totp_secret_confirmed,false),coalesce(totp_secret,'') FROM users WHERE uid=$1 `+lock, expected.ID).Scan(&passwd, &openid, &hash, &register, &mfa, &confirmed, &secret)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrLocalSignIn
 	}
@@ -78,7 +83,10 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		if method != loginproof.Password || register != nats.REGISTER_FORCE_PASSWORD_CHANGE {
 			return ErrLocalSignIn
 		}
-	} else if register != nats.REGISTER_COMPLETE && register != nats.REGISTER_APPROVED && !(method == loginproof.Certificate && register == nats.REGISTER_CERTIFICATE_SENT) {
+	} else if register != nats.REGISTER_COMPLETE && register != nats.REGISTER_APPROVED && !(stage != LocalSignInCurrentSession && method == loginproof.Certificate && register == nats.REGISTER_CERTIFICATE_SENT) {
+		return ErrLocalSignIn
+	}
+	if stage == LocalSignInCurrentSession && (confirmed != expected.TotpSecretConfirmed || secret != expected.TotpSecret) {
 		return ErrLocalSignIn
 	}
 	if stage == LocalSignInPendingMFA && !mfa {
