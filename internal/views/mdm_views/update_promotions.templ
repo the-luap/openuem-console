@@ -80,10 +80,10 @@ templ AppleUpdatePromotionPlans(c echo.Context, info *partials.CommonInfo, pilot
 	}
 }
 
-templ AppleUpdatePromotionGroups(c echo.Context, info *partials.CommonInfo, pilot apple.UpdatePilotReadiness, plan apple.UpdatePlan, page *inventory.DeviceGroupPage, paging DevicePagination) {
+templ AppleUpdatePromotionGroups(c echo.Context, info *partials.CommonInfo, pilot apple.UpdatePilotReadiness, plan apple.UpdatePlan, page *inventory.DeviceGroupPage, paging DevicePagination, organization bool) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(pilot.Progress.Assignment.Plan.ID, pilot.Progress.Assignment.ID))}, {Title: "Destination group", Url: UpdatePromotionGroupChoiceURL(info, pilot.Progress.Assignment, plan, "")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(pilot.Progress.Assignment.Plan.ID, pilot.Progress.Assignment.ID))}, {Title: "Destination group", Url: UpdatePromotionGroupSourceChoiceURL(info, pilot.Progress.Assignment, plan, "", organization)}}, info)
 		<main id="device-management" data-update-promotion-page="groups" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div><h1 class="text-2xl font-semibold">Choose the destination group</h1><p>The next step reviews all current members, policy replacements and any overlap with the original pilot.</p></div>
 			@appleUpdatePilotReadiness(info, pilot)
@@ -93,6 +93,15 @@ templ AppleUpdatePromotionGroups(c echo.Context, info *partials.CommonInfo, pilo
 					@appleUpdatePlanDefinition(plan)
 				</div>
 			</section>
+			if organization {
+				<p data-promotion-organization-source>Organization groups are listed. The next step evaluates the group's current rule only within the selected target site. Devices from other sites are outside this promotion.</p>
+			}
+			<nav aria-label="Destination group source" class="flex flex-wrap gap-4">
+				<a class="underline" href={ templ.URL(UpdatePromotionGroupSourceChoiceURL(info, pilot.Progress.Assignment, plan, "", false)) }>Site groups</a>
+				if profileOrganizationGroupsAllowed(info) {
+					<a class="underline" href={ templ.URL(UpdatePromotionGroupSourceChoiceURL(info, pilot.Progress.Assignment, plan, "", true)) }>Organization groups</a>
+				}
+			</nav>
 			for _,group:=range page.Groups {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
@@ -117,7 +126,7 @@ templ AppleUpdatePromotionGroups(c echo.Context, info *partials.CommonInfo, pilo
 templ AppleUpdatePromotionPreview(c echo.Context, info *partials.CommonInfo, p apple.UpdatePromotionPreview, requestKey string) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(p.Pilot.Progress.Assignment.Plan.ID, p.Pilot.Progress.Assignment.ID))}, {Title: "Review destination", Url: UpdatePromotionGroupChoiceURL(info, p.Pilot.Progress.Assignment, p.Destination.Plan, "")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Pilot promotion", Url: partials.GetNavigationUrl(info, UpdatePromotionPath(p.Pilot.Progress.Assignment.Plan.ID, p.Pilot.Progress.Assignment.ID))}, {Title: "Review destination", Url: UpdatePromotionGroupSourceChoiceURL(info, p.Pilot.Progress.Assignment, p.Destination.Plan, "", p.Destination.Group.Scope.SiteID == 0)}}, info)
 		<main id="device-management" data-update-promotion-page="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div><h1 class="text-2xl font-semibold">Review pilot promotion</h1><p>Confirmation rechecks every original pilot device, the destination plan, group, complete eligible selection and current policies.</p></div>
 			@appleUpdatePilotReadiness(info, p.Pilot)
@@ -125,7 +134,7 @@ templ AppleUpdatePromotionPreview(c echo.Context, info *partials.CommonInfo, p a
 				<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
 					<h2 class="uk-card-title">Destination rollout</h2>
 					@appleUpdatePlanDefinition(p.Destination.Plan)
-					@appleProfileGroupSource(info, apple.ProfileGroupSource{ID: p.Destination.Group.ID, Revision: p.Destination.Group.Revision, Name: p.Destination.Group.Name, Rule: p.Destination.Group.Rule})
+					@appleProfileAssignmentGroupSource(info, apple.ProfileGroupSource{ID: p.Destination.Group.ID, Revision: p.Destination.Group.Revision, Name: p.Destination.Group.Name, Rule: p.Destination.Group.Rule}, apple.Scope{TenantID: p.Destination.Group.Scope.TenantID, SiteID: p.Destination.Group.Scope.SiteID})
 					<p>Eligible native devices: { Number(len(p.Destination.Targets)) } · Outside the original pilot: { Number(p.NewTargets) } · Original pilot overlap: { Number(len(p.PilotOverlap)) }</p>
 					if !p.CompatibleTarget {
 						<p role="status">Promotion is blocked: the destination must use the original pilot's platform, target version and build.</p>
@@ -173,10 +182,11 @@ templ AppleUpdatePromotionPreview(c echo.Context, info *partials.CommonInfo, p a
 					}
 				</div>
 			</section>
-			if p.Ready && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) {
+			if p.Ready && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) && (profileGroupSourceKind(apple.Scope{TenantID:p.Destination.Group.Scope.TenantID,SiteID:p.Destination.Group.Scope.SiteID})=="site" || profileOrganizationGroupsAllowed(info)) {
 				<form method="post" action={ partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(p.Pilot.Progress.Assignment.Plan.ID, p.Pilot.Progress.Assignment.ID)) } class="uk-card uk-card-default" data-promotion-confirm>
 					<div class="uk-card-body grid gap-4">
 						@CSRF(info)
+						<input type="hidden" name="group_source" value={ profileGroupSourceKind(apple.Scope{TenantID: p.Destination.Group.Scope.TenantID, SiteID: p.Destination.Group.Scope.SiteID}) }/>
 						<input type="hidden" name="destination_plan" value={ p.Destination.Plan.ID }/><input type="hidden" name="expected_revision" value={ Number(p.Destination.Plan.Revision) }/><input type="hidden" name="group_id" value={ p.Destination.Group.ID }/><input type="hidden" name="group_revision" value={ Number(p.Destination.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="devices" value={ updatePlanGroupFields(p.Destination) }/>
 						<p>This saves the verified pilot evidence and applies the reviewed destination policy once to every eligible device shown above. Device notifications are queued; destination installation requires subsequent device reports.</p>
 						<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Promote this pilot to the complete destination selection, including overlapping pilot devices and all policy replacements shown above.</label>
@@ -208,7 +218,7 @@ templ AppleUpdatePromotion(c echo.Context, info *partials.CommonInfo, r apple.Up
 					if r.Assignment!=nil {
 						<h2 class="uk-card-title">Admitted destination plan</h2>
 						@appleUpdateRemovalPlan(r.Assignment.Plan)
-						@appleProfileGroupSource(info, r.Assignment.Group)
+						@appleProfileAssignmentGroupSource(info, r.Assignment.Group, r.Assignment.GroupScope)
 						<p>Admitted native devices: { Number(len(r.Assignment.Commands)) }. Original notifications are recorded with the destination assignment.</p>
 						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(r.DestinationPlanID)+"/"+r.AssignmentID)) }>Open original destination assignment</a>
 						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(r.DestinationPlanID, r.AssignmentID))) }>Open current destination progress</a>
@@ -252,6 +262,9 @@ templ AppleUpdatePromotions(c echo.Context, info *partials.CommonInfo, plan, ass
 						if r.Assignment!=nil {
 							<h2 class="uk-card-title">{ r.Assignment.Plan.Definition.Name } · Revision { Number(r.DestinationRevision) }</h2>
 							<p>{ r.Assignment.Group.Name } · Group revision { Number(r.GroupRevision) }</p>
+							if profileGroupSourceKind(r.GroupScope)=="organization" {
+								<p>Source: organization group · Target site: { info.SiteID }</p>
+							}
 							<p>{ Number(len(r.Assignment.Commands)) } native Apple devices</p>
 						}
 						<p>Confirmed by { r.Actor } · { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") } UTC</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePromotionHistoryPath(plan, assignment)+"/"+r.ID)) }>Open original promotion</a>

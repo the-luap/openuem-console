@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Pilot promotions to organization groups](apple-update-organization-promotions.md)
+  retain the explicitly reviewed destination source and target-site intersection.
+  Original pilot readiness remains mandatory; current organization read and target
+  update rights are checked through admission and before exact replay. Version-2
+  encrypted parents require matching child source scope, while version-1 site
+  receipts retain historical read and retry compatibility. Target-site operators
+  can read original evidence without gaining live organization visibility.
+  The combined pilot/promotion, organization-source and child-integrity
+  PostgreSQL/race regression passes in 76.277 seconds, including changed proofs,
+  policies and grants, concurrent retries, held final-audit locks, complete
+  rollback, legacy receipts and source substitution. All 37 strict form cases
+  and actual registered Linux routes pass. All 228 relevant Chrome cases pass,
+  including 45 new organization-promotion cases at three widths. macOS view,
+  handler and router-middleware race checks pass. Linux package race checks and
+  the full Linux build also pass. The complete 1,284-case Chrome matrix passes
+  in 85.589 seconds; mobile confirmation and historical source details were
+  visually inspected.
+
 - [Scheduled Apple updates from organization groups](apple-update-organization-schedules.md)
   retain an explicitly reviewed target-site intersection in encrypted version-2
   intent and preserve original version-1 site schedules. The worker rechecks
@@ -84,8 +102,8 @@ the table's package summaries do not remove any detail from the roadmap.
   Version-2 encrypted receipts preserve source scope; legacy version-1 site
   receipts remain readable. Historical progress, matching removal, monitoring
   and use as an original pilot remain available after source archival.
-  The following scheduling increment extends retained source scope to schedules;
-  promotion destinations retain their site-only child contract.
+  The following scheduling and promotion increments extend retained source
+  scope to their parent intents and require matching child source scopes.
   The 15.208-second PostgreSQL/race regression includes late-audit rollback,
   held source/site/device/grant locks, exact replay without policy restoration,
   source-version compatibility and substituted child rejection. Registered Linux

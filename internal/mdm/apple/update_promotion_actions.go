@@ -61,6 +61,10 @@ func (s *Store) verifyUpdatePromotionAdmission(ctx context.Context, tx *sql.Tx, 
 // Promotion is an explicit reviewed action. The original pilot must still be
 // ready in the same transaction that applies the destination group policies.
 func (s *Store) PromoteUpdatePlanGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, q UpdatePromotionRequest) (*UpdatePromotion, error) {
+	return s.promoteUpdatePlanGroupSource(ctx, actor, permissions, scope, scope, sources, q)
+}
+
+func (s *Store) promoteUpdatePlanGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, q UpdatePromotionRequest) (*UpdatePromotion, error) {
 	targets, err := canonicalUpdateGroupSelection(q.Targets)
 	if err != nil || !sources.Apple || !profileRevisionUUID(q.RequestKey) || !profileRevisionUUID(q.PilotPlanID) || !profileRevisionUUID(q.PilotAssignmentID) || !profileRevisionUUID(q.DestinationPlanID) || !profileRevisionUUID(q.GroupID) || q.DestinationRevision < 1 || q.DestinationRevision > 2147483647 || q.GroupRevision < 1 || q.GroupRevision > 2147483647 {
 		return nil, ErrUpdatePromotion
@@ -75,6 +79,14 @@ func (s *Store) PromoteUpdatePlanGroup(ctx context.Context, actor string, permis
 	if err = updateExceptionAuthority(ctx, tx, permissions, actor, scope); err != nil {
 		return nil, err
 	}
+	if !validAppleGroupSourceScope(groupScope, scope) {
+		return nil, ErrUpdatePromotion
+	}
+	if groupScope != scope {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}); err != nil {
+			return nil, err
+		}
+	}
 	var actorRevision int64
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT revision FROM uem_access_revisions WHERE user_id=$1),0)`, actor).Scan(&actorRevision); err != nil {
 		return nil, err
@@ -84,7 +96,7 @@ func (s *Store) PromoteUpdatePlanGroup(ctx context.Context, actor string, permis
 	}
 	previous, err := s.scanUpdatePromotion(tx.QueryRowContext(ctx, `SELECT `+updatePromotionColumns+` FROM mdm_apple_update_promotions WHERE tenant_id=$1 AND site_id=$2 AND request_key=$3`, scope.TenantID, scope.SiteID, q.RequestKey))
 	if err == nil {
-		if previous.Actor != actor || previous.ActorRevision != actorRevision || previous.PilotPlanID != q.PilotPlanID || previous.PilotAssignmentID != q.PilotAssignmentID || previous.DestinationPlanID != q.DestinationPlanID || previous.DestinationRevision != q.DestinationRevision || previous.GroupID != q.GroupID || previous.GroupRevision != q.GroupRevision || !slices.Equal(previous.Targets, targets) {
+		if previous.GroupScope != groupScope || previous.Actor != actor || previous.ActorRevision != actorRevision || previous.PilotPlanID != q.PilotPlanID || previous.PilotAssignmentID != q.PilotAssignmentID || previous.DestinationPlanID != q.DestinationPlanID || previous.DestinationRevision != q.DestinationRevision || previous.GroupID != q.GroupID || previous.GroupRevision != q.GroupRevision || !slices.Equal(previous.Targets, targets) {
 			return nil, ErrConflict
 		}
 		if err = s.validateUpdatePromotionSources(ctx, tx, previous); err != nil {
@@ -101,7 +113,7 @@ func (s *Store) PromoteUpdatePlanGroup(ctx context.Context, actor string, permis
 	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	preview, err := s.inspectUpdatePromotion(ctx, tx, actor, permissions, scope, sources, q.PilotPlanID, q.PilotAssignmentID, q.DestinationPlanID, q.DestinationRevision, q.GroupID, q.GroupRevision, true)
+	preview, err := s.inspectUpdatePromotionSource(ctx, tx, actor, permissions, scope, groupScope, sources, q.PilotPlanID, q.PilotAssignmentID, q.DestinationPlanID, q.DestinationRevision, q.GroupID, q.GroupRevision, true)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +136,7 @@ func (s *Store) PromoteUpdatePlanGroup(ctx context.Context, actor string, permis
 	if err != nil {
 		return nil, err
 	}
-	r := &UpdatePromotion{ID: uuid.NewString(), Scope: scope, RequestKey: q.RequestKey, PilotPlanID: q.PilotPlanID, PilotAssignmentID: q.PilotAssignmentID, DestinationPlanID: q.DestinationPlanID, AssignmentID: assignment.ID, Actor: actor, ActorRevision: actorRevision, DestinationRevision: q.DestinationRevision, GroupID: q.GroupID, GroupRevision: q.GroupRevision, Targets: targets, Evidence: evidence, Pilot: &preview.Pilot.Progress.Assignment, Assignment: assignment, activationKey: activationKey, sources: sources}
+	r := &UpdatePromotion{GroupScope: assignment.GroupScope, ID: uuid.NewString(), Scope: scope, RequestKey: q.RequestKey, PilotPlanID: q.PilotPlanID, PilotAssignmentID: q.PilotAssignmentID, DestinationPlanID: q.DestinationPlanID, AssignmentID: assignment.ID, Actor: actor, ActorRevision: actorRevision, DestinationRevision: q.DestinationRevision, GroupID: q.GroupID, GroupRevision: q.GroupRevision, Targets: targets, Evidence: evidence, Pilot: &preview.Pilot.Progress.Assignment, Assignment: assignment, activationKey: activationKey, sources: sources}
 	if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&r.CreatedAt); err != nil {
 		return nil, err
 	}

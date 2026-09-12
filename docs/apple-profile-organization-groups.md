@@ -64,8 +64,10 @@ version-2 source scope is rejected, and authenticated encryption protects the
 source scope with the original intent. Console instances reading newly written
 version-2 receipts need this reader. [Organization-source updates](apple-update-organization-groups.md) now use their
 own version-2 group receipts. Schedule source compatibility is described in
-[organization-source scheduling](apple-update-organization-schedules.md);
-pilot-promotion parent formats remain unchanged.
+[organization-source scheduling](apple-update-organization-schedules.md).
+[Organization-source pilot promotions](apple-update-organization-promotions.md)
+retain their destination source in version-2 parent intents with legacy site
+receipt compatibility.
 
 History and detail retain the original organization group name, rule and revision
 while keeping target-site authorization. A site operator can read an assignment's

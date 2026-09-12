@@ -31,9 +31,15 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 	require.NoError(t, err)
 	sm.Put(ctx, "uid", "owned-operator")
 	scope := access.Scope{TenantID: 1, SiteID: 1}
-	for _, state := range []string{"plans", "empty-plans", "groups", "empty-groups", "ready", "overlap", "unknown", "stale", "error", "exception", "post-exception", "different-policy", "unavailable", "incompatible", "pilot-only", "viewer", "receipt", "history", "empty-history", "long"} {
+	for _, state := range []string{"plans", "empty-plans", "groups", "empty-groups", "ready", "overlap", "unknown", "stale", "error", "exception", "post-exception", "different-policy", "unavailable", "incompatible", "pilot-only", "viewer", "receipt", "history", "empty-history", "long", "organization-groups", "organization-empty-groups", "organization-ready", "organization-overlap", "organization-unknown", "organization-error", "organization-exception", "organization-incompatible", "organization-pilot-only", "organization-viewer", "organization-receipt", "organization-history", "organization-receipt-site-operator", "organization-preview-site-operator", "organization-long"} {
 		t.Run(state, func(t *testing.T) {
+			fixture := state
+			organization := strings.HasPrefix(state, "organization-")
+			state := strings.TrimPrefix(state, "organization-")
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "owned-operator", Grants: []access.Grant{{Role: access.Operator, Scope: scope}}}, SM: &sessions.SessionManager{Manager: sm}, CSRFToken: "owned-csrf", TenantID: "1", SiteID: "1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Owned organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
+			if organization && state != "receipt-site-operator" && state != "preview-site-operator" {
+				info.Principal.Grants = []access.Grant{{Role: access.TenantAdmin, Scope: access.Scope{TenantID: 1}}}
+			}
 			now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
 			observed := now.Add(-time.Minute)
 			plan := apple.UpdatePlan{ID: "30000000-0000-4000-8000-000000000001", Scope: apple.Scope{TenantID: 1, SiteID: 1}, Revision: 2, Definition: apple.UpdatePlanDefinition{Name: "Owned <pilot plan>", Platform: "ios", TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00"}}
@@ -41,7 +47,7 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 			pilotID := "10000000-0000-4000-8000-000000000001"
 			newID := "10000000-0000-4000-8000-000000000002"
 			pilotSelection := apple.UpdatePlanGroupSelection{DeviceID: pilotID, PolicyToken: strings.Repeat("a", 64)}
-			original := apple.UpdatePlanGroupAssignment{ID: "40000000-0000-4000-8000-000000000001", Plan: plan, Scope: plan.Scope, CreatedAt: now.Add(-time.Hour), Commands: []apple.UpdatePlanGroupCommand{{Selection: pilotSelection, CommandID: "80000000-0000-4000-8000-000000000001"}}}
+			original := apple.UpdatePlanGroupAssignment{GroupScope: plan.Scope, ID: "40000000-0000-4000-8000-000000000001", Plan: plan, Scope: plan.Scope, CreatedAt: now.Add(-time.Hour), Commands: []apple.UpdatePlanGroupCommand{{Selection: pilotSelection, CommandID: "80000000-0000-4000-8000-000000000001"}}}
 			d := apple.UpdateGroupDeviceProgress{DeviceID: pilotID, Name: "Owned <pilot phone>", Availability: "available", PolicyState: "matches", CurrentPolicy: &policy, RecordedAt: &observed, ReportSource: "declarative_status", ReportedVersion: "18.7.1", ReportedBuild: "22H100", Result: "target_reported"}
 			readiness := apple.UpdatePilotDeviceReadiness{DeviceID: pilotID, Ready: true}
 			destination := plan
@@ -49,7 +55,10 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 			destination.Definition.Name = "Owned <broad plan>"
 			destination.Definition.Deadline = "2026-11-01T18:00:00"
 			group := inventory.DeviceGroup{ID: "20000000-0000-4000-8000-000000000001", Scope: scope, Revision: 3, DeviceGroupDefinition: inventory.DeviceGroupDefinition{Name: "Owned <broad group>", Rule: inventory.DeviceGroupRule{Search: "Owned"}}}
-			target := apple.UpdatePlanGroupTarget{Selection: apple.UpdatePlanGroupSelection{DeviceID: newID, PolicyToken: "none"}, Entry: inventory.DeviceEntry{ID: newID, Name: "Owned <destination phone>", Platform: "iOS", OSVersion: "18.6.2"}}
+			if organization {
+				group.Scope.SiteID = 0
+			}
+			target := apple.UpdatePlanGroupTarget{Selection: apple.UpdatePlanGroupSelection{DeviceID: newID, PolicyToken: strings.Repeat("b", 64)}, Entry: inventory.DeviceEntry{ID: newID, Name: "Owned <destination phone>", Platform: "iOS", OSVersion: "18.6.2"}}
 			p := apple.UpdatePromotionPreview{Destination: apple.UpdatePlanGroupPreview{Plan: destination, Group: group, Targets: []apple.UpdatePlanGroupTarget{target}, Excluded: []apple.ProfileGroupTarget{{Entry: inventory.DeviceEntry{ID: "owned-desktop", Name: "Owned <desktop>", Platform: "Windows"}, Reason: "not_apple_mdm"}}}, CompatibleTarget: true, NewTargets: 1, Ready: true}
 			switch state {
 			case "unknown":
@@ -117,9 +126,9 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 				p.Pilot.Blocked = 1
 				p.Ready = false
 			}
-			child := apple.UpdatePlanGroupAssignment{ID: "40000000-0000-4000-8000-000000000002", Plan: destination, Scope: plan.Scope, CreatedAt: now, Group: apple.ProfileGroupSource{ID: group.ID, Revision: group.Revision, Name: group.Name, Rule: group.Rule}, Commands: []apple.UpdatePlanGroupCommand{{Selection: target.Selection, CommandID: "80000000-0000-4000-8000-000000000002"}}}
+			child := apple.UpdatePlanGroupAssignment{GroupScope: apple.Scope{TenantID: group.Scope.TenantID, SiteID: group.Scope.SiteID}, ID: "40000000-0000-4000-8000-000000000002", Plan: destination, Scope: plan.Scope, CreatedAt: now, Group: apple.ProfileGroupSource{ID: group.ID, Revision: group.Revision, Name: group.Name, Rule: group.Rule}, Commands: []apple.UpdatePlanGroupCommand{{Selection: target.Selection, CommandID: "80000000-0000-4000-8000-000000000002"}}}
 			ended := now.Add(-2 * time.Minute)
-			r := apple.UpdatePromotion{ID: "50000000-0000-4000-8000-000000000001", RequestKey: "60000000-0000-4000-8000-000000000001", Scope: plan.Scope, PilotPlanID: plan.ID, PilotAssignmentID: original.ID, DestinationPlanID: destination.ID, AssignmentID: child.ID, Actor: "Owned <operator>", CreatedAt: now, DestinationRevision: 2, GroupRevision: 3, Pilot: &original, Assignment: &child, Evidence: &apple.UpdatePilotEvidence{AssessedAt: now, Devices: []apple.UpdatePilotDeviceEvidence{{DeviceID: pilotID, Observation: apple.OSObservation{Version: d.ReportedVersion, Build: d.ReportedBuild, Source: d.ReportSource, RecordedAt: observed}, IdentityExpiresAt: now.Add(365 * 24 * time.Hour), PolicyToken: pilotSelection.PolicyToken, ExceptionEndedAt: &ended}}}}
+			r := apple.UpdatePromotion{GroupScope: child.GroupScope, ID: "50000000-0000-4000-8000-000000000001", RequestKey: "60000000-0000-4000-8000-000000000001", Scope: plan.Scope, PilotPlanID: plan.ID, PilotAssignmentID: original.ID, DestinationPlanID: destination.ID, AssignmentID: child.ID, Actor: "Owned <operator>", CreatedAt: now, DestinationRevision: 2, GroupRevision: 3, Pilot: &original, Assignment: &child, Evidence: &apple.UpdatePilotEvidence{AssessedAt: now, Devices: []apple.UpdatePilotDeviceEvidence{{DeviceID: pilotID, Observation: apple.OSObservation{Version: d.ReportedVersion, Build: d.ReportedBuild, Source: d.ReportSource, RecordedAt: observed}, IdentityExpiresAt: now.Add(365 * 24 * time.Hour), PolicyToken: pilotSelection.PolicyToken, ExceptionEndedAt: &ended}}}}
 			c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/1"+UpdatePromotionPath(plan.ID, original.ID), nil).WithContext(ctx), httptest.NewRecorder())
 			var component templ.Component
 			switch state {
@@ -143,8 +152,8 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 				if state == "empty-groups" {
 					groups = nil
 				}
-				component = AppleUpdatePromotionGroups(c, info, p.Pilot, destination, &inventory.DeviceGroupPage{Groups: groups}, DevicePagination{Next: UpdatePromotionGroupChoiceURL(info, original, destination, archived.ID)})
-			case "receipt":
+				component = AppleUpdatePromotionGroups(c, info, p.Pilot, destination, &inventory.DeviceGroupPage{Groups: groups}, DevicePagination{Next: UpdatePromotionGroupSourceChoiceURL(info, original, destination, archived.ID, organization)}, organization)
+			case "receipt", "receipt-site-operator":
 				component = AppleUpdatePromotion(c, info, r)
 			case "history", "empty-history":
 				items := []apple.UpdatePromotion{r}
@@ -171,6 +180,7 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 				require.Contains(t, html, `name="expected_revision" value="2"`)
 				require.Contains(t, html, `name="group_revision" value="3"`)
 				require.Contains(t, html, `name="csrf" value="owned-csrf"`)
+				require.Contains(t, html, `name="group_source" value="`+profileGroupSourceKind(child.GroupScope)+`"`)
 			}
 			if state == "receipt" {
 				require.Contains(t, html, "Saved original pilot evidence")
@@ -178,9 +188,21 @@ func TestAppleUpdatePromotionPages(t *testing.T) {
 				require.NotContains(t, html, pilotSelection.PolicyToken)
 				require.NotContains(t, html, r.Actor)
 			}
+			if organization {
+				if state == "groups" || state == "empty-groups" {
+					require.Contains(t, html, "only within the selected target site")
+					require.Contains(t, html, "source=organization")
+				} else if state == "history" {
+					require.Contains(t, html, "Source: organization group · Target site: 1")
+				} else {
+					require.Contains(t, html, "Only the selected target site's members")
+					require.NotContains(t, html, `href="/tenant/1/site/1/device-groups/`+group.ID+`"`)
+					require.Equal(t, state != "receipt-site-operator" && state != "preview-site-operator", strings.Contains(html, `href="/tenant/1/device-groups/`+group.ID+`"`))
+				}
+			}
 			if dir := os.Getenv("APPLE_MDM_UI_ARTIFACTS"); dir != "" {
 				require.NoError(t, os.MkdirAll(dir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "apple-update-promotion-"+state+".html"), body.Bytes(), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "apple-update-promotion-"+fixture+".html"), body.Bytes(), 0644))
 			}
 		})
 	}

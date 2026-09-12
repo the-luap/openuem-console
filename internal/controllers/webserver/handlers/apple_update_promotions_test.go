@@ -12,15 +12,22 @@ import (
 )
 
 func TestAppleUpdatePromotionFormBoundary(t *testing.T) {
-	states := []string{"valid", "100-targets", "101-targets", "empty-targets", "malformed-target", "unconfirmed", "signed-revision", "padded-revision", "zero-revision", "overflow-revision", "signed-group-revision", "missing-csrf", "wrong-csrf", "header-only", "query", "empty-query", "json", "encoding", "duplicate-content-type", "oversized", "chunked-oversized", "parsed-oversized", "malformed", "unknown", "pilot-field"}
-	for _, field := range []string{"csrf", "destination_plan", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed"} {
+	states := []string{"valid", "organization-source", "legacy-source", "unknown-source", "100-targets", "101-targets", "empty-targets", "malformed-target", "unconfirmed", "signed-revision", "padded-revision", "zero-revision", "overflow-revision", "signed-group-revision", "missing-csrf", "wrong-csrf", "header-only", "query", "empty-query", "json", "encoding", "duplicate-content-type", "oversized", "chunked-oversized", "parsed-oversized", "malformed", "unknown", "pilot-field"}
+	for _, field := range []string{"csrf", "destination_plan", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed"} {
 		states = append(states, "duplicate-"+field)
 	}
 	for _, state := range states {
 		t.Run(state, func(t *testing.T) {
-			f := url.Values{"csrf": {"owned-csrf"}, "destination_plan": {"30000000-0000-4000-8000-000000000002"}, "expected_revision": {"2"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"3"}, "request_key": {"60000000-0000-4000-8000-000000000001"}, "devices": {"10000000-0000-4000-8000-000000000001:" + strings.Repeat("a", 64)}, "confirmed": {"yes"}}
+			f := url.Values{"csrf": {"owned-csrf"}, "destination_plan": {"30000000-0000-4000-8000-000000000002"}, "expected_revision": {"2"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"3"}, "group_source": {"site"}, "request_key": {"60000000-0000-4000-8000-000000000001"}, "devices": {"10000000-0000-4000-8000-000000000001:" + strings.Repeat("a", 64)}, "confirmed": {"yes"}}
 			switch state {
+			case "organization-source":
+				f.Set("group_source", "organization")
+			case "legacy-source":
+				f.Del("group_source")
+			case "unknown-source":
+				f.Set("group_source", "unknown")
 			case "100-targets", "101-targets":
+				f.Set("group_source", "organization")
 				n := 100
 				if state == "101-targets" {
 					n = 101
@@ -98,9 +105,10 @@ func TestAppleUpdatePromotionFormBoundary(t *testing.T) {
 			c.Set("csrf", "owned-csrf")
 			c.SetParamNames("plan", "assignment")
 			c.SetParamValues("30000000-0000-4000-8000-000000000001", "40000000-0000-4000-8000-000000000001")
-			q, err := appleUpdatePromotionForm(c)
-			if state == "valid" || state == "100-targets" {
+			q, organization, err := appleUpdatePromotionForm(c)
+			if state == "valid" || state == "100-targets" || state == "organization-source" || state == "legacy-source" {
 				require.NoError(t, err)
+				require.Equal(t, state == "organization-source" || state == "100-targets", organization)
 				require.Equal(t, c.Param("plan"), q.PilotPlanID)
 				require.Equal(t, c.Param("assignment"), q.PilotAssignmentID)
 				require.Equal(t, 2, q.DestinationRevision)

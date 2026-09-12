@@ -53,8 +53,9 @@ version-2 schedules needs this reader.
 An activated schedule accepts only a child assignment whose source scope matches
 its retained source, alongside the existing plan/group, actor, request, selection
 and activation-time checks. Both site-to-organization and organization-to-site
-child substitutions are rejected. Promotion destinations retain their separate
-site-only contract.
+child substitutions are rejected.
+[Organization-source pilot promotions](apple-update-organization-promotions.md)
+apply the same source matching to their separate destination receipts.
 
 Current target-site operators can read original schedules and cancel pending
 ones without acquiring organization-wide source visibility. The source name,

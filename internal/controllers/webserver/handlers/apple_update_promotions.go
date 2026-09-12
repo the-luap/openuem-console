@@ -65,7 +65,7 @@ func (h *Handler) AppleUpdatePromotionGroups(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	q, err := groupQuery(c, "destination_plan", "revision", "after")
+	q, err := groupQuery(c, "destination_plan", "revision", "source", "after")
 	if err != nil {
 		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
 	}
@@ -84,25 +84,33 @@ func (h *Handler) AppleUpdatePromotionGroups(c echo.Context) error {
 	if !apple.UpdatePromotionTargetMatches(pilot.Progress.Assignment.Plan.Definition, plan.Definition) {
 		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotionNotReady)
 	}
-	groups, err := inventory.ListDeviceGroups(c.Request().Context(), h.Model.DB, h.Access, h.appleActor(c), access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, q.Get("after"))
+	organization, err := appleUpdateGroupSource(q.Get("source"))
+	if err != nil {
+		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
+	}
+	groupScope := access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}
+	if organization {
+		groupScope.SiteID = 0
+	}
+	groups, err := inventory.ListDeviceGroups(c.Request().Context(), h.Model.DB, h.Access, h.appleActor(c), groupScope, q.Get("after"))
 	if err != nil {
 		return appleUpdatePromotionFailure(c, err)
 	}
 	paging := mdm_views.DevicePagination{}
 	if q.Get("after") != "" {
-		paging.First = mdm_views.UpdatePromotionGroupChoiceURL(info, pilot.Progress.Assignment, *plan, "")
+		paging.First = mdm_views.UpdatePromotionGroupSourceChoiceURL(info, pilot.Progress.Assignment, *plan, "", organization)
 	}
 	if groups.Next != "" {
-		paging.Next = mdm_views.UpdatePromotionGroupChoiceURL(info, pilot.Progress.Assignment, *plan, groups.Next)
+		paging.Next = mdm_views.UpdatePromotionGroupSourceChoiceURL(info, pilot.Progress.Assignment, *plan, groups.Next, organization)
 	}
-	return renderApple(c, mdm_views.AppleUpdatePromotionGroups(c, info, *pilot, *plan, groups, paging))
+	return renderApple(c, mdm_views.AppleUpdatePromotionGroups(c, info, *pilot, *plan, groups, paging, organization))
 }
 func (h *Handler) ApplePreviewUpdatePromotion(c echo.Context) error {
 	info, scope, err := h.appleUpdatePlanContext(c)
 	if err != nil {
 		return err
 	}
-	q, err := groupQuery(c, "destination_plan", "revision", "group", "group_revision")
+	q, err := groupQuery(c, "destination_plan", "revision", "group", "group_revision", "source")
 	if err != nil {
 		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
 	}
@@ -114,35 +122,51 @@ func (h *Handler) ApplePreviewUpdatePromotion(c echo.Context) error {
 	if err != nil || groupVersion == 0 {
 		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
 	}
-	preview, err := h.Apple.PreviewUpdatePromotion(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), c.Param("assignment"), q.Get("destination_plan"), revision, q.Get("group"), groupVersion)
+	organization, err := appleUpdateGroupSource(q.Get("source"))
+	if err != nil {
+		return appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
+	}
+	previewGroup := h.Apple.PreviewUpdatePromotion
+	if organization {
+		previewGroup = h.Apple.PreviewUpdatePromotionOrganizationGroup
+	}
+	preview, err := previewGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), c.Param("assignment"), q.Get("destination_plan"), revision, q.Get("group"), groupVersion)
 	if err != nil {
 		return appleUpdatePromotionFailure(c, err)
 	}
 	return renderApple(c, mdm_views.AppleUpdatePromotionPreview(c, info, *preview, uuid.NewString()))
 }
-func appleUpdatePromotionForm(c echo.Context) (apple.UpdatePromotionRequest, error) {
+func appleUpdatePromotionForm(c echo.Context) (apple.UpdatePromotionRequest, bool, error) {
 	q := apple.UpdatePromotionRequest{PilotPlanID: c.Param("plan"), PilotAssignmentID: c.Param("assignment")}
-	f, err := boundedDeviceManagementForm(c, "apple_update_promotions.invalid", []string{"csrf", "destination_plan", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed"}, 16<<10)
+	f, err := boundedDeviceManagementForm(c, "apple_update_promotions.invalid", []string{"csrf", "destination_plan", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed"}, 16<<10)
 	if err != nil {
-		return q, err
+		return q, false, err
 	}
 	q.DestinationRevision, q.GroupRevision, q.Targets, err = appleUpdateGroupSelection(f)
 	if err != nil {
-		return q, appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
+		return q, false, appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
 	}
 	q.RequestKey, q.DestinationPlanID, q.GroupID = f.Get("request_key"), f.Get("destination_plan"), f.Get("group_id")
-	return q, nil
+	organization, err := appleUpdateGroupSource(f.Get("group_source"))
+	if err != nil {
+		return q, false, appleUpdatePromotionFailure(c, apple.ErrUpdatePromotion)
+	}
+	return q, organization, nil
 }
 func (h *Handler) ApplePromoteUpdatePlanGroup(c echo.Context) error {
 	info, scope, err := h.appleUpdatePlanContext(c)
 	if err != nil {
 		return err
 	}
-	q, err := appleUpdatePromotionForm(c)
+	q, organization, err := appleUpdatePromotionForm(c)
 	if err != nil {
 		return err
 	}
-	r, err := h.Apple.PromoteUpdatePlanGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, q)
+	promoteGroup := h.Apple.PromoteUpdatePlanGroup
+	if organization {
+		promoteGroup = h.Apple.PromoteUpdatePlanOrganizationGroup
+	}
+	r, err := promoteGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, q)
 	if err != nil {
 		return appleUpdatePromotionFailure(c, err)
 	}

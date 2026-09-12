@@ -97,6 +97,8 @@ retain the source organization and recheck its read grant at activation.
 [Temporary update exceptions](apple-update-exceptions.md) now prevent new Apple
 update admission, and [reviewed pilot promotion](apple-update-promotions.md)
 retains original-pilot evidence with an explicitly approved destination group.
+[Organization-group promotion destinations](apple-update-organization-promotions.md)
+use the reviewed target-site intersection and retain its original source scope.
 Software assignments, Apple profile scheduling, broader conflict previews,
 automatic promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale

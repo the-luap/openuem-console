@@ -6,6 +6,8 @@ and dynamic group, then confirm the complete eligible selection. The console
 records the qualifying pilot evidence and destination assignment together.
 Current `updates.manage` and `devices.read` permission in the exact original
 organization/site are required for every step, including receipts and history.
+[Organization-group destinations](apple-update-organization-promotions.md) also
+require current organization-wide source read rights for preview and admission.
 
 This is an explicit promotion action. It does not automatically promote a ring
 or continuously reconcile group membership. Existing individual, group and
@@ -41,8 +43,10 @@ to a particular assignment. See [cohort progress](apple-update-progress.md) and
 
 The destination plan must be active and use the original pilot's platform,
 target version and build. Its deadline and information URL may differ. The
-current destination group must be active and contain at most 100 members across
-enabled inventory sources. Ordinary [group admission](apple-update-groups.md)
+current destination group must be active. Choose either a site group or an
+organization group evaluated only within the selected target site. The complete
+site intersection may contain at most 100 members across enabled inventory
+sources; matching devices elsewhere are outside the action. Ordinary [group admission](apple-update-groups.md)
 checks current native channel, platform, prerequisites, release availability,
 exceptions and downgrade rules for every member.
 
@@ -53,13 +57,15 @@ in the preview. Confirmation applies the destination policy to them again,
 including any changed deadline and the displayed policy replacements. No pilot
 member is silently removed from the destination's eligible selection.
 
-The confirmation form carries the destination plan/group revisions, complete
+The confirmation form carries the destination source kind, plan/group revisions, complete
 eligible native IDs, every reviewed current-policy token and a request UUID.
-It requires a checked confirmation and body CSRF token. Only the eight declared
+It requires a checked confirmation and body CSRF token. Only the nine declared
 fields are accepted, with a 16 KiB wire and parsed-body limit sufficient for
 100 targets. Duplicate fields, query overrides, unsupported media/encoding and
 header-only CSRF credentials are rejected. Plan and group choices use 25-entry
-pages with scoped links; a stale revision requires another review.
+pages with scoped links; a stale revision requires another review. Missing
+`group_source` retains the original site-only API. Unknown or duplicate source
+kinds are rejected, and dropping the field cannot select an organization group.
 
 ## Atomic admission and retries
 
@@ -80,7 +86,7 @@ including the destination assignment and its notifications.
 
 Concurrent identical requests create one promotion and one destination
 assignment. An exact retry checks current authority, actor/grant revision and
-all original request intent, then returns the immutable original receipt before
+all original request intent, including source scope, then returns the immutable original receipt before
 consulting mutable pilot or destination state. It cannot restore a subsequently
 removed or replaced policy. Reusing the request UUID with changed intent or
 permission revision is rejected.
@@ -98,7 +104,12 @@ to both the original pilot and resulting group assignment. A unique destination
 assignment can belong to only one promotion. SQL rejects receipt updates and
 deletion. A bounded 128 KiB encrypted intent binds the complete destination
 review, private child request identity and pilot evidence to the promotion IDs,
-source IDs, scope, actor, permission revision and recording time.
+source IDs, scope, actor, permission revision and recording time. New version-2
+intents additionally retain the destination group scope and require the child
+assignment to carry that same source. Original version-1 receipts remain
+readable and retryable with their original site source. No schema migration or
+history rewrite is needed. All instances reading newly written receipts need
+the updated reader; the original pilot evidence format is unchanged.
 
 Saved evidence contains each original pilot's native ID, OS version/build,
 packet source and timestamp, identity expiry, matching policy token and any
@@ -125,8 +136,8 @@ devices and failed read audits. The combined pilot/promotion tests pass in
 seconds. Broader regression evidence is recorded in
 [implementation status](implementation-status.md).
 
-All 33 strict form-boundary cases pass, including a complete 100-device
-selection. Actual registered Linux routes cover selection, stale pilot proof,
+All 37 current strict form-boundary cases pass, including explicit and legacy
+source kinds, duplicate-source rejection and a complete 100-device selection. Actual registered Linux routes cover selection, stale pilot proof,
 changed destination policy, successful admission, retained receipts, replay,
 permissions and rejected query overrides. macOS/Linux package race checks and
 the full Linux build pass. All 378 relevant browser cases pass. Sixty new Chrome cases cover plan/group choice, blocked readiness,
@@ -134,3 +145,6 @@ overlap, exact keyboard confirmation, history, receipts, reader controls and
 long escaped metadata at 390, 768 and 1440 pixels. These are owned synthetic
 checks. Actual Apple update installation, APNs delivery, reboot behavior and
 physical pilot acceptance remain separate evidence.
+
+The organization-source extension and its additional verification are described
+in [organization-group pilot promotions](apple-update-organization-promotions.md).

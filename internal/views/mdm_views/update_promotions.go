@@ -16,7 +16,13 @@ func UpdatePromotionHistoryPath(plan, assignment string) string {
 	return UpdatePlanGroupHistoryPath(plan) + "/" + assignment + "/promotions"
 }
 func UpdatePromotionGroupChoiceURL(info *partials.CommonInfo, pilot apple.UpdatePlanGroupAssignment, plan apple.UpdatePlan, after string) string {
+	return UpdatePromotionGroupSourceChoiceURL(info, pilot, plan, after, false)
+}
+func UpdatePromotionGroupSourceChoiceURL(info *partials.CommonInfo, pilot apple.UpdatePlanGroupAssignment, plan apple.UpdatePlan, after string, organization bool) string {
 	q := url.Values{"destination_plan": {plan.ID}, "revision": {strconv.Itoa(plan.Revision)}}
+	if organization {
+		q.Set("source", "organization")
+	}
 	if after != "" {
 		q.Set("after", after)
 	}
@@ -24,6 +30,9 @@ func UpdatePromotionGroupChoiceURL(info *partials.CommonInfo, pilot apple.Update
 }
 func updatePromotionReviewURL(info *partials.CommonInfo, pilot apple.UpdatePlanGroupAssignment, plan apple.UpdatePlan, group inventory.DeviceGroup) string {
 	q := url.Values{"destination_plan": {plan.ID}, "revision": {strconv.Itoa(plan.Revision)}, "group": {group.ID}, "group_revision": {strconv.Itoa(group.Revision)}}
+	if group.Scope.TenantID > 0 && group.Scope.SiteID == 0 {
+		q.Set("source", "organization")
+	}
 	return partials.GetNavigationUrl(info, UpdatePromotionPath(pilot.Plan.ID, pilot.ID)+"/review") + "?" + q.Encode()
 }
 func updatePilotDecision(p apple.UpdatePilotReadiness, id string) apple.UpdatePilotDeviceReadiness {

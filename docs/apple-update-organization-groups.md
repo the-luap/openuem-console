@@ -14,7 +14,8 @@ The same organization rule can be used in another site after a separate review.
 This action does not continuously reconcile membership or automatically assign
 updates across sites. **Site groups** retains the existing site-group workflow.
 Organization-source previews also offer a schedule form with the same reviewed
-selection. Pilot promotion destination selectors currently use site groups.
+selection. [Pilot promotion destinations](apple-update-organization-promotions.md)
+can also use an organization group within the selected site.
 
 ## Scope, authority and confirmation
 
@@ -63,8 +64,9 @@ plan/group metadata and target evidence. All console instances reading new
 receipts need this reader. Profile receipts keep their existing version-2 format.
 Schedule parent intents now retain source scope as described in
 [organization-source scheduling](apple-update-organization-schedules.md); child
-source scope must match its parent. Promotion parent formats remain unchanged
-and reject a substituted organization-source destination receipt.
+source scope must match its parent.
+[Promotion parent intents](apple-update-organization-promotions.md) also retain
+the destination source scope and reject a child with a different source kind.
 
 History and [cohort progress](apple-update-progress.md) retain the original
 organization group name, rule and revision. Original target-site authority is
@@ -78,7 +80,7 @@ links remain in the original target site.
 [pilot cohort](apple-update-promotions.md) continue to use the retained native
 selection. They do not require the old organization rule to remain active or
 unchanged. A reviewed pilot promotion still requires fresh evidence from every
-original device and a freshly admitted site-group destination. A saved update
+original device and a freshly reviewed site- or organization-group destination. A saved update
 assignment establishes admission; later device reports determine OS results.
 
 ## Verification

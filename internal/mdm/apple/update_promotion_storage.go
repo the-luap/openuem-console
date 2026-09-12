@@ -15,6 +15,7 @@ import (
 )
 
 type UpdatePromotion struct {
+	GroupScope          Scope                      `json:"-" xml:"-" yaml:"-"`
 	ID                  string                     `json:"-" xml:"-" yaml:"-"`
 	Scope               Scope                      `json:"-" xml:"-" yaml:"-"`
 	RequestKey          string                     `json:"-" xml:"-" yaml:"-"`
@@ -40,6 +41,7 @@ func (UpdatePromotion) String() string     { return "[protected Apple update pro
 func (r UpdatePromotion) GoString() string { return r.String() }
 
 type updatePromotionWire struct {
+	GroupScope          *Scope `json:",omitempty"`
 	Version             int
 	DestinationRevision int
 	GroupID             string
@@ -56,14 +58,14 @@ func updatePromotionPurpose(r *UpdatePromotion) string {
 	return fmt.Sprintf("openuem/apple/update-promotion/v1/%s/%d/%d/%s/%s/%s/%s/%s/%x/%d/%s", r.ID, r.Scope.TenantID, r.Scope.SiteID, r.RequestKey, r.PilotPlanID, r.PilotAssignmentID, r.DestinationPlanID, r.AssignmentID, sha256.Sum256([]byte(r.Actor)), r.ActorRevision, r.CreatedAt.UTC().Format(time.RFC3339Nano))
 }
 func validUpdatePromotionMetadata(r *UpdatePromotion) bool {
-	if r == nil || !profileRevisionUUID(r.ID) || !profileRevisionUUID(r.RequestKey) || !profileRevisionUUID(r.PilotPlanID) || !profileRevisionUUID(r.PilotAssignmentID) || !profileRevisionUUID(r.DestinationPlanID) || !profileRevisionUUID(r.AssignmentID) || r.AssignmentID == r.PilotAssignmentID || r.Scope.TenantID < 1 || r.Scope.SiteID < 1 || len(r.Actor) < 1 || len(r.Actor) > 255 || r.ActorRevision < 0 || r.CreatedAt.IsZero() || r.DestinationRevision < 1 || r.DestinationRevision > 2147483647 || !profileRevisionUUID(r.GroupID) || r.GroupRevision < 1 || r.GroupRevision > 2147483647 || !profileRevisionUUID(r.activationKey) || !r.sources.Apple || r.Evidence == nil || r.Evidence.AssessedAt.IsZero() || r.Evidence.AssessedAt.After(r.CreatedAt) || len(r.Evidence.Devices) < 1 || len(r.Evidence.Devices) > 100 {
+	if r == nil || !validAppleGroupSourceScope(r.GroupScope, r.Scope) || !profileRevisionUUID(r.ID) || !profileRevisionUUID(r.RequestKey) || !profileRevisionUUID(r.PilotPlanID) || !profileRevisionUUID(r.PilotAssignmentID) || !profileRevisionUUID(r.DestinationPlanID) || !profileRevisionUUID(r.AssignmentID) || r.AssignmentID == r.PilotAssignmentID || r.Scope.TenantID < 1 || r.Scope.SiteID < 1 || len(r.Actor) < 1 || len(r.Actor) > 255 || r.ActorRevision < 0 || r.CreatedAt.IsZero() || r.DestinationRevision < 1 || r.DestinationRevision > 2147483647 || !profileRevisionUUID(r.GroupID) || r.GroupRevision < 1 || r.GroupRevision > 2147483647 || !profileRevisionUUID(r.activationKey) || !r.sources.Apple || r.Evidence == nil || r.Evidence.AssessedAt.IsZero() || r.Evidence.AssessedAt.After(r.CreatedAt) || len(r.Evidence.Devices) < 1 || len(r.Evidence.Devices) > 100 {
 		return false
 	}
 	canonical, err := canonicalUpdateGroupSelection(r.Targets)
 	return err == nil && slices.Equal(canonical, r.Targets)
 }
 func promotionWire(r *UpdatePromotion) updatePromotionWire {
-	w := updatePromotionWire{Version: 1, DestinationRevision: r.DestinationRevision, GroupID: r.GroupID, GroupRevision: r.GroupRevision, Evidence: pilotEvidenceWire(r.Evidence), ActivationKey: r.activationKey, Sources: r.sources}
+	w := updatePromotionWire{Version: 2, GroupScope: &r.GroupScope, DestinationRevision: r.DestinationRevision, GroupID: r.GroupID, GroupRevision: r.GroupRevision, Evidence: pilotEvidenceWire(r.Evidence), ActivationKey: r.activationKey, Sources: r.sources}
 	for _, target := range r.Targets {
 		w.Targets = append(w.Targets, struct{ DeviceID, PolicyToken string }{target.DeviceID, target.PolicyToken})
 	}
@@ -94,8 +96,19 @@ func (s *Store) scanUpdatePromotion(row scanner) (*UpdatePromotion, error) {
 	var w updatePromotionWire
 	decoder := json.NewDecoder(bytes.NewReader(plain))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&w) != nil || decoder.Decode(new(any)) != io.EOF || w.Version != 1 {
+	if decoder.Decode(&w) != nil || decoder.Decode(new(any)) != io.EOF || (w.Version != 1 && w.Version != 2) {
 		return nil, ErrUpdatePromotionIntegrity
+	}
+	if w.Version == 1 {
+		if w.GroupScope != nil {
+			return nil, ErrUpdatePromotionIntegrity
+		}
+		r.GroupScope = r.Scope
+	} else {
+		if w.GroupScope == nil || !validAppleGroupSourceScope(*w.GroupScope, r.Scope) {
+			return nil, ErrUpdatePromotionIntegrity
+		}
+		r.GroupScope = *w.GroupScope
 	}
 	r.DestinationRevision, r.GroupID, r.GroupRevision, r.Evidence, r.activationKey, r.sources = w.DestinationRevision, w.GroupID, w.GroupRevision, decodePilotEvidence(w.Evidence), w.ActivationKey, w.Sources
 	for _, target := range w.Targets {
@@ -118,7 +131,7 @@ func (s *Store) validateUpdatePromotionSources(ctx context.Context, tx *sql.Tx, 
 	if err != nil {
 		return err
 	}
-	if assignment.GroupScope != r.Scope || assignment.RequestKey != r.activationKey || assignment.Actor != r.Actor || assignment.ActorRevision != r.ActorRevision || assignment.Plan.Revision != r.DestinationRevision || assignment.Group.ID != r.GroupID || assignment.Group.Revision != r.GroupRevision || assignment.CreatedAt.Before(r.Evidence.AssessedAt) || assignment.CreatedAt.After(r.CreatedAt) || !UpdatePromotionTargetMatches(pilot.Plan.Definition, assignment.Plan.Definition) || len(assignment.Commands) != len(r.Targets) {
+	if assignment.GroupScope != r.GroupScope || assignment.RequestKey != r.activationKey || assignment.Actor != r.Actor || assignment.ActorRevision != r.ActorRevision || assignment.Plan.Revision != r.DestinationRevision || assignment.Group.ID != r.GroupID || assignment.Group.Revision != r.GroupRevision || assignment.CreatedAt.Before(r.Evidence.AssessedAt) || assignment.CreatedAt.After(r.CreatedAt) || !UpdatePromotionTargetMatches(pilot.Plan.Definition, assignment.Plan.Definition) || len(assignment.Commands) != len(r.Targets) {
 		return ErrUpdatePromotionIntegrity
 	}
 	originalIDs := make(map[string]bool, len(pilot.Commands))

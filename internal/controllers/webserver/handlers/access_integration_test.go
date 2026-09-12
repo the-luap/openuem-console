@@ -421,6 +421,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("Apple update exceptions", func(t *testing.T) {
 		exerciseAppleUpdateExceptions(t, h, ctx, tenantID, siteID, request)
 	})
+	t.Run("Apple organization pilot promotions", func(t *testing.T) {
+		exerciseAppleUpdateOrganizationPromotions(t, h, ctx, tenantID, siteID, request)
+	})
 	t.Run("Apple organization update schedules", func(t *testing.T) {
 		exerciseAppleUpdateOrganizationSchedules(t, h, ctx, tenantID, siteID, request)
 	})

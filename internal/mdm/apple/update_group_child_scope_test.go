@@ -8,13 +8,13 @@ import (
 )
 
 func TestUpdateGroupChildSourceMustMatchScheduleOrPromotionSource(t *testing.T) {
-	for _, parent := range []string{"schedule", "organization-schedule", "promotion"} {
+	for _, parent := range []string{"schedule", "organization-schedule", "promotion", "organization-promotion"} {
 		t.Run(parent, func(t *testing.T) {
 			ctx := t.Context()
 			var f updateScheduleFixture
 			var child *UpdatePlanGroupAssignment
 			var reject func()
-			if parent != "promotion" {
+			if parent == "schedule" || parent == "organization-schedule" {
 				var schedule *UpdateSchedule
 				if parent == "organization-schedule" {
 					f = ownedOrganizationUpdateFixture(t)
@@ -35,8 +35,15 @@ func TestUpdateGroupChildSourceMustMatchScheduleOrPromotionSource(t *testing.T) 
 				}
 			} else {
 				var q UpdatePromotionRequest
-				f, _, q = ownedUpdatePromotionFixture(t)
-				promotion, err := f.store.PromoteUpdatePlanGroup(ctx, "operator", f.permissions, f.scope, f.sources, q)
+				var promotion *UpdatePromotion
+				var err error
+				if parent == "organization-promotion" {
+					f, _, q = ownedOrganizationPromotionFixture(t)
+					promotion, err = f.store.PromoteUpdatePlanOrganizationGroup(ctx, "organization", f.permissions, f.scope, f.sources, q)
+				} else {
+					f, _, q = ownedUpdatePromotionFixture(t)
+					promotion, err = f.store.PromoteUpdatePlanGroup(ctx, "operator", f.permissions, f.scope, f.sources, q)
+				}
 				require.NoError(t, err)
 				child = promotion.Assignment
 				reject = func() {
@@ -47,7 +54,7 @@ func TestUpdateGroupChildSourceMustMatchScheduleOrPromotionSource(t *testing.T) 
 			}
 			// This owned corruption fixture changes only the authenticated source
 			// kind of an otherwise valid child. Parent evidence must reject it.
-			if parent == "organization-schedule" {
+			if parent == "organization-schedule" || parent == "organization-promotion" {
 				child.GroupScope = f.scope
 			} else {
 				child.GroupScope = Scope{TenantID: f.scope.TenantID}

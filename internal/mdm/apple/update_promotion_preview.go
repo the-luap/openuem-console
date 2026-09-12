@@ -24,7 +24,7 @@ func (r UpdatePromotionPreview) GoString() string { return r.String() }
 func UpdatePromotionTargetMatches(pilot, destination UpdatePlanDefinition) bool {
 	return pilot.Platform == destination.Platform && pilot.TargetVersion == destination.TargetVersion && pilot.TargetBuild == destination.TargetBuild
 }
-func (s *Store) inspectUpdatePromotion(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, pilotPlanID, pilotAssignmentID, destinationPlanID string, destinationRevision int, groupID string, groupRevision int, admitting bool) (*UpdatePromotionPreview, error) {
+func (s *Store) inspectUpdatePromotionSource(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, pilotPlanID, pilotAssignmentID, destinationPlanID string, destinationRevision int, groupID string, groupRevision int, admitting bool) (*UpdatePromotionPreview, error) {
 	original, err := s.scanUpdateGroupAssignment(tx.QueryRowContext(ctx, `SELECT `+updateGroupColumns+` FROM mdm_apple_update_group_assignments WHERE id=$1 AND tenant_id=$2 AND site_id=$3 AND plan_id=$4`, pilotAssignmentID, scope.TenantID, scope.SiteID, pilotPlanID))
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (s *Store) inspectUpdatePromotion(ctx context.Context, tx *sql.Tx, actor st
 	for _, command := range original.Commands {
 		pilotIDs = append(pilotIDs, command.Selection.DeviceID)
 	}
-	destination, err := s.inspectUpdatePlanGroupWithPilot(ctx, tx, actor, permissions, scope, sources, destinationPlanID, destinationRevision, groupID, groupRevision, admitting, pilotIDs)
+	destination, err := s.inspectUpdatePlanGroupSourceWithPilot(ctx, tx, actor, permissions, scope, groupScope, sources, destinationPlanID, destinationRevision, groupID, groupRevision, admitting, pilotIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +56,10 @@ func (s *Store) inspectUpdatePromotion(ctx context.Context, tx *sql.Tx, actor st
 	return r, nil
 }
 func (s *Store) PreviewUpdatePromotion(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, pilotPlanID, pilotAssignmentID, destinationPlanID string, destinationRevision int, groupID string, groupRevision int) (*UpdatePromotionPreview, error) {
+	return s.previewUpdatePromotionSource(ctx, actor, permissions, scope, scope, sources, pilotPlanID, pilotAssignmentID, destinationPlanID, destinationRevision, groupID, groupRevision)
+}
+
+func (s *Store) previewUpdatePromotionSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, pilotPlanID, pilotAssignmentID, destinationPlanID string, destinationRevision int, groupID string, groupRevision int) (*UpdatePromotionPreview, error) {
 	if !sources.Apple || !profileRevisionUUID(pilotPlanID) || !profileRevisionUUID(pilotAssignmentID) || !profileRevisionUUID(destinationPlanID) || !profileRevisionUUID(groupID) || destinationRevision < 1 || destinationRevision > 2147483647 || groupRevision < 1 || groupRevision > 2147483647 {
 		return nil, ErrUpdatePlanGroup
 	}
@@ -69,7 +73,7 @@ func (s *Store) PreviewUpdatePromotion(ctx context.Context, actor string, permis
 	if err = updateExceptionAuthority(ctx, tx, permissions, actor, scope); err != nil {
 		return nil, err
 	}
-	r, err := s.inspectUpdatePromotion(ctx, tx, actor, permissions, scope, sources, pilotPlanID, pilotAssignmentID, destinationPlanID, destinationRevision, groupID, groupRevision, false)
+	r, err := s.inspectUpdatePromotionSource(ctx, tx, actor, permissions, scope, groupScope, sources, pilotPlanID, pilotAssignmentID, destinationPlanID, destinationRevision, groupID, groupRevision, false)
 	if err != nil {
 		return nil, err
 	}
