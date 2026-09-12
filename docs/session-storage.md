@@ -25,10 +25,21 @@ so cancellation of the initiating request does not prevent cleanup. Recovery and
 second-factor state from a previous account or flow is never inherited.
 
 OpenID MFA completion carries forward only an identity which still passes current
-account/binding/policy validation. Its local confirmation remains conditional;
-missing identity requires sign-in again. This shared operation addresses session
-state and cookie publication. Local credential/method validation is described below; remaining MFA persistence
-and concurrency guarantees remain separate security work.
+account/binding/policy validation. Its final transaction also locks the current
+configuration, identity binding and account before confirming registration. It
+compares the policy, binding revision, active state, account mode and exact MFA
+state, including the stored TOTP secret. Missing identity or changed authorization
+requires sign-in again. Initial callbacks use the same transaction with an explicit
+pending/complete MFA distinction. Configured initial auto-approval is retained
+only for an account whose pending-review state has not changed since validation.
+Confirmation cannot undo review imposed on an already approved account.
+
+The owned OpenID baseline reproduced 22 callback/MFA admissions despite review,
+disabled method, inactive/revised binding or changed MFA requirements/secrets.
+The actual TLS-provider/router fixtures now reject those changes before issuing
+a cookie. Store tests cover initial auto-approval, pending and completed enrollment,
+plus canceled and committed/rolled-back binding-lock waits. These checks govern
+admission; durable primary-proof consumption and TOTP replay counters remain open.
 
 Owned regressions reproduced inherited authority and usable cookies after failed
 owner association or login confirmation. Tests cover same-account reauthentication,

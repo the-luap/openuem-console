@@ -453,6 +453,12 @@ func ReadOIDCCookie(c echo.Context, name string, secretKey string) (string, erro
 // account's second-factor or recovery flags, even when reauthenticating the same
 // local account. Cookies are issued only after admission bookkeeping succeeds.
 func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcaccounts.Session) error {
+	if h.OIDCAccounts == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID account admission is unavailable")
+	}
+	if identity == nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "OpenID identity is missing")
+	}
 	identityJSON, err := json.Marshal(identity)
 	if err != nil {
 		return err
@@ -463,7 +469,7 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcac
 		extra[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.OpenID, string(identityJSON), time.Now())
 	}
 	return h.establishUserSession(c, user, false, extra, func(ctx context.Context) error {
-		return h.Model.ConfirmOIDCLogIn(ctx, user.ID)
+		return h.OIDCAccounts.AdmitSession(ctx, *identity, user, false)
 	})
 }
 
@@ -509,8 +515,7 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 			return echo.NewHTTPError(401, "OpenID access changed; start sign-in again")
 		}
 		if err := h.CreateSession(c, account, identity); err != nil {
-			log.Printf("[ERROR]: could not create session, reason: %v", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "could not create session")
+			return sessionAdmissionError(err, "OpenID session could not be completed.")
 		}
 
 		if h.AuthLogger != nil {

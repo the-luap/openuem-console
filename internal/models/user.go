@@ -245,18 +245,6 @@ func (m *Model) UserSetRevokedCertificate(uid string) error {
 	return m.Client.User.Update().SetRegister(openuem_nats.REGISTER_REVOKED).Where(user.ID(uid)).Exec(context.Background())
 }
 
-// ConfirmOIDCLogIn cannot reactivate an account revoked after identity resolution.
-func (m *Model) ConfirmOIDCLogIn(ctx context.Context, uid string) error {
-	count, err := m.Client.User.Update().SetRegister(openuem_nats.REGISTER_COMPLETE).SetCertClearPassword("").Where(user.ID(uid), user.Openid(true), user.Or(user.Passwd(false), user.PasswdIsNil()), user.RegisterNEQ(openuem_nats.REGISTER_REVOKED)).Save(ctx)
-	if err != nil {
-		return err
-	}
-	if count != 1 {
-		return errors.New("OpenID account access changed during sign-in")
-	}
-	return nil
-}
-
 func (m *Model) DeleteUser(uid string) error {
 	return m.Client.User.DeleteOneID(uid).Exec(context.Background())
 }

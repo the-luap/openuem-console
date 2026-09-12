@@ -9,10 +9,11 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 func sessionAdmissionError(err error, message string) error {
-	if errors.Is(err, models.ErrLocalSignIn) {
+	if errors.Is(err, models.ErrLocalSignIn) || errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Account access or sign-in requirements changed; sign in again.")
 	}
 	var response *echo.HTTPError
@@ -54,11 +55,14 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 		return h.Model.AdmitLocalSignIn(ctx, user, method, models.LocalSignInComplete)
 	}
 	if user.Openid {
-		if err := h.validateOIDCSession(c, user.ID); err != nil {
+		identity, err := h.validatedOIDCIdentity(c, user.ID)
+		if err != nil {
 			return err
 		}
 		extra = map[string]any{oidcSessionKey: h.SessionManager.Manager.GetString(c.Request().Context(), oidcSessionKey)}
-		confirm = func(ctx context.Context) error { return h.Model.ConfirmOIDCLogIn(ctx, user.ID) }
+		confirm = func(ctx context.Context) error {
+			return h.OIDCAccounts.AdmitSession(ctx, *identity, user, secondFactor)
+		}
 	}
 	return h.establishUserSession(c, user, secondFactor, extra, confirm)
 }

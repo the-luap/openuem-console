@@ -683,6 +683,72 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 			t.Fatal("valid session did not recover after database contention", rec.Code)
 		}
 	})
+	for _, phase := range []string{"callback", "MFA"} {
+		for _, change := range []string{"review", "method", "binding", "revision", "MFA requirement", "MFA secret"} {
+			if phase == "callback" && change == "MFA secret" {
+				continue
+			}
+			t.Run("final admission/"+phase+"/"+change, func(t *testing.T) {
+				const secret = "JBSWY3DPEHPK3PXP"
+				if err := m.Client.User.UpdateOneID("oidc-reader").SetRegister(nats.REGISTER_COMPLETE).SetUse2fa(phase == "MFA").SetTotpSecretConfirmed(phase == "MFA").SetTotpSecret(secret).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				b := browser{}
+				callback := begin(b, "valid", "oidc-reader")
+				if phase == "MFA" {
+					if rec := request(b, callback); rec.Code != 302 {
+						t.Fatal("cannot prepare owned pending MFA", rec.Code)
+					}
+				}
+				mutation := `UPDATE users SET register='` + nats.REGISTER_IN_REVIEW + `' WHERE uid=NEW.user_sessions;`
+				switch change {
+				case "method":
+					mutation = `UPDATE authentications SET use_oidc=false;`
+				case "binding":
+					mutation = `UPDATE uem_oidc_bindings SET active=false WHERE user_id=NEW.user_sessions;`
+				case "revision":
+					mutation = `UPDATE uem_oidc_accounts SET revision=revision+1 WHERE user_id=NEW.user_sessions;`
+				case "MFA requirement":
+					mutation = `UPDATE users SET use2fa=NOT use2fa WHERE uid=NEW.user_sessions;`
+				case "MFA secret":
+					mutation = `UPDATE users SET totp_secret='KRSXG5DSNFXGOIDT' WHERE uid=NEW.user_sessions;`
+				}
+				if _, err := m.DB.Exec(`CREATE FUNCTION change_final_oidc_admission() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN ` + mutation + ` RETURN NEW; END $$; CREATE TRIGGER change_final_oidc_admission AFTER UPDATE OF user_sessions ON sessions FOR EACH ROW EXECUTE FUNCTION change_final_oidc_admission()`); err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if _, err := m.DB.Exec(`DROP TRIGGER change_final_oidc_admission ON sessions; DROP FUNCTION change_final_oidc_admission(); UPDATE uem_oidc_bindings SET active=true WHERE user_id='oidc-reader'`); err != nil {
+						t.Error(err)
+					}
+					if err := m.Client.User.UpdateOneID("oidc-reader").SetRegister(nats.REGISTER_COMPLETE).SetUse2fa(false).SetTotpSecretConfirmed(false).SetTotpSecret("").Exec(t.Context()); err != nil {
+						t.Error(err)
+					}
+					configure("authelia")
+				}()
+				path := callback
+				if phase == "MFA" {
+					code, err := totp.GenerateCode(secret, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					path = "/fixture/complete-mfa?confirm-code=" + url.QueryEscape(code)
+				}
+				rec := request(b, path)
+				if rec.Code != http.StatusUnauthorized || request(b, "/fixture/session").Body.String() != "" {
+					t.Error("OpenID final admission ignored changed authorization", rec.Code)
+				}
+				if change == "review" {
+					current, err := m.Client.User.Get(t.Context(), "oidc-reader")
+					if err != nil {
+						t.Fatal(err)
+					}
+					if current.Register != nats.REGISTER_IN_REVIEW {
+						t.Error("OpenID final confirmation undid account review")
+					}
+				}
+			})
+		}
+	}
 	t.Run("revocation during admission stays revoked", func(t *testing.T) {
 		if _, err := m.DB.Exec(`CREATE FUNCTION revoke_during_oidc_admission() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN UPDATE users SET register='users.certificate_revoked' WHERE uid=NEW.user_sessions; RETURN NEW; END $$; CREATE TRIGGER revoke_during_oidc_admission AFTER UPDATE OF user_sessions ON sessions FOR EACH ROW EXECUTE FUNCTION revoke_during_oidc_admission()`); err != nil {
 			t.Fatal(err)

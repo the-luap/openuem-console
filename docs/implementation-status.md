@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- OpenID callback and MFA confirmation now run final admission in the identity
+  store's transaction. Configuration, binding namespace and account locks recheck
+  the exact policy, active identity/revision, account registration/mode and MFA
+  state before confirmation. Earlier validation cannot admit a changed binding,
+  disabled method or superseded factor; automatic initial approval cannot undo
+  review imposed after approval. The unconditional model confirmation was removed.
+  Twenty-two owned TLS-provider/router baseline cases reproduced stale admission;
+  all now return HTTP 401 without an authenticated session. Positive initial,
+  pending/new/completed MFA and auto-approval stages, intervening review and
+  committed/rolled-back/canceled binding waits pass in the 5.100-second identity
+  race suite. The full session race suite passes in 61.012 seconds; actual Linux
+  ARM64 console routes, auth/router races and the full Linux build pass. Durable
+  primary-proof consumption, TOTP replay counters and broader request-time local
+  credential checks remain open. See [OpenID admission](oidc-sign-in.md).
+
 - Local MFA completion now compares the exact stored TOTP secret inside the
   final account-lock transaction. A secret replaced after verification cannot
   authorize a password/certificate session, including backup-code completion.

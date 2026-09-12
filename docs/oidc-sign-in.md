@@ -127,8 +127,17 @@ to the same account. Previous second-factor and password-recovery flags are
 cleared, and the previous session token is retired. Local second-factor checks
 must be completed again when required by the account. The authenticated cookie
 is written only after session-owner association and login confirmation succeed.
-Login confirmation also refuses to reactivate an account revoked after identity
-resolution. On failure, authentication values are cleared before bounded session cleanup,
+Final confirmation uses one read-committed transaction with a five-second request
+deadline. It locks the current configuration, binding namespace and account in
+the same order as identity changes. The exact policy, active binding and revision,
+account mode/registration and MFA state must still match the verified evidence.
+Both initial callbacks and MFA completion reject changes made after their earlier
+validation, including replacement of the stored TOTP secret. Initial auto-approval
+can confirm an unchanged pending-review account; it cannot undo review newly
+imposed on an approved account. Pending MFA and a newly confirmed enrollment remain
+valid stages of the normal sign-in flow.
+
+On failure, authentication values are cleared before bounded session cleanup,
 so a cleanup error or the session middleware's later save cannot issue the
 failed account's authenticated session. This is failure-safe admission, not a
 single transaction spanning the session store and all account operations.

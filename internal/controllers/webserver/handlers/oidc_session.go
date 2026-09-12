@@ -13,8 +13,13 @@ import (
 const oidcSessionKey = "oidc-identity"
 
 func (h *Handler) validateOIDCSession(c echo.Context, uid string) error {
+	_, err := h.validatedOIDCIdentity(c, uid)
+	return err
+}
+
+func (h *Handler) validatedOIDCIdentity(c echo.Context, uid string) (*oidcaccounts.Session, error) {
 	if h.OIDCAccounts == nil {
-		return echo.NewHTTPError(503, "OpenID session verification is unavailable")
+		return nil, echo.NewHTTPError(503, "OpenID session verification is unavailable")
 	}
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
 	defer cancel()
@@ -27,11 +32,11 @@ func (h *Handler) validateOIDCSession(c echo.Context, uid string) error {
 		err = h.OIDCAccounts.ValidateSession(ctx, session)
 	}
 	if err == nil {
-		return nil
+		return &session, nil
 	}
 	if errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
 		_ = h.SessionManager.Manager.Clear(ctx)
-		return echo.NewHTTPError(401, "OpenID access changed; sign in again")
+		return nil, echo.NewHTTPError(401, "OpenID access changed; sign in again")
 	}
-	return echo.NewHTTPError(503, "OpenID session verification is unavailable")
+	return nil, echo.NewHTTPError(503, "OpenID session verification is unavailable")
 }
