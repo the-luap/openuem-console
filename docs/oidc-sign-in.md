@@ -161,6 +161,16 @@ so a cleanup error or the session middleware's later save cannot issue the
 failed account's authenticated session. This is failure-safe admission, not a
 single transaction spanning the session store and all account operations.
 
+Authenticated users can submit the CSRF-protected `POST /logout` action without
+administrator grants. Logout retires the local session before returning its
+provider redirect. Return destinations use the configured public console origin,
+proxy origin or direct console address; request `Referer` and forwarded headers
+never choose them. Provider URLs preserve issuer path prefixes and separately
+encode client identifiers and return URLs. An invalid or unsupported provider
+configuration falls back to the configured console address after local logout.
+The owned-provider tests verify URL construction and permanent local session
+retirement, not completion of a real provider's browser logout flow.
+
 Provider-specific production configuration, actual IdP acceptance and the other
 SSO/SEC-01 requirements remain open.
 

@@ -279,6 +279,7 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	e.POST("/myaccount/enable2fa", h.Enable2FA, h.IsAuthenticated)
 	e.POST("/myaccount/register2fa", h.Enabled2FA, h.IsAuthenticated)
 	e.POST("/myaccount/disable2fa", h.Disable2FA, h.IsAuthenticated)
+	e.POST("/logout", h.Logout, h.IsAuthenticated)
 	e.GET("/fixture/old-session", func(c echo.Context) error {
 		uid := "password-victim"
 		if c.QueryParam("same") == "yes" {
@@ -367,6 +368,78 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 		}
 	}
 	configure("authelia")
+
+	t.Run("logout uses only trusted configured URLs", func(t *testing.T) {
+		defer configure("authelia")
+		for _, kind := range []string{"authelia", "authentik", "keycloak", "zitadel"} {
+			configure(kind)
+			for _, referer := range []string{"", "https://untrusted.invalid:9443/", ":malformed"} {
+				b := browser{}
+				if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+					t.Fatal("cannot begin owned logout session", rec.Code)
+				}
+				csrf := request(b, "/fixture/csrf").Body.String()
+				oldToken := b[sm.Cookie.Name].Value
+				for _, invalid := range []string{"missing CSRF", "foreign origin"} {
+					form := url.Values{"csrf": {csrf}}
+					origin := "https://console.test"
+					if invalid == "missing CSRF" {
+						form.Del("csrf")
+					} else {
+						origin = "https://untrusted.invalid"
+					}
+					bad := httptest.NewRequest(http.MethodPost, "https://console.test/logout", strings.NewReader(form.Encode()))
+					bad.Header.Set("Origin", origin)
+					bad.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+					for _, cookie := range b {
+						bad.AddCookie(cookie)
+					}
+					denied := httptest.NewRecorder()
+					e.ServeHTTP(denied, bad)
+					if denied.Code != http.StatusForbidden {
+						t.Fatal("logout accepted an unauthorized browser request", invalid, denied.Code)
+					}
+					ctx, err := sm.Load(t.Context(), oldToken)
+					if err != nil || sm.GetString(ctx, "uid") != "oidc-reader" {
+						t.Fatal("rejected logout removed a valid session", err)
+					}
+				}
+				req := httptest.NewRequest(http.MethodPost, "https://console.test/logout", strings.NewReader(url.Values{"csrf": {csrf}}.Encode()))
+				req.Header.Set("Origin", "https://console.test")
+				req.Header.Set("Referer", referer)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				for _, cookie := range b {
+					req.AddCookie(cookie)
+				}
+				rec := httptest.NewRecorder()
+				e.ServeHTTP(rec, req)
+				if rec.Code != http.StatusFound {
+					t.Errorf("logout failed with untrusted request metadata: provider=%s status=%d", kind, rec.Code)
+					continue
+				}
+				target, err := url.Parse(rec.Header().Get("HX-Redirect"))
+				if err != nil {
+					t.Error("logout returned a malformed provider URL", err)
+					continue
+				}
+				issuer, err := url.Parse(provider.server.URL)
+				if err != nil {
+					t.Fatal(err)
+				}
+				paths := map[string]string{"authelia": "/logout", "authentik": "/end-session/", "keycloak": "/protocol/openid-connect/logout", "zitadel": "/oidc/v1/end_session"}
+				if target.Scheme != issuer.Scheme || target.Host != issuer.Host || target.Path != paths[kind] {
+					t.Errorf("logout lost configured provider endpoint: provider=%s target=%s", kind, target.Redacted())
+				}
+				if kind == "authelia" && target.Query().Get("rd") != h.PublicOrigin || (kind == "keycloak" || kind == "zitadel") && target.Query().Get("post_logout_redirect_uri") != h.PublicOrigin {
+					t.Errorf("logout return URL followed request metadata: provider=%s", kind)
+				}
+				ctx, err := sm.Load(t.Context(), oldToken)
+				if err != nil || sm.GetString(ctx, "uid") != "" {
+					t.Fatal("logout retained the local authenticated session", err)
+				}
+			}
+		}
+	})
 
 	t.Run("MFA enrollment and account settings retain provider identity", func(t *testing.T) {
 		post := func(b browser, path string, form url.Values) *httptest.ResponseRecorder {

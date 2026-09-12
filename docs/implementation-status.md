@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Non-administrator users can now submit the protected logout action for their
+  own account. Twenty-four owned-provider route cases previously stopped at the
+  administrator-only gate. After that gate was corrected, the same matrix exposed
+  request-controlled or empty return destinations, malformed provider URLs when
+  an issuer lacked a trailing slash, and errors for malformed referrers. Logout
+  now constructs URLs from trusted configuration, preserving issuer prefixes and
+  separately encoding parameters. Tests cover all four existing provider modes
+  in both storage modes, local session retirement, missing CSRF/cross-origin
+  denial, encoded client IDs, direct/proxy/public console origins and safe local
+  fallback. Handler/router race tests, the owned-provider and native-console
+  Linux routes, the added CSRF/Origin matrix and the complete Linux build pass.
+  Provider-side browser logout remains a separate acceptance boundary.
+
 - OpenID MFA staging, confirmation and disable operations now check the full
   original identity policy and active binding revision in the enrollment write
   transaction, with configuration/binding/account locks in a consistent order.

@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/auth"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -36,35 +36,41 @@ func (h *Handler) Logout(c echo.Context) error {
 	}
 
 	if u.Openid {
-		logoutURL := ""
-		redirecURI := fmt.Sprintf("https://%s:%s", h.ServerName, h.ConsolePort)
-		if h.ReverseProxyServer != "" {
-			u, err := url.Parse(c.Request().Referer())
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-			}
-
-			if u.Port() == "" {
-				redirecURI = fmt.Sprintf("https://%s", u.Hostname())
-			} else {
-				redirecURI = fmt.Sprintf("https://%s:%s", u.Hostname(), u.Port())
-			}
-		}
-
-		switch settings.OIDCProvider {
-		case auth.AUTHELIA:
-			logoutURL = fmt.Sprintf("%s/logout?rd=%s", settings.OIDCIssuerURL, redirecURI)
-		case auth.AUTHENTIK:
-			logoutURL = fmt.Sprintf("%send-session/", settings.OIDCIssuerURL)
-		case auth.KEYCLOAK:
-			logoutURL = fmt.Sprintf("%s/protocol/openid-connect/logout?client_id=%s&post_logout_redirect_uri=%s", settings.OIDCIssuerURL, settings.OIDCClientID, redirecURI)
-		case auth.ZITADEL:
-			logoutURL = fmt.Sprintf("%s/oidc/v1/end_session?client_id=%s&post_logout_redirect_uri=%s", settings.OIDCIssuerURL, settings.OIDCClientID, redirecURI)
-		}
-
-		c.Response().Header().Set("HX-Redirect", logoutURL)
+		c.Response().Header().Set("HX-Redirect", h.oidcLogoutURL(settings))
 		return c.String(http.StatusFound, "")
 	}
 
 	return h.Login(c)
+}
+
+// Logout destinations use trusted configuration only. URL construction keeps
+// issuer path prefixes and escapes the client ID and return URL independently.
+func (h *Handler) oidcLogoutURL(settings *ent.Authentication) string {
+	origin := h.consoleOrigin()
+	if settings == nil || !oidcIssuer(settings.OIDCIssuerURL) {
+		return origin
+	}
+	issuer, _ := url.Parse(settings.OIDCIssuerURL)
+	query := url.Values{}
+	var endpoint string
+	switch settings.OIDCProvider {
+	case auth.AUTHELIA:
+		endpoint = "logout"
+		query.Set("rd", origin)
+	case auth.AUTHENTIK:
+		endpoint = "end-session/"
+	case auth.KEYCLOAK:
+		endpoint = "protocol/openid-connect/logout"
+		query.Set("client_id", settings.OIDCClientID)
+		query.Set("post_logout_redirect_uri", origin)
+	case auth.ZITADEL:
+		endpoint = "oidc/v1/end_session"
+		query.Set("client_id", settings.OIDCClientID)
+		query.Set("post_logout_redirect_uri", origin)
+	default:
+		return origin
+	}
+	target := issuer.JoinPath(endpoint)
+	target.RawQuery = query.Encode()
+	return target.String()
 }

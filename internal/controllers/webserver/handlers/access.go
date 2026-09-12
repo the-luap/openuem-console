@@ -153,7 +153,7 @@ func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc)
 	}
 	if c.Request().Method == http.MethodPost {
 		switch c.Path() {
-		case "/myaccount/language", "/myaccount/info", "/myaccount/password", "/myaccount/enable2fa", "/myaccount/disable2fa", "/myaccount/register2fa":
+		case "/logout", "/myaccount/language", "/myaccount/info", "/myaccount/password", "/myaccount/enable2fa", "/myaccount/disable2fa", "/myaccount/register2fa":
 			return next(c)
 		}
 	}
