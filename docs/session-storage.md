@@ -27,7 +27,8 @@ second-factor state from a previous account or flow is never inherited.
 OpenID MFA completion carries forward only an identity which still passes current
 account/binding/policy validation. Its final transaction also locks the current
 configuration, identity binding and account before confirming registration. It
-compares the policy, binding revision, active state, account mode and exact MFA
+compares the policy and its durable generation, binding revision, active state,
+account mode and exact MFA
 state, including the stored TOTP secret. Missing identity or changed authorization
 requires sign-in again. Initial callbacks use the same transaction with an explicit
 pending/complete MFA distinction. Configured initial auto-approval is retained
@@ -240,6 +241,15 @@ method state at admission. Certificate sessions additionally retain their origin
 certificate and recheck the current registry. Request-time checks cannot recall a domain action already admitted
 before a later policy change; domain transactions must still enforce their own
 authorization boundaries.
+
+## OpenID policy generations
+
+OpenID authorization flows, pending MFA and completed sessions now retain a
+separate durable configuration generation. Changing and restoring OIDC policy
+values does not revive earlier evidence. The value is captured before provider
+authorization and checked through final admission, MFA mutations and protected
+requests; existing identity-binding revisions remain independent. Migration and
+verification are described in [OpenID policy generations](oidc-policy-generations.md).
 
 ## Completed local session generations
 

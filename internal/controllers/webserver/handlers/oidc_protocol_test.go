@@ -125,11 +125,11 @@ func TestOIDCIdentityVerificationUsesOwnedTLSProvider(t *testing.T) {
 func TestOIDCFlowExpiresAndBindsConfiguration(t *testing.T) {
 	now := time.Now()
 	settings := &ent.Authentication{UseOIDC: true, OIDCIssuerURL: "https://issuer.example", OIDCClientID: "owned-client"}
-	original := oidcFlow{Policy: oidcPolicy(settings), State: strings.Repeat("s", 64), Nonce: strings.Repeat("n", 64), Verifier: strings.Repeat("v", 43), Issuer: settings.OIDCIssuerURL, ClientID: settings.OIDCClientID, Redirect: "https://console.example/oidc/callback", Expires: now.Add(10 * time.Minute).Unix()}
-	if !original.valid(settings, original.Redirect, original.State, now) {
+	original := oidcFlow{PolicyGeneration: "a9e6a0a1-72f3-4610-ae4b-1c9d497af1d0", Policy: oidcPolicy(settings), State: strings.Repeat("s", 64), Nonce: strings.Repeat("n", 64), Verifier: strings.Repeat("v", 43), Issuer: settings.OIDCIssuerURL, ClientID: settings.OIDCClientID, Redirect: "https://console.example/oidc/callback", Expires: now.Add(10 * time.Minute).Unix()}
+	if !original.valid(settings, original.PolicyGeneration, original.Redirect, original.State, now) {
 		t.Fatal("fresh flow rejected")
 	}
-	for _, name := range []string{"expired", "future", "state", "nonce", "verifier", "issuer", "client", "redirect"} {
+	for _, name := range []string{"expired", "future", "state", "nonce", "verifier", "issuer", "client", "redirect", "missing-generation", "different-generation"} {
 		f := original
 		switch name {
 		case "expired":
@@ -146,10 +146,14 @@ func TestOIDCFlowExpiresAndBindsConfiguration(t *testing.T) {
 			f.Issuer = "https://other.example"
 		case "client":
 			f.ClientID = "other"
+		case "missing-generation":
+			f.PolicyGeneration = ""
+		case "different-generation":
+			f.PolicyGeneration = "7bba9d24-fbf9-441b-abca-0c15df08b62d"
 		case "redirect":
 			f.Redirect = "https://untrusted.invalid"
 		}
-		if f.valid(settings, original.Redirect, original.State, now) {
+		if f.valid(settings, original.PolicyGeneration, original.Redirect, original.State, now) {
 			t.Fatal("unbound flow accepted", name)
 		}
 	}

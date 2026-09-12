@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Durable OpenID policy generations](oidc-policy-generations.md) prevent a
+  changed-then-restored OIDC configuration from reviving earlier browser flows,
+  pending MFA or completed sessions. A transactional UUID follows the original
+  policy through provider verification, resolution, admission and protected
+  requests. Migration preserves generations across restarts and rejects missing
+  guards; legacy evidence requires a fresh sign-in. No-op, unrelated and rolled
+  back changes preserve valid sessions. The complete OpenID account PostgreSQL/
+  race suite passes in 28.435 seconds. The final generation/MFA regression passes
+  in 14.850 seconds, including transient configuration row waits; shared protected
+  MFA enrollment passes in 23.743 seconds. Registered Linux routes with the owned
+  TLS provider pass for plaintext and encrypted session-token storage, restored
+  policy, legacy flows, final callback/MFA races and recoverable database locks.
+  macOS/Linux package race checks and the full Linux build pass.
+
 - [Pilot promotions to organization groups](apple-update-organization-promotions.md)
   retain the explicitly reviewed destination source and target-site intersection.
   Original pilot readiness remains mandatory; current organization read and target

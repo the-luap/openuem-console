@@ -89,7 +89,11 @@ func newFixture(t *testing.T) fixture {
 			t.Fatal(err)
 		}
 	}
-	return fixture{s, m, a, oidcaccounts.PolicyFrom(settings)}
+	policy, err := s.CapturePolicy(t.Context(), oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fixture{s, m, a, policy}
 }
 
 func (f fixture) change(t *testing.T, actor, uid, subject, action string, revision int64) error {
@@ -151,7 +155,10 @@ func TestOIDCAccountBindingMigrationRevocationAndIssuerIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.p = oidcaccounts.PolicyFrom(settings)
+	f.p, err = f.s.CapturePolicy(ctx, oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err = f.s.Resolve(ctx, f.p, id); !errors.Is(err, oidcaccounts.ErrIdentity) {
 		t.Fatal("automatic registration bypassed disabled binding", err)
 	}
@@ -179,7 +186,10 @@ func TestOIDCAccountBindingMigrationRevocationAndIssuerIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.p = oidcaccounts.PolicyFrom(settings)
+	f.p, err = f.s.CapturePolicy(ctx, oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err = f.s.Resolve(ctx, oldPolicy, id); !errors.Is(err, oidcaccounts.ErrConflict) {
 		t.Fatal("old provider admitted after configuration change", err)
 	}
@@ -222,7 +232,10 @@ func TestOIDCAutomaticCreationIsAtomicConcurrentAndIndependent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.p = oidcaccounts.PolicyFrom(settings)
+	f.p, err = f.s.CapturePolicy(ctx, oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		t.Fatal(err)
+	}
 	id := oidcaccounts.Identity{Issuer: f.p.Issuer, Subject: "brand-new", Name: "admin", Email: "admin@example.test"}
 	results := make(chan string, 12)
 	failures := make(chan error, 12)

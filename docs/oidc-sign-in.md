@@ -110,7 +110,8 @@ records are retained.
 
 OpenID sessions carry the admitted local account, subject, binding revision and
 authentication policy, without provider tokens. Every protected console request
-checks the current binding, account mode/approval and configured policy within a
+checks the current binding, account mode/approval, configured policy and its
+durable generation within a
 five-second database deadline before second-factor or authorization processing.
 Missing legacy evidence, changed policy or binding revision, inactive identities,
 revoked/unapproved accounts and account-mode changes reject the request and clear
@@ -118,9 +119,11 @@ its authenticated session state. Disabling then re-enabling a binding does not
 revive old sessions. Temporary database errors return service unavailable and
 leave the valid session available for a later retry. Requests that already passed
 this check may finish; this does not claim atomic cancellation of in-progress
-operations. Changes reverted to the same policy before a session is checked are
-not a permanent policy-revocation mechanism; change the identity binding to
-invalidate that account's existing OpenID sessions permanently.
+operations. A durable configuration generation now prevents restored policy values from
+reviving old authorization flows, pending MFA or completed sessions. See
+[OpenID policy generations](oidc-policy-generations.md) for migration and retry
+behavior. Changing an identity binding remains the account-specific revocation
+mechanism.
 
 Every successful OIDC callback starts a fresh session, including a repeat login
 to the same account. Previous second-factor and password-recovery flags are

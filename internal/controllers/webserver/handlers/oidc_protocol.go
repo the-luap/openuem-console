@@ -27,7 +27,7 @@ var errOIDCResponse = errors.New("invalid OIDC response")
 type oidcFlow struct {
 	State, Verifier, Nonce     string
 	Issuer, ClientID, Redirect string
-	Policy                     string
+	Policy, PolicyGeneration   string
 	Expires                    int64
 }
 
@@ -37,10 +37,10 @@ func oidcPolicy(settings *ent.Authentication) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func (f oidcFlow) valid(settings *ent.Authentication, redirect, state string, now time.Time) bool {
+func (f oidcFlow) valid(settings *ent.Authentication, generation, redirect, state string, now time.Time) bool {
 	return len(f.State) == 64 && len(f.Nonce) == 64 && len(f.Verifier) >= 43 && len(f.Verifier) <= 128 &&
 		subtle.ConstantTimeCompare([]byte(f.State), []byte(state)) == 1 &&
-		settings.UseOIDC && f.Policy == oidcPolicy(settings) && f.Issuer == settings.OIDCIssuerURL && f.ClientID == settings.OIDCClientID && f.Redirect == redirect &&
+		settings.UseOIDC && generation != "" && f.PolicyGeneration == generation && f.Policy == oidcPolicy(settings) && f.Issuer == settings.OIDCIssuerURL && f.ClientID == settings.OIDCClientID && f.Redirect == redirect &&
 		f.Expires > now.Unix() && f.Expires <= now.Add(10*time.Minute).Unix()
 }
 

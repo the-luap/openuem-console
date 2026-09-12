@@ -163,7 +163,11 @@ func TestMFAEnrollmentSerializesCompletionAndRetiresDisabledSessions(t *testing.
 					if err = accounts.Change(t.Context(), u.ID, u.ID, settings.OIDCIssuerURL, settings.OIDCClientID, "owned-subject", "link", 0); err != nil {
 						t.Fatal(err)
 					}
-					identity, err := accounts.SessionFor(t.Context(), oidcaccounts.PolicyFrom(settings), u.ID, "owned-subject")
+					policy, err := accounts.CapturePolicy(t.Context(), oidcaccounts.PolicyFrom(settings))
+					if err != nil {
+						t.Fatal(err)
+					}
+					identity, err := accounts.SessionFor(t.Context(), policy, u.ID, "owned-subject")
 					if err != nil {
 						t.Fatal(err)
 					}

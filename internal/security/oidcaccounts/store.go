@@ -28,6 +28,9 @@ var (
 //go:embed migrations/001_bindings.sql
 var schema string
 
+//go:embed migrations/002_policy_generation.sql
+var policySchema string
+
 type Store struct {
 	db     *sql.DB
 	access *access.Store
@@ -46,6 +49,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `LOCK TABLE authentications IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684627916)`); err != nil {
 		return err
 	}
@@ -64,6 +70,26 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_oidc_migrations WHERE name='002_policy_generation')`).Scan(&applied); err != nil {
+		return err
+	}
+	if !applied {
+		if _, err = tx.ExecContext(ctx, policySchema); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO uem_oidc_migrations VALUES ('002_policy_generation')`); err != nil {
+			return err
+		}
+	}
+	var intact bool
+	if err = tx.QueryRowContext(ctx, `SELECT
+      (SELECT count(*) FROM uem_oidc_policy_generation WHERE singleton AND generation IS NOT NULL)=1
+      AND (SELECT count(*) FROM pg_catalog.pg_trigger WHERE tgrelid=pg_catalog.to_regclass('authentications') AND tgenabled IN ('O','A') AND tgfoid=pg_catalog.to_regprocedure('uem_rotate_oidc_policy_generation()') AND ((tgname='uem_oidc_policy_generation' AND tgtype=29) OR (tgname='uem_oidc_policy_truncation' AND tgtype=32)))=2`).Scan(&intact); err != nil {
+		return err
+	}
+	if !intact {
+		return errors.New("OpenID policy generation is incomplete")
+	}
 	if _, err = tx.ExecContext(ctx, mfaadmission.Schema); err != nil {
 		return err
 	}
@@ -71,13 +97,15 @@ func (s *Store) Migrate(ctx context.Context) error {
 }
 
 type Policy struct {
+	Generation                       string
 	Enabled                          bool
 	Issuer, ClientID, Provider, Role string
 	AutoCreate, AutoApprove          bool
 }
 
+// PolicyFrom extracts values for CapturePolicy; it does not authorize admission.
 func PolicyFrom(s *ent.Authentication) Policy {
-	return Policy{s.UseOIDC, s.OIDCIssuerURL, s.OIDCClientID, s.OIDCProvider, s.OIDCRole, s.OIDCAutoCreateAccount, s.OIDCAutoApprove}
+	return Policy{Enabled: s.UseOIDC, Issuer: s.OIDCIssuerURL, ClientID: s.OIDCClientID, Provider: s.OIDCProvider, Role: s.OIDCRole, AutoCreate: s.OIDCAutoCreateAccount, AutoApprove: s.OIDCAutoApprove}
 }
 
 func readPolicy(ctx context.Context, tx *sql.Tx) (Policy, error) {
@@ -88,6 +116,9 @@ func readPolicy(ctx context.Context, tx *sql.Tx) (Policy, error) {
 	}
 	defer rows.Close()
 	if !rows.Next() {
+		if err = rows.Err(); err != nil {
+			return p, err
+		}
 		return p, ErrConflict
 	}
 	if err = rows.Scan(&p.Enabled, &p.Issuer, &p.ClientID, &p.Provider, &p.Role, &p.AutoCreate, &p.AutoApprove); err != nil {
@@ -96,7 +127,17 @@ func readPolicy(ctx context.Context, tx *sql.Tx) (Policy, error) {
 	if rows.Next() {
 		return p, ErrConflict
 	}
-	return p, rows.Err()
+	if err = rows.Err(); err != nil {
+		return p, err
+	}
+	if err = rows.Close(); err != nil {
+		return p, err
+	}
+	err = tx.QueryRowContext(ctx, `SELECT generation::text FROM uem_oidc_policy_generation WHERE singleton FOR SHARE`).Scan(&p.Generation)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, ErrConflict
+	}
+	return p, err
 }
 
 func validIdentity(issuer, subject string) bool {

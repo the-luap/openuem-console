@@ -63,9 +63,9 @@ type ZitadelRolesResponse struct {
 }
 
 type OIDCSessionInfo struct {
-	Issuer, Subject, Policy string
-	Name, Email, Phone      string
-	EmailVerified           bool
+	Issuer, Subject, Policy, PolicyGeneration string
+	Name, Email, Phone                        string
+	EmailVerified                             bool
 }
 
 func (h *Handler) OIDCLogIn(c echo.Context) error {
@@ -82,6 +82,14 @@ func (h *Handler) OIDCLogIn(c echo.Context) error {
 
 	if !settings.UseOIDC {
 		return echo.NewHTTPError(http.StatusForbidden, "OpenID sign-in is disabled")
+	}
+
+	if h.OIDCAccounts == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
+	}
+	policy, err := h.OIDCAccounts.CapturePolicy(ctx, oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
 	}
 
 	// if CloudFlare Turnstile is used, check response
@@ -160,7 +168,7 @@ func (h *Handler) OIDCLogIn(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not start OpenID sign-in")
 	}
-	flow := oidcFlow{Policy: oidcPolicy(settings), State: state, Verifier: verifier, Nonce: nonce, Issuer: settings.OIDCIssuerURL, ClientID: settings.OIDCClientID, Redirect: h.GetRedirectURI(c), Expires: time.Now().Add(10 * time.Minute).Unix()}
+	flow := oidcFlow{PolicyGeneration: policy.Generation, Policy: oidcPolicy(settings), State: state, Verifier: verifier, Nonce: nonce, Issuer: settings.OIDCIssuerURL, ClientID: settings.OIDCClientID, Redirect: h.GetRedirectURI(c), Expires: time.Now().Add(10 * time.Minute).Unix()}
 	payload, err := json.Marshal(flow)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not start OpenID sign-in")
@@ -227,9 +235,16 @@ func (h *Handler) OIDCCallback(c echo.Context) error {
 		}
 	}
 
+	if h.OIDCAccounts == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
+	}
+	policy, err := h.OIDCAccounts.CapturePolicy(ctx, oidcaccounts.PolicyFrom(settings))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID sign-in is unavailable")
+	}
 	payload, err := ReadOIDCCookie(c, oidcFlowCookie, cookieEncryptionKey)
 	var flow oidcFlow
-	if err != nil || json.Unmarshal([]byte(payload), &flow) != nil || !flow.valid(settings, h.GetRedirectURI(c), state, time.Now()) {
+	if err != nil || json.Unmarshal([]byte(payload), &flow) != nil || !flow.valid(settings, policy.Generation, h.GetRedirectURI(c), state, time.Now()) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid OpenID sign-in; start again")
 	}
 
@@ -268,7 +283,7 @@ func (h *Handler) OIDCCallback(c echo.Context) error {
 
 	// Get user information
 	oidcUser := OIDCSessionInfo{
-		Issuer: idToken.Issuer, Subject: idToken.Subject, Policy: flow.Policy,
+		Issuer: idToken.Issuer, Subject: idToken.Subject, Policy: flow.Policy, PolicyGeneration: flow.PolicyGeneration,
 		Name:          u.Name,
 		Email:         u.Email,
 		EmailVerified: u.EmailVerified,
@@ -490,7 +505,9 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 	if h.OIDCAccounts == nil {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, "OpenID account registration is unavailable")
 	}
-	uid, err := h.OIDCAccounts.Resolve(c.Request().Context(), oidcaccounts.PolicyFrom(settings), oidcaccounts.Identity{
+	policy := oidcaccounts.PolicyFrom(settings)
+	policy.Generation = u.PolicyGeneration
+	uid, err := h.OIDCAccounts.Resolve(c.Request().Context(), policy, oidcaccounts.Identity{
 		Issuer: u.Issuer, Subject: u.Subject, Name: u.Name, Email: u.Email, Phone: u.Phone, EmailVerified: u.EmailVerified,
 	})
 	if err != nil {
@@ -510,7 +527,7 @@ func (h *Handler) ManageOIDCSession(c echo.Context, u *OIDCSessionInfo) error {
 
 	// If user has been approved by admin, auto approve is on or user already logged in (register completed)
 	if account.Register == nats.REGISTER_APPROVED || settings.OIDCAutoApprove || account.Register == nats.REGISTER_COMPLETE {
-		identity, err := h.OIDCAccounts.SessionFor(c.Request().Context(), oidcaccounts.PolicyFrom(settings), uid, u.Subject)
+		identity, err := h.OIDCAccounts.SessionFor(c.Request().Context(), policy, uid, u.Subject)
 		if err != nil {
 			return echo.NewHTTPError(401, "OpenID access changed; start sign-in again")
 		}

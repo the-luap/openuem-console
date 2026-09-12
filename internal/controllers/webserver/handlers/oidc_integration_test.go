@@ -272,6 +272,19 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	e.GET("/fixture/session", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) })
 	e.GET("/myaccount", func(c echo.Context) error { return c.String(200, sm.GetString(c.Request().Context(), "uid")) }, h.IsAuthenticated)
 	e.GET("/fixture/remove-identity", func(c echo.Context) error { sm.Remove(c.Request().Context(), oidcSessionKey); return c.NoContent(200) })
+	e.GET("/fixture/remove-policy-generation", func(c echo.Context) error {
+		var identity oidcaccounts.Session
+		if err := json.Unmarshal([]byte(sm.GetString(c.Request().Context(), oidcSessionKey)), &identity); err != nil {
+			return err
+		}
+		identity.Policy.Generation = ""
+		encoded, err := json.Marshal(identity)
+		if err != nil {
+			return err
+		}
+		sm.Put(c.Request().Context(), oidcSessionKey, string(encoded))
+		return c.NoContent(200)
+	})
 	e.GET("/fixture/complete-mfa", h.LoginTOTPValidate)
 	e.GET("/fixture/csrf", func(c echo.Context) error { return c.String(200, c.Get("csrf").(string)) })
 	e.POST("/login/totpregister", h.Register2FA)
@@ -369,6 +382,49 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 	}
 	configure("authelia")
 
+	for _, field := range []string{"use_oidc", "oidc_issuer_url", "oidc_client_id", "oidc_provider", "oidc_role", "oidc_auto_create_account", "oidc_auto_approve"} {
+		t.Run("restored OpenID policy/"+field, func(t *testing.T) {
+			configure("authelia")
+			completed := browser{}
+			if rec := request(completed, begin(completed, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("cannot create owned session", rec.Code)
+			}
+			pending := browser{}
+			callback := begin(pending, "valid", "oidc-reader")
+			var change any
+			switch field {
+			case "use_oidc":
+				change = false
+			case "oidc_issuer_url":
+				change = "https://other.example.test"
+			case "oidc_client_id":
+				change = "other-client"
+			case "oidc_provider":
+				change = "authentik"
+			case "oidc_role":
+				change = "other-role"
+			default:
+				change = true
+			}
+			if _, err := m.DB.ExecContext(t.Context(), `UPDATE authentications SET `+field+`=$1`, change); err != nil {
+				t.Fatal(err)
+			}
+			configure("authelia")
+			if rec := request(pending, callback); rec.Code != 401 || request(pending, "/fixture/session").Body.String() != "" {
+				t.Fatal("restored policy revived browser authorization flow", rec.Code)
+			}
+			if rec := request(completed, "/myaccount"); rec.Code != 401 || request(completed, "/fixture/session").Body.String() != "" {
+				t.Fatal("restored policy revived completed session", rec.Code)
+			}
+			fresh := browser{}
+			if rec := request(fresh, begin(fresh, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("restored policy denied fresh sign-in", rec.Code)
+			}
+			if rec := request(fresh, "/myaccount"); rec.Code != 200 {
+				t.Fatal("fresh generation lost protected access", rec.Code)
+			}
+		})
+	}
 	t.Run("logout uses only trusted configured URLs", func(t *testing.T) {
 		defer configure("authelia")
 		for _, kind := range []string{"authelia", "authentik", "keycloak", "zitadel"} {
@@ -651,12 +707,12 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 		t.Fatal("auto approval reactivated a revoked OIDC account", rec.Code)
 	}
 
-	for _, mode := range []string{"expired", "tampered", "duplicate cookie", "duplicate state", "changed client", "changed issuer", "changed role", "changed provider", "changed approval", "disabled"} {
+	for _, mode := range []string{"expired", "legacy policy generation", "tampered", "duplicate cookie", "duplicate state", "changed client", "changed issuer", "changed role", "changed provider", "changed approval", "disabled"} {
 		configure("authelia")
 		b := browser{}
 		callback := begin(b, "valid", "oidc-reader")
 		switch mode {
-		case "expired":
+		case "expired", "legacy policy generation":
 			req := httptest.NewRequest("GET", "https://console.test", nil)
 			req.AddCookie(b[oidcFlowCookie])
 			c := echo.New().NewContext(req, httptest.NewRecorder())
@@ -668,7 +724,11 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 			if err = json.Unmarshal([]byte(raw), &flow); err != nil {
 				t.Fatal(err)
 			}
-			flow.Expires = time.Now().Add(-time.Second).Unix()
+			if mode == "expired" {
+				flow.Expires = time.Now().Add(-time.Second).Unix()
+			} else {
+				flow.PolicyGeneration = ""
+			}
 			data, _ := json.Marshal(flow)
 			rec := httptest.NewRecorder()
 			c = echo.New().NewContext(httptest.NewRequest("GET", "/", nil), rec)
@@ -781,7 +841,7 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 			}
 		})
 	}
-	for _, mode := range []string{"disabled", "reenabled", "role", "issuer", "provider disabled", "revoked account", "account review", "account mode", "legacy session"} {
+	for _, mode := range []string{"disabled", "reenabled", "role", "issuer", "provider disabled", "revoked account", "account review", "account mode", "legacy session", "legacy policy generation"} {
 		t.Run("live session "+mode, func(t *testing.T) {
 			configure("authelia")
 			b := browser{}
@@ -842,6 +902,8 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 						t.Error(err)
 					}
 				}()
+			case "legacy policy generation":
+				request(b, "/fixture/remove-policy-generation")
 			case "legacy session":
 				request(b, "/fixture/remove-identity")
 			}
@@ -854,34 +916,40 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 		})
 	}
 	configure("authelia")
-	t.Run("temporary validation failure denies access without losing session", func(t *testing.T) {
-		b := browser{}
-		if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
-			t.Fatal(rec.Code)
-		}
-		tx, err := m.DB.BeginTx(t.Context(), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer tx.Rollback()
-		if _, err = tx.ExecContext(t.Context(), `LOCK TABLE uem_oidc_bindings IN ACCESS EXCLUSIVE MODE`); err != nil {
-			t.Fatal(err)
-		}
-		if rec := request(b, "/myaccount", 30*time.Millisecond); rec.Code != 503 {
-			t.Fatal("database validation failure did not deny access", rec.Code)
-		}
-		if uid := request(b, "/fixture/session").Body.String(); uid != "oidc-reader" {
-			t.Fatal("temporary verification failure discarded session", uid)
-		}
-		if err = tx.Rollback(); err != nil {
-			t.Fatal(err)
-		}
-		if rec := request(b, "/myaccount"); rec.Code != 200 {
-			t.Fatal("valid session did not recover after database contention", rec.Code)
-		}
-	})
+	for _, source := range []string{"binding", "policy"} {
+		t.Run("temporary "+source+" validation failure preserves session", func(t *testing.T) {
+			b := browser{}
+			if rec := request(b, begin(b, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal(rec.Code)
+			}
+			tx, err := m.DB.BeginTx(t.Context(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+			statement := `LOCK TABLE uem_oidc_bindings IN ACCESS EXCLUSIVE MODE`
+			if source == "policy" {
+				statement = `UPDATE authentications SET oidc_role='temporary'`
+			}
+			if _, err = tx.ExecContext(t.Context(), statement); err != nil {
+				t.Fatal(err)
+			}
+			if rec := request(b, "/myaccount", 30*time.Millisecond); rec.Code != 503 {
+				t.Fatal("database validation failure did not deny access", rec.Code)
+			}
+			if uid := request(b, "/fixture/session").Body.String(); uid != "oidc-reader" {
+				t.Fatal("temporary verification failure discarded session", uid)
+			}
+			if err = tx.Rollback(); err != nil {
+				t.Fatal(err)
+			}
+			if rec := request(b, "/myaccount"); rec.Code != 200 {
+				t.Fatal("valid session did not recover after database contention", rec.Code)
+			}
+		})
+	}
 	for _, phase := range []string{"callback", "MFA"} {
-		for _, change := range []string{"review", "method", "binding", "revision", "MFA requirement", "MFA secret"} {
+		for _, change := range []string{"review", "method", "binding", "revision", "restored policy", "MFA requirement", "MFA secret"} {
 			if phase == "callback" && change == "MFA secret" {
 				continue
 			}
@@ -905,6 +973,8 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 					mutation = `UPDATE uem_oidc_bindings SET active=false WHERE user_id=NEW.user_sessions;`
 				case "revision":
 					mutation = `UPDATE uem_oidc_accounts SET revision=revision+1 WHERE user_id=NEW.user_sessions;`
+				case "restored policy":
+					mutation = `UPDATE authentications SET oidc_role='temporary'; UPDATE authentications SET oidc_role='uem-users';`
 				case "MFA requirement":
 					mutation = `UPDATE users SET use2fa=NOT use2fa WHERE uid=NEW.user_sessions;`
 				case "MFA secret":

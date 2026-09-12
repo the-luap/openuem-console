@@ -32,6 +32,11 @@ func TestOIDCAdmissionPreservesValidFirstLoginAndMFAStages(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.p.AutoApprove = true
+				f.p.Generation = ""
+				f.p, err = f.s.CapturePolicy(t.Context(), f.p)
+				if err != nil {
+					t.Fatal(err)
+				}
 				status = nats.REGISTER_IN_REVIEW
 			}
 			u, err := f.m.Client.User.UpdateOneID("reader").SetRegister(status).SetUse2fa(stage != "no MFA" && stage != "auto approval").SetTotpSecretConfirmed(stage == "confirmed MFA").SetTotpSecret("JBSWY3DPEHPK3PXP").SetCertClearPassword("owned temporary credential").Save(t.Context())
@@ -157,6 +162,11 @@ func TestOIDCAutoApprovalCannotUndoInterveningReview(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.p.AutoApprove = true
+		f.p.Generation = ""
+		f.p, err = f.s.CapturePolicy(t.Context(), f.p)
+		if err != nil {
+			t.Fatal(err)
+		}
 		u, err := f.m.Client.User.UpdateOneID("reader").SetUse2fa(secondFactor).SetTotpSecretConfirmed(secondFactor).SetTotpSecret("JBSWY3DPEHPK3PXP").Save(t.Context())
 		if err != nil {
 			t.Fatal(err)

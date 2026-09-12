@@ -24,7 +24,7 @@ func enrollmentCodes() []string {
 
 func TestOIDCMFAEnrollmentRejectsInterveningIdentityChanges(t *testing.T) {
 	for _, operation := range []string{"stage", "confirm", "disable"} {
-		for _, mutation := range []string{"binding revision", "disabled binding", "enabled", "issuer", "client", "provider", "role", "auto create", "auto approve"} {
+		for _, mutation := range []string{"binding revision", "disabled binding", "enabled", "issuer", "client", "provider", "role", "auto create", "auto approve", "restored policy"} {
 			t.Run(operation+"/"+mutation, func(t *testing.T) {
 				f := newFixture(t)
 				if err := f.change(t, "admin", "reader", "enrollment-subject", "link", 0); err != nil {
@@ -49,13 +49,14 @@ func TestOIDCMFAEnrollmentRejectsInterveningIdentityChanges(t *testing.T) {
 					}
 				} else {
 					statements := map[string]string{
-						"enabled":      `UPDATE authentications SET use_oidc=false`,
-						"issuer":       `UPDATE authentications SET oidc_issuer_url='https://replacement.example.test'`,
-						"client":       `UPDATE authentications SET oidc_client_id='replacement-client'`,
-						"provider":     `UPDATE authentications SET oidc_provider='keycloak'`,
-						"role":         `UPDATE authentications SET oidc_role='replacement-role'`,
-						"auto create":  `UPDATE authentications SET oidc_auto_create_account=true`,
-						"auto approve": `UPDATE authentications SET oidc_auto_approve=true`,
+						"enabled":         `UPDATE authentications SET use_oidc=false`,
+						"restored policy": `UPDATE authentications SET oidc_role='temporary'; UPDATE authentications SET oidc_role='members'`,
+						"issuer":          `UPDATE authentications SET oidc_issuer_url='https://replacement.example.test'`,
+						"client":          `UPDATE authentications SET oidc_client_id='replacement-client'`,
+						"provider":        `UPDATE authentications SET oidc_provider='keycloak'`,
+						"role":            `UPDATE authentications SET oidc_role='replacement-role'`,
+						"auto create":     `UPDATE authentications SET oidc_auto_create_account=true`,
+						"auto approve":    `UPDATE authentications SET oidc_auto_approve=true`,
 					}
 					if _, err = f.m.DB.ExecContext(t.Context(), statements[mutation]); err != nil {
 						t.Fatal(err)
