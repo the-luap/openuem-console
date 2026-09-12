@@ -146,6 +146,14 @@ en:
       candidate_expired: "The issued certificate expired before the device confirmed it. Check the current identity expiry and enroll the device again if needed."
       enrollment_inactive: "Renewal stopped because this enrollment is no longer active."
       attention: "Identity renewal needs attention. Review the enrollment and command status."
+  apple_groups:
+    invalid: "Review a current System profile and dynamic group, then confirm its exact Apple device selection."
+    changed: "The profile, group or eligible devices changed. Start a new review before assigning."
+    large: "This group exceeds 100 members or the supported inventory size. Narrow its rules before assigning."
+    permission: "Your current permissions do not allow profile assignment in this site."
+    missing: "The profile, group or assignment is unavailable in this site."
+    unavailable: "The group assignment could not complete. Reload its history before retrying."
+    site: "Select a concrete site to review Apple profile group assignments."
   apple_errors:
     assignment_permission: "Your current permissions do not allow profile assignment in this scope."
     assignment_form: "Reload the profile, select 1–1000 distinct devices and choose whether to apply or remove the displayed revision."

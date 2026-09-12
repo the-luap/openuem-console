@@ -4,12 +4,13 @@ export default async function run(browser, record) {
       await browser.visit(state, width);
       const result = await browser.evaluate(`(() => {
         window.assignmentForm = document.querySelector('form[action$="/20000000-0000-0000-0000-000000000001/assign"]');
-        return {form:!!assignmentForm, revision:assignmentForm?.elements.expected_revision?.value,
+        return {groupLinks:!!document.querySelector('[data-profile-group-actions]'), form:!!assignmentForm, revision:assignmentForm?.elements.expected_revision?.value,
           fields:assignmentForm?.querySelectorAll('[name="expected_revision"]').length,
           current:document.body.textContent.includes('Current profile revision: 2'),
           width:document.documentElement.scrollWidth,viewport:innerWidth};
       })()`);
       browser.check(result.width <= result.viewport + 1, "Apple profile assignment overflows the viewport");
+      if (state === "profiles") browser.check(!result.groupLinks, "Organization catalog offered site-only group actions");
       if (state === "device-unavailable-source") {
         browser.check(!result.form, "Missing catalog source still offers an assignment");
       } else {

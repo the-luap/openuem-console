@@ -77,9 +77,11 @@ The twelve existing device-list and twelve navigation cases also pass.
 [Immediate and scheduled native Windows ring assignments](native-windows-update-groups.md) now
 capture reviewed site group revisions and exact native Windows target sets, with
 other management identities shown as exclusions. Scheduled activation rechecks
-the original revision, native membership and enabled sources. Apple/software assignments,
-exceptions, broader conflict previews, pilot promotion
-and richer predicates remain
-roadmap work. Those operations must establish their own action eligibility,
+the original revision, native membership and enabled sources.
+[Immediate Apple System-profile assignments](apple-profile-groups.md) now preview
+current action eligibility, resolve canonical Mac channels, confirm exact native
+targets and retain immutable original request evidence. Software assignments,
+Apple scheduling/update rings, exceptions, broader conflict previews, pilot
+promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale
 database acceptance and physical-device acceptance remain separate.

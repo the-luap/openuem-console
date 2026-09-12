@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple profile assignments from dynamic groups](apple-profile-groups.md) now
+  preview current action eligibility, resolve canonical Mac records to current
+  native MDM channels and require the exact reviewed profile/group revisions and
+  native target set at confirmation. Savepoint probes leave no commands or
+  reservations. Immutable encrypted receipts retain original group and command
+  evidence; exact concurrent retries preserve the original request after later
+  group, catalog or device changes. Current authority, scope and audit checks
+  protect chooser metadata, preview, admission and history. The complete Apple
+  PostgreSQL 17/race suite passes in 457.681 seconds; final group regressions pass
+  in 11.993 seconds. Registered Linux routes, middleware/handler/view/locale race
+  checks and the full Linux build pass. Thirty new Chrome cases plus nine manual
+  assignment cases pass at 390/768/1440 pixels. Small-form wire limits now apply
+  before global CSRF parsing for both body and header token paths. Apple update
+  groups, scheduling, ongoing reconciliation, organization-group intersections,
+  exceptions, promotion, software assignment and physical acceptance remain open.
+
 - Apple device-profile assignment forms now carry the displayed current catalog
   revision. Transactional admission rejects a changed revision before creating
   commands; device history labels the current source separately from its older
@@ -70,8 +86,8 @@ the table's package summaries do not remove any detail from the roadmap.
   Linux routes cover real source edits, stale forms, duplicate/missing fields,
   scope and unchanged queues after rejection. Nine Chrome cases cover exact
   keyboard apply/removal and missing-source behavior at all three widths.
-  Apple group provenance, previewed eligibility/conflicts and durable cohort
-  request replay remain further work.
+  Group provenance, eligibility preview and durable request replay are recorded
+  in the subsequent group assignment change above.
 
 - [Apple profile assignment](apple-profile-revisions.md#current-assignment-authority)
   now rechecks current console assignment permissions inside the command/audit
@@ -83,7 +99,7 @@ the table's package summaries do not remove any detail from the roadmap.
   profile/certificate/ACME/SSO/VPN/policy regression selection passes in 65.932
   seconds. Registered Linux console routes, handler/catalog race checks on
   Linux and macOS and the full Linux build pass. Reviewed manual source revisions
-  are added above; Apple group provenance remains separate implementation work.
+  and Apple group provenance are recorded above.
 
 - [Scheduled Windows group assignments](native-windows-update-groups.md) now
   capture the reviewed site group revision, exact native Windows targets and
@@ -97,8 +113,8 @@ the table's package summaries do not remove any detail from the roadmap.
   routes, Linux handler/view/catalog race checks and the full Linux build pass.
   Seventy-eight Chrome cases include 36 immediate/scheduled group cases and 42
   existing group/list/navigation cases. Organization-group intersections,
-  exceptions, automated promotion, Apple/software assignments and physical
-  patch/restart acceptance remain open.
+  exceptions, automated promotion, Apple update groups, software assignments and
+  physical patch/restart acceptance remain open.
 
 - [Immediate Windows ring assignments from dynamic groups](native-windows-update-groups.md)
   now select an exact site group revision, display native Windows targets and
@@ -115,7 +131,8 @@ the table's package summaries do not remove any detail from the roadmap.
   the full Linux build also pass. Sixty Chrome cases include the eighteen new
   Windows group states plus existing group, list and navigation checks.
   Organization-group intersections, automated promotion,
-  Apple/software group assignments and hardware acceptance remain open.
+  Apple update groups, software group assignments and hardware acceptance remain
+  open. Apple profile group assignments are recorded above.
 
 - [Dynamic device groups](dynamic-device-groups.md) now persist exact-scope
   platform/search rules with numbered history, archive/reactivation and current

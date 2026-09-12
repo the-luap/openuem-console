@@ -29,6 +29,7 @@ import deviceList from "./device-list.mjs";
 import deviceGroups from "./device-groups.mjs";
 import windowsUpdateGroups from "./windows-update-groups.mjs";
 import appleProfileAssignments from "./apple-profile-assignments.mjs";
+import appleProfileGroups from "./apple-profile-groups.mjs";
 import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
@@ -80,6 +81,7 @@ try {
         [deviceGroups,18],
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
+        [appleProfileGroups,30],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

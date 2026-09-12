@@ -81,8 +81,9 @@ ten-second deadline.
 Owned PostgreSQL/race cases cover all four roles, missing authority, organization
 and site scope, pending permission replacement, concurrent site movement and
 rollback after the final device's audit fails. The existing profile, certificate,
-ACME, SSO, VPN and policy regression selection also passes. Group provenance
-remains subsequent work.
+ACME, SSO, VPN and policy regression selection also passes.
+[Dynamic group assignment receipts](apple-profile-groups.md) now retain the
+original group revision and exact confirmed native device/command IDs.
 
 ## Reviewed assignment source
 
@@ -102,7 +103,8 @@ the established catalog update behavior.
 Assignment POSTs accept only URL-encoded body fields: one `csrf`, one
 `expected_revision`, one `desired` and 1–1000 distinct canonical `device_id`
 values. The body and parsed form are bounded to 64 KiB, including already parsed
-requests. Unknown/duplicate singleton fields, repeated devices, query arguments,
+requests. Global CSRF extraction now applies this wire limit before caching
+normalized form fields, including requests carrying a header token. Unknown/duplicate singleton fields, repeated devices, query arguments,
 content encoding and header-only CSRF proofs are rejected. Older forms need a
 reload. Invalid requests create no commands.
 

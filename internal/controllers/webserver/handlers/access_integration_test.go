@@ -403,6 +403,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 			t.Fatal("sensitive read was not audited")
 		}
 	})
+	t.Run("Apple profile group assignments", func(t *testing.T) {
+		exerciseAppleProfileGroups(t, h, ctx, tenantID, siteID, request)
+	})
 	t.Run("account reset retains permission identity and revokes old credentials", func(t *testing.T) {
 		if err = h.Access.ReplaceGrants(ctx, adminID, "openuem", 0, []access.Grant{{Role: access.Administrator}}); err != nil {
 			t.Fatal(err)

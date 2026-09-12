@@ -104,6 +104,11 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/configurations", h.AppleSaveProfile)
 		g.GET("/ios/configurations/:id/download", h.AppleDownloadProfile)
 		g.POST("/ios/configurations/:id/assign", h.AppleAssignProfile)
+		g.GET("/ios/configurations/:id/groups", h.AppleProfileGroups)
+		g.GET("/ios/configurations/:id/groups/:group/preview", h.ApplePreviewProfileGroup)
+		g.POST("/ios/configurations/:id/group-assignments", h.AppleAssignProfileGroup)
+		g.GET("/ios/configurations/:id/group-assignments", h.AppleProfileGroupAssignments)
+		g.GET("/ios/configurations/:id/group-assignments/:assignment", h.AppleProfileGroupAssignment)
 		g.POST("/ios/configurations/:id/delete", h.AppleDeleteProfile)
 		g.GET("/ios/:id", h.AppleDevice)
 		g.GET("/ios/:id/users/:user", h.AppleUser)
@@ -135,6 +140,10 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/ios/configurations/:id/assign":
+				limit = 64 << 10
+			case "/ios/configurations/:id/group-assignments":
+				limit = 8192
 			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192
 			case "/software/catalog/:version/windows-requests/:request/dispatch/reconcile", "/software/catalog/:version/windows-requests/:request/dispatch/reconciliations/:reconciliation/cancel":

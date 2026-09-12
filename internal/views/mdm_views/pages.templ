@@ -582,6 +582,13 @@ templ Profiles(c echo.Context, info *partials.CommonInfo, profiles []apple.Profi
 								</label>
 								<div class="flex flex-wrap gap-4"><button class="uk-button uk-button-primary" type="submit" name="desired" value="installed">Apply profile</button><button class="uk-button uk-button-default" type="submit" name="desired" value="removed">Remove from selected devices</button></div>
 							</form>
+							if profileGroupSiteSelected(info) {
+								<div class="flex flex-wrap gap-4" data-profile-group-actions>
+									<a class="underline" href={ templ.URL(ProfileGroupChoiceURL(info,ProfileGroupChoice{ProfileID:p.ID,ProfileName:p.Name,Revision:p.Revision,Desired:"installed"},"")) }>Apply to a dynamic group</a>
+									<a class="underline" href={ templ.URL(ProfileGroupChoiceURL(info,ProfileGroupChoice{ProfileID:p.ID,ProfileName:p.Name,Revision:p.Revision,Desired:"removed"},"")) }>Remove from a dynamic group</a>
+									<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info,ProfileGroupHistoryPath(p.ID))) }>Group assignment history</a>
+								</div>
+							}
 						}
 						<details>
 							<summary class="cursor-pointer">Upload a new revision</summary>

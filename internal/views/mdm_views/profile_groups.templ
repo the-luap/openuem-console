@@ -1,0 +1,159 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ AppleProfileGroups(c echo.Context, info *partials.CommonInfo, choice ProfileGroupChoice, page *inventory.DeviceGroupPage, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Choose a dynamic group", Url: ProfileGroupChoiceURL(info, choice, "")}}, info)
+		<main id="device-management" data-profile-groups="choose" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Choose a dynamic group</h1><p>{ profileGroupAction(choice.Desired)+": "+choice.ProfileName+" · Revision "+Number(choice.Revision) }</p><p>Only groups in the selected site are listed. The next step checks every member and shows eligible native Apple devices and exclusions.</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups")) }>Manage dynamic groups</a></div>
+			for _, group := range page.Groups {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ group.Name } · Revision { Number(group.Revision) }</h2>
+						<p>{ group.Description }</p>
+						if group.Archived {
+							<p>Archived; unavailable for new assignments.</p>
+						} else {
+							<a class="uk-button uk-button-default" href={ templ.URL(profileGroupPreviewURL(info, choice, group)) }>Review this group</a>
+						}
+					</div>
+				</section>
+			}
+			if len(page.Groups)==0 {
+				<p>No dynamic groups in this site. Create a group before assigning this profile.</p>
+			}
+			@GroupPaging(paging, "Dynamic group pages")
+		</main>
+	}
+}
+
+templ appleProfileGroupSource(info *partials.CommonInfo, source apple.ProfileGroupSource) {
+	<div data-profile-group-source style="overflow-wrap:anywhere;">
+		<h3 class="font-semibold">Original group source</h3>
+		<p>{ source.Name } · Revision { Number(source.Revision) }</p>
+		<p>{ "Platform: "+Show(source.Rule.Platform)+" · Inventory search: "+Show(source.Rule.Search) }</p>
+		<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups/"+source.ID)) }>Open the current group and its history</a>
+	</div>
+}
+
+templ AppleProfileGroupPreview(c echo.Context, info *partials.CommonInfo, preview apple.ProfileGroupPreview, requestKey string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Review group assignment", Url: ProfileGroupChoiceURL(info, ProfileGroupChoice{ProfileID: preview.ProfileID, ProfileName: preview.ProfileName, Revision: preview.ProfileRevision, Desired: preview.Desired}, "")}}, info)
+		<main id="device-management" data-profile-groups="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Review group assignment</h1><p>No device work has been saved. Confirmation rechecks the profile revision, group and complete eligible selection.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					<h2 class="uk-card-title">{ preview.ProfileName } · Revision { Number(preview.ProfileRevision) }</h2>
+					<p>{ profileGroupAction(preview.Desired) }</p>
+					@appleProfileGroupSource(info, apple.ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule})
+					<p>Some profiles reserve settings or certificate identities that cannot be shared. Review excluded devices before confirming the eligible selection.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-profile-group-targets>
+					<h2 class="uk-card-title">Eligible native Apple devices ({ Number(len(preview.Targets)) })</h2>
+					for _, target := range preview.Targets {
+						<article style="overflow-wrap:anywhere;"><h3 class="font-semibold">{ Show(target.Entry.Name) }</h3><p>{ target.Entry.Platform+" "+target.Entry.OSVersion }</p><p>Native Apple enrollment: <code>{ target.DeviceID }</code></p></article>
+					}
+					if len(preview.Targets)==0 {
+						<p>No members can receive this profile action. Review the exclusions or choose another group.</p>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-profile-group-exclusions>
+					<h2 class="uk-card-title">Excluded members ({ Number(len(preview.Excluded)) })</h2>
+					for _, target := range preview.Excluded {
+						<article style="overflow-wrap:anywhere;"><h3 class="font-semibold">{ Show(target.Entry.Name) }</h3><p>{ profileGroupExclusion(target.Reason) }</p><p>{ target.Entry.Platform } · <code>{ target.Entry.ID }</code></p></article>
+					}
+				</div>
+			</section>
+			if len(preview.Targets)>0 {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body">
+						<form method="post" action={ partials.GetNavigationUrl(info, ProfileGroupHistoryPath(preview.ProfileID)) } class="grid gap-4" data-profile-group-confirm>
+							@CSRF(info)
+							<input type="hidden" name="expected_revision" value={ Number(preview.ProfileRevision) }/><input type="hidden" name="group_id" value={ preview.Group.ID }/><input type="hidden" name="group_revision" value={ Number(preview.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="desired" value={ preview.Desired }/><input type="hidden" name="devices" value={ profileGroupDeviceFields(preview) }/>
+							<p>Only the eligible devices listed above receive this action. Profile delivery and the later device report determine its result. Later catalog revisions can update existing profile assignments.</p>
+							<label><input type="checkbox" class="uk-checkbox" name="confirmed" value="yes" required/> Apply this exact profile action to the eligible devices listed above.</label>
+							<button class="uk-button uk-button-primary" type="submit">Confirm group assignment</button>
+						</form>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ AppleProfileGroupAssignment(c echo.Context, info *partials.CommonInfo, assignment apple.ProfileGroupAssignment) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Group assignment history", Url: partials.GetNavigationUrl(info, ProfileGroupHistoryPath(assignment.ProfileID))}}, info)
+		<main id="device-management" data-profile-groups="assignment" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Original group assignment</h1><p>This records the confirmed request. Current profile and device state may have changed since it was saved.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					<h2 class="uk-card-title">{ assignment.ProfileName } · Revision { Number(assignment.ProfileRevision) }</h2>
+					<p>{ profileGroupAction(assignment.Desired) }</p>
+					@appleProfileGroupSource(info, assignment.Group)
+					<dl class="uk-description-list">
+						<dt>Confirmed by</dt>
+						<dd>{ assignment.Actor }</dd>
+						<dt>Saved</dt>
+						<dd>
+							@Timestamp(&assignment.CreatedAt)
+						</dd>
+						<dt>Assignment ID</dt>
+						<dd>{ assignment.ID }</dd>
+						<dt>Request ID</dt>
+						<dd>{ assignment.RequestKey }</dd>
+					</dl>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-profile-group-commands>
+					<h2 class="uk-card-title">Original device commands ({ Number(len(assignment.Commands)) })</h2>
+					for _, command := range assignment.Commands {
+						<article style="overflow-wrap:anywhere;"><p>Native Apple enrollment: <code>{ command.DeviceID }</code></p><p>Original command: <code>{ command.CommandID }</code></p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+command.DeviceID)) }>Open current device state</a></article>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ AppleProfileGroupAssignments(c echo.Context, info *partials.CommonInfo, profile string, items []apple.ProfileGroupAssignment, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Group assignment history", Url: partials.GetNavigationUrl(info, ProfileGroupHistoryPath(profile))}}, info)
+		<main id="device-management" data-profile-groups="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Group assignment history</h1><p>Original confirmed group requests for this profile and site. Repeating an original request does not restore earlier device state.</p></div>
+			for _, item := range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ item.ProfileName } · Revision { Number(item.ProfileRevision) }</h2>
+						<p>{ profileGroupAction(item.Desired) } · { item.Group.Name } · Group revision { Number(item.Group.Revision) }</p>
+						<p>
+							@Timestamp(&item.CreatedAt)
+						</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, ProfileGroupHistoryPath(profile)+"/"+item.ID)) }>Open original assignment</a>
+					</div>
+				</section>
+			}
+			if len(items)==0 {
+				<p>No confirmed group assignments for this profile in this site.</p>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, ProfileGroupHistoryPath(profile)) + "?before=" + next) }>Older assignments</a>
+			}
+		</main>
+	}
+}

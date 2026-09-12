@@ -79,3 +79,28 @@ func TestAppleSetupKeepsKnownGuidanceWithoutWrappedDetails(t *testing.T) {
 		}
 	}
 }
+
+func TestAppleProfileGroupErrorsSeparateBadInputFromUnreadableReceipts(t *testing.T) {
+	const secret = "owned-private-group-error-canary"
+	for _, failure := range []struct {
+		cause  error
+		status int
+	}{
+		{apple.ErrProfileGroup, 400},
+		{apple.ErrProfileGroupIntegrity, 503},
+		{errors.New("private database failure"), 503},
+	} {
+		e := router.New(&sessions.SessionManager{Manager: scs.New()}, "console.test", "443", "1M")
+		e.GET("/owned-group-error", func(c echo.Context) error {
+			return appleProfileGroupFailure(c, fmt.Errorf("%s: %w", secret, failure.cause))
+		})
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "https://console.test/owned-group-error", nil))
+		if rec.Code != failure.status {
+			t.Fatal("unexpected group error status", rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), secret) || strings.Contains(rec.Body.String(), "apple_groups.") {
+			t.Fatal("group error exposed private details or an untranslated key")
+		}
+	}
+}

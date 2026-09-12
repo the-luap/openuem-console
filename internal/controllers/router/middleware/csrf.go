@@ -38,15 +38,18 @@ func CSRF() echo.MiddlewareFunc {
 			// ordinary forms and HTMX share one invariant, regardless of browser age.
 			request := original.Clone(original.Context())
 			request.Header.Del("Sec-Fetch-Site")
-			if request.Method != http.MethodGet && request.Method != http.MethodHead && request.Method != http.MethodOptions && request.Header.Get("X-CSRF-Token") == "" {
+			formLimit := scopedFormLimit(c.Path())
+			if request.Method != http.MethodGet && request.Method != http.MethodHead && request.Method != http.MethodOptions && (request.Header.Get("X-CSRF-Token") == "" || formLimit > 0) {
 				// Parse PostForm, not Form: query parameters must never become
 				// CSRF credentials or appear in access logs as token-bearing URLs.
 				// Native console forms are small. Large package uploads use
 				// the HTMX header and retain the configured global upload limit.
 				limit := int64(4 << 20)
-				route := strings.TrimPrefix(strings.TrimPrefix(c.Path(), "/tenant/:tenant/site/:site"), "/tenant/:tenant")
-				if route == "/auth/confirm/:token" || route == "/myaccount/language" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
-					limit = 8192
+				if formLimit > 0 {
+					limit = formLimit
+				}
+				if request.ContentLength > limit {
+					return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form is too large")
 				}
 				request.Body = http.MaxBytesReader(c.Response(), request.Body, limit)
 				parseErr := request.ParseForm()
@@ -63,7 +66,7 @@ func CSRF() echo.MiddlewareFunc {
 				if request.MultipartForm != nil {
 					defer request.MultipartForm.RemoveAll()
 				}
-				if token := request.PostForm.Get("csrf"); token != "" {
+				if token := request.PostForm.Get("csrf"); token != "" && request.Header.Get("X-CSRF-Token") == "" {
 					request.Header.Set("X-CSRF-Token", token)
 				}
 			}
@@ -78,6 +81,20 @@ func CSRF() echo.MiddlewareFunc {
 			})(c)
 		}
 	}
+}
+
+// Apply small action limits before token extraction can cache a normalized
+// PostForm. Repeated separators may make a large wire body decode to few fields.
+// Header tokens retain the same bound on these explicitly enumerated forms.
+func scopedFormLimit(path string) int64 {
+	route := strings.TrimPrefix(strings.TrimPrefix(path, "/tenant/:tenant/site/:site"), "/tenant/:tenant")
+	if route == "/ios/configurations/:id/assign" {
+		return 64 << 10
+	}
+	if route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
+		return 8192
+	}
+	return 0
 }
 
 func sameRequestOrigin(r *http.Request) bool {
