@@ -8,6 +8,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"net/http"
 	"time"
 
@@ -66,11 +67,14 @@ func (h *Handler) Auth(c echo.Context) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {
 			return err
 		}
-		stage := models.LocalSignInComplete
 		if user.Use2fa {
-			stage = models.LocalSignInPendingMFA
+			return h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInPendingMFA, nil)
 		}
-		return h.Model.AdmitCertificateSignIn(ctx, user, cert, stage, nil)
+		generation, err := h.Model.CompleteLocalSession(ctx, user, loginproof.Certificate, cert, nil)
+		if err == nil {
+			h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, generation)
+		}
+		return err
 	}); err != nil {
 		if errors.Is(err, models.ErrLocalSignIn) {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Certificate account access or sign-in requirements changed.")

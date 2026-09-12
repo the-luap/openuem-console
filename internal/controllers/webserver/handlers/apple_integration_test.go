@@ -36,6 +36,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 )
 
@@ -73,6 +74,9 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		admin.Close()
 	})
 	if _, err = m.Client.Settings.Create().Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = sessiongeneration.Migrate(ctx, m.DB); err != nil {
 		t.Fatal(err)
 	}
 	settings, err := m.GetAuthenticationSettings()
@@ -141,6 +145,7 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &Handler{Access: permissions, Model: m, Apple: store, SessionManager: &sessions.SessionManager{Manager: sm}, Version: "0.11.0", ServerReleasesFolder: releases}
+	stampOwnedConsoleSession(t, h, ctx, "apple-console-admin")
 	e := echo.New()
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error { c.Set("csrf", "console-test-token"); return next(c) }

@@ -17,6 +17,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 func TestLocalSessionRejectsChangedAccountAndMethodPolicy(t *testing.T) {
@@ -47,6 +48,11 @@ func TestLocalSessionRejectsChangedAccountAndMethodPolicy(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.manager.Put(ctx, "usepasswd", password)
+				stamp, err := sessiongeneration.Current(t.Context(), f.model.DB, f.user.ID, method)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 				switch change {
 				case "revoked":
 					err = f.user.Update().SetRegister(nats.REGISTER_REVOKED).Exec(t.Context())
@@ -128,6 +134,15 @@ func prepareLocalSession(t *testing.T, password, encrypted, mfa bool) (accountPa
 	}
 	f.manager.Put(ctx, "usepasswd", password)
 	f.manager.Put(ctx, "twofa", mfa)
+	method := loginproof.Certificate
+	if password {
+		method = loginproof.Password
+	}
+	stamp, err := sessiongeneration.Current(t.Context(), f.model.DB, f.user.ID, method)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 	return f, ctx
 }
 

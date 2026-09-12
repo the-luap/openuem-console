@@ -61,6 +61,26 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Completed local sessions now retain independent random account and method
+  generations captured by the final admission transaction. Credential, active
+  MFA, account identity and restrictive registration changes rotate the account
+  generation; method changes rotate its policy generation. Restoring earlier
+  values cannot revive existing sessions. Database triggers make these changes
+  atomic with existing credential writers, while ordinary profile edits and
+  disabled-MFA secret staging preserve access. Final session metadata must be
+  saved successfully before its cookie is published. Twelve owned baseline
+  cases reproduced retained password/TOTP authority in both storage modes.
+  Regressions cover rollback, injected trigger failure, caller schema isolation,
+  exact account recreation, source-lock cancellation, fresh processes, repeated
+  migration, disabled-trigger rejection and publication failure with valid retry.
+  Focused persistence races pass in 10.631 seconds and the complete session race
+  suite in 100.832 seconds. Generation/proof/auth/router races, actual Linux ARM64
+  console/OpenID and administrator routes, startup migration and the full Linux
+  build pass. Existing local sessions without generation metadata must sign in
+  again, and older writers must stop before upgrade. Pending-proof generations
+  and completed-certificate lifetime/registry binding remain separate work. See
+  [completed local session generations](session-storage.md#completed-local-session-generations).
+
 - Certificate sign-in now requires the exact user/type/expiry registry record
   and no current local revocation, in the final admission transaction. A short
   shared revocation-table lock also observes insertions from existing writers;

@@ -53,8 +53,7 @@ func runConsoleBrowserFixture(t *testing.T, h *Handler, ctx context.Context, pat
 			if err != nil {
 				return err
 			}
-			h.SessionManager.Manager.Put(requestCtx, "uid", "apple-console-admin")
-			h.SessionManager.Manager.Put(requestCtx, "usepasswd", false)
+			stampOwnedConsoleSession(t, h, requestCtx, "apple-console-admin")
 			c.SetRequest(c.Request().WithContext(requestCtx))
 			return next(c)
 		}

@@ -166,11 +166,65 @@ with production CSRF/session middleware verify cookie deletion and durable
 retirement in both storage modes. Synthetic role/browser fixtures now declare
 completed certificate accounts and the same method flag written by real sign-in.
 
-This is live policy validation, not a credential-generation binding to the
-original local sign-in. Binding completed sessions to their original password,
-account creation and MFA generations, and certificate expiry/revocation/rotation,
-remains necessary. Checks also cannot recall a domain action already admitted
-before a later policy change. These boundaries remain open roadmap work.
+The generation checks below also bind completed sessions to the account and
+method state at admission. Original certificate expiry/revocation/rotation remains
+separate. Request-time checks cannot recall a domain action already admitted
+before a later policy change; domain transactions must still enforce their own
+authorization boundaries.
+
+## Completed local session generations
+
+Completed password and certificate sessions now carry random generation UUIDs
+for their account and authentication method. Database triggers rotate the account
+generation when its password hash, account mode, creation identity, MFA requirement,
+confirmation or active secret changes, or its registration crosses a restricted
+state. Method enable/disable changes rotate the corresponding method generation.
+Restoring a previous field value does not restore its earlier UUID, so a brief
+suspension or policy cycle still invalidates existing sessions. Generation changes
+commit or roll back with the credential/policy write.
+
+Ordinary name/email/profile edits, preparation of an unconfirmed MFA secret while
+MFA is disabled, and normal approved/issued-certificate sign-in confirmation do
+not rotate the account generation. Changing certificate policy does not rotate
+the password-method UUID. Account deletion removes its generation; recreation
+gets a new one even if the UID, creation time and credentials are copied exactly.
+Account-settings MFA confirmation requires a new sign-in for subsequent protected
+requests, after the response has shown the newly generated recovery codes.
+
+Final local admission reads these identifiers while holding configuration and
+account locks. Only a successful commit returns the new session stamp. The shared
+session publisher saves the stamp after final admission and before sending its
+cookie. Failure of that second save clears authority and retires the token; a
+valid retry can sign in. Confirmation and MFA receipts already committed by final
+admission remain committed if later session persistence or delivery fails.
+
+Protected requests compare the stored generation with current UUIDs under the
+same source locks as policy verification. They cannot adopt a new generation by
+loading the latest password hash or MFA secret. Rejected sessions are retired;
+transient verification failures still permit retry. The generation is server-side
+metadata, not a client-supplied credential or replacement for session-token proof.
+
+Migration seeds existing accounts and method identifiers, installs schema-bound
+triggers and preserves UUIDs on repeated startup. It rejects missing/disabled
+triggers or incomplete generation rows. New trigger writes require the application's
+database writers to retain access to the generation tables. All older console/auth
+writers must stop before upgrade. Completed local sessions without a stamp must
+sign in again. Existing database-backed credential writers participate through
+the triggers without constructing session metadata themselves.
+
+Twelve owned baseline cases retained old password sessions after credential,
+MFA, account-generation and restored-policy changes. The corrected baseline and
+regressions use actual password/TOTP completion in both storage modes. Additional
+checks cover harmless edits and staging, method isolation, rollback and injected
+trigger failure, a caller with a different search path, repeated startup, disabled
+trigger rejection, exact account recreation, canceled credential waits, fresh
+processes and failed final session persistence with a valid retry.
+
+This stamps completed local sessions. Pending primary proofs still use their
+existing credential, lifetime and certificate-registry checks; they do not yet
+carry independent account/method generation stamps. OpenID uses its separate
+live policy and binding-revision checks. Original certificate lifetime, registry
+changes after completed sign-in, issuer/key identity and rotation remain open.
 
 ## Password replacement policy
 

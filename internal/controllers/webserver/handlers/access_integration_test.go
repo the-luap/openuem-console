@@ -18,15 +18,37 @@ import (
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
+
+// Role/UI fixtures declare a completed sign-in; authentication protocol tests
+// separately exercise the password, certificate and MFA handlers themselves.
+func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid string) {
+	t.Helper()
+	u, err := h.Model.Client.User.Get(ctx, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	method := loginproof.Certificate
+	if u.Passwd {
+		method = loginproof.Password
+	}
+	stamp, err := sessiongeneration.Current(ctx, h.Model.DB, uid, method)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.SessionManager.Manager.Put(ctx, "uid", uid)
+	h.SessionManager.Manager.Put(ctx, "usepasswd", u.Passwd)
+	h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
+}
 
 // This runs on the complete real console router and the real Ent/Apple schemas,
 // rather than a route mock or a test-only authorization schema.
 func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, tenantID, siteID int, profileID string) {
 	t.Helper()
 	adminID := "apple-console-admin"
-	sm := h.SessionManager.Manager
-	defer sm.Put(ctx, "uid", adminID)
+	defer stampOwnedConsoleSession(t, h, ctx, adminID)
 	otherTenant, err := h.Model.Client.Tenant.Create().SetDescription("Private organization").Save(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -79,8 +101,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	}
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
-		sm.Put(ctx, "uid", user)
-		sm.Put(ctx, "usepasswd", false)
+		stampOwnedConsoleSession(t, h, ctx, user)
 		if form == nil {
 			form = url.Values{}
 		}

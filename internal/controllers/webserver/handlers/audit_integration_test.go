@@ -29,8 +29,7 @@ func exerciseAuditConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.Co
 		t.Fatal(err)
 	}
 	const admin = "apple-console-admin"
-	sm := h.SessionManager.Manager
-	defer sm.Put(ctx, "uid", admin)
+	defer stampOwnedConsoleSession(t, h, ctx, admin)
 	base := fmt.Sprintf("/tenant/%d/audit", tenant)
 	siteBase := fmt.Sprintf("/tenant/%d/site/%d/audit", tenant, site)
 	var other int
@@ -46,8 +45,7 @@ func exerciseAuditConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.Co
 	}
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
-		sm.Put(ctx, "uid", user)
-		sm.Put(ctx, "usepasswd", false)
+		stampOwnedConsoleSession(t, h, ctx, user)
 		req := httptest.NewRequest(method, path, strings.NewReader(form.Encode())).WithContext(ctx)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
@@ -212,7 +210,7 @@ func exerciseAuditConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.Co
 		protected := echo.New()
 		protected.Use(consolemiddleware.CSRF())
 		h.RegisterAudit(protected)
-		sm.Put(ctx, "uid", admin)
+		stampOwnedConsoleSession(t, h, ctx, admin)
 		req := httptest.NewRequest("GET", "https://uem.example.test"+base, nil).WithContext(ctx)
 		rec := httptest.NewRecorder()
 		protected.ServeHTTP(rec, req)

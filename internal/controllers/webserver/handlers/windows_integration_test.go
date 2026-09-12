@@ -31,15 +31,13 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 	h.Windows = store
 	h.WindowsOptions = windows.EnrollmentOptions{ManagementURL: "https://uem.example.test/mdm/windows/syncml", ProviderID: "OpenUEM", DisplayName: "OpenUEM Windows Management"}
 	admin := "apple-console-admin"
-	sm := h.SessionManager.Manager
-	defer sm.Put(ctx, "uid", admin)
+	defer stampOwnedConsoleSession(t, h, ctx, admin)
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenant, site)
 	orgBase := fmt.Sprintf("/tenant/%d", tenant)
 	scope := access.Scope{TenantID: tenant, SiteID: site}
 	request := func(user, method, path string, form url.Values) *httptest.ResponseRecorder {
 		t.Helper()
-		sm.Put(ctx, "uid", user)
-		sm.Put(ctx, "usepasswd", false)
+		stampOwnedConsoleSession(t, h, ctx, user)
 		if form == nil {
 			form = url.Values{}
 		}

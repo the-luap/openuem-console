@@ -42,6 +42,11 @@ func (s *SessionManager) Establish(ctx context.Context, writer http.ResponseWrit
 		if err = finish(ctx, token); err != nil {
 			return err
 		}
+		// Final admission may attach generation metadata. Persist that state
+		// before publishing its cookie, and retire the token if this write fails.
+		if token, expiry, err = sm.Commit(ctx); err != nil {
+			return err
+		}
 	}
 	sm.WriteSessionCookie(ctx, writer, token, expiry)
 	return nil

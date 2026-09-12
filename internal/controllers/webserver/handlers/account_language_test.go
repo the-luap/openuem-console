@@ -26,8 +26,7 @@ func exerciseAccountLanguageRoutes(t *testing.T, h *Handler) {
 	e := router.New(h.SessionManager, "console.test", "443", "1M")
 	h.Register(e, 3)
 	e.GET("/fixture/login/:id", func(c echo.Context) error {
-		h.SessionManager.Manager.Put(c.Request().Context(), "uid", c.Param("id"))
-		h.SessionManager.Manager.Put(c.Request().Context(), "usepasswd", false)
+		stampOwnedConsoleSession(t, h, c.Request().Context(), c.Param("id"))
 		return c.String(200, c.Get("csrf").(string))
 	})
 	type browser struct {

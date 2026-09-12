@@ -22,6 +22,8 @@ import (
 	console "github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 func TestAccountPasswordChangeRetiresSessionsAndRecoveryGrants(t *testing.T) {
@@ -332,6 +334,11 @@ func newAccountPasswordFixture(t *testing.T, encrypted bool) accountPasswordFixt
 	sm.Put(ctx, "uid", u.ID)
 	sm.Put(ctx, "twofa", true)
 	sm.Put(ctx, "usepasswd", true)
+	stamp, err := sessiongeneration.Current(t.Context(), f.model.DB, u.ID, loginproof.Password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
 	token, _, err := sm.Commit(ctx)
 	if err != nil {
 		t.Fatal(err)

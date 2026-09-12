@@ -12,6 +12,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 // validateLocalSession checks the currently configured local authentication
@@ -46,7 +47,9 @@ func (h *Handler) validateLocalSession(ctx context.Context, c echo.Context, user
 			err = h.Model.AdmitCertificateSignIn(ctx, user, cert, stage, nil)
 		}
 	}
-	if stage != models.LocalSignInPendingMFA || method != loginproof.Certificate {
+	if stage == models.LocalSignInCurrentSession {
+		err = h.Model.CheckLocalSession(ctx, user, method, h.SessionManager.Manager.GetString(ctx, sessiongeneration.SessionKey))
+	} else if method != loginproof.Certificate {
 		err = h.Model.AdmitLocalSignIn(ctx, user, method, stage)
 	}
 	if err == nil {

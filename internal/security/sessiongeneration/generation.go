@@ -1,0 +1,82 @@
+package sessiongeneration
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"io"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+)
+
+const SessionKey = "local-generation"
+
+var ErrChanged = errors.New("local authentication generation changed")
+
+type Stamp struct {
+	Version int    `json:"version"`
+	UserID  string `json:"user"`
+	Method  string `json:"method"`
+	Account string `json:"account"`
+	Policy  string `json:"policy"`
+}
+
+type Queryer interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+// Current reads generation identifiers. It does not authorize a user or verify
+// credentials; admission must hold the configuration and account locks first.
+func Current(ctx context.Context, q Queryer, uid, method string) (Stamp, error) {
+	stamp := Stamp{Version: 1, UserID: uid, Method: method}
+	if uid == "" || (method != loginproof.Password && method != loginproof.Certificate) {
+		return Stamp{}, ErrChanged
+	}
+	err := q.QueryRowContext(ctx, `SELECT a.generation::text,p.generation::text FROM uem_session_account_generations a CROSS JOIN uem_session_method_generations p WHERE a.user_id=$1 AND p.method=$2`, uid, method).Scan(&stamp.Account, &stamp.Policy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Stamp{}, ErrChanged
+	}
+	return stamp, err
+}
+
+func (s Stamp) Encode() string {
+	raw, _ := json.Marshal(s)
+	return string(raw)
+}
+
+func Read(raw, uid, method string) (Stamp, error) {
+	var s Stamp
+	if raw == "" || len(raw) > 2048 || uid == "" {
+		return s, ErrChanged
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&s) != nil || decoder.Decode(new(any)) != io.EOF || s.Version != 1 || s.UserID != uid || s.Method != method || (method != loginproof.Password && method != loginproof.Certificate) {
+		return Stamp{}, ErrChanged
+	}
+	for _, value := range []string{s.Account, s.Policy} {
+		parsed, err := uuid.Parse(value)
+		if err != nil || parsed.String() != value || parsed.Version() != 4 || parsed.Variant() != uuid.RFC4122 {
+			return Stamp{}, ErrChanged
+		}
+	}
+	return s, nil
+}
+
+func Migrate(parent context.Context, db *sql.DB) error {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	defer cancel()
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, Schema); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

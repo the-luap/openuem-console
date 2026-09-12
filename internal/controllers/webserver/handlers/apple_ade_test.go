@@ -37,11 +37,10 @@ func TestADEExactRoutesAndSafeFailures(t *testing.T) {
 func exerciseADERoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, tenant, site, otherTenant, otherSite int) {
 	t.Helper()
 	t.Run("ADE connection routes enforce organization scope and safe token import", func(t *testing.T) {
-		defer h.SessionManager.Manager.Put(ctx, "uid", "apple-console-admin")
+		defer stampOwnedConsoleSession(t, h, ctx, "apple-console-admin")
 		request := func(user, method, path, contentType string, body []byte) *httptest.ResponseRecorder {
 			t.Helper()
-			h.SessionManager.Manager.Put(ctx, "uid", user)
-			h.SessionManager.Manager.Put(ctx, "usepasswd", false)
+			stampOwnedConsoleSession(t, h, ctx, user)
 			req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(ctx)
 			req.Header.Set("Content-Type", contentType)
 			rec := httptest.NewRecorder()

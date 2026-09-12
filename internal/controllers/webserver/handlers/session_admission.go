@@ -13,6 +13,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 func sessionAdmissionError(err error, message string) error {
@@ -61,10 +62,11 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 		method = loginproof.Password
 	}
 	confirm := func(ctx context.Context) error {
-		if secondFactor {
-			return h.Model.CompleteMFASignIn(ctx, user, method, evidence)
+		generation, err := h.Model.CompleteLocalSession(ctx, user, method, nil, evidence)
+		if err == nil {
+			h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, generation)
 		}
-		return h.Model.AdmitLocalSignIn(ctx, user, method, models.LocalSignInComplete)
+		return err
 	}
 	if user.Openid {
 		identity, err := h.validatedOIDCIdentity(c, user.ID)
@@ -85,7 +87,11 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 			return err
 		}
 		confirm = func(ctx context.Context) error {
-			return h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInComplete, evidence)
+			generation, err := h.Model.CompleteLocalSession(ctx, user, method, cert, evidence)
+			if err == nil {
+				h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, generation)
+			}
+			return err
 		}
 	}
 	return h.establishUserSession(c, user, secondFactor, extra, confirm)

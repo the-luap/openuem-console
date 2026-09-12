@@ -37,14 +37,12 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	h.Desktop = store
 	h.PublicOrigin = "https://uem.example.test"
 	adminID := "apple-console-admin"
-	sm := h.SessionManager.Manager
-	defer sm.Put(ctx, "uid", adminID)
+	defer stampOwnedConsoleSession(t, h, ctx, adminID)
 	base := fmt.Sprintf("/tenant/%d/site/%d", tenantID, siteID)
 	orgBase := fmt.Sprintf("/tenant/%d", tenantID)
 	requestBody := func(user, method, path, contentType string, body []byte) *httptest.ResponseRecorder {
 		t.Helper()
-		sm.Put(ctx, "uid", user)
-		sm.Put(ctx, "usepasswd", false)
+		stampOwnedConsoleSession(t, h, ctx, user)
 		req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(ctx)
 		req.Header.Set("Content-Type", contentType)
 		rec := httptest.NewRecorder()

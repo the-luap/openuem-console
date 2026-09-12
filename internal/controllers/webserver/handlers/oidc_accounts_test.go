@@ -52,11 +52,9 @@ func exerciseOIDCAccountRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx conte
 			t.Fatal(err)
 		}
 	}
-	sm := h.SessionManager.Manager
-	defer sm.Put(ctx, "uid", "apple-console-admin")
+	defer stampOwnedConsoleSession(t, h, ctx, "apple-console-admin")
 	request := func(actor, method, path string, form url.Values) *httptest.ResponseRecorder {
-		sm.Put(ctx, "uid", actor)
-		sm.Put(ctx, "usepasswd", false)
+		stampOwnedConsoleSession(t, h, ctx, actor)
 		req := httptest.NewRequest(method, path, strings.NewReader(form.Encode())).WithContext(ctx)
 		if method == "POST" {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

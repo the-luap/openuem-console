@@ -11,6 +11,7 @@ import (
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
+	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
 
 var ErrLocalSignIn = errors.New("local sign-in policy or credentials changed")
@@ -29,17 +30,29 @@ const (
 // was checked. Configuration is locked before the account, so confirmation cannot
 // undo revocation or silently accept a changed password, mode or MFA requirement.
 func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage) error {
-	return m.admitLocalSignIn(parent, expected, method, stage, nil, nil)
+	return m.admitLocalSignIn(parent, expected, method, stage, nil, nil, "", nil)
 }
 
 func (m *Model) CompleteMFASignIn(parent context.Context, expected *ent.User, method string, evidence *mfaadmission.Evidence) error {
 	if evidence == nil {
 		return mfaadmission.ErrRejected
 	}
-	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence, nil)
+	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence, nil, "", nil)
 }
 
-func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate) error {
+// CompleteLocalSession returns generation metadata only after final admission
+// commits. The session publisher must save it before issuing the new cookie.
+func (m *Model) CompleteLocalSession(ctx context.Context, expected *ent.User, method string, cert *x509.Certificate, evidence *mfaadmission.Evidence) (string, error) {
+	var issued string
+	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInComplete, evidence, cert, "", &issued)
+	return issued, err
+}
+
+func (m *Model) CheckLocalSession(ctx context.Context, expected *ent.User, method, generation string) error {
+	return m.admitLocalSignIn(ctx, expected, method, LocalSignInCurrentSession, nil, nil, generation, nil)
+}
+
+func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate, generation string, issued *string) error {
 	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInCurrentSession {
 		return ErrLocalSignIn
 	}
@@ -95,6 +108,19 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 	if stage == LocalSignInCurrentSession && (confirmed != expected.TotpSecretConfirmed || secret != expected.TotpSecret) {
 		return ErrLocalSignIn
 	}
+	if stage == LocalSignInCurrentSession {
+		previous, err := sessiongeneration.Read(generation, expected.ID, method)
+		if err != nil {
+			return ErrLocalSignIn
+		}
+		current, err := sessiongeneration.Current(ctx, tx, expected.ID, method)
+		if err != nil {
+			return err
+		}
+		if previous.Account != current.Account || previous.Policy != current.Policy {
+			return ErrLocalSignIn
+		}
+	}
 	if stage == LocalSignInPendingMFA && !mfa {
 		return ErrLocalSignIn
 	}
@@ -121,10 +147,23 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			return err
 		}
 	}
+	var stamp sessiongeneration.Stamp
+	if issued != nil {
+		stamp, err = sessiongeneration.Current(ctx, tx, expected.ID, method)
+		if err != nil {
+			return err
+		}
+	}
 	if cert != nil && !cert.NotAfter.After(time.Now()) {
 		return ErrLocalSignIn
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	if issued != nil {
+		*issued = stamp.Encode()
+	}
+	return nil
 }
 
 // All credential mutations lock configuration before users to share one lock order.
