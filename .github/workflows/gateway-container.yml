@@ -10,6 +10,7 @@ on:
       - 'cmd/openuem-gateway/**'
       - 'internal/gateway/**'
       - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
       - 'internal/desktop/protocol/**'
       - 'internal/mdm/windows/protocol/**'
   push:
@@ -22,6 +23,7 @@ on:
       - 'cmd/openuem-gateway/**'
       - 'internal/gateway/**'
       - 'internal/security/clientidentity/**'
+      - 'internal/security/loginproof/**'
       - 'internal/desktop/protocol/**'
       - 'internal/mdm/windows/protocol/**'
 

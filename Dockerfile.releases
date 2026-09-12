@@ -6,6 +6,7 @@ COPY cmd/openuem-agent-releases ./cmd/openuem-agent-releases
 COPY internal/desktop ./internal/desktop
 COPY internal/gateway ./internal/gateway
 COPY internal/security/clientidentity ./internal/security/clientidentity
+COPY internal/security/loginproof ./internal/security/loginproof
 COPY internal/mdm/windows/protocol ./internal/mdm/windows/protocol
 ARG TARGETOS
 ARG TARGETARCH

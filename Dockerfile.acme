@@ -9,6 +9,7 @@ COPY cmd/openuem-acme ./cmd/openuem-acme
 COPY internal/acmeissuer ./internal/acmeissuer
 COPY internal/gateway ./internal/gateway
 COPY internal/security/clientidentity ./internal/security/clientidentity
+COPY internal/security/loginproof ./internal/security/loginproof
 COPY internal/desktop/protocol ./internal/desktop/protocol
 COPY internal/mdm/windows/protocol ./internal/mdm/windows/protocol
 ARG TARGETOS

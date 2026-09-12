@@ -321,7 +321,14 @@ func newAccountPasswordFixture(t *testing.T, encrypted bool) accountPasswordFixt
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, err := f.model.Client.User.Create().SetID("owner").SetName("Owned account user").SetPasswd(true).SetHash(hash).SetRegister(nats.REGISTER_COMPLETE).SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret("JBSWY3DPEHPK3PXP").SetForgotPasswordCode("owned outstanding recovery hash").SetForgotPasswordCodeExpiresAt(time.Now().Add(time.Hour)).SetNewUserToken("owned outstanding invitation").Save(t.Context())
+	// Include sub-microsecond precision on every host; PostgreSQL persists only
+	// microseconds. Assertions must compare the persisted pre-request snapshot.
+	expires := time.Now().Add(time.Hour).Truncate(time.Microsecond).Add(123 * time.Nanosecond)
+	u, err := f.model.Client.User.Create().SetID("owner").SetName("Owned account user").SetPasswd(true).SetHash(hash).SetRegister(nats.REGISTER_COMPLETE).SetUse2fa(true).SetTotpSecretConfirmed(true).SetTotpSecret("JBSWY3DPEHPK3PXP").SetForgotPasswordCode("owned outstanding recovery hash").SetForgotPasswordCodeExpiresAt(expires).SetNewUserToken("owned outstanding invitation").Save(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err = f.model.Client.User.Get(t.Context(), u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

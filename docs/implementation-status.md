@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- CI exposed missing `loginproof` inputs in the restricted gateway, ACME and
+  release-tool container builds after certificate evidence introduced that
+  dependency. Each build context and copy list now includes the package; gateway
+  and ACME workflow filters also track it. All three actual Linux ARM64 images
+  build locally. The isolated unprivileged gateway process passes in 3.10 seconds;
+  real local DNS-01/renewal passes with authorization reuse disabled and enabled
+  in 15.54 and 9.74 seconds. The release-tool runtime starts successfully. Separate
+  Linux session failures reproduced six assertions comparing the create builder's
+  nanosecond timestamp against PostgreSQL's persisted microseconds. Fixtures now
+  deliberately include fractional microseconds and reload their original database
+  snapshot before checking denied writes. The Linux account-password cases and
+  their complete focused race suite pass, the latter in 11.436 seconds. These
+  local results do not claim that the earlier failing remote runs passed.
+
 - Completed local sessions now retain independent random account and method
   generations captured by the final admission transaction. Credential, active
   MFA, account identity and restrictive registration changes rotate the account

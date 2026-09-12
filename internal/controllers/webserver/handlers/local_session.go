@@ -17,8 +17,8 @@ import (
 
 // validateLocalSession checks the currently configured local authentication
 // policy against the method recorded at sign-in. It never confirms registration.
-// Credential-generation binding to the original sign-in is separate from this
-// request-time policy check.
+// Completed sessions must also retain the account and method generations
+// recorded by their original admission.
 func (h *Handler) validateLocalSession(ctx context.Context, c echo.Context, user *ent.User) error {
 	password, recorded := h.SessionManager.Manager.Get(ctx, "usepasswd").(bool)
 	if !recorded || user.Openid {

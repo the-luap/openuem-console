@@ -5,6 +5,7 @@ COPY go.mod go.sum ./
 COPY cmd/openuem-gateway ./cmd/openuem-gateway
 COPY internal/gateway ./internal/gateway
 COPY internal/security/clientidentity ./internal/security/clientidentity
+COPY internal/security/loginproof ./internal/security/loginproof
 COPY internal/desktop/protocol ./internal/desktop/protocol
 COPY internal/mdm/windows/protocol ./internal/mdm/windows/protocol
 ARG TARGETOS

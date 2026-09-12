@@ -19,6 +19,8 @@
 !internal/security/
 !internal/security/clientidentity/
 !internal/security/clientidentity/*.go
+!internal/security/loginproof/
+!internal/security/loginproof/*.go
 !internal/mdm/
 !internal/mdm/windows/
 !internal/mdm/windows/protocol/
