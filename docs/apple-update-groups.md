@@ -68,7 +68,10 @@ availability indefinitely or introduce a separate delivery-time group authorizat
 mechanism. Normal declarative management, availability reconciliation and device
 observations continue to determine the current policy and compliance. Receipt
 links open current device state while retaining original source and notification
-identities. Current-state changes do not rewrite historical requests.
+identities. [Current cohort progress](apple-update-progress.md) separately
+assesses fresh OS observations, configured-policy changes and original
+notification state for the exact retained selection. Current-state changes do not
+rewrite historical requests.
 
 History requires current update authority in the original scope and a successful
 read audit. It uses 25-entry timestamp/UUID pages; cursors belong to the selected

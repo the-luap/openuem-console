@@ -74,6 +74,23 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.Contains(t, detail.Body.String(), "Original group update assignment")
 	require.Contains(t, detail.Body.String(), "Owned &lt;group update&gt;")
 	require.Equal(t, 403, request("scoped-viewer", "GET", location, nil).Code)
+	progressPath := location + "/progress"
+	require.Equal(t, 403, request("scoped-viewer", "GET", progressPath, nil).Code)
+	progressPage := request("scoped-operator", "GET", progressPath, nil)
+	require.Equal(t, 200, progressPage.Code)
+	require.Equal(t, "no-store", progressPage.Header().Get("Cache-Control"))
+	require.Contains(t, progressPage.Body.String(), "Current cohort progress")
+	require.Contains(t, progressPage.Body.String(), "No usable OS observation")
+	require.Equal(t, 400, request("scoped-operator", "GET", progressPath+"?record=yes", nil).Code)
+	// Owned protocol-observation projection for the actual registered read path.
+	// The Apple package separately exercises authenticated status ingestion.
+	_, err = h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_apple_os_observations(device_id,version,build,source,recorded_at) VALUES($1,'18.7.1','22H100','declarative_status',clock_timestamp())`, invite.DeviceID)
+	require.NoError(t, err)
+	progressPage = request("scoped-operator", "GET", progressPath, nil)
+	require.Equal(t, 200, progressPage.Code)
+	require.Contains(t, progressPage.Body.String(), "Target or newer OS reported")
+	require.Contains(t, progressPage.Body.String(), "Reported OS: 18.7.1")
+
 	definition := plan.Definition
 	definition.Archived = true
 	_, err = h.Apple.SaveUpdatePlan(ctx, "scoped-operator", h.Access, scope, plan.ID, 1, definition)

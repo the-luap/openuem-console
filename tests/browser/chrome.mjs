@@ -23,6 +23,7 @@ const assetRoot = realpathSync(
 const fixtures = new Set([
  ...["choose","empty","preview","existing","excluded","assignment","history","empty-history","long"].map(state=>`apple-update-group-${state}`),
  ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long"].map(state=>`apple-update-schedule-${state}`),
+ ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long"].map(state=>`apple-update-progress-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`apple-update-plan-${state}`),
  ...["choose","empty","preview","remove","excluded","assignment","history","empty-history","long","catalog"].map(state=>`apple-profile-group-${state}`),
  ...["first","next","empty","long"].map(state=>`device-list-${state}`),

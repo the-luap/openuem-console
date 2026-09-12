@@ -33,6 +33,7 @@ export default async function run(browser,record) {
   if(state==='empty')browser.check(view.text.includes('No dynamic groups'),'Empty chooser lost its explanation');
   if(state==='excluded')browser.check(view.text.includes('No members can receive')&&view.text.includes('Owned Windows'),'All-excluded preview lost its explanation');
   if(state==='assignment')browser.check(view.text.includes('Original group update assignment')&&view.text.includes('Owned <update pilot>')&&view.text.includes('60000000-0000-0000-0000-000000000001')&&view.links.some(a=>a.href==='/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001'),'Original receipt lost source, command or device navigation');
+  if(state==='assignment')browser.check(view.links.some(a=>a.text==='Current cohort progress'&&a.href==='/tenant/1/site/1/ios/update-plans/70000000-0000-0000-0000-000000000001/group-assignments/40000000-0000-0000-0000-000000000001/progress'),'Receipt lost its original-cohort progress link');
   if(state==='history')browser.check(view.links.some(a=>a.text==='Older assignments'&&a.href.endsWith('?before=40000000-0000-0000-0000-000000000001')),'History lost its scoped cursor');
   if(state==='empty-history')browser.check(view.text.includes('No confirmed group updates')&&!view.links.some(a=>a.text==='Older assignments'),'Empty history offers more results');
   if(width===390)await browser.capture('apple-update-group-'+state+'-390');record({name:'Apple update group '+state,width,passed:true});

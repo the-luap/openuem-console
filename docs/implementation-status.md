@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Current Apple update cohort progress](apple-update-progress.md) assesses the
+  exact original receipt's native targets under current update/device-read
+  authority. It separates fresh post-admission OS evidence, current configured
+  policy, original notification status and unavailable enrollments. New bounded
+  protocol observations prevent merged older builds or unrelated partial reports
+  from becoming fresh installation evidence. Targeted PostgreSQL 17/race tests
+  pass in 17.624 seconds; registered Linux console routes and macOS/Linux package
+  checks and the full Linux build pass. All 111 relevant Chrome cases pass.
+  The complete Apple PostgreSQL/race suite passes in 543.717 seconds.
+  Persisted historical results, exceptions, automatic promotion, deadline-aware
+  escalation and physical acceptance remain separate work.
+
 - [Scheduled Apple update activation](apple-update-schedules.md) retains immutable
   encrypted original plan/group/selection intent and an absolute UTC activation
   window. A private random activation key, current permission/source/review

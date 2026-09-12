@@ -61,7 +61,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
-		case "/ios/update-plans/:plan/schedules", "/ios/update-plans/:plan/schedules/:schedule", "/ios/update-plans/:plan/groups", "/ios/update-plans/:plan/groups/:group/preview", "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/group-assignments/:assignment":
+		case "/ios/update-plans/:plan/group-assignments/:assignment/progress", "/ios/update-plans/:plan/schedules", "/ios/update-plans/:plan/schedules/:schedule", "/ios/update-plans/:plan/groups", "/ios/update-plans/:plan/groups/:group/preview", "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/group-assignments/:assignment":
 			return access.ManageUpdates, true
 		case "/ios/update-plans", "/ios/update-plans/:plan":
 			return access.ReadDevices, true

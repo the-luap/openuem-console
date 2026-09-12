@@ -656,6 +656,11 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 		if err != nil {
 			return err
 		}
+		versionField, hasVersion := info["OSVersion"]
+		buildField, hasBuild := info["BuildVersion"]
+		if err = recordOSObservation(ctx, tx, d.ID, "device_information", versionField, hasVersion, buildField, hasBuild); err != nil {
+			return err
+		}
 		if err = s.savePlatformInventory(ctx, tx, d, info, model); err != nil {
 			return err
 		}

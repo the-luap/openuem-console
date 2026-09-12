@@ -80,7 +80,9 @@ binding is checked again when reading an activated schedule.
 pages. Original sources remain readable after later revision or archival.
 Details show UTC timing, fixed lifecycle reason, original targets, attempts and
 current state revision. An activated schedule links its original receipt; device
-links open current reports and compliance. Protected reads require current update
+links open current reports and compliance. The original receipt also opens
+[current cohort progress](apple-update-progress.md), which assesses its exact
+selection without following later group edits. Protected reads require current update
 authority in the original scope and a successful audit, and prohibit caching.
 
 Any currently authorized operator in the site can explicitly cancel a pending

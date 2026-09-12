@@ -141,6 +141,21 @@ func (h *Handler) AppleUpdatePlanGroupAssignment(c echo.Context) error {
 	}
 	return renderApple(c, mdm_views.AppleUpdatePlanGroupAssignment(c, info, *assignment))
 }
+
+func (h *Handler) AppleUpdatePlanGroupProgress(c echo.Context) error {
+	info, scope, err := h.appleUpdatePlanContext(c)
+	if err != nil {
+		return err
+	}
+	if _, err = groupQuery(c); err != nil {
+		return appleUpdateGroupFailure(c, err)
+	}
+	progress, err := h.Apple.UpdatePlanGroupProgress(c.Request().Context(), h.appleActor(c), h.Access, scope, c.Param("plan"), c.Param("assignment"))
+	if err != nil {
+		return appleUpdateGroupFailure(c, err)
+	}
+	return renderApple(c, mdm_views.AppleUpdateGroupProgress(c, info, *progress))
+}
 func (h *Handler) AppleUpdatePlanGroupAssignments(c echo.Context) error {
 	info, scope, err := h.appleUpdatePlanContext(c)
 	if err != nil {

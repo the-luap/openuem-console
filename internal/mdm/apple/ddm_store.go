@@ -234,6 +234,9 @@ func (s *Store) saveStatus(ctx context.Context, d *Device, report *StatusReport)
 	if err != nil {
 		return err
 	}
+	if err = recordDDMOSObservation(ctx, tx, d.ID, report); err != nil {
+		return err
+	}
 	if updateID := statusString(report.StatusItems, "softwareupdate", "device-id"); updateID != "" {
 		if err = s.savePlatformInventory(ctx, tx, current, map[string]any{"SoftwareUpdateDeviceID": updateID}, current.Model); err != nil {
 			return err

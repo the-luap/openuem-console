@@ -129,6 +129,7 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/update-plans/:plan/group-assignments", h.AppleAssignUpdatePlanGroup)
 		g.GET("/ios/update-plans/:plan/group-assignments", h.AppleUpdatePlanGroupAssignments)
 		g.GET("/ios/update-plans/:plan/group-assignments/:assignment", h.AppleUpdatePlanGroupAssignment)
+		g.GET("/ios/update-plans/:plan/group-assignments/:assignment/progress", h.AppleUpdatePlanGroupProgress)
 		g.POST("/ios/update-plans/:plan/schedules", h.AppleScheduleUpdatePlan)
 		g.GET("/ios/update-plans/:plan/schedules", h.AppleUpdateSchedules)
 		g.GET("/ios/update-plans/:plan/schedules/:schedule", h.AppleUpdateSchedule)
