@@ -462,7 +462,7 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 		MessageText:      "Please, confirm your email address so that it can be used to receive emails from OpenUEM",
 		MessageGreeting:  fmt.Sprintf("Hi %s", user.Name),
 		MessageAction:    "Confirm email",
-		MessageActionURL: c.Request().Header.Get("Origin") + "/auth/confirm/" + token,
+		MessageActionURL: h.consoleOrigin() + "/auth/confirm/" + token,
 	}
 
 	data, err := json.Marshal(notification)
@@ -482,11 +482,11 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 }
 
 func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.User) error {
-	encryptedToken := ""
 	token, err := h.generateEmailToken(user.ID, "New password", 1)
 	if err != nil {
 		return err
 	}
+	encryptedToken := token
 
 	// encrypt the access token if we have the encryption master key
 	if h.EncryptionMasterKey != "" {
@@ -507,7 +507,7 @@ func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.U
 		MessageText:      "You must set a password to log into OpenUEM. Click the link below to set your initial password. NOTE: the following link will only be valid for one hour",
 		MessageGreeting:  fmt.Sprintf("Hi %s, a new OpenUEM account with username %s has been created for you", user.Name, user.ID),
 		MessageAction:    "Generate a password",
-		MessageActionURL: c.Request().Header.Get("Origin") + fmt.Sprintf("/login/new?token=%s", token),
+		MessageActionURL: h.consoleOrigin() + fmt.Sprintf("/login/new?token=%s", token),
 	}
 
 	data, err := json.Marshal(notification)

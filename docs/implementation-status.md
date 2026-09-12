@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Account confirmation and initial-password notifications now use the configured
+  console origin for public, proxy and direct installations. Empty or foreign
+  request `Origin` values cannot change those links. Initial-password creation
+  also retains the exact token when no master key is configured; previously that
+  branch saved an empty value and made the emailed invitation unusable. Encryption
+  remains enabled when a master key exists. An isolated broker/database matrix
+  reproduced 24 incorrect origins and nine empty saved tokens. All 36 cases now
+  pass on Darwin and Linux with race checks, verifying recipient, route, stored
+  invitation, encryption and signed token subject/issuer/expiry. The Linux test
+  container had no external network access and also passed the entire model suite.
+  No notification was delivered to a real mailbox; email-confirmation token
+  admission and its account-state binding remain a separate review.
+
 - The two outstanding upstream user-test failures were reproduced and corrected
   without changing account behavior. The OpenID creation fixture now selects
   OpenID and verifies first-login, email-verification and authentication flags;
