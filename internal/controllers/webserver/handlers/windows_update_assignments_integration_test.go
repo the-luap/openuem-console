@@ -15,19 +15,23 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
-func windowsAssignmentSecondDevice(t *testing.T, h *Handler, ctx context.Context, scope access.Scope, original string) string {
+func windowsAssignmentSecondDevice(t *testing.T, h *Handler, ctx context.Context, scope access.Scope, original string, names ...string) string {
 	t.Helper()
 	invitation, _, err := h.Windows.CreateEnrollmentInvitation(ctx, "apple-console-admin", scope, "cohort-second@example.test", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id, certID := uuid.NewString(), uuid.NewString()
+	name := "Synthetic second Windows"
+	if len(names) > 0 {
+		name = names[0]
+	}
 	// These database-only identities never authenticate a transport or install
 	// certificates. Each row belongs to the already reserved disposable schema.
-	if _, err := h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_windows_devices(id,tenant_id,site_id,invitation_id,reported_device_id,device_name,enrollment_type,os_edition,os_version,application_version) VALUES($1,$2,$3,$4,'SYNTHETIC-SECOND','Synthetic second Windows','Device',4,'10.0.26100.1','10.0.26100.1')`, id, scope.TenantID, scope.SiteID, invitation.ID); err != nil {
+	if _, err := h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_windows_devices(id,tenant_id,site_id,invitation_id,reported_device_id,device_name,enrollment_type,os_edition,os_version,application_version) VALUES($1,$2,$3,$4,'SYNTHETIC-SECOND',$5,'Device',4,'10.0.26100.1','10.0.26100.1')`, id, scope.TenantID, scope.SiteID, invitation.ID, name); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_windows_device_certificates(id,device_id,tenant_id,site_id,authority_id,certificate,fingerprint,public_key_fingerprint,serial,issued_at,expires_at) SELECT $1,$2,tenant_id,site_id,authority_id,'synthetic second certificate',decode(repeat('05',32),'hex'),decode(repeat('06',32),'hex'),'serial-second',clock_timestamp(),clock_timestamp()+INTERVAL '1 day' FROM mdm_windows_device_certificates WHERE device_id=$3`, certID, id, original); err != nil {
+	if _, err := h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_windows_device_certificates(id,device_id,tenant_id,site_id,authority_id,certificate,fingerprint,public_key_fingerprint,serial,issued_at,expires_at) SELECT $1::uuid,$2::uuid,tenant_id,site_id,authority_id,'synthetic second certificate',sha256($2::uuid::text::bytea),sha256($1::uuid::text::bytea),uuid_send($1::uuid),clock_timestamp(),clock_timestamp()+INTERVAL '1 day' FROM mdm_windows_device_certificates WHERE device_id=$3`, certID, id, original); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_windows_enrollments(invitation_id,tenant_id,site_id,device_id,certificate_id,request_digest,configuration_digest,encrypted_provisioning,encrypted_auth) VALUES($1,$2,$3,$4,$5,decode(repeat('05',32),'hex'),decode(repeat('06',32),'hex'),decode(repeat('07',30),'hex'),decode(repeat('08',30),'hex'))`, invitation.ID, scope.TenantID, scope.SiteID, id, certID); err != nil {

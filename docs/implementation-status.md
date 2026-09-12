@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Immediate Windows ring assignments from dynamic groups](native-windows-update-groups.md)
+  now select an exact site group revision, display native Windows targets and
+  other management identities as exclusions, and recheck the full selected native
+  membership during atomic admission. A changed/archived group or changed target
+  set requires a new review. Group origin is retained in authenticated encrypted
+  rollout intent and shown from that original snapshot in cohort history. Exact
+  retries preserve the admitted cohort after group changes; omitting or changing
+  group provenance cannot reuse its request as another operation. Scheduled
+  requests keep their separate explicit-target format and reject group fields.
+  The complete native Windows PostgreSQL 17/race suite passes in actual Linux
+  (193.552 seconds), including protected group source/delivery tests, while
+  registered console routes, Linux handler/inventory/views/catalog checks and
+  the full Linux build also pass. Sixty Chrome cases include the eighteen new
+  Windows group states plus existing group, list and navigation checks. Scheduled
+  group evaluation, organization-group intersections, automated promotion,
+  Apple/software group assignments and hardware acceptance remain open.
+
 - [Dynamic device groups](dynamic-device-groups.md) now persist exact-scope
   platform/search rules with numbered history, archive/reactivation and current
   membership previews. Current permissions, the definition lock, scoped query
@@ -72,9 +89,9 @@ the table's package summaries do not remove any detail from the roadmap.
   desktop assignments for every group reader. Owned PostgreSQL inventory/audit
   race suites, registered Linux routes, Linux handler/view/access/catalog checks
   and the full build pass. Forty-two Chrome cases cover the eighteen new group
-  states and existing inventory/navigation behavior. Group-based assignments,
-  reviewed target sets, exceptions, conflict checks, rings and production-scale
-  acceptance remain open.
+  states and existing inventory/navigation behavior. Broader assignments,
+  scheduled group evaluation, exceptions, conflict checks, automatic promotion
+  and production-scale acceptance remain open.
 
 - Unified device CSV/JSON exports now prepare all filtered rows in the selected
   order within one authorized, audited transaction. Preparation is limited to

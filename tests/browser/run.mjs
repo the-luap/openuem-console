@@ -27,6 +27,7 @@ import security from "./desktop-security.mjs";
 import managementNavigation from "./management-navigation.mjs";
 import deviceList from "./device-list.mjs";
 import deviceGroups from "./device-groups.mjs";
+import windowsUpdateGroups from "./windows-update-groups.mjs";
 import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
@@ -76,6 +77,7 @@ try {
         [managementNavigation,12],
         [deviceList,12],
         [deviceGroups,18],
+        [windowsUpdateGroups,18],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

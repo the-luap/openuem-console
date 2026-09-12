@@ -83,6 +83,8 @@ times, current role/scope checks, failed audit, cancellation, concurrent capacit
 encoded-size limits, oversized metadata and the 5,000/5,001-entry boundary.
 
 [Dynamic device groups](dynamic-device-groups.md) now persist scoped platform/search
-rules and evaluate current membership with revision history. Group-based actions,
+rules and evaluate current membership with revision history.
+[Native Windows ring assignments](native-windows-update-groups.md) can now review
+and admit a site group's exact native Windows members. Other group-based actions,
 bulk actions and production-scale database performance acceptance remain separate
 roadmap work.

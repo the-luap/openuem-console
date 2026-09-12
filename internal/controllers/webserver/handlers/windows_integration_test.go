@@ -171,6 +171,7 @@ func exerciseWindowsConsole(t *testing.T, h *Handler, e *echo.Echo, ctx context.
 	}
 	exerciseWindowsRingConsole(t, h, ctx, scope, request, artifact)
 	exerciseWindowsAssignmentConsole(t, h, ctx, scope, deviceID, request, artifact)
+	exerciseWindowsGroupAssignments(t, h, ctx, scope, deviceID, request)
 	exerciseWindowsScheduleConsole(t, h, ctx, scope, deviceID, request, artifact)
 	exerciseWindowsUpdateConsole(t, h, ctx, scope, deviceID, request, artifact)
 	exerciseWindowsCSPConsole(t, h, ctx, scope, request, artifact)

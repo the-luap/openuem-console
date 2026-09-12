@@ -1,4 +1,18 @@
 en:
+  windows_groups:
+    selected_help: "These device IDs come from the selected group revision. Choose the group again to refresh its members."
+    choose: "Choose devices from a dynamic group"
+    choice_help: "Choose an active group in this site. The next step selects its native Windows members and lists other management identities as exclusions. The complete group must contain no more than 100 devices."
+    select: "Use this group revision"
+    source: "Source device group"
+    current_group: "Open current group and history"
+    original_rule: "Original platform rule: %s · Search: %s"
+    review_help: "The group revision and selected native Windows devices are checked again on confirmation. Changed rules or native Windows membership require a new review. Other management identities are excluded from this assignment."
+    excluded: "Excluded management identities: %d"
+    exclusion_reason: "Outside native Windows management"
+    invalid: "Choose an active site group with at least one native Windows member and a valid group revision."
+    conflict: "The group revision or selected native Windows membership changed. Choose the group again and review its current devices."
+    large: "The complete group exceeds 100 members or supported inventory text limits. Narrow its rule before selecting devices."
   mdm:
     groups:
       title: "Dynamic device groups"

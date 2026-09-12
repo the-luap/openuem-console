@@ -98,7 +98,8 @@ silently substitutes a newer revision.
 
 Enter 1–100 distinct native Windows UUIDs, one per line, from the selected site's
 native Windows inventory. This explicit list is separate from agent identities,
-reported hardware IDs and dynamic groups. Blank internal lines, duplicate IDs,
+reported hardware IDs. The immediate assignment form can also
+[select a reviewed dynamic group](native-windows-update-groups.md). Blank internal lines, duplicate IDs,
 noncanonical UUIDs and more than 100 targets are rejected. The field is bounded
 to 4,000 bytes inside the existing 8 KiB body limit. LF and CRLF lists and ordinary
 surrounding line whitespace produce the same canonical sorted target set.
@@ -132,12 +133,13 @@ that could bypass the existing sent/uncertain step boundaries.
 
 | Method and path | Behavior |
 | --- | --- |
+| `GET /windows/update-rings/:ring/assign/groups?revision=N&mode=apply` | Choose an exact site group revision for immediate assignment |
 | `GET /windows/update-rings/:ring/assign?revision=N&mode=apply` | Draft an explicit revision/device assignment; mode may also be `remove` |
 | `POST /windows/update-rings/:ring/assign/preview` | Validate/review all selected devices or edit the draft |
 | `POST /windows/update-rings/:ring/assign/create` | Confirm atomic cohort admission |
 | `GET /windows/update-rollouts/:rollout` | Audited original cohort and per-device historical evidence |
 
-All four routes require a concrete authorized site and `ManageUpdates`, under
+All assignment routes require a concrete authorized site and `ManageUpdates`, under
 the same three console prefixes. The unique-field/CSRF/no-query POST boundary
 also applies here. Names are escaped, and failed audited reads expose neither
 protected payloads nor internal SQL messages.

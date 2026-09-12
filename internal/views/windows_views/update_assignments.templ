@@ -2,6 +2,7 @@ package windows_views
 
 import (
 	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/views/layout"
@@ -31,17 +32,31 @@ templ UpdateAssignmentForm(c echo.Context, info *partials.CommonInfo, draft Upda
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					@assignmentSource(info, draft.Ring)
+					@updateGroupPreview(info, draft.Group)
 					<p class="my-3">Select the exact native Windows devices for this revision. The next step checks their site and identity, then shows every selected device for review.</p>
 					if draft.Scheduled {
 						<p>Confirmation saves a future activation plan. The server creates device runs only when the activation window opens and the original source, devices and creator still permit the assignment.</p>
 					} else {
 						<p>No commands are created until you confirm.</p>
 					}
+					if !draft.Scheduled {
+						<a class="uk-button uk-button-default my-4" href={ templ.URL(updateGroupSelectionURL(info, draft.Ring, draft.Form.Get("mode"), nil)) }>{ i18n.T(ctx,"windows_groups.choose") }</a>
+					}
 					<form class="grid gap-4" method="post" action={ partials.GetNavigationUrl(info, assignmentPath(draft)+"/preview") }>
 						@mdm_views.CSRF(info)
+						@updateGroupFields(draft)
 						<input type="hidden" name="ring_revision" value={ draft.Form.Get("ring_revision") }/><input type="hidden" name="request_key" value={ draft.Form.Get("request_key") }/>
 						<label class="grid gap-2">Action<select class="uk-select" name="mode"><option value="apply" selected?={ draft.Form.Get("mode")=="apply" }>Apply selected revision</option><option value="remove" selected?={ draft.Form.Get("mode")=="remove" }>Remove this revision's settings from this management source</option></select></label>
-						<label class="grid gap-2">Native Windows device IDs<textarea class="uk-textarea font-mono" name="devices" rows="6" maxlength="4000" required spellcheck="false" autocomplete="off" placeholder="One native Windows device UUID per line">{ draft.Form.Get("devices") }</textarea><span class="uk-text-muted">Paste 1–100 distinct IDs, one per line, from native Windows inventory in this site. Agent IDs and reported hardware identifiers are different identities.</span></label>
+						<label class="grid gap-2">
+							Native Windows device IDs<textarea class="uk-textarea font-mono" name="devices" readonly?={ draft.Form.Get("group_id")!="" } rows="6" maxlength="4000" required spellcheck="false" autocomplete="off" placeholder="One native Windows device UUID per line">{ draft.Form.Get("devices") }</textarea>
+							<span class="uk-text-muted">
+								if draft.Form.Get("group_id")!="" {
+									{ i18n.T(ctx,"windows_groups.selected_help") }
+								} else {
+									Paste 1–100 distinct IDs, one per line, from native Windows inventory in this site. Agent IDs and reported hardware identifiers are different identities.
+								}
+							</span>
+						</label>
 						if draft.Scheduled {
 							<label class="grid gap-2">Activate no earlier than (UTC)<input class="uk-input" type="datetime-local" name="not_before" step="60" value={ draft.Form.Get("not_before") } required/><span class="uk-text-muted">Enter UTC, not your browser's local time. Choose a time within 90 days.</span></label>
 							<label class="grid gap-2">Activation window (minutes)<input class="uk-input" type="number" name="activation_minutes" min="1" max="10080" step="1" value={ draft.Form.Get("activation_minutes") } required/><span class="uk-text-muted">The server may create the cohort during this window. It is not a Windows installation or restart maintenance window and does not stop later device delivery.</span></label>
@@ -72,6 +87,7 @@ templ UpdateAssignmentForm(c echo.Context, info *partials.CommonInfo, draft Upda
 }
 
 templ assignmentDraftFields(draft UpdateAssignmentDraft) {
+	@updateGroupFields(draft)
 	for _,name:=range []string{"ring_revision","request_key","mode","hours","devices"} {
 		<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
 	}
@@ -93,14 +109,22 @@ templ UpdateAssignmentPreview(c echo.Context, info *partials.CommonInfo, draft U
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					@assignmentSource(info, draft.Ring)
+					@updateGroupPreview(info, draft.Group)
 					<p class="my-3">Nothing has been queued by this preview. Confirm the exact revision, action and complete device list below.</p>
 					<dl class="uk-description-list"><dt>Action</dt><dd>{ updateMode(draft.Form.Get("mode")) }</dd><dt>Site</dt><dd>{ ringScope(info) }</dd><dt>Selected devices</dt><dd>{ fmt.Sprint(len(draft.Devices)) }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("hours") } hours</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd></dl>
 					if draft.Scheduled {
-						<dl class="uk-description-list"><dt>Activate no earlier than</dt><dd>
-							@ScheduleTime(draft.NotBefore)
-						</dd><dt>Activation window closes</dt><dd>
-							@ScheduleTime(draft.NotBefore.Add(draft.ActivationWindow))
-						</dd><dt>Activation window</dt><dd>{ draft.Form.Get("activation_minutes") } minutes</dd></dl>
+						<dl class="uk-description-list">
+							<dt>Activate no earlier than</dt>
+							<dd>
+								@ScheduleTime(draft.NotBefore)
+							</dd>
+							<dt>Activation window closes</dt>
+							<dd>
+								@ScheduleTime(draft.NotBefore.Add(draft.ActivationWindow))
+							</dd>
+							<dt>Activation window</dt>
+							<dd>{ draft.Form.Get("activation_minutes") } minutes</dd>
+						</dl>
 						<p>Both times above are UTC. This window controls creation of device runs; it does not schedule Windows installation or restart, or cut off subsequent device delivery.</p>
 					}
 					<div class="overflow-x-auto" role="region" aria-label="Reviewed Windows assignment devices" tabindex="0">
@@ -124,9 +148,7 @@ templ UpdateAssignmentPreview(c echo.Context, info *partials.CommonInfo, draft U
 										<td>{ DeviceStatus(device) }</td>
 										if draft.Scheduled {
 											<td>
-
-	@ScheduleTime(device.CertificateExpiresAt)
-
+												@ScheduleTime(device.CertificateExpiresAt)
 												if !device.CertificateExpiresAt.After(draft.NotBefore) {
 													<p>Current certificate expires before activation.</p>
 												}
@@ -179,9 +201,23 @@ templ UpdateRollout(c echo.Context, info *partials.CommonInfo, rollout windows.U
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					<p>These are the original device runs and their historical policy evidence. Each device is observed separately. Queue admission and verified policy values do not prove patch installation, reboot or current continuous compliance.</p>
-					<dl class="uk-description-list"><dt>Assignment ID</dt><dd>{ rollout.ID }</dd><dt>Source ring / revision</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", rollout.RingID, rollout.RingRevision+1, rollout.RingRevision))) }>{ rollout.RingID } · { fmt.Sprint(rollout.RingRevision) }</a></dd><dt>Action</dt><dd>{ updateMode(rollout.Mode) }</dd><dt>Created</dt><dd>
-						@ReportTime(rollout.CreatedAt)
-					</dd><dt>Created by</dt><dd>{ rollout.CreatedBy }</dd><dt>Per-device admission lifetime</dt><dd>{ fmt.Sprint(int64(rollout.Lifetime/time.Second)) } seconds</dd></dl>
+					<dl class="uk-description-list">
+						<dt>Assignment ID</dt>
+						<dd>{ rollout.ID }</dd>
+						<dt>Source ring / revision</dt>
+						<dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", rollout.RingID, rollout.RingRevision+1, rollout.RingRevision))) }>{ rollout.RingID } · { fmt.Sprint(rollout.RingRevision) }</a></dd>
+						<dt>Action</dt>
+						<dd>{ updateMode(rollout.Mode) }</dd>
+						<dt>Created</dt>
+						<dd>
+							@ReportTime(rollout.CreatedAt)
+						</dd>
+						<dt>Created by</dt>
+						<dd>{ rollout.CreatedBy }</dd>
+						<dt>Per-device admission lifetime</dt>
+						<dd>{ fmt.Sprint(int64(rollout.Lifetime/time.Second)) } seconds</dd>
+					</dl>
+					@updateGroupSource(info, rollout.Group)
 					if rollout.ScheduleID!="" {
 						<dl class="uk-description-list"><dt>Source schedule</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules/"+rollout.ScheduleID)) }>{ rollout.ScheduleID }</a></dd></dl>
 					}
@@ -190,9 +226,14 @@ templ UpdateRollout(c echo.Context, info *partials.CommonInfo, rollout windows.U
 							<caption class="sr-only">Original per-device runs in this assignment</caption><thead><tr><th scope="col">Device</th><th scope="col">Policy run</th><th scope="col">Historical evidence</th><th scope="col">Admission expires</th></tr></thead>
 							<tbody>
 								for _,row:=range rows {
-									<tr><td>{ row.Device.Name }<div>{ row.Device.ID }</div></td><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.Device.ID+"/updates/"+row.Detail.Run.ID)) }>{ row.Detail.Name }</a><div>{ row.Detail.Run.ID }</div></td><td>{ updateState(row.Detail.Phase) }</td><td>
-										@ReportTime(row.Detail.Run.ExpiresAt)
-									</td></tr>
+									<tr>
+										<td>{ row.Device.Name }<div>{ row.Device.ID }</div></td>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.Device.ID+"/updates/"+row.Detail.Run.ID)) }>{ row.Detail.Name }</a><div>{ row.Detail.Run.ID }</div></td>
+										<td>{ updateState(row.Detail.Phase) }</td>
+										<td>
+											@ReportTime(row.Detail.Run.ExpiresAt)
+										</td>
+									</tr>
 								}
 							</tbody>
 						</table>

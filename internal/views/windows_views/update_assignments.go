@@ -7,9 +7,10 @@ import (
 )
 
 type UpdateAssignmentDraft struct {
-	Form             url.Values                 `json:"-" xml:"-" yaml:"-"`
-	Ring             windows.UpdateRingRevision `json:"-" xml:"-" yaml:"-"`
-	Devices          []windows.DeviceMetadata   `json:"-" xml:"-" yaml:"-"`
+	Group            *windows.UpdateGroupPreview `json:"-" xml:"-" yaml:"-"`
+	Form             url.Values                  `json:"-" xml:"-" yaml:"-"`
+	Ring             windows.UpdateRingRevision  `json:"-" xml:"-" yaml:"-"`
+	Devices          []windows.DeviceMetadata    `json:"-" xml:"-" yaml:"-"`
 	Scheduled        bool
 	NotBefore        time.Time     `json:"-" xml:"-" yaml:"-"`
 	ActivationWindow time.Duration `json:"-" xml:"-" yaml:"-"`

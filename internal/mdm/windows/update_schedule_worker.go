@@ -229,7 +229,7 @@ func (s *Store) finishUpdateScheduleAttempt(ctx context.Context, tx *sql.Tx, r *
 }
 
 func (s *Store) activateUpdateSchedule(ctx context.Context, tx *sql.Tx, r *updateStoredSchedule) (*UpdateRollout, error) {
-	rollout, err := s.assignUpdateRingTx(ctx, tx, r.CreatedBy, r.Scope, r.RingID, r.RingRevision, updateScheduleRolloutRequest(r.ID), r.Targets, r.Mode == "remove", r.Lifetime, r)
+	rollout, err := s.assignUpdateRingTx(ctx, tx, r.CreatedBy, r.Scope, r.RingID, r.RingRevision, updateScheduleRolloutRequest(r.ID), r.Targets, r.Mode == "remove", r.Lifetime, r, nil)
 	if err != nil {
 		return nil, err
 	}

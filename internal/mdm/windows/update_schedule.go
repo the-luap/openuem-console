@@ -90,7 +90,7 @@ func (s *Store) openUpdateSchedule(r *updateStoredSchedule) error {
 	}
 	defer clear(plain)
 	var targetSet updateRolloutTargets
-	if decodeSyncMLProtectedJSON(plain, &targetSet) != nil || targetSet.Version != 1 {
+	if decodeSyncMLProtectedJSON(plain, &targetSet) != nil || targetSet.Version != 1 || targetSet.Group != nil {
 		return ErrAuthoritySecret
 	}
 	targets, err := canonicalUpdateTargets(targetSet.Devices)

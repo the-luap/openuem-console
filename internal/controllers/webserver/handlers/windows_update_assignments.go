@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/windows_views"
@@ -69,7 +70,7 @@ func (h *Handler) windowsAssignmentRing(c echo.Context, scope access.Scope, revi
 func (h *Handler) windowsRingRevision(c echo.Context, scope access.Scope, id string, revision int64) (*windows.UpdateRingRevision, error) {
 	rings, err := h.Windows.UpdateRingRevisions(c.Request().Context(), h.appleActor(c), scope, id, revision+1, 1)
 	if err != nil {
-		return nil, windowsFailure(err)
+		return nil, windowsGroupFailure(c, err)
 	}
 	if len(rings) != 1 || rings[0].Revision != revision {
 		return nil, windowsFailure(windows.ErrNotFound)
@@ -90,6 +91,14 @@ func (h *Handler) windowsNewAssignment(c echo.Context, scheduled bool) error {
 	if err != nil {
 		return err
 	}
+	allowed := []string{"revision", "mode"}
+	if !scheduled {
+		allowed = append(allowed, "group", "group_revision")
+	}
+	query, err := groupQuery(c, allowed...)
+	if err != nil {
+		return groupError(c, err)
+	}
 	form := url.Values{"ring_revision": {c.QueryParam("revision")}, "request_key": {uuid.NewString()}, "mode": {c.QueryParam("mode")}, "hours": {"24"}, "devices": {""}}
 	if len(c.QueryParams()["revision"]) != 1 || len(c.QueryParams()["mode"]) > 1 {
 		return echo.NewHTTPError(400, "Choose one ring revision and action")
@@ -109,7 +118,17 @@ func (h *Handler) windowsNewAssignment(c echo.Context, scheduled bool) error {
 		form.Set("not_before", time.Now().UTC().Add(time.Hour).Truncate(time.Minute).Format(windowsScheduleTimeLayout))
 		form.Set("activation_minutes", "60")
 	}
-	return renderApple(c, windows_views.UpdateAssignmentForm(c, info, windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring, Scheduled: scheduled}))
+	draft := windows_views.UpdateAssignmentDraft{Form: form, Ring: *ring, Scheduled: scheduled}
+	if query.Get("group") != "" || query.Get("group_revision") != "" {
+		form.Set("group_id", query.Get("group"))
+		form.Set("group_revision", query.Get("group_revision"))
+		draft.Group, err = h.windowsAssignmentGroup(c, scope, form)
+		if err != nil {
+			return err
+		}
+		form.Set("devices", strings.Join(draft.Group.Targets, "\n"))
+	}
+	return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))
 }
 
 func (h *Handler) WindowsPreviewUpdateAssignment(c echo.Context) error {
@@ -125,7 +144,7 @@ func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error
 	if err != nil {
 		return err
 	}
-	names := windowsAssignmentNames()
+	names := windowsImmediateAssignmentNames()
 	if scheduled {
 		names = windowsScheduleNames()
 	}
@@ -155,6 +174,15 @@ func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error
 		draft.Error = parseErr.Error()
 		return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))
 	}
+	if !scheduled {
+		draft.Group, err = h.windowsAssignmentGroup(c, scope, form)
+		if err != nil {
+			return err
+		}
+		if draft.Group != nil && !slices.Equal(draft.Group.Targets, targets) {
+			return windowsGroupFailure(c, windows.ErrUpdateGroupConflict)
+		}
+	}
 	if form.Get("edit_assignment") == "yes" {
 		return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))
 	}
@@ -172,7 +200,7 @@ func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error
 	if form.Get("mode") == "apply" {
 		current, err := h.Windows.UpdateRingRevisions(c.Request().Context(), h.appleActor(c), scope, ring.RingID, 0, 1)
 		if err != nil {
-			return windowsFailure(err)
+			return windowsGroupFailure(c, err)
 		}
 		if len(current) != 1 || current[0].Revision != revision || !ring.Enabled {
 			c.Response().Status = 409
@@ -183,7 +211,7 @@ func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error
 	for _, id := range targets {
 		device, err := h.Windows.Device(c.Request().Context(), h.appleActor(c), scope, id)
 		if err != nil {
-			return windowsFailure(err)
+			return windowsGroupFailure(c, err)
 		}
 		if device.RevokedAt != nil || device.CertificateRevokedAt != nil || !device.CertificateExpiresAt.After(time.Now()) {
 			return windowsFailure(windows.ErrManagementIdentity)
@@ -201,7 +229,7 @@ func (h *Handler) WindowsCreateUpdateAssignment(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	form, err := windowsForm(c, windowsAssignmentNames()...)
+	form, err := windowsForm(c, windowsImmediateAssignmentNames()...)
 	if err != nil {
 		return err
 	}
@@ -215,9 +243,18 @@ func (h *Handler) WindowsCreateUpdateAssignment(c echo.Context) error {
 	// Admission rechecks all source/target authority in one transaction. Do not
 	// precede this call with new-work eligibility checks that would break an exact
 	// retry after the original ring was changed or a device finished its work.
-	rollout, err := h.Windows.AssignUpdateRing(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", lifetime)
+	groupID, groupRevision, err := windowsAssignmentGroupReference(form)
 	if err != nil {
-		return windowsFailure(err)
+		return windowsGroupFailure(c, err)
+	}
+	var rollout *windows.UpdateRollout
+	if groupID != "" {
+		rollout, err = h.Windows.AssignUpdateRingFromGroup(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", lifetime, inventory.DeviceSources{Apple: h.Apple != nil, Windows: h.Windows != nil}, groupID, groupRevision)
+	} else {
+		rollout, err = h.Windows.AssignUpdateRing(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", lifetime)
+	}
+	if err != nil {
+		return windowsGroupFailure(c, err)
 	}
 	return appleRedirect(c, info, "/windows/update-rollouts/"+rollout.ID)
 }
@@ -229,7 +266,7 @@ func (h *Handler) WindowsUpdateRollout(c echo.Context) error {
 	}
 	rollout, err := h.Windows.UpdateRolloutDetails(c.Request().Context(), h.appleActor(c), scope, c.Param("rollout"))
 	if err != nil {
-		return windowsFailure(err)
+		return windowsGroupFailure(c, err)
 	}
 	// RolloutDetails already authenticates the original ring and every run. Read
 	// their protected current history separately so phase labels retain the same
@@ -238,11 +275,11 @@ func (h *Handler) WindowsUpdateRollout(c echo.Context) error {
 	for _, run := range rollout.Runs {
 		device, err := h.Windows.Device(c.Request().Context(), h.appleActor(c), scope, run.DeviceID)
 		if err != nil {
-			return windowsFailure(err)
+			return windowsGroupFailure(c, err)
 		}
 		detail, err := h.Windows.UpdateRunDetails(c.Request().Context(), h.appleActor(c), scope, run.DeviceID, run.ID)
 		if err != nil {
-			return windowsFailure(err)
+			return windowsGroupFailure(c, err)
 		}
 		rows = append(rows, windows_views.UpdateRolloutRow{Device: *device, Detail: *detail})
 	}

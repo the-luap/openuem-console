@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 708 cases:
+headless Chrome session. The runner covers 726 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -19,6 +19,7 @@ headless Chrome session. The runner covers 708 cases:
 | Management navigation | Four roles × three widths; native disclosure and scoped links | 12 |
 | Unified device list | First/next/empty/long metadata × three widths; scoped filter links, keyboard pagination and export forms | 12 |
 | Dynamic device groups | List/empty/detail/archived/viewer/long metadata × three widths; scoped revision links and keyboard saves | 18 |
+| Windows group assignments | Choose/empty/form/preview/history/long metadata × three widths; exclusions, source revisions and explicit keyboard confirmation | 18 |
 | OpenID account identities | Unlinked/active/disabled/ineligible/long/disabled provider × three widths; explicit keyboard confirmation | 18 |
 | Account language | Seven catalogs, browser default, unavailable storage and long profile × three widths | 30 |
 | Report timestamps | Seven catalogs × three widths | 21 |

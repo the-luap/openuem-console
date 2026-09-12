@@ -1,0 +1,91 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+func updateGroupSelectionURL(info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, g *inventory.DeviceGroup) string {
+	q := url.Values{"revision": {fmt.Sprint(ring.Revision)}, "mode": {mode}}
+	path := "/windows/update-rings/" + ring.RingID + "/assign"
+	if g == nil {
+		path += "/groups"
+	} else {
+		q.Set("group", g.ID)
+		q.Set("group_revision", fmt.Sprint(g.Revision))
+	}
+	return partials.GetNavigationUrl(info, path) + "?" + q.Encode()
+}
+
+templ UpdateAssignmentGroups(c echo.Context, info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, page *inventory.DeviceGroupPage, paging mdm_views.DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "windows_groups.choose"), Url: updateGroupSelectionURL(info, ring, mode, nil)}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="windows-group-choice">
+			<div>
+				<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"windows_groups.choose") }</h1>
+				@ringNavigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4">
+					@assignmentSource(info, ring)
+					<p>{ i18n.T(ctx,"windows_groups.choice_help") }</p>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups")) }>{ i18n.T(ctx,"mdm.groups.title") }</a>
+					for _,g:=range page.Groups {
+						<article class="border-b pb-4" style="overflow-wrap:anywhere;">
+							<h2 class="font-semibold">{ g.Name } · { i18n.T(ctx,"mdm.groups.revision",g.Revision) }</h2>
+							<p>{ g.Description }</p>
+							if g.Archived {
+								<p>{ i18n.T(ctx,"mdm.groups.archived") }</p>
+							} else {
+								<a class="uk-button uk-button-default" href={ templ.URL(updateGroupSelectionURL(info, ring, mode, &g)) }>{ i18n.T(ctx,"windows_groups.select") }</a>
+							}
+						</article>
+					}
+					if len(page.Groups)==0 {
+						<p>{ i18n.T(ctx,"mdm.groups.empty") }</p>
+					}
+					@mdm_views.GroupPaging(paging, i18n.T(ctx, "mdm.groups.list_pages"))
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ updateGroupSource(info *partials.CommonInfo, source *windows.UpdateGroupSource) {
+	if source!=nil {
+		<div class="my-4" data-group-source style="overflow-wrap:anywhere;min-width:0;">
+			<h3 class="font-semibold">{ i18n.T(ctx,"windows_groups.source") }</h3>
+			<p>{ source.Name } · { i18n.T(ctx,"mdm.groups.revision",source.Revision) }</p>
+			<p>{ i18n.T(ctx,"windows_groups.original_rule",mdm_views.Show(source.Rule.Platform),mdm_views.Show(source.Rule.Search)) }</p>
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups/"+source.ID)) }>{ i18n.T(ctx,"windows_groups.current_group") }</a>
+		</div>
+	}
+}
+
+templ updateGroupPreview(info *partials.CommonInfo, preview *windows.UpdateGroupPreview) {
+	if preview!=nil {
+		@updateGroupSource(info, &preview.Source)
+		<p class="uk-text-muted my-3">{ i18n.T(ctx,"windows_groups.review_help") }</p>
+		<div data-group-exclusions>
+			<h3 class="font-semibold">{ i18n.T(ctx,"windows_groups.excluded",len(preview.Excluded)) }</h3>
+			for _,entry:=range preview.Excluded {
+				<p style="overflow-wrap:anywhere;">{ entry.Name } · { entry.ID } · { i18n.T(ctx,"windows_groups.exclusion_reason") }</p>
+			}
+		</div>
+	}
+}
+
+templ updateGroupFields(draft UpdateAssignmentDraft) {
+	if !draft.Scheduled && draft.Form.Get("group_id")!="" {
+		<input type="hidden" name="group_id" value={ draft.Form.Get("group_id") }/>
+		<input type="hidden" name="group_revision" value={ draft.Form.Get("group_revision") }/>
+	}
+}

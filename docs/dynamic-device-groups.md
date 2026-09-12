@@ -74,8 +74,11 @@ Eighteen Chrome cases cover list, empty, detail, archived, viewer and long text
 at 390, 768 and 1440 pixels, including keyboard submission and revision links.
 The twelve existing device-list and twelve navigation cases also pass.
 
-Group-based profile/update/software assignment, reviewed target snapshots,
-exceptions, conflict previews, pilot promotion and richer predicates remain
+[Immediate native Windows ring assignments](native-windows-update-groups.md) now
+capture reviewed site group revisions and exact native Windows target sets, with
+other management identities shown as exclusions. Apple/software assignments,
+scheduled group evaluation, exceptions, broader conflict previews, pilot promotion
+and richer predicates remain
 roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale
 database acceptance and physical-device acceptance remain separate.
