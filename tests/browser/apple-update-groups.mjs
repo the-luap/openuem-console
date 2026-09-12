@@ -14,6 +14,15 @@ export default async function run(browser,record) {
    const fields=await browser.evaluate('window.updateFields');
    browser.check(fields&&fields.expected_revision==='2'&&fields.group_revision==='3'&&fields.group_id==='30000000-0000-0000-0000-000000000001'&&fields.request_key==='50000000-0000-0000-0000-000000000001'&&fields.devices==='10000000-0000-0000-0000-000000000001:'+ 'a'.repeat(64)&&fields.csrf==='owned-csrf'&&fields.confirmed==='yes','Keyboard confirmation lost plan/group revisions, policy token, targets or CSRF');
    browser.check(await browser.evaluate("updateGroupForm.getAttribute('action')==='/tenant/1/site/1/ios/update-plans/70000000-0000-0000-0000-000000000001/group-assignments'"),'Update confirmation changed scope or plan');
+   const schedule=await browser.evaluate(`(()=>{window.scheduleForm=document.querySelector('[data-update-schedule-confirm]');return {form:!!scheduleForm,required:scheduleForm?.elements.confirmed.required,text:scheduleForm?.parentElement.textContent,action:scheduleForm?.getAttribute('action')};})()`);
+   browser.check(schedule.form&&schedule.required&&schedule.text.includes('absolute UTC')&&schedule.text.includes('local to each device')&&schedule.action.endsWith('/schedules'),'Schedule review lost UTC timing, current source or confirmation');
+   await browser.evaluate(`(()=>{scheduleForm.addEventListener('submit',event=>{event.preventDefault();window.scheduleFields=Object.fromEntries(new FormData(scheduleForm,event.submitter));});scheduleForm.elements.not_before.value='2026-09-15T18:00:00Z';scheduleForm.querySelector('button').focus();})()`);
+   await browser.enter();browser.check(await browser.evaluate('!window.scheduleFields'),'Unchecked schedule submitted');
+   await browser.evaluate("scheduleForm.elements.confirmed.checked=true;scheduleForm.elements.not_before.value='2026-09-15T18:00:00+02:00';scheduleForm.querySelector('button').focus()");await browser.enter();
+   browser.check(await browser.evaluate('!window.scheduleFields'),'Non-UTC schedule submitted');
+   await browser.evaluate("scheduleForm.elements.not_before.value='2026-09-15T18:00:00Z';scheduleForm.querySelector('button').focus()");await browser.enter();
+   const scheduled=await browser.evaluate('window.scheduleFields');
+   browser.check(scheduled&&scheduled.devices===fields.devices&&scheduled.expected_revision===fields.expected_revision&&scheduled.group_revision===fields.group_revision&&scheduled.request_key===fields.request_key&&scheduled.csrf==='owned-csrf'&&scheduled.confirmed==='yes'&&scheduled.not_before==='2026-09-15T18:00:00Z'&&scheduled.activation_window_minutes==='60','Scheduled keyboard confirmation lost exact selection or timing');
    if(state==='existing')browser.check(view.text.includes('Existing policy will be replaced: 18.7')&&view.text.includes('22H90')&&view.text.includes('2026-11-01T18:00:00'),'Replacement preview hid the current policy');
    if(state==='preview')browser.check(view.text.includes('No existing update policy.'),'New assignment claimed an existing policy');
   }else browser.check(!view.form,'Read-only group state offers confirmation');

@@ -129,6 +129,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/update-plans/:plan/group-assignments", h.AppleAssignUpdatePlanGroup)
 		g.GET("/ios/update-plans/:plan/group-assignments", h.AppleUpdatePlanGroupAssignments)
 		g.GET("/ios/update-plans/:plan/group-assignments/:assignment", h.AppleUpdatePlanGroupAssignment)
+		g.POST("/ios/update-plans/:plan/schedules", h.AppleScheduleUpdatePlan)
+		g.GET("/ios/update-plans/:plan/schedules", h.AppleUpdateSchedules)
+		g.GET("/ios/update-plans/:plan/schedules/:schedule", h.AppleUpdateSchedule)
+		g.POST("/ios/update-plans/:plan/schedules/:schedule/cancel", h.AppleCancelUpdateSchedule)
 		g.GET("/ios/update-plans/:plan", h.AppleUpdatePlan)
 		g.POST("/ios/update-plans/:plan", h.AppleSaveUpdatePlan)
 		g.POST("/ios/:id/update", h.AppleUpdate)
@@ -149,11 +153,11 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
-			case "/ios/update-plans/:plan/group-assignments":
+			case "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/schedules":
 				limit = 16 << 10
 			case "/ios/configurations/:id/assign":
 				limit = 64 << 10
-			case "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
+			case "/ios/update-plans/:plan/schedules/:schedule/cancel", "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
 				limit = 8192
 			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192

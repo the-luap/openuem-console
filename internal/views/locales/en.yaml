@@ -146,6 +146,9 @@ en:
       candidate_expired: "The issued certificate expired before the device confirmed it. Check the current identity expiry and enroll the device again if needed."
       enrollment_inactive: "Renewal stopped because this enrollment is no longer active."
       attention: "Identity renewal needs attention. Review the enrollment and command status."
+  apple_update_schedules:
+    invalid: "Enter an absolute UTC activation time and a window of 1 to 10,080 minutes, then confirm the exact reviewed selection."
+    full: "This site already has 256 pending update schedules. Cancel or complete an existing schedule before creating another."
   apple_update_groups:
     invalid: "Review the current plan and group, then confirm the exact eligible device selection."
     permission: "Your current permissions do not allow group update assignments in this site."

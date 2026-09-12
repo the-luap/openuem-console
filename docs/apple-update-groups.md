@@ -77,9 +77,11 @@ readable after later source edits and archival.
 
 ## Scope and validation
 
-This workflow applies one reviewed plan immediately. It does not continuously
-recalculate membership, schedule future activation, promote pilot cohorts, provide
-exceptions, perform a group removal or provide aggregate historical compliance.
+This workflow applies one reviewed plan immediately.
+[Scheduled activation](apple-update-schedules.md) also retains the same review for
+a future UTC window and rechecks it before admission. Neither workflow continuously
+recalculates membership, promotes pilot cohorts, provides exceptions, performs a
+group removal or provides aggregate historical compliance.
 Manual device policy removal remains available. Only eligible target state is
 retained; excluded members are not a frozen historical snapshot. New plan revisions
 and later group edits do not change already assigned policies. Organization-group

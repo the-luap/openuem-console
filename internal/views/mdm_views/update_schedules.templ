@@ -1,0 +1,121 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ appleUpdateScheduleForm(info *partials.CommonInfo, preview apple.UpdatePlanGroupPreview, requestKey string) {
+	<section class="uk-card uk-card-default">
+		<div class="uk-card-body grid gap-4">
+			<h2 class="uk-card-title">Schedule this update</h2>
+			<p>Save the exact reviewed selection for later activation. The plan, group, eligible devices, existing policies and your permissions are checked again when it starts. Changed inputs block the schedule and require a new review.</p>
+			<form method="post" action={ partials.GetNavigationUrl(info, UpdateSchedulePath(preview.Plan.ID)) } class="grid gap-4" data-update-schedule-confirm>
+				@CSRF(info)
+				<input type="hidden" name="expected_revision" value={ Number(preview.Plan.Revision) }/><input type="hidden" name="group_id" value={ preview.Group.ID }/><input type="hidden" name="group_revision" value={ Number(preview.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="devices" value={ updatePlanGroupFields(preview) }/>
+				<label class="grid gap-2" for="update-schedule-time">
+					Activate at (UTC)
+					<input class="uk-input" id="update-schedule-time" type="text" name="not_before" value={ updateScheduleDefaultTime() } maxlength="20" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z" aria-describedby="update-schedule-time-help" required/>
+				</label>
+				<p id="update-schedule-time-help">Use YYYY-MM-DDTHH:MM:SSZ, up to 90 days ahead. This is an absolute UTC start time. The update deadline shown above remains local to each device.</p>
+				<label class="grid gap-2" for="update-schedule-window">
+					Activation window (minutes)
+					<input class="uk-input" id="update-schedule-window" type="number" name="activation_window_minutes" value="60" min="1" max="10080" step="1" aria-describedby="update-schedule-window-help" required/>
+				</label>
+				<p id="update-schedule-window-help">Allow 1 to 10,080 minutes to admit the complete assignment after its start time. An expired schedule does not activate later. This window does not measure installation time.</p>
+				<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Schedule this plan revision, exact eligible selection and the existing-policy replacements shown above for the UTC time and activation window entered here.</label>
+				<button class="uk-button uk-button-primary" type="submit">Confirm update schedule</button>
+			</form>
+		</div>
+	</section>
+}
+
+templ AppleUpdateSchedule(c echo.Context, info *partials.CommonInfo, r apple.UpdateSchedule) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Scheduled activations", Url: partials.GetNavigationUrl(info, UpdateSchedulePath(r.Plan.ID))}}, info)
+		<main id="device-management" data-update-schedule={ r.Phase } class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Scheduled Apple update</h1><p>The original reviewed source and selection are retained below. A saved schedule does not establish an installed update.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					<h2 class="uk-card-title">{ updateScheduleStatus(r.Phase) }</h2>
+					if r.Reason!="" {
+						<p>{ updateScheduleReason(r.Reason) }</p>
+					}
+					<p>Activate at (UTC): { r.NotBefore.UTC().Format("2006-01-02 15:04:05") }</p>
+					<p>Activation window ends (UTC): { r.ExpiresAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					<p>Created by { r.Actor } · { r.CreatedAt.UTC().Format("2006-01-02 15:04:05") } UTC</p>
+					<p>Attempts: { Number(r.Attempts) } · State revision: { Number(r.Revision) }</p>
+					if r.Phase=="waiting" {
+						<p>Next attempt (UTC): { r.NextAttemptAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					}
+					if r.CompletedAt!=nil {
+						<p>Completed (UTC): { r.CompletedAt.UTC().Format("2006-01-02 15:04:05") }</p>
+					}
+					<p>Schedule ID: <code>{ r.ID }</code></p>
+					if r.Phase=="activated" {
+						<p>The complete assignment was admitted. Open its original receipt and current device reports to review delivery and compliance.</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(r.Plan.ID)+"/"+r.AssignmentID)) }>Open activation receipt</a>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdatePlanDefinition(r.Plan)
+					@appleProfileGroupSource(info, r.Group)
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" data-update-schedule-targets>
+					<h2 class="uk-card-title">Original native Apple selection ({ Number(len(r.Targets)) })</h2>
+					for _,target:=range r.Targets {
+						<article style="overflow-wrap:anywhere;"><p>Native Apple enrollment: <code>{ target.DeviceID }</code></p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+target.DeviceID)) }>Open current device state</a></article>
+					}
+				</div>
+			</section>
+			if r.Phase=="scheduled" || r.Phase=="waiting" {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4">
+						<h2 class="uk-card-title">Cancel before activation</h2>
+						<p>Cancellation succeeds only while this state revision is still pending. It cannot undo an admitted assignment.</p>
+						<form method="post" action={ partials.GetNavigationUrl(info, UpdateSchedulePath(r.Plan.ID)+"/"+r.ID+"/cancel") } class="grid gap-4" data-update-schedule-cancel>
+							@CSRF(info)
+							<input type="hidden" name="expected_revision" value={ Number(r.Revision) }/>
+							<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> Cancel this pending schedule.</label>
+							<button class="uk-button uk-button-danger" type="submit">Cancel schedule</button>
+						</form>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ AppleUpdateSchedules(c echo.Context, info *partials.CommonInfo, plan string, items []apple.UpdateSchedule, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Scheduled activations", Url: partials.GetNavigationUrl(info, UpdateSchedulePath(plan))}}, info)
+		<main id="device-management" data-update-schedules="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Scheduled activations</h1><p>Original schedules for this update plan and site. Each activation rechecks its complete reviewed selection.</p></div>
+			for _,r:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
+						<h2 class="uk-card-title">{ r.Plan.Definition.Name } · Revision { Number(r.Plan.Revision) }</h2>
+						<p>{ r.Group.Name } · Group revision { Number(r.Group.Revision) }</p>
+						<p>{ updateScheduleStatus(r.Phase) } · { Number(len(r.Targets)) } native Apple devices</p>
+						<p>Activate at (UTC): { r.NotBefore.UTC().Format("2006-01-02 15:04:05") }</p>
+						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateSchedulePath(plan)+"/"+r.ID)) }>Open original schedule</a>
+					</div>
+				</section>
+			}
+			if len(items)==0 {
+				<p>No scheduled activations for this plan in this site.</p>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdateSchedulePath(plan)) + "?before=" + next) }>Older schedules</a>
+			}
+		</main>
+	}
+}

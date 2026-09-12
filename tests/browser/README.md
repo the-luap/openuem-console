@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 828 cases:
+headless Chrome session. The runner covers 855 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -24,6 +24,7 @@ headless Chrome session. The runner covers 828 cases:
 | Apple profile groups | Site catalog, chooser, empty chooser, apply/removal previews, exclusions, original receipt, populated/empty history and long metadata × three widths; immutable fields and keyboard confirmation | 30 |
 | Apple update plans | List, empty, detail, archived, viewer and long metadata × three widths; exact revisions, retained history and keyboard saving | 18 |
 | Apple update groups | Chooser, empty chooser, new/replacement previews, exclusions, original receipt, populated/empty history and long metadata × three widths; exact policy tokens and keyboard confirmation | 27 |
+| Apple update schedules | Six lifecycle states, populated/empty history and long metadata × three widths; original targets, UTC timing, receipt links and keyboard cancellation | 27 |
 | OpenID account identities | Unlinked/active/disabled/ineligible/long/disabled provider × three widths; explicit keyboard confirmation | 18 |
 | Account language | Seven catalogs, browser default, unavailable storage and long profile × three widths | 30 |
 | Report timestamps | Seven catalogs × three widths | 21 |

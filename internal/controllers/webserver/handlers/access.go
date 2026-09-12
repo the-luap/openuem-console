@@ -61,7 +61,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/software/catalog", "/software/catalog/:version", "/ios/:id/applications", "/ios/:id/applications/:assignment/history", "/ios/:id/setup/applications/:requirement/history":
 			return access.ReadSoftware, true
-		case "/ios/update-plans/:plan/groups", "/ios/update-plans/:plan/groups/:group/preview", "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/group-assignments/:assignment":
+		case "/ios/update-plans/:plan/schedules", "/ios/update-plans/:plan/schedules/:schedule", "/ios/update-plans/:plan/groups", "/ios/update-plans/:plan/groups/:group/preview", "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/group-assignments/:assignment":
 			return access.ManageUpdates, true
 		case "/ios/update-plans", "/ios/update-plans/:plan":
 			return access.ReadDevices, true
@@ -111,7 +111,7 @@ func appleCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/ios/:id/mac-admin/passwords/:key/reveal", "/ios/:id/filevault/keys/:key/reveal", "/ios/:id/recovery-lock/passwords/:key/reveal":
 			return access.RetrieveRecoveryKeys, true
-		case "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan", "/ios/update-plans/:plan/group-assignments":
+		case "/ios/update-plans/:plan/schedules", "/ios/update-plans/:plan/schedules/:schedule/cancel", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan", "/ios/update-plans/:plan/group-assignments":
 			return access.ManageUpdates, true
 		// A retry can redeliver a previously authorized configuration or update.
 		case "/ios/:id/commands/:command/retry":

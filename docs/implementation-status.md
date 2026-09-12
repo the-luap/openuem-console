@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Scheduled Apple update activation](apple-update-schedules.md) retains immutable
+  encrypted original plan/group/selection intent and an absolute UTC activation
+  window. A private random activation key, current permission/source/review
+  rechecks, atomic receipt/device/state writes, final-audit expiry rollback and
+  revision-checked cancellation protect durable execution. The console starts and
+  joins bounded schedule and SMTP workers independently. Targeted PostgreSQL
+  17/race tests pass in 23.451 seconds; the complete Apple suite passes in
+  523.030 seconds. Registered Linux console routes, macOS/Linux package race
+  tests, the full Linux build and 84 schedule/group/plan/navigation Chrome cases
+  pass. The owned PostgreSQL SMTP shutdown/maintenance lifecycle test passes in
+  2.105 seconds. Startup captures sources after Windows initialization. Continuous reconciliation, exceptions, automatic promotion,
+  group removal, aggregate cohort results and physical-device acceptance remain
+  separate work.
+
 - [Apple update assignments from dynamic groups](apple-update-groups.md) now
   review exact plan/group revisions, current eligibility and each native target's
   configured policy. Confirmation rechecks the complete selection and configured
@@ -70,7 +84,7 @@ the table's package summaries do not remove any detail from the roadmap.
   The targeted PostgreSQL/race regression passes in 29.461 seconds and the complete
   Apple suite in 483.258 seconds. Registered Linux routes, macOS/Linux package
   race tests, the full Linux build and 57 group/plan/navigation Chrome cases pass.
-  Continuous reconciliation, schedules, exceptions, pilot promotion, group removal
+  Continuous reconciliation, exceptions, pilot promotion, group removal
   and aggregate historical results remain separate work.
 
 - [Apple update plans](apple-update-plans.md) now provide an exact-site catalog of
@@ -82,8 +96,9 @@ the table's package summaries do not remove any detail from the roadmap.
   locale race tests pass. The complete Apple PostgreSQL/race suite passes in
   476.388 seconds, and the full Linux build passes. Eighteen plan browser cases
   and twelve navigation cases
-  pass at all three widths. Immediate group assignment is recorded above;
-  scheduling, exceptions, promotion and cohort result evidence remain separate work.
+  pass at all three widths. Immediate group assignment and scheduled activation
+  are recorded above. Exceptions, promotion and cohort result
+  evidence remain separate work.
 
 - [Apple update policy admission](apple-update-policy-admission.md) now rechecks
   current update authority inside the bounded policy/notification/audit

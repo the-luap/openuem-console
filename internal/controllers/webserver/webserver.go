@@ -134,8 +134,6 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	defer w.stopInventoryRefresh()
 	w.startAuditRetention()
 	defer w.stopAuditRetention()
-	w.startAppleReminders()
-	defer w.stopAppleReminders()
 	identity, err := clientidentity.FromEnvironment()
 	if err != nil {
 		return err
@@ -144,6 +142,10 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	defer w.stopWindows()
+	// Capture the final enabled inventory sources only after native Windows
+	// initialization, so restarted Apple schedules retain the console's sources.
+	w.startAppleReminders()
+	defer w.stopAppleReminders()
 	if err := w.startDesktop(certFile, certKey); err != nil {
 		return err
 	}

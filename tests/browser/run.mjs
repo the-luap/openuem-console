@@ -32,6 +32,7 @@ import appleProfileAssignments from "./apple-profile-assignments.mjs";
 import appleProfileGroups from "./apple-profile-groups.mjs";
 import appleUpdatePlans from "./apple-update-plans.mjs";
 import appleUpdateGroups from "./apple-update-groups.mjs";
+import appleUpdateSchedules from "./apple-update-schedules.mjs";
 import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
@@ -86,6 +87,7 @@ try {
         [appleProfileGroups,30],
         [appleUpdatePlans,18],
         [appleUpdateGroups,27],
+        [appleUpdateSchedules,27],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

@@ -9,8 +9,9 @@ separate from each device's current policy and observed update result.
 The catalog and revision history now connect to
 [immediate dynamic group assignments](apple-update-groups.md), with current
 eligibility, reviewed policy replacements and immutable original request evidence.
-Scheduling, exceptions, promotion and per-cohort result tracking remain separate
-implementation work. The existing device action continues to use
+[Scheduled group activation](apple-update-schedules.md) retains the same review
+for a UTC activation window. Exceptions, promotion and per-cohort result tracking
+remain separate implementation work. The existing device action continues to use
 [transaction-bound update policy admission](apple-update-policy-admission.md).
 Saving, revising or archiving a plan creates no device policy or notification.
 

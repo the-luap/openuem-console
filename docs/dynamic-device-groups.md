@@ -82,8 +82,10 @@ the original revision, native membership and enabled sources.
 current action eligibility, resolve canonical Mac channels, confirm exact native
 targets and retain immutable original request evidence.
 [Apple update plan assignments](apple-update-groups.md) additionally compare
-reviewed current policy values and explicitly confirm replacements. Software
-assignments, Apple scheduling, exceptions, broader conflict previews, pilot
+reviewed current policy values and explicitly confirm replacements.
+[Scheduled Apple update activation](apple-update-schedules.md) retains that review
+and rechecks it in an absolute UTC activation window. Software assignments, Apple
+profile scheduling, exceptions, broader conflict previews, pilot
 promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale
 database acceptance and physical-device acceptance remain separate.

@@ -88,13 +88,13 @@ func CSRF() echo.MiddlewareFunc {
 // Header tokens retain the same bound on these explicitly enumerated forms.
 func scopedFormLimit(path string) int64 {
 	route := strings.TrimPrefix(strings.TrimPrefix(path, "/tenant/:tenant/site/:site"), "/tenant/:tenant")
-	if route == "/ios/update-plans/:plan/group-assignments" {
+	if route == "/ios/update-plans/:plan/group-assignments" || route == "/ios/update-plans/:plan/schedules" {
 		return 16 << 10
 	}
 	if route == "/ios/configurations/:id/assign" {
 		return 64 << 10
 	}
-	if route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/ios/:id/update" || route == "/ios/update-plans" || route == "/ios/update-plans/:plan" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
+	if route == "/ios/update-plans/:plan/schedules/:schedule/cancel" || route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/ios/:id/update" || route == "/ios/update-plans" || route == "/ios/update-plans/:plan" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
 		return 8192
 	}
 	return 0

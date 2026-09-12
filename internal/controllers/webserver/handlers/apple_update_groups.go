@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -83,6 +84,30 @@ func (h *Handler) ApplePreviewUpdatePlanGroup(c echo.Context) error {
 	}
 	return renderApple(c, mdm_views.AppleUpdatePlanGroupPreview(c, info, *preview, uuid.NewString()))
 }
+func appleUpdateGroupSelection(f url.Values) (int, int, []apple.UpdatePlanGroupSelection, error) {
+	revision, err := groupRevision(f.Get("expected_revision"))
+	if err != nil || revision == 0 || f.Get("confirmed") != "yes" {
+		return 0, 0, nil, apple.ErrUpdatePlanGroup
+	}
+	groupVersion, err := groupRevision(f.Get("group_revision"))
+	if err != nil || groupVersion == 0 {
+		return 0, 0, nil, apple.ErrUpdatePlanGroup
+	}
+	lines := strings.Split(strings.TrimSpace(f.Get("devices")), "\n")
+	if len(lines) < 1 || len(lines) > 100 {
+		return 0, 0, nil, apple.ErrUpdatePlanGroup
+	}
+	selected := make([]apple.UpdatePlanGroupSelection, len(lines))
+	for i, line := range lines {
+		id, token, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
+			return 0, 0, nil, apple.ErrUpdatePlanGroup
+		}
+		selected[i] = apple.UpdatePlanGroupSelection{DeviceID: id, PolicyToken: token}
+	}
+	return revision, groupVersion, selected, nil
+}
+
 func (h *Handler) AppleAssignUpdatePlanGroup(c echo.Context) error {
 	info, scope, err := h.appleUpdatePlanContext(c)
 	if err != nil {
@@ -92,25 +117,9 @@ func (h *Handler) AppleAssignUpdatePlanGroup(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	revision, err := groupRevision(f.Get("expected_revision"))
-	if err != nil || revision == 0 || f.Get("confirmed") != "yes" {
-		return appleUpdateGroupFailure(c, apple.ErrUpdatePlanGroup)
-	}
-	groupVersion, err := groupRevision(f.Get("group_revision"))
-	if err != nil || groupVersion == 0 {
-		return appleUpdateGroupFailure(c, apple.ErrUpdatePlanGroup)
-	}
-	lines := strings.Split(strings.TrimSpace(f.Get("devices")), "\n")
-	if len(lines) < 1 || len(lines) > 100 {
-		return appleUpdateGroupFailure(c, apple.ErrUpdatePlanGroup)
-	}
-	selected := make([]apple.UpdatePlanGroupSelection, len(lines))
-	for i, line := range lines {
-		id, token, ok := strings.Cut(strings.TrimSpace(line), ":")
-		if !ok {
-			return appleUpdateGroupFailure(c, apple.ErrUpdatePlanGroup)
-		}
-		selected[i] = apple.UpdatePlanGroupSelection{DeviceID: id, PolicyToken: token}
+	revision, groupVersion, selected, err := appleUpdateGroupSelection(f)
+	if err != nil {
+		return appleUpdateGroupFailure(c, err)
 	}
 	assignment, err := h.Apple.AssignUpdatePlanFromGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, f.Get("group_id"), groupVersion, f.Get("request_key"), selected)
 	if err != nil {

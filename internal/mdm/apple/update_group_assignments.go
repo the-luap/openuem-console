@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -115,11 +116,8 @@ func (s *Store) sealUpdateGroupAssignment(r *UpdatePlanGroupAssignment) ([]byte,
 	return s.secrets.seal(plain, updateGroupPurpose(r))
 }
 
-// AssignUpdatePlanFromGroup accepts only the complete reviewed eligible native
-// selection and its unchanged configured policies. Exact retry returns original
-// admission evidence before consulting mutable plan, group or device state.
-func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
-	if !sources.Apple || !profileRevisionUUID(planID) || planRevision < 1 || planRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || len(selection) < 1 || len(selection) > 100 {
+func canonicalUpdateGroupSelection(selection []UpdatePlanGroupSelection) ([]UpdatePlanGroupSelection, error) {
+	if len(selection) < 1 || len(selection) > 100 {
 		return nil, ErrUpdatePlanGroup
 	}
 	targets := slices.Clone(selection)
@@ -137,6 +135,20 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 			return nil, ErrUpdatePlanGroup
 		}
 	}
+	return targets, nil
+}
+
+// AssignUpdatePlanFromGroup accepts only the complete reviewed eligible native
+// selection and its unchanged configured policies. Exact retry returns original
+// admission evidence before consulting mutable plan, group or device state.
+func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
+	if !sources.Apple || !profileRevisionUUID(planID) || planRevision < 1 || planRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || len(selection) < 1 || len(selection) > 100 {
+		return nil, ErrUpdatePlanGroup
+	}
+	targets, err := canonicalUpdateGroupSelection(selection)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -144,6 +156,21 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 		return nil, err
 	}
 	defer tx.Rollback()
+	r, err := s.assignUpdatePlanGroupTransaction(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, requestKey, targets)
+	if err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// assignUpdatePlanGroupTransaction lets scheduled activation retain its state
+// transition and device admission in one transaction. Targets and source IDs
+// must already be canonical and validated by the caller.
+func (s *Store) assignUpdatePlanGroupTransaction(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, targets []UpdatePlanGroupSelection) (*UpdatePlanGroupAssignment, error) {
+	var err error
 	if err = updatePlanAuthority(ctx, tx, permissions, actor, scope, access.ManageUpdates); err != nil {
 		return nil, err
 	}
@@ -164,9 +191,6 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 			return nil, ErrConflict
 		}
 		if err = auditUpdatePlan(ctx, tx, scope, actor, "group.replayed", previous.ID, planRevision); err != nil {
-			return nil, err
-		}
-		if err = tx.Commit(); err != nil {
 			return nil, err
 		}
 		return previous, nil
@@ -215,9 +239,6 @@ func (s *Store) AssignUpdatePlanFromGroup(ctx context.Context, actor string, per
 		return nil, err
 	}
 	if err = auditUpdatePlan(ctx, tx, scope, actor, "group.created", r.ID, planRevision); err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
 	return r, nil

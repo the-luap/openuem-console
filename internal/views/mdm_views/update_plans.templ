@@ -101,6 +101,7 @@ templ AppleUpdatePlan(c echo.Context, info *partials.CommonInfo, plan apple.Upda
 						<a class="uk-button uk-button-default" href={templ.URL(UpdatePlanGroupChoiceURL(info,plan,""))}>Assign to a dynamic group</a>
 					}
 					<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,UpdatePlanGroupHistoryPath(plan.ID)))}>Group update history</a>
+					<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,UpdateSchedulePath(plan.ID)))}>Scheduled activations</a>
 				</div>
 			}
 			if info.Can(access.ManageUpdates) {
