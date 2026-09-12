@@ -5,6 +5,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/tagcolor"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"net/url"
@@ -34,7 +35,16 @@ templ OrganizationTagForm(info *partials.CommonInfo, tag inventory.OrganizationT
 		}
 		<label>{ i18n.T(ctx,"organization_tags.name") }<input class="uk-input" name="name" value={ tag.Name } maxlength="255" required/></label>
 		<label>{ i18n.T(ctx,"organization_tags.description") }<input class="uk-input" name="description" value={ tag.Description } maxlength="2048"/></label>
-		<label>{ i18n.T(ctx,"organization_tags.color") }<input type="color" name="color" value={ tag.Color } required/></label>
+		<label>{ i18n.T(ctx,"organization_tags.color") }
+			<select name="color" class="uk-select" required>
+				for _, color := range tagcolor.Names() {
+					<option value={ color } selected?={ tag.Color==color }>{ i18n.T(ctx,"organization_tags.colors."+color) }</option>
+				}
+				if tagcolor.IsHex(tag.Color) {
+					<option value={ tag.Color } selected>{ i18n.T(ctx,"organization_tags.custom_color",tag.Color) }</option>
+				}
+			</select>
+		</label>
 		<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"organization_tags.save") }</button>
 	</form>
 }
@@ -80,7 +90,7 @@ templ OrganizationTags(c echo.Context, info *partials.CommonInfo, page *inventor
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-4">
 						<h2 class="uk-card-title">{ i18n.T(ctx,"organization_tags.create") }</h2>
-						@OrganizationTagForm(info, inventory.OrganizationTag{TagDefinition: inventory.TagDefinition{Color: "#64748b"}})
+					@OrganizationTagForm(info, inventory.OrganizationTag{TagDefinition: inventory.TagDefinition{Color: "blue"}})
 					</div>
 				</section>
 			}

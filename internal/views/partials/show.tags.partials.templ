@@ -18,7 +18,8 @@ templ ShowAppliedTags(tags []*ent.Tag, agentId string, p PaginationAndSort, url,
 			<button
 				title={ fmt.Sprintf("Remove tag %s", tag.Tag) }
 				type="button"
-				class={ "flex items-center gap-2 rounded-full px-4 py-1 text-white", fmt.Sprintf("bg-%s-500", tag.Color) }
+				class="flex min-w-0 max-w-full items-center gap-2 rounded-lg px-4 py-1"
+				style={ templ.SafeCSS(string(TagColorStyle(tag.Color))+"overflow-wrap:anywhere;") }
 				hx-delete={ url }
 				hx-target={ target }
 				hx-swap={ swap }
@@ -35,10 +36,11 @@ templ ShowAppliedTags(tags []*ent.Tag, agentId string, p PaginationAndSort, url,
 }
 
 templ ShowAppliedTagsWithoutRemoveOption(tags []*ent.Tag) {
-	<div class="flex items-center gap-2">
+	<div class="flex flex-wrap items-center gap-2">
 		for _, tag := range tags {
 			<span
-				class={ "flex items-center gap-2 rounded-full px-4 py-1 text-white", fmt.Sprintf("bg-%s-500", tag.Color) }
+				class="flex min-w-0 max-w-full items-center gap-2 rounded-lg px-4 py-1"
+				style={ templ.SafeCSS(string(TagColorStyle(tag.Color))+"overflow-wrap:anywhere;") }
 			>
 				{ tag.Tag }
 			</span>

@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Tag color compatibility](organization-tags.md) preserves the original 19
+  palette names and existing hexadecimal colors without changing stored values
+  or no-op revisions. Shared device badges and picker swatches now resolve
+  bounded colors explicitly, choose readable label contrast and wrap long text;
+  unsupported historical values use a neutral fallback. A PostgreSQL regression
+  reproduced and fixed rejection of an unchanged legacy palette tag. All tag
+  PostgreSQL/race tests pass in 4.489 seconds, including the unchanged revision;
+  registered console routes verify the same edit through the real form. View,
+  catalog, Linux package race checks and the full Linux build pass. Thirty
+  focused Chrome cases cover palette/custom colors and organization forms. The
+  final complete 1,314-case Chrome matrix passes in 83.315 seconds, with mobile
+  contrast, long labels and the legacy editor also inspected visually.
+
 - [Organization tag administration](organization-tags.md) now provides bounded
   whole-organization catalog reads and separately authorized definition changes.
   Existing Ent writers participate in durable revision checks; stale edits,

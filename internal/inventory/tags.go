@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/tagcolor"
 )
 
 var (
@@ -36,13 +37,8 @@ func (d TagDefinition) Valid() bool {
 	text := func(s string, max int) bool {
 		return len(s) <= max && utf8.ValidString(s) && strings.IndexFunc(s, unicode.IsControl) < 0
 	}
-	if strings.TrimSpace(d.Name) == "" || !text(d.Name, 255) || !text(d.Description, 2048) || len(d.Color) != 7 || d.Color[0] != '#' {
+	if strings.TrimSpace(d.Name) == "" || !text(d.Name, 255) || !text(d.Description, 2048) || !tagcolor.Valid(d.Color) {
 		return false
-	}
-	for _, c := range d.Color[1:] {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
-			return false
-		}
 	}
 	return true
 }

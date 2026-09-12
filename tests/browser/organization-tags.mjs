@@ -1,5 +1,5 @@
 export default async function run(browser, record) {
-  for (const state of ['list','empty','detail','used','viewer','long','list-viewer','administrator']) {
+  for (const state of ['list','empty','detail','used','viewer','long','list-viewer','administrator','legacy-palette']) {
     for (const width of [390,768,1440]) {
       await browser.visit('organization-tags-'+state,width);
       const creating=['list','empty','list-viewer'].includes(state);
@@ -8,23 +8,24 @@ export default async function run(browser, record) {
         window.tagForm=tagRoot.querySelector('form[aria-label="Edit tag"]');
         window.tagDelete=tagRoot.querySelector('form[aria-label="Delete tag"]');
         window.tagSearch=tagRoot.querySelector('form[aria-label="Search tags"]');
-        return {form:!!tagForm,remove:!!tagDelete,search:!!tagSearch,revision:tagForm?.elements.revision?.value,
+        return {form:!!tagForm,remove:!!tagDelete,search:!!tagSearch,revision:tagForm?.elements.revision?.value,initialColor:tagForm?.elements.color.value,
           path:tagForm?new URL(tagForm.action).pathname:null,method:tagForm?.method,articles:tagRoot.querySelectorAll('article').length,
           scripts:tagRoot.querySelectorAll('script').length,width:document.documentElement.scrollWidth,viewport:innerWidth};
       })()`);
       browser.check(view.form===!state.includes('viewer'),'Tag editor disagrees with whole-organization permission');
-      browser.check(view.remove===(state==='detail'||state==='long'||state==='administrator'),'Used or read-only tag exposes deletion');
+      browser.check(view.remove===(state==='detail'||state==='long'||state==='administrator'||state==='legacy-palette'),'Used or read-only tag exposes deletion');
       browser.check(view.search===creating && view.articles===(creating&&state!=='empty'?1:0),'Tag list state changed');
       browser.check(view.scripts===0 && view.width<=view.viewport+1,'Tag text became script content or overflows');
       browser.check(await browser.evaluate(`getComputedStyle(tagRoot.querySelector('h1')).color===getComputedStyle(document.querySelector('header')).color`),'Tag heading lost the active theme foreground');
       browser.check(await browser.evaluate(`!!document.querySelector('option[value="/admin"]')===${state==='administrator'} && !!tagRoot.querySelector('a[href="/tenant/1/admin/settings"]')===${state==='administrator'} && !document.querySelector('select[name="site"]') && !document.querySelector('#console-header-controls').textContent.includes('Berlin')`),'Organization tag navigation lost administrator settings or exposes an unauthorized scope');
       if(view.form) {
+        browser.check(view.initialColor===(creating?'blue':state==='legacy-palette'?'red':'#123456'),'Tag editor silently changed the stored palette or custom color');
         browser.check(view.method==='post' && view.path==='/tenant/1/admin/tags'+(creating?'':'/42'),'Tag action lost its organization scope');
         browser.check(creating?view.revision===undefined:view.revision==='00000000-0000-4000-8000-000000000042','Tag edit lost the reviewed generation');
-        await browser.evaluate(`tagForm.elements.name.value='Keyboard tag';tagForm.elements.description.value='Reviewed definition';tagForm.elements.color.value='#abcdef';tagForm.addEventListener('submit',e=>{e.preventDefault();window.tagFields=Object.fromEntries(new FormData(tagForm,e.submitter))});tagForm.querySelector('button').focus()`);
+        await browser.evaluate(`tagForm.elements.name.value='Keyboard tag';tagForm.elements.description.value='Reviewed definition';tagForm.elements.color.value='blue';tagForm.addEventListener('submit',e=>{e.preventDefault();window.tagFields=Object.fromEntries(new FormData(tagForm,e.submitter))});tagForm.querySelector('button').focus()`);
         await browser.enter();
         const fields=await browser.evaluate('tagFields');
-        browser.check(fields.csrf==='owned-csrf' && fields.name==='Keyboard tag' && fields.description==='Reviewed definition' && fields.color==='#abcdef','Keyboard tag edit lost form values or CSRF');
+        browser.check(fields.csrf==='owned-csrf' && fields.name==='Keyboard tag' && fields.description==='Reviewed definition' && fields.color==='blue','Keyboard tag edit lost form values or CSRF');
       }
       if(view.remove) {
         browser.check(await browser.evaluate('!tagDelete.checkValidity()'),'Deletion lacks explicit native confirmation');

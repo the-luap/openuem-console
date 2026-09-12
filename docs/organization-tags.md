@@ -19,7 +19,13 @@ records, notes, task output or assignment identities. Each page or detail read
 requires current permissions and a committed audit event before returning data.
 
 Names are nonblank and bounded to 255 UTF-8 bytes; single-line descriptions are
-bounded to 2,048 bytes. Colors use a six-digit hexadecimal value. Legacy data
+bounded to 2,048 bytes. Colors retain the original 19-name palette or a six-digit
+hexadecimal value. The editor preserves an existing custom color as a selected
+option and offers the original palette for new choices. Saving an unchanged
+named color preserves both its stored value and the tag revision. Shared device
+badges and tag pickers resolve either representation to a bounded color, with
+black or white label text chosen for contrast. Unsupported old color strings
+display a neutral fallback and cannot inject CSS. Legacy data
 exceeding the text transfer limits fails closed instead of being silently
 truncated and overwritten. The upstream global name-uniqueness constraint remains
 in force; a collision produces a generic unavailable-name error without naming

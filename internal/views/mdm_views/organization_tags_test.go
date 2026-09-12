@@ -28,7 +28,7 @@ func TestOrganizationTagPages(t *testing.T) {
 	ctx, err = sm.Load(ctx, "")
 	require.NoError(t, err)
 	sm.Put(ctx, "uid", "owned-tag-admin")
-	for _, state := range []string{"list", "empty", "detail", "used", "viewer", "long", "list-viewer", "administrator"} {
+	for _, state := range []string{"list", "empty", "detail", "used", "viewer", "long", "list-viewer", "administrator", "legacy-palette"} {
 		t.Run(state, func(t *testing.T) {
 			role := access.TenantAdmin
 			if strings.Contains(state, "viewer") {
@@ -37,6 +37,9 @@ func TestOrganizationTagPages(t *testing.T) {
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "owned-tag-admin", Grants: []access.Grant{{Role: role, Scope: access.Scope{TenantID: 1}}}}, SM: &sessions.SessionManager{Manager: sm}, CSRFToken: "owned-csrf", TenantID: "1", SiteID: "-1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Owned organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 			tag := inventory.OrganizationTag{ID: 42, Revision: "00000000-0000-4000-8000-000000000042", TagDefinition: inventory.TagDefinition{Name: "Owned <tag>", Description: "Shared organization definition", Color: "#123456"}, Used: state == "used"}
 			info.IsAdmin = true
+			if state == "legacy-palette" {
+				tag.Color = "red"
+			}
 			if state == "administrator" {
 				info.Principal.Grants = []access.Grant{{Role: access.Administrator}}
 			}
@@ -64,7 +67,7 @@ func TestOrganizationTagPages(t *testing.T) {
 			require.Equal(t, state == "administrator", strings.Contains(html, `value="/admin"`))
 			require.Equal(t, state == "administrator", strings.Contains(html, `href="/tenant/1/admin/settings"`))
 			require.Equal(t, role == access.TenantAdmin, strings.Contains(html, `aria-label="Edit tag"`))
-			require.Equal(t, state == "detail" || state == "long" || state == "administrator", strings.Contains(html, `aria-label="Delete tag"`))
+			require.Equal(t, state == "detail" || state == "long" || state == "administrator" || state == "legacy-palette", strings.Contains(html, `aria-label="Delete tag"`))
 			require.False(t, strings.Contains(html, tag.Name), "tag text was not escaped")
 			if dir := os.Getenv("APPLE_MDM_UI_ARTIFACTS"); dir != "" {
 				require.NoError(t, os.MkdirAll(dir, 0755))

@@ -27,6 +27,18 @@ func tagDefinition(name string) inventory.TagDefinition {
 	return inventory.TagDefinition{Name: name, Description: "Owned tag description", Color: "#aBc123"}
 }
 
+func TestOrganizationTagsPreserveLegacyPaletteDefinitions(t *testing.T) {
+	f, scope := tagFixture(t)
+	legacy, err := f.client.Tag.Create().SetTag("Existing palette tag").SetDescription("Original description").SetColor("red").SetTenantID(scope.TenantID).Save(t.Context())
+	require.NoError(t, err)
+	current, err := inventory.ReadOrganizationTag(t.Context(), f.db, f.permissions, "tag-admin", scope, int64(legacy.ID))
+	require.NoError(t, err)
+	unchanged, err := inventory.SaveOrganizationTag(t.Context(), f.db, f.permissions, "tag-admin", scope, current.ID, current.Revision, current.TagDefinition)
+	require.NoError(t, err)
+	require.Equal(t, current.Revision, unchanged.Revision)
+	require.Equal(t, "red", unchanged.Color)
+}
+
 func TestOrganizationTagsAuthorizeScopeAndRetainLegacyWriters(t *testing.T) {
 	f, scope := tagFixture(t)
 	ctx := t.Context()
@@ -168,7 +180,7 @@ func TestOrganizationTagsRequireUnusedCurrentRevisionAndLiveGrants(t *testing.T)
 }
 
 func TestOrganizationTagValidationAndMigrationGuard(t *testing.T) {
-	for _, d := range []inventory.TagDefinition{{Name: "", Color: "#ffffff"}, {Name: "Name", Color: "red"}, {Name: "Name", Color: "#fff\"xx"}, {Name: "Name", Color: "#000000", Description: "line\nbreak"}, {Name: strings.Repeat("x", 256), Color: "#000000"}} {
+	for _, d := range []inventory.TagDefinition{{Name: "", Color: "#ffffff"}, {Name: "Name", Color: "maroon"}, {Name: "Name", Color: "#fff\"xx"}, {Name: "Name", Color: "#000000", Description: "line\nbreak"}, {Name: strings.Repeat("x", 256), Color: "#000000"}} {
 		require.False(t, d.Valid())
 	}
 	require.True(t, tagDefinition("Unicode label <tag>").Valid())

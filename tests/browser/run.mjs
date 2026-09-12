@@ -28,6 +28,7 @@ import managementNavigation from "./management-navigation.mjs";
 import deviceList from "./device-list.mjs";
 import deviceGroups from "./device-groups.mjs";
 import organizationTags from "./organization-tags.mjs";
+import tagColors from "./tag-colors.mjs";
 import windowsUpdateGroups from "./windows-update-groups.mjs";
 import appleProfileAssignments from "./apple-profile-assignments.mjs";
 import appleProfileOrganizationGroups from "./apple-profile-organization-groups.mjs";
@@ -93,7 +94,8 @@ try {
         [managementNavigation,12],
         [deviceList,12],
         [deviceGroups,18],
-        [organizationTags,24],
+        [organizationTags,27],
+        [tagColors,3],
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
         [appleProfileGroups,30],

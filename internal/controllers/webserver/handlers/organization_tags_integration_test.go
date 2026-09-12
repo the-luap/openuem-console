@@ -57,7 +57,7 @@ func exerciseOrganizationTags(t *testing.T, h *Handler, ctx context.Context, ten
 		return match[1]
 	}
 	original := revision()
-	for _, bad := range []struct{ key, value string }{{"name", ""}, {"color", "red"}, {"tenant_id", "99"}, {"tagId", "1"}, {"revision", "invalid"}, {"description", "line\nbreak"}} {
+	for _, bad := range []struct{ key, value string }{{"name", ""}, {"color", "maroon"}, {"tenant_id", "99"}, {"tagId", "1"}, {"revision", "invalid"}, {"description", "line\nbreak"}} {
 		v := form(original)
 		v.Set(bad.key, bad.value)
 		require.Equal(t, 400, request("organization-admin", "POST", detail, v).Code)
@@ -101,4 +101,17 @@ func exerciseOrganizationTags(t *testing.T, h *Handler, ctx context.Context, ten
 	var deleted int
 	require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_inventory_audit WHERE tenant_id=$1 AND site_id=0 AND actor='organization-admin' AND action='inventory.tags.delete'`, tenant).Scan(&deleted))
 	require.Equal(t, 1, deleted)
+	legacy, err := h.Model.Client.Tag.Create().SetTag("Owned legacy palette definition").SetDescription("Original color").SetColor("red").SetTenantID(tenant).Save(ctx)
+	require.NoError(t, err)
+	legacyPath := base + "/" + strconv.Itoa(legacy.ID)
+	w = request("organization-admin", "GET", legacyPath, nil)
+	require.Equal(t, 200, w.Code)
+	require.Contains(t, w.Body.String(), `value="red" selected`)
+	var before, after, color string
+	require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT uem_revision::text FROM tags WHERE id=$1`, legacy.ID).Scan(&before))
+	w = request("organization-admin", "POST", legacyPath, url.Values{"name": {legacy.Tag}, "description": {legacy.Description}, "color": {"red"}, "revision": {before}})
+	require.Equal(t, 303, w.Code)
+	require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT uem_revision::text,color FROM tags WHERE id=$1`, legacy.ID).Scan(&after, &color))
+	require.Equal(t, before, after)
+	require.Equal(t, "red", color)
 }
