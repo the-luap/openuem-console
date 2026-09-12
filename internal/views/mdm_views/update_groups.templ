@@ -115,6 +115,8 @@ templ AppleUpdatePlanGroupAssignment(c echo.Context, info *partials.CommonInfo, 
 					</p>
 					<p>Assignment ID: { assignment.ID }</p>
 					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupProgressPath(assignment.Plan.ID,assignment.ID)))}>Current cohort progress</a>
+					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupRemovalPreviewPath(assignment.Plan.ID,assignment.ID)))}>Review matching policy removal</a>
+					<a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateGroupRemovalHistoryPath(assignment.Plan.ID,assignment.ID)))}>Policy removal history</a>
 					<p>Request ID: { assignment.RequestKey }</p>
 				</div>
 			</section>

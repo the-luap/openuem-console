@@ -126,6 +126,8 @@ introduce a separate delivery-time group authorization mechanism. Configured
 policy tokens compare values, not a durable generation; changing a policy away
 and back to the same values is not detected as a distinct generation.
 
-Continuous group reconciliation, group removal, exceptions, automatic pilot
+[Reviewed policy removal](apple-update-group-removals.md) is available from an
+activated schedule's original assignment receipt. It does not cancel other
+scheduled actions. Continuous group reconciliation, exceptions, automatic pilot
 promotion, aggregate historical cohort compliance and physical-device acceptance
 remain separate work.

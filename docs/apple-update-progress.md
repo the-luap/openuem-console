@@ -12,6 +12,10 @@ replaced or removed. An acknowledged declarative-management notification does
 not establish installation, and the report does not attribute an OS change to
 this particular assignment.
 
+An original assignment also offers [reviewed removal of matching policies](apple-update-group-removals.md).
+Its immutable removal receipts are separate from this current assessment. Later
+policy removal or replacement leaves the original OS target and cohort intact.
+
 ## OS observations and result criteria
 
 Migration 047 adds a bounded current OS-observation row per native enrollment.

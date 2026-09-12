@@ -83,9 +83,12 @@ readable after later source edits and archival.
 This workflow applies one reviewed plan immediately.
 [Scheduled activation](apple-update-schedules.md) also retains the same review for
 a future UTC window and rechecks it before admission. Neither workflow continuously
-recalculates membership, promotes pilot cohorts, provides exceptions, performs a
-group removal or provides aggregate historical compliance.
-Manual device policy removal remains available. Only eligible target state is
+recalculates membership, promotes pilot cohorts, provides exceptions, performs
+automatic group removal or provides aggregate historical compliance.
+[Reviewed removal](apple-update-group-removals.md) can now remove the current
+matching policies from an original receipt's complete eligible selection, with
+its own immutable replay evidence. Manual device policy removal also remains
+available. Only eligible target state is
 retained; excluded members are not a frozen historical snapshot. New plan revisions
 and later group edits do not change already assigned policies. Organization-group
 intersections and richer predicates remain separate work.

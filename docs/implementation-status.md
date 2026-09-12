@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reviewed Apple update group removal](apple-update-group-removals.md) now
+  retains an original assignment's native targets, excludes changed or unavailable
+  policies, binds notification availability to confirmation and records atomic
+  policy/notification/audit writes in encrypted immutable receipts. Exact retries
+  preserve later policies; authenticated history and cursor reads retain original
+  scope. Expanded PostgreSQL 17/race checks pass in 36.975 seconds, and the
+  complete-cohort/second-target rollback check in 2.575 seconds. Registered Linux
+  routes, macOS/Linux package race tests and 186 relevant Chrome cases pass.
+  The final original-plan labeling and timestamp layout pass 33 additional Chrome
+  checks and the view race test in 1.894 seconds. Full Linux builds pass. The
+  complete Apple PostgreSQL/race suite passes in 580.840 seconds after correcting
+  an existing immediate-retry fixture to use one clock and assert SMTP invocation;
+  the focused reminder regression passes in 9.170 seconds.
+  Automatic reconciliation, exceptions, promotion and hardware acceptance remain
+  separate work.
+
 - Manual Apple update forms now bind application and removal to the
   [reviewed configured policy](apple-update-policy-admission.md). Current
   read/update authority, native-device locking and scope-bound value comparison

@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),
  ...["required","compliant","missing-build","stale","unmanaged","error","error-limited","no-policy","viewer","long","missing"].map(state=>`apple-device-update-${state}`),
  ...["choose","empty","preview","existing","excluded","assignment","history","empty-history","long"].map(state=>`apple-update-group-${state}`),
  ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long"].map(state=>`apple-update-schedule-${state}`),
