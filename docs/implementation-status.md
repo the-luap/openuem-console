@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Backup-code consumption now conditionally updates the verified unused record
+  inside a request-bound transaction. Concurrent reuse, changed hashes/owners and
+  deletion cannot reuse a stale comparison. Canceled row waits roll back, storage
+  faults return a generic HTTP 503 and submitted recovery codes are no longer
+  logged. The owned baseline admitted four concurrent consumers of one code;
+  controlled transaction and actual-handler regressions now establish one winner
+  with both session storage modes. All PostgreSQL/session race tests pass in
+  34.938 seconds, alongside auth/router races, actual Linux ARM64 console routes
+  and the full Linux build. Atomic enrollment/code-set replacement and primary
+  proof/TOTP replay protection remain open; an already committed code stays
+  consumed if later session admission fails. See [session storage](session-storage.md).
+  The preceding commit's [ACME arm64 workflow](https://github.com/the-luap/openuem-console/actions/runs/34660676344)
+  timed out during owned daemon renewal, then passed unchanged on retry. Local
+  isolated default/forced-authorization-reuse fixtures pass in 18.31/8.39 seconds;
+  the cause of the first timeout remains undetermined.
+
 - Password-replacement transactions now check current method configuration,
   account mode and registration before consuming initial-password, recovery or
   invitation proofs. Earlier proofs cannot reactivate revoked/review accounts or

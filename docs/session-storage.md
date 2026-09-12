@@ -66,7 +66,8 @@ login clears its temporary certificate password. The forced-password lifecycle
 remains restricted and the protected administrator startup/password tests pass.
 
 These checks govern new local sign-in admission. They do not yet provide complete
-request-time local credential revalidation ; the separate recovery/invitation checks below also apply to credential changes.
+request-time local credential revalidation; the recovery/invitation checks below
+also apply to credential changes.
 
 ## Password replacement policy
 
@@ -121,11 +122,38 @@ code and first enrollment, plus actual certificate and OpenID MFA completion.
 Proof identity, method, lifetime, size and malformed-state tests run in CI; database
 checks cover changed credentials and disabled/revoked state.
 
-These checks do not make the existing enrollment/recovery-code mutations atomic.
-Durable one-use MFA consumption, TOTP replay counters, concurrent enrollment
+These checks do not make the existing enrollment mutations atomic.
+Durable one-use primary-proof consumption, TOTP replay counters, concurrent enrollment
 completion and request-time local credential revalidation remain open. A request which
 already loaded its primary proof may still race another completion; removing the
 proof from the completed session alone is not a durable consumption receipt.
+
+## Single-use recovery codes
+
+Backup-code verification compares only unused hashes, then conditionally changes
+the exact record from unused to used. The update rechecks its owner and stored
+hash. Only one affected row followed by a successful transaction commit grants
+admission. A competing consumer, changed hash, reassigned owner or deleted code
+invalidates the earlier comparison. Hash verification holds no database locks;
+unrelated accounts can consume their codes while another record is locked.
+
+The request context and a five-second deadline cover the database work. An
+explicit transaction prevents a canceled, blocked update from later committing
+when its lock is released. Database failures return a generic HTTP 503 without
+an authenticated cookie; neither the submitted code nor database diagnostics are
+logged or returned by this operation. Empty and oversized inputs are rejected.
+Hash comparison itself is not interruptible; cancellation is checked between
+comparisons and before the write. An uncertain commit response denies admission
+and may leave the code consumed. A committed code also stays consumed if a later
+account-policy or session-admission check fails.
+
+The owned baseline admitted four simultaneous requests with one code. Controlled
+PostgreSQL row-lock tests now establish one winner, reject stale records, preserve
+unused state on canceled waits and rejected writes, and permit valid retries.
+Actual backup-code handlers repeat the four-request test and storage-failure
+checks with plaintext and encrypted session stores. These guarantees concern a
+stored recovery-code record; atomic enrollment/code-set replacement and durable
+one-use primary proofs or TOTP counters remain separate work.
 
 ## Durable deletion
 

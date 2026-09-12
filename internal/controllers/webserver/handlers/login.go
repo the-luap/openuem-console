@@ -476,7 +476,10 @@ func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_empty_code"), true))
 	}
 
-	isValid := h.Model.ConsumeRecoveryCode(username, code)
+	isValid, err := h.Model.ConsumeRecoveryCode(c.Request().Context(), username, code)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Recovery code verification is temporarily unavailable.")
+	}
 	if !isValid {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_recovery_code"), true))
 	}

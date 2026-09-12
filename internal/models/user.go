@@ -237,33 +237,6 @@ func (m *Model) GetUserById(uid string) (*ent.User, error) {
 	return m.Client.User.Get(context.Background(), uid)
 }
 
-func (m *Model) ConsumeRecoveryCode(uid string, code string) bool {
-	hashes, err := m.Client.RecoveryCode.Query().Where(recoverycode.HasUserWith(user.ID(uid))).All(context.Background())
-	if err != nil {
-		log.Println("[ERROR]: could not find recovery codes for this user")
-		return false
-	}
-
-	for _, hash := range hashes {
-		match, err := argon2id.ComparePasswordAndHash(code, hash.Code)
-		if err == nil && match {
-			if hash.Used {
-				log.Println("[ERROR]: could not find recovery codes for this user")
-				return false
-			} else {
-				if err := m.Client.RecoveryCode.Update().SetUsed(true).Where(recoverycode.ID(hash.ID)).Exec(context.Background()); err != nil {
-					log.Printf("[ERROR]: could not invalidate recovery code %s, reason: %v", code, err)
-					return false
-				}
-				return true
-			}
-		}
-	}
-
-	log.Println("[ERROR]: could not find the recovery code")
-	return false
-}
-
 func (m *Model) ConfirmEmail(uid string) error {
 	return m.Client.User.Update().SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE).Where(user.ID(uid)).Exec(context.Background())
 }
