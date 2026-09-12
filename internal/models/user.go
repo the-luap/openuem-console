@@ -400,25 +400,6 @@ func (m *Model) CreateDefaultAdminPassword(reset bool) error {
 	return nil
 }
 
-func (m *Model) ChangePassword(username string, password string) error {
-	exist, err := m.Client.User.Query().Where(user.ID(username)).Exist(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if exist {
-		hash, err := argon2id.CreateHash(password, argon2id.DefaultParams)
-		if err != nil {
-			return err
-		}
-
-		// Save password
-		return m.Client.User.Update().Where(user.ID(username)).SetRegister("users.completed").SetHash(hash).Exec(context.Background())
-	} else {
-		return errors.New("user not found")
-	}
-}
-
 func (m *Model) GetUserIDByEmail(email string) string {
 	user, err := m.Client.User.Query().Select(user.FieldTotpSecret).Where(user.Email(email)).First(context.Background())
 	if err != nil {

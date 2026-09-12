@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"image/png"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	validator "github.com/go-passwd/validator"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/openuem-console/internal/views/account_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -81,10 +83,17 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
 	}
 
-	user, err := h.Model.GetUserById(username)
+	user, err := h.Model.Client.User.Get(c.Request().Context(), username)
 	if err != nil {
 		log.Printf("[ERROR]: could not get user account for username %s, reason: %v", username, err)
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
+	}
+
+	if !user.Passwd || user.Openid {
+		return echo.NewHTTPError(http.StatusForbidden, "This account does not use password sign-in.")
+	}
+	if user.Use2fa && (!user.TotpSecretConfirmed || !h.SessionManager.Manager.GetBool(c.Request().Context(), "twofa")) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Complete two-factor sign-in before changing the password.")
 	}
 
 	currentPassword := c.FormValue("current-password")
@@ -93,12 +102,12 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 	}
 
 	newPassword := c.FormValue("new-password")
-	if currentPassword == "" {
+	if newPassword == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.new_password_empty"), true))
 	}
 
 	confirmNewPassword := c.FormValue("confirm-new-password")
-	if currentPassword == "" {
+	if confirmNewPassword == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.confirm_new_password_empty"), true))
 	}
 
@@ -122,8 +131,14 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 	}
 
 	// Change password in database
-	if err := h.Model.ChangePassword(username, newPassword); err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.could_not_save_new_password"), true))
+	if err := h.Model.ChangeAccountPassword(c.Request().Context(), user, newPassword); err != nil {
+		if errors.Is(err, models.ErrPasswordUnchanged) {
+			return echo.NewHTTPError(http.StatusBadRequest, "Choose a password different from the current password.")
+		}
+		if errors.Is(err, models.ErrPasswordReplacement) || errors.Is(err, models.ErrLocalSignIn) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "Account access or credentials changed. Sign in again before changing the password.")
+		}
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Password change could not be saved. Try again.")
 	}
 
 	// Log this change

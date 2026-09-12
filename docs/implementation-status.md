@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Account-settings password changes now bind the current-password verification
+  to the locked credential and MFA snapshot. The shared replacement transaction
+  rechecks enabled password authentication, account mode and registration, clears
+  recovery/invitation grants and retires all owned sessions together. It cannot
+  undo a newer password, revocation, review or factor change. The unsafe standalone
+  setter was removed. The owned baseline retained grants/preloaded sessions and
+  overwrote all four tested intervening changes. Regressions now cover eight
+  concurrent policy changes, sixteen invalid states/inputs, four competing
+  replacements, cancellation, rollback/retry, storage-error privacy and denial of
+  serialized account proofs. Registered routes verify CSRF, logout and rejection
+  of replayed cookies in both storage modes. The focused session race suite passes
+  in 11.075 seconds and the complete session race suite in 73.189 seconds;
+  authentication/router races, actual Linux ARM64 OpenID and
+  administrator password lifecycles and the full Linux build pass. Broader local
+  credential checks and account-settings step-up policies remain separate work.
+  See [password replacement policy](session-storage.md#password-replacement-policy).
+
 - MFA sign-in now consumes a unique primary-flow UUID and the accepted TOTP
   counter in the final account-confirmation transaction. Password, certificate
   and OpenID paths share the same persisted checks; one primary flow cannot be

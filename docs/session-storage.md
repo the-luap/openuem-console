@@ -107,6 +107,32 @@ administrator password/recovery/invitation routes and concurrent initial-passwor
 replacement test also pass. Fixture invitations use the same password-link-sent
 registration state as administrator invitation issuance.
 
+The protected account-settings password change now uses the same transaction.
+Its handler verifies the current password, requires completed MFA when configured,
+and passes the full account snapshot to the model. The transaction checks the
+current password hash, password method, enabled configuration, approved/completed
+registration and exact MFA requirement, confirmation and stored secret. It cannot
+override a newer password, revocation, review or MFA change. Forced-password and
+invitation states must use their respective restricted workflows. An account
+proof cannot enter this path through the serialized recovery-proof API.
+
+A successful account change clears outstanding email-recovery/invitation grants
+and retires every owned session atomically, preserving MFA configuration. Failure
+at session deletion rolls back the password and all other writes, including the
+revocation receipts. A valid retry remains possible. Cancellation during an
+account-row wait cannot commit after the lock is released; a rolled-back policy
+change permits the original request. Concurrent changes based on one verified
+password have one winner. The same password is rejected, and empty new-password
+and confirmation fields now use their correct validation messages.
+
+Owned tests exercise the registered HTTP route with its CSRF and session
+middleware in both storage modes, including cookie deletion and replay of the old
+cookie. Separate tests cover invalid inputs, current policy, intervening changes,
+transaction failure, cancellation and concurrent replacement. Storage errors are
+returned as generic HTTP 503 responses. This transaction binds the current password
+verification to its write; broader completed-session credential revalidation and
+account-settings step-up policies remain separate work.
+
 ## MFA and recovery boundaries
 
 A password-replacement session identifies its target account but cannot authorize
