@@ -1,4 +1,9 @@
 en:
+  http_errors:
+    internal: "The request could not be completed. Refresh the page to check its status. If the problem continues, contact your administrator."
+    upstream: "A required service is unavailable. Refresh the page to check the request status."
+    unavailable: "The service is temporarily unavailable. Refresh the page to check the request status."
+    timeout: "The request timed out. Refresh the page to check its status before trying again."
   security_inventory:
     reported: "Reported security"
     title: "Security report inventory"

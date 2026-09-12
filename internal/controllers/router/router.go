@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	session "github.com/canidam/echo-scs-session"
+	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	mw "github.com/labstack/echo/v4/middleware"
 	"github.com/open-uem/openuem-console/internal/controllers/router/middleware"
@@ -116,6 +117,7 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 	if c.Response().Committed {
 		return
 	}
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	if he, ok := err.(*echo.HTTPError); ok {
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
 		c.Response().WriteHeader(he.Code)
@@ -125,11 +127,7 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 				c.Logger().Error(err)
 			}
 		case http.StatusInternalServerError:
-			message := "Internal server error"
-			if he.Message != nil {
-				message = fmt.Sprint(he.Message)
-			}
-
+			message := publicServerError(c, he.Code)
 			if err := views.ErrorPage("500", message).Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
@@ -165,7 +163,15 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 				c.Logger().Error(err)
 			}
 		default:
-			if err := views.ErrorPage(strconv.Itoa(he.Code), err.Error()).Render(c.Request().Context(), c.Response().Writer); err != nil {
+			message := http.StatusText(he.Code)
+			if he.Code >= 500 {
+				message = publicServerError(c, he.Code)
+			} else if he.Message != nil {
+				// Message is the handler's client-facing rejection. HTTPError.Error
+				// also includes Internal, which can contain credentials or raw URLs.
+				message = fmt.Sprint(he.Message)
+			}
+			if err := views.ErrorPage(strconv.Itoa(he.Code), message).Render(c.Request().Context(), c.Response().Writer); err != nil {
 				c.Logger().Error(err)
 			}
 		}
@@ -173,6 +179,31 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		c.Logger().Error(err)
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextHTML)
 		c.Response().WriteHeader(http.StatusInternalServerError)
-		_ = views.ErrorPage("500", "Internal server error").Render(c.Request().Context(), c.Response().Writer)
+		_ = views.ErrorPage("500", publicServerError(c, http.StatusInternalServerError)).Render(c.Request().Context(), c.Response().Writer)
 	}
+}
+
+// Server failures never use exception text as browser copy. Refresh/check advice
+// does not imply that an interrupted mutation was rolled back or can be repeated.
+func publicServerError(c echo.Context, code int) string {
+	key := "http_errors.internal"
+	switch code {
+	case http.StatusBadGateway:
+		key = "http_errors.upstream"
+	case http.StatusServiceUnavailable:
+		key = "http_errors.unavailable"
+	case http.StatusGatewayTimeout:
+		key = "http_errors.timeout"
+	}
+	ctx := c.Request().Context()
+	if i18n.GetLocale(ctx) == nil {
+		// Errors can occur before locale middleware has attached its context.
+		if english, err := locales.WithLocale(ctx, "en"); err == nil {
+			ctx = english
+		}
+	}
+	if !i18n.Has(ctx, key) {
+		return "Internal server error"
+	}
+	return i18n.T(ctx, key)
 }

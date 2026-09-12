@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Shared HTTP error pages now keep server exception text and nested internal
+  errors out of browser responses. The owned baseline exposed a synthetic private
+  URL/token or internal database error across nine status codes. Server failures
+  use English catalog messages with locale fallback; explicit client-facing 4xx
+  rejection text and response status remain available. Error responses use
+  `Cache-Control: no-store`, and a late error leaves an already committed response
+  untouched. Tests also cover failures before locale middleware, unexpected
+  errors, safe English fallback and preserved client guidance. Router, handler
+  and catalog race tests, owned-provider/native-console Linux route tests and the
+  complete Linux build pass. This covers the shared error handler; raw details in
+  independently rendered legacy partials or caller-supplied 4xx messages still
+  require their own review under UX-01/SEC-01.
+
 - Non-administrator users can now submit the protected logout action for their
   own account. Twenty-four owned-provider route cases previously stopped at the
   administrator-only gate. After that gate was corrected, the same matrix exposed
