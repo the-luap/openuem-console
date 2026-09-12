@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The Windows WSTEP parser fuzzing CI step now uses a fixed 10,000-input budget,
+  one-second minimization limit and two-minute overall timeout. The preceding
+  time-window run stopped with `context deadline exceeded` after 54 executions;
+  it recorded no failing input. The unchanged parser completes the new budget
+  on macOS ARM64 in 1.175 seconds and in an isolated, unprivileged Linux ARM64
+  container with networking disabled. Its existing request-size, XML-depth,
+  node/attribute and protected-state invariants remain exercised by the target.
+  These local results do not claim that the earlier remote run passed.
+
 - Pending local MFA proofs now retain independent account, method and certificate
   generations captured after first-factor admission commits. Every local MFA
   entry point, source-locked enrollment write and final factor admission compares

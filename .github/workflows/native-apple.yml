@@ -95,7 +95,8 @@ jobs:
       - name: Bounded Windows enrollment policy parser fuzzing
         run: go test -run '^$' -fuzz=FuzzPolicyRequest -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Bounded Windows certificate enrollment parser fuzzing
-        run: go test -run '^$' -fuzz=FuzzWSTEPRequest -fuzztime=15s -parallel=2 ./internal/mdm/windows
+        # Bound input count, minimization time and overall runtime independently.
+        run: go test -run '^$' -fuzz='^FuzzWSTEPRequest$' -fuzztime=10000x -fuzzminimizetime=1s -timeout=2m -parallel=2 ./internal/mdm/windows
       - name: Windows enrollment CSR proof and parser fuzzing
         run: go test -run '^$' -fuzz=FuzzEnrollmentCSR -fuzztime=15s -parallel=2 ./internal/mdm/windows
       - name: Windows CMS renewal proof fuzzing
