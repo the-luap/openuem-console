@@ -437,7 +437,6 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/profiles/task-definition", h.ProfileTaskDefinition, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
-	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)

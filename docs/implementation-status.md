@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile status](profile-status.md) now shares exact audience and
+  transaction-bound server authorization with profile tag actions. The real
+  console route test reproduced activation of a foreign-organization profile
+  through another organization's URL; the new action rejects it. Status changes
+  preserve definition fields, tasks, tags and assignment mode, while permission
+  and audience locks remain held through audit. The complete inventory
+  PostgreSQL/race suite passes in 47.951 seconds and the complete audit suite in
+  9.466 seconds. Registered Apple/OIDC routes, macOS/Linux package race checks
+  and the full Linux build pass. Native buttons preserve pagination/sorting and
+  keyboard activation under strict POST and CSRF checks. All 36 focused status/
+  tag browser cases pass; the complete 1,350-case Chrome matrix passes in 87.348
+  seconds. Mobile action text and visible keyboard focus were inspected. Status
+  remains an eligibility setting, with task execution and other legacy profile
+  mutations retaining their separate workflows.
+
 - [Legacy profile tag assignments](profile-tag-assignments.md) now require the
   complete current global, organization or site audience and server authority
   through the audit commit. Scoped profiles reject foreign tags; global profiles

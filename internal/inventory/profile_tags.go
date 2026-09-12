@@ -16,43 +16,13 @@ func ChangeProfileTag(parent context.Context, db *sql.DB, permissions *access.St
 	if profileID <= 0 || tagID <= 0 {
 		return ErrTagInvalid
 	}
-	if db == nil || permissions == nil || scope.TenantID < 0 || scope.SiteID < 0 || scope.TenantID == 0 && scope.SiteID != 0 {
-		return access.ErrDenied
-	}
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
-	var tx *sql.Tx
-	var err error
-	if scope.TenantID == 0 {
-		tx, err = db.BeginTx(ctx, nil)
-	} else {
-		tx, err = beginGroupTransaction(ctx, db, permissions, actor, scope, access.ManageProfiles)
-	}
+	tx, err := beginLegacyProfileTransaction(ctx, db, permissions, actor, scope, profileID)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageProfiles, access.Scope{}); err != nil {
-		return err
-	}
-	// Count the complete audience, including otherwise hidden edges. A legacy
-	// profile with ambiguous ownership must not be edited through a smaller URL.
-	if _, err = tx.ExecContext(ctx, `LOCK TABLE tenant_profiles,site_profiles IN SHARE MODE`); err != nil {
-		return err
-	}
-	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT p.id FROM profiles p WHERE p.id=$1
- AND (SELECT count(*) FROM (SELECT 1 FROM tenant_profiles WHERE profile_id=p.id LIMIT 2) audience) = CASE WHEN $2::bigint=0 THEN 0 ELSE 1 END
- AND (SELECT count(*) FROM (SELECT 1 FROM site_profiles WHERE profile_id=p.id LIMIT 2) audience) = CASE WHEN $3::bigint=0 THEN 0 ELSE 1 END
- AND ($2::bigint=0 OR EXISTS(SELECT 1 FROM tenant_profiles WHERE profile_id=p.id AND tenant_id=$2))
- AND ($3::bigint=0 OR EXISTS(SELECT 1 FROM site_profiles WHERE profile_id=p.id AND site_id=$3))
- FOR UPDATE OF p`, profileID, scope.TenantID, scope.SiteID).Scan(&current)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
 	var owner sql.NullInt64
 	var revision string
 	err = tx.QueryRowContext(ctx, `SELECT tenant_tags,uem_revision::text FROM tags WHERE id=$1 FOR SHARE`, tagID).Scan(&owner, &revision)

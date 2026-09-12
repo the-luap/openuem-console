@@ -58,6 +58,8 @@ methods have been removed from both tag-action callers. Profile definition edits
 task changes, cloning, deletion and audience moves remain separate legacy
 workflows; this change does not grant them delegated permissions or add their
 missing transactional audit coverage.
+[Profile status changes](profile-status.md) now share the same bounded authority
+and audience transaction while preserving tags and assignment mode.
 
 ## Verification
 

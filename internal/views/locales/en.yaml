@@ -1,4 +1,9 @@
 en:
+  profile_status:
+    invalid: "Reopen the profile list and choose the status action again."
+    not_found: "Profile not found in the selected scope."
+    denied: "Only a server administrator can change legacy profile status."
+    unavailable: "The profile status could not be saved. Refresh the list and try again."
   profile_tags:
     invalid: "Choose one tag from the current profile. Reopen the profile if the form is out of date."
     not_found: "Profile or tag not found in the selected scope."

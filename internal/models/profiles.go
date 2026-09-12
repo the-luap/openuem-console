@@ -158,10 +158,6 @@ func (m *Model) GetProfileIssuesByPage(p partials.PaginationAndSort, profileID i
 		Offset((p.CurrentPage - 1) * p.PageSize).All(context.Background())
 }
 
-func (m *Model) EnableProfile(profiledID int, enabled bool) error {
-	return m.Client.Profile.Update().SetDisabled(!enabled).Where(profile.ID(profiledID)).Exec(context.Background())
-}
-
 func (m *Model) SetProfileAsGlobal(profiledID int) error {
 	return m.Client.Profile.Update().ClearSite().ClearTenant().Where(profile.ID(profiledID)).Exec(context.Background())
 }

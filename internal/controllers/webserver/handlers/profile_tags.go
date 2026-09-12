@@ -25,7 +25,7 @@ func profileTagFailure(c echo.Context, err error) error {
 	return echo.NewHTTPError(status, i18n.T(c.Request().Context(), "profile_tags."+key))
 }
 
-func profileTagScope(info *partials.CommonInfo) (access.Scope, error) {
+func legacyProfileScope(info *partials.CommonInfo) (access.Scope, error) {
 	if info.TenantID == "-1" && info.SiteID == "-1" {
 		return access.Scope{}, nil
 	}
@@ -59,7 +59,7 @@ func (h *Handler) ProfileTags(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	scope, err := profileTagScope(info)
+	scope, err := legacyProfileScope(info)
 	if err != nil {
 		return profileTagFailure(c, err)
 	}

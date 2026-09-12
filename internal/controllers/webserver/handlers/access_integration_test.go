@@ -182,6 +182,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("profile tag assignment scope and HTMX protocol", func(t *testing.T) {
 		exerciseProfileTagAssignments(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
 	})
+	t.Run("profile status matches current audience", func(t *testing.T) {
+		exerciseProfileStatusScope(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
+	})
 	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
 		var before, after int
 		if err := h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM mdm_apple_commands WHERE profile_id=$1`, profileID).Scan(&before); err != nil {
