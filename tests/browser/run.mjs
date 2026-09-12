@@ -34,6 +34,7 @@ import appleUpdatePlans from "./apple-update-plans.mjs";
 import appleUpdateGroups from "./apple-update-groups.mjs";
 import appleUpdateSchedules from "./apple-update-schedules.mjs";
 import appleUpdateRemovals from "./apple-update-removals.mjs";
+import appleUpdateEscalations from "./apple-update-escalations.mjs";
 import appleUpdateExceptions from "./apple-update-exceptions.mjs";
 import appleDeviceUpdates from "./apple-device-updates.mjs";
 import appleUpdateProgress from "./apple-update-progress.mjs";
@@ -95,6 +96,7 @@ try {
         [appleUpdateProgress,39],
         [appleDeviceUpdates,66],
         [appleUpdateExceptions,33],
+        [appleUpdateEscalations,54],
         [appleUpdateRemovals,33],
         [oidcAccounts,18],
         [accountLanguage,30],

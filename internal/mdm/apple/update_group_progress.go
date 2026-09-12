@@ -117,6 +117,23 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 	if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
 		return nil, err
 	}
+	progress, err := s.assessUpdateGroupProgressTransaction(ctx, tx, scope, planID, id)
+	if err != nil {
+		return nil, err
+	}
+	if err = auditUpdatePlan(ctx, tx, scope, actor, "group.progress", progress.Assignment.ID, progress.Assignment.Plan.Revision); err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return progress, nil
+}
+
+// The caller retains current update/read authority and site locks. This helper
+// holds all source device/policy locks without committing, so console reads and
+// escalation decisions can use the same transactional evidence.
+func (s *Store) assessUpdateGroupProgressTransaction(ctx context.Context, tx *sql.Tx, scope Scope, planID, id string) (*UpdateGroupProgress, error) {
 	receipt, err := s.scanUpdateGroupAssignment(tx.QueryRowContext(ctx, `SELECT `+updateGroupColumns+` FROM mdm_apple_update_group_assignments WHERE id=$1 AND tenant_id=$2 AND site_id=$3 AND plan_id=$4`, id, scope.TenantID, scope.SiteID, planID))
 	if err != nil {
 		return nil, err
@@ -220,12 +237,6 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 		if d.PolicyState == "matches" && (d.PolicyHasError || d.CurrentPolicy.Status == "failed" || d.CurrentPolicy.Status == "unavailable") {
 			progress.Counts.PolicyAttention++
 		}
-	}
-	if err = auditUpdatePlan(ctx, tx, scope, actor, "group.progress", receipt.ID, receipt.Plan.Revision); err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
-		return nil, err
 	}
 	return progress, nil
 }

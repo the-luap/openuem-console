@@ -61,6 +61,9 @@ func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing
 			if !strings.Contains(html, "Management pages") || !strings.Contains(html, `aria-label="Management pages"`) || strings.Contains(html, "management_navigation.") {
 				t.Fatal("navigation catalog fallback missing", language.Code, role)
 			}
+			if strings.Contains(html, "MISSING: apple_update_escalations") || strings.Contains(html, `/tenant/1/site/1/ios/update-alerts"`) != (role != access.Viewer) {
+				t.Fatal("update alert navigation lost catalog or current permission", language.Code, role)
+			}
 			if !strings.Contains(html, "Apple setup &amp; enrollment") || strings.Contains(html, `\u0026`) {
 				t.Fatal("catalog text was not decoded before HTML escaping", language.Code, role)
 			}

@@ -104,6 +104,8 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.Equal(t, 200, currentPage.Code)
 	require.Contains(t, currentPage.Body.String(), `data-update-deadline="pending"`)
 
+	exerciseAppleUpdateEscalations(t, h, ctx, scope, plan, location, invite.DeviceID, request)
+
 	definition := plan.Definition
 	definition.Archived = true
 	_, err = h.Apple.SaveUpdatePlan(ctx, "scoped-operator", h.Access, scope, plan.ID, 1, definition)

@@ -2496,3 +2496,12 @@ en:
     South Sudan: "South Sudan"
     Japan: "Japan"
     Kosovo: "Kosovo"
+  apple_update_escalations:
+
+    title: Apple update alerts
+    permission: You do not have permission to manage update alerts in this site.
+    missing: The original update assignment or alert event was not found in this site.
+    changed: The monitoring configuration or incident changed. Review it again before confirming.
+    invalid: Review the update alert form and confirm the requested action.
+    full: This site has reached its limit of 256 enabled update monitors. Pause an existing monitor before enabling another.
+    unavailable: Apple update alerts are temporarily unavailable. No result can be confirmed.

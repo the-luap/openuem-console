@@ -21,6 +21,7 @@ export default async function run(browser, record) {
         'Approved software':'/software/catalog','All devices':'/devices','Dynamic device groups':'/device-groups','Apple profiles':'/ios/configurations','Apple update plans':'/ios/update-plans',
         'Apple setup & enrollment':'/ios/setup','Desktop enrollment':'/desktop/enrollment','Native Windows management':'/windows',
       };
+      if(role!=='viewer')expected['Apple update alerts']='/ios/update-alerts';
       if(role==='administrator'){
         expected['Windows software deployment']='/deploy';expected['Windows profiles']='/profiles';
       }

@@ -107,6 +107,8 @@ keyboard confirmation at 390, 768 and 1440 pixels. Device and cohort fixtures
 also distinguish active exceptions from OS evidence and policy state. Broader
 validation is recorded in [implementation status](implementation-status.md).
 
-Continuous group reconciliation, automatic pilot promotion, escalation delivery
-and physical-device acceptance remain separate work. Exception expiry permits
-new assignments; it does not itself schedule one.
+[Console update monitoring](apple-update-escalations.md) excludes active
+exceptions and requires fresh OS evidence after an exception ends before opening
+an overdue incident. Continuous group reconciliation, automatic pilot promotion,
+external escalation delivery and physical-device acceptance remain separate work.
+Exception expiry permits new assignments; it does not itself schedule one.

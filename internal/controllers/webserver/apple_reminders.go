@@ -16,12 +16,14 @@ import (
 )
 
 type appleMaintenance interface {
+	RunUpdateEscalations(context.Context, *access.Store, *slog.Logger)
 	RunPushReminders(context.Context, *slog.Logger, apple.PushReminderSender)
 	RunUpdateSchedules(context.Context, *access.Store, inventory.DeviceSources, *slog.Logger)
 }
 
 func runAppleMaintenance(ctx context.Context, logger *slog.Logger, store appleMaintenance, permissions *access.Store, sources inventory.DeviceSources, send apple.PushReminderSender) {
 	var workers sync.WaitGroup
+	workers.Go(func() { store.RunUpdateEscalations(ctx, permissions, logger) })
 	workers.Go(func() { store.RunPushReminders(ctx, logger, send) })
 	workers.Go(func() { store.RunUpdateSchedules(ctx, permissions, sources, logger) })
 	workers.Wait()

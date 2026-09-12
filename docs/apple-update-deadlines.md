@@ -72,3 +72,7 @@ Kathmandu's quarter-hour offset and Kiritimati's skipped day, plus post-deadline
 OS evidence. Registered viewer/group routes and Chrome fixtures exercise the
 display and permissions. This is protocol and console evidence; physical-device
 acceptance and macOS response behavior remain open.
+
+[Console update monitoring](apple-update-escalations.md) uses the latest
+estimated deadline and fresh post-deadline OS evidence to open an incident.
+Unknown deadline timing cannot create an incident or prove recovery from one.

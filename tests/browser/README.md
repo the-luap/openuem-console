@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 1026 cases:
+headless Chrome session. The runner covers 1080 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -105,3 +105,5 @@ Screenshots support visual review; they are not image-difference assertions.
 Implementation references: [Node WebSocket](https://nodejs.org/api/globals.html#class-websocket),
 [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/),
 [GitHub's Ubuntu runner inventory](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md).
+
+Apple update monitoring adds 54 cases covering opt-in configuration, persisted incidents, missing evidence, acknowledgments, paused and blocked monitors, immutable event receipts, scoped pagination, and keyboard confirmation at 390, 768 and 1440 pixels.

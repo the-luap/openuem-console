@@ -13,9 +13,10 @@ import (
 )
 
 type appleMaintenanceFixture struct {
-	updates, reminders, release chan struct{}
-	sources                     inventory.DeviceSources
-	permissions                 *access.Store
+	updates, reminders, escalations, release chan struct{}
+	escalationPermissions                    *access.Store
+	sources                                  inventory.DeviceSources
+	permissions                              *access.Store
 }
 
 func (f *appleMaintenanceFixture) RunPushReminders(ctx context.Context, _ *slog.Logger, _ apple.PushReminderSender) {
@@ -28,10 +29,16 @@ func (f *appleMaintenanceFixture) RunUpdateSchedules(ctx context.Context, permis
 	close(f.updates)
 	<-ctx.Done()
 }
+func (f *appleMaintenanceFixture) RunUpdateEscalations(ctx context.Context, permissions *access.Store, _ *slog.Logger) {
+	f.escalationPermissions = permissions
+	close(f.escalations)
+	<-ctx.Done()
+	<-f.release
+}
 func TestAppleMaintenanceWorkersStartIndependentlyAndJoin(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	f := &appleMaintenanceFixture{updates: make(chan struct{}), reminders: make(chan struct{}), release: make(chan struct{})}
+	f := &appleMaintenanceFixture{updates: make(chan struct{}), escalations: make(chan struct{}), reminders: make(chan struct{}), release: make(chan struct{})}
 	done := make(chan struct{})
 	sources := inventory.DeviceSources{Apple: true, Windows: true}
 	permissions := &access.Store{}
@@ -39,14 +46,14 @@ func TestAppleMaintenanceWorkersStartIndependentlyAndJoin(t *testing.T) {
 		defer close(done)
 		runAppleMaintenance(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)), f, permissions, sources, nil)
 	}()
-	for _, started := range []chan struct{}{f.updates, f.reminders} {
+	for _, started := range []chan struct{}{f.updates, f.reminders, f.escalations} {
 		select {
 		case <-started:
 		case <-time.After(time.Second):
 			t.Fatal("independent Apple maintenance worker did not start")
 		}
 	}
-	if f.sources != sources || f.permissions != permissions {
+	if f.sources != sources || f.permissions != permissions || f.escalationPermissions != permissions {
 		t.Fatal("schedule worker lost server sources or current access store")
 	}
 	cancel()

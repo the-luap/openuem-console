@@ -18,6 +18,7 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 				<p>Assessed at (UTC): { progress.AssessedAt.UTC().Format("2006-01-02 15:04:05") }</p>
 				<p>OS observations and current configured policy are evaluated separately. A notification acknowledgment does not establish installation or prove which assignment caused an update.</p>
 				<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(progress.Assignment.Plan.ID, progress.Assignment.ID))) }>Refresh this assessment</a>
+ <a class="underline" href={templ.URL(partials.GetNavigationUrl(info,UpdateEscalationPath(progress.Assignment.Plan.ID,progress.Assignment.ID)))}>Review console update monitoring</a>
 			</div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" data-update-progress-counts>

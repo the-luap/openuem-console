@@ -24,6 +24,9 @@ templ Navigation(info *partials.CommonInfo) {
 			if profileGroupSiteSelected(info) && info.Can(access.ReadDevices) {
 				<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,"/ios/update-plans"))}>{i18n.T(ctx,"apple_update_plans.title")}</a>
 			}
+			if profileGroupSiteSelected(info) && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) {
+ <a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,"/ios/update-alerts"))}>{i18n.T(ctx,"apple_update_escalations.title")}</a>
+ }
 			if info.Can(access.ManageCertificates) {
 				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/ade")) }>{ i18n.T(ctx,"management_navigation.ade") }</a>
 			}

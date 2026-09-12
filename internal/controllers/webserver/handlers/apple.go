@@ -126,6 +126,12 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.GET("/ios/:id/update-exceptions", h.AppleUpdateExceptions)
 		g.POST("/ios/:id/update-exceptions", h.AppleRecordUpdateException)
 		g.GET("/ios/:id/update-exceptions/:exception", h.AppleUpdateException)
+		g.GET("/ios/update-alerts", h.AppleUpdateEscalations)
+		g.GET("/ios/update-plans/:plan/group-assignments/:assignment/escalation", h.AppleReviewUpdateEscalation)
+		g.POST("/ios/update-plans/:plan/group-assignments/:assignment/escalation", h.AppleConfigureUpdateEscalation)
+		g.POST("/ios/update-plans/:plan/group-assignments/:assignment/escalation/acknowledge", h.AppleAcknowledgeUpdateEscalation)
+		g.GET("/ios/update-plans/:plan/group-assignments/:assignment/escalation/events", h.AppleUpdateEscalationEvents)
+		g.GET("/ios/update-plans/:plan/group-assignments/:assignment/escalation/events/:event", h.AppleUpdateEscalationEvent)
 		g.GET("/ios/update-plans", h.AppleUpdatePlans)
 		g.POST("/ios/update-plans", h.AppleSaveUpdatePlan)
 		g.GET("/ios/update-plans/:plan/groups", h.AppleUpdatePlanGroups)
@@ -166,7 +172,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 				limit = 16 << 10
 			case "/ios/configurations/:id/assign":
 				limit = 64 << 10
-			case "/ios/update-plans/:plan/schedules/:schedule/cancel", "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
+			case "/ios/update-plans/:plan/group-assignments/:assignment/escalation", "/ios/update-plans/:plan/group-assignments/:assignment/escalation/acknowledge", "/ios/update-plans/:plan/schedules/:schedule/cancel", "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":
 				limit = 8192
 			case "/devices/export", "/device-groups", "/device-groups/:group", "/admin/oidc-accounts", "/myaccount/language", "/software/catalog/:version/sources", "/software/catalog/:version/sources/:source/approve":
 				limit = 8192

@@ -113,5 +113,8 @@ states at 390, 768 and 1440 pixels. The view offers no assignment or scheduling
 form. Broader package/build/browser and full Apple regression evidence is recorded
 in [implementation status](implementation-status.md).
 
-Persisted historical cohort snapshots, automatic promotion gates,
-deadline-aware escalation and physical-device acceptance remain separate work.
+[Opt-in update monitoring](apple-update-escalations.md) now retains encrypted
+original-cohort assessments and immutable console incident history with explicit
+operator acknowledgments. General historical reporting, automatic promotion
+gates, external escalation channels and physical-device acceptance remain
+separate work.
