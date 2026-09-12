@@ -25,6 +25,8 @@ type UpdateGroupDeviceProgress struct {
 	Result             string                    `json:"-" xml:"-" yaml:"-"`
 	Reason             string                    `json:"-" xml:"-" yaml:"-"`
 	Deadline           *UpdateDeadlineAssessment `json:"-" xml:"-" yaml:"-"`
+	Exception          *UpdateException          `json:"-" xml:"-" yaml:"-"`
+	ExceptionActive    bool                      `json:"-" xml:"-" yaml:"-"`
 }
 type UpdateGroupProgressCounts struct {
 	Total                       int `json:"-" xml:"-" yaml:"-"`
@@ -40,6 +42,7 @@ type UpdateGroupProgressCounts struct {
 	DeadlinePending             int `json:"-" xml:"-" yaml:"-"`
 	DeadlineUnverified          int `json:"-" xml:"-" yaml:"-"`
 	UpdateRequiredAfterDeadline int `json:"-" xml:"-" yaml:"-"`
+	ActiveExceptions            int `json:"-" xml:"-" yaml:"-"`
 }
 type UpdateGroupProgress struct {
 	Assignment UpdatePlanGroupAssignment   `json:"-" xml:"-" yaml:"-"`
@@ -148,6 +151,10 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 			if err != nil {
 				return nil, err
 			}
+			d.Exception, err = s.currentUpdateException(ctx, tx, scope, d.DeviceID)
+			if err != nil {
+				return nil, err
+			}
 			d.PolicyState = "absent"
 			if d.CurrentPolicy != nil {
 				d.PolicyState = "different"
@@ -170,6 +177,13 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 			d.Availability = "identity_expired"
 		}
 		assessUpdateGroupResult(d, receipt.Plan, receipt.CreatedAt, progress.AssessedAt)
+		if d.Exception != nil && d.Exception.CreatedAt.After(progress.AssessedAt) {
+			return nil, ErrUpdateExceptionIntegrity
+		}
+		d.ExceptionActive = d.Exception.Active(progress.AssessedAt)
+		if d.ExceptionActive {
+			progress.Counts.ActiveExceptions++
+		}
 		originalPolicy := receipt.Plan.Definition.Policy()
 		d.Deadline = assessUpdateDeadline(d.Availability == "available", &originalPolicy, zones[i], progress.AssessedAt)
 		switch d.Deadline.State {

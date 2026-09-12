@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 978 cases:
+headless Chrome session. The runner covers 1026 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -26,8 +26,9 @@ headless Chrome session. The runner covers 978 cases:
 | Apple update groups | Chooser, empty chooser, new/replacement previews, exclusions, original receipt, populated/empty history and long metadata × three widths; exact policy tokens and keyboard confirmation | 27 |
 | Apple update schedules | Six lifecycle states, populated/empty history and long metadata × three widths; original targets, UTC timing, receipt links and keyboard cancellation | 27 |
 | Apple update group removal | Eleven preview/receipt/history states × three widths; explicit keyboard confirmation, exact eligible selection, original scope and unavailable notification evidence | 33 |
-| Apple device update assessment | Eighteen OS/policy/deadline states × three widths; packet evidence, time zone freshness, DST gaps/folds, error limits, scoped forms, keyboard submission of reviewed policy values and read-only permissions | 54 |
-| Apple update cohort progress | Twelve states × three widths; separate OS/configuration/deadline evidence, repeated local hours, elapsed deadline counts and original scoped selection | 36 |
+| Apple update exceptions | Eleven review/receipt/history states × three widths; explicit keyboard confirmation, UTC expiry, current policy removal, resume, placement and notification limits | 33 |
+| Apple device update assessment | Twenty-two OS/policy/deadline/exception states × three widths; packet evidence, time zone freshness, DST gaps/folds, error limits, scoped forms, keyboard submission of reviewed policy values and read-only permissions | 66 |
+| Apple update cohort progress | Thirteen states × three widths; separate OS/configuration/deadline/exception evidence, repeated local hours, elapsed deadline counts and original scoped selection | 39 |
 | OpenID account identities | Unlinked/active/disabled/ineligible/long/disabled provider × three widths; explicit keyboard confirmation | 18 |
 | Account language | Seven catalogs, browser default, unavailable storage and long profile × three widths | 30 |
 | Report timestamps | Seven catalogs × three widths | 21 |

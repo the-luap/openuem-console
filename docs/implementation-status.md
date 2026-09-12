@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Temporary Apple update exceptions](apple-update-exceptions.md) now provide
+  reviewed, reasoned pauses with UTC expiry, policy removal, replacement and
+  explicit ending. Shared admission guards cover individual/trusted, immediate
+  group and scheduled assignments. Immutable encrypted event receipts, scoped
+  keyset history and exact retries preserve later state. A database-maintained
+  placement revision prevents old exceptions or forms from becoming applicable
+  again after a site round trip. Active exceptions remain separate from OS,
+  deadline and policy outcomes. PostgreSQL 17/race checks covering history,
+  authority revisions, concurrency, lifecycle, placement and late rollback pass
+  in 36.499 seconds; the complete Apple suite passes in 636.455 seconds.
+  Registered Linux routes, macOS/Linux package race tests and the full Linux
+  build pass. All 31 strict form cases pass, and all 264 relevant Chrome cases
+  pass, including 48 new exception/device/cohort cases. The mobile active-exception
+  review was inspected visually. The complete browser runner now defines 1,026
+  cases; this change reran the relevant 264. Escalation, continuous group
+  reconciliation, pilot promotion and physical-device acceptance remain open.
+
 - [Apple update deadline estimates](apple-update-deadlines.md) now use bounded
   authenticated Device Information time-zone observations for individual current
   policies and immutable original-cohort deadlines. Missing/stale/future evidence
@@ -91,7 +108,7 @@ the table's package summaries do not remove any detail from the roadmap.
   complete Apple PostgreSQL/race suite passes in 580.840 seconds after correcting
   an existing immediate-retry fixture to use one clock and assert SMTP invocation;
   the focused reminder regression passes in 9.170 seconds.
-  Automatic reconciliation, exceptions, promotion and hardware acceptance remain
+  Automatic reconciliation, promotion and hardware acceptance remain
   separate work.
 
 - Manual Apple update forms now bind application and removal to the
@@ -124,7 +141,7 @@ the table's package summaries do not remove any detail from the roadmap.
   pass in 17.624 seconds; registered Linux console routes and macOS/Linux package
   checks and the full Linux build pass. All 111 relevant Chrome cases pass.
   The complete Apple PostgreSQL/race suite passes in 543.717 seconds.
-  Persisted historical results, exceptions, automatic promotion, deadline-aware
+  Persisted historical results, automatic promotion, deadline-aware
   escalation and physical acceptance remain separate work.
 
 - [Scheduled Apple update activation](apple-update-schedules.md) retains immutable

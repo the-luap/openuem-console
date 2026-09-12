@@ -30,7 +30,7 @@ func TestAppleUpdateGroupProgressPages(t *testing.T) {
 	require.NoError(t, err)
 	sm.Put(ctx, "uid", "owned-operator")
 	scope := access.Scope{TenantID: 1, SiteID: 1}
-	for _, state := range []string{"reported", "required", "unverified", "different", "removed", "unavailable", "attention", "mixed", "long", "deadline-elapsed", "deadline-fold", "deadline-stale"} {
+	for _, state := range []string{"reported", "required", "unverified", "different", "removed", "unavailable", "attention", "mixed", "long", "deadline-elapsed", "deadline-fold", "deadline-stale", "exception-active"} {
 		t.Run(state, func(t *testing.T) {
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "owned-operator", Grants: []access.Grant{{Role: access.Operator, Scope: scope}}}, SM: &sessions.SessionManager{Manager: sm}, CSRFToken: "owned-csrf", TenantID: "1", SiteID: "1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Owned organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 			now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
@@ -48,6 +48,11 @@ func TestAppleUpdateGroupProgressPages(t *testing.T) {
 				receipt.Plan.Definition.Deadline, policy.Deadline = local, local
 			}
 			switch state {
+			case "exception-active":
+				expires := now.Add(time.Hour)
+				d.Exception = &apple.UpdateException{ID: "60000000-0000-4000-8000-000000000001", Scope: plan.Scope, DeviceID: d.DeviceID, Kind: "pause", Reason: "Owned temporary maintenance", CreatedAt: now.Add(-time.Minute), ExpiresAt: &expires}
+				d.ExceptionActive = true
+				d.PolicyState, d.CurrentPolicy = "absent", nil
 			case "required", "deadline-elapsed":
 				d.Result = "update_required"
 				d.ReportedVersion = "18.6.2"
@@ -95,6 +100,9 @@ func TestAppleUpdateGroupProgressPages(t *testing.T) {
 			}
 			for _, device := range p.Devices {
 				p.Counts.Total++
+				if device.ExceptionActive {
+					p.Counts.ActiveExceptions++
+				}
 				switch device.Deadline.State {
 				case "pending":
 					p.Counts.DeadlinePending++

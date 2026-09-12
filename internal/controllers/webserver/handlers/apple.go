@@ -122,6 +122,10 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/mac-binding/cancel", h.AppleMacBinding)
 		g.POST("/ios/:id/refresh", h.AppleRefresh)
 		g.POST("/ios/:id/revoke", h.AppleRevoke)
+		g.GET("/ios/:id/update-exceptions/review", h.AppleReviewUpdateException)
+		g.GET("/ios/:id/update-exceptions", h.AppleUpdateExceptions)
+		g.POST("/ios/:id/update-exceptions", h.AppleRecordUpdateException)
+		g.GET("/ios/:id/update-exceptions/:exception", h.AppleUpdateException)
 		g.GET("/ios/update-plans", h.AppleUpdatePlans)
 		g.POST("/ios/update-plans", h.AppleSaveUpdatePlan)
 		g.GET("/ios/update-plans/:plan/groups", h.AppleUpdatePlanGroups)
@@ -842,7 +846,10 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 		if errors.Is(err, apple.ErrUpdatePolicyReview) {
 			return echo.NewHTTPError(http.StatusConflict, i18n.T(c.Request().Context(), "updates.review_changed"))
 		}
-		if errors.Is(err, apple.ErrUpdatePlanGroupIntegrity) {
+		if errors.Is(err, apple.ErrUpdateExceptionActive) {
+			return echo.NewHTTPError(http.StatusConflict, i18n.T(c.Request().Context(), "updates.exception_blocks_assignment"))
+		}
+		if errors.Is(err, apple.ErrUpdatePlanGroupIntegrity) || errors.Is(err, apple.ErrUpdateExceptionIntegrity) {
 			return echo.NewHTTPError(http.StatusServiceUnavailable, i18n.T(c.Request().Context(), "updates.assessment_unavailable"))
 		}
 		return appleFailure(c, err)

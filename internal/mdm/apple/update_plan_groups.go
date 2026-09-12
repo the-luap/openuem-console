@@ -151,6 +151,13 @@ func (s *Store) inspectUpdatePlanGroup(ctx context.Context, tx *sql.Tx, actor st
 				reason = "update_prerequisite"
 			}
 		}
+		if reason == "" {
+			if err = s.requireNoUpdateException(ctx, tx, d); errors.Is(err, ErrUpdateExceptionActive) {
+				reason = "update_exception"
+			} else if err != nil {
+				return nil, err
+			}
+		}
 		if reason == "" && (!fresh || !releases.Supports(*d, policy, now)) {
 			reason = "release_unavailable"
 		}

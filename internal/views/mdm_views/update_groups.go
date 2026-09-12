@@ -42,6 +42,8 @@ func updatePlanGroupExclusion(reason string) string {
 		return "This device does not meet the plan's update prerequisites. Review its current inventory and update authorization."
 	case "release_unavailable":
 		return "This exact release is unavailable for this device in the current Apple catalog, or the catalog needs a refresh."
+	case "update_exception":
+		return "A temporary update exception is active for this device."
 	default:
 		return "This member cannot receive the reviewed update plan."
 	}

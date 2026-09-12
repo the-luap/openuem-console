@@ -418,6 +418,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("Apple update forms", func(t *testing.T) {
 		exerciseAppleUpdateForms(t, h, ctx, tenantID, siteID, request)
 	})
+	t.Run("Apple update exceptions", func(t *testing.T) {
+		exerciseAppleUpdateExceptions(t, h, ctx, tenantID, siteID, request)
+	})
 	t.Run("Apple profile group assignments", func(t *testing.T) {
 		exerciseAppleProfileGroups(t, h, ctx, tenantID, siteID, request)
 	})

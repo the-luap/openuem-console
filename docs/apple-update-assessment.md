@@ -34,6 +34,12 @@ stays unknown; repeated local times remain pending until their latest possible
 instant. The zone, source and recording time are shown independently of OS
 compliance and policy delivery status.
 
+[Temporary update exceptions](apple-update-exceptions.md) appear independently
+of these OS results. An active exception hides the policy-application form and
+blocks assignment at the shared admission boundary. Expiry and explicit ending
+do not restore a previous policy. Current update managers can open an audited
+exception review in the device's exact site; viewers retain a read-only summary.
+
 ## Authority and consistency
 
 `AssessDeviceUpdate` requires current `ReadDevices` authority, including for a
@@ -73,7 +79,7 @@ and the following read is denied. Registered console tests exercise the actual
 viewer route, missing and complete observations, absent builds, escaped and
 oversized errors, fixed source-failure responses and policy removal.
 
-Eighteen rendered states are checked in Chrome at 390, 768 and 1440 pixels. These
+Twenty-two rendered states are checked in Chrome at 390, 768 and 1440 pixels. These
 checks verify separate policy/OS evidence, absence of merged inventory fallback,
 time-zone freshness and DST uncertainty, bounded long-text layout, scoped CSRF
 forms and read-only viewer behavior.

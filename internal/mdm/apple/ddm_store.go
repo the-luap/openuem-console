@@ -128,6 +128,9 @@ func (s *Store) setDeviceUpdatePolicy(ctx context.Context, tx *sql.Tx, d *Device
 		return errors.New("device must be enrolled")
 	}
 	if p != nil {
+		if err = s.requireNoUpdateException(ctx, tx, d); err != nil {
+			return err
+		}
 		if err = ValidateUpdatePolicy(*d, *p); err != nil {
 			return err
 		}

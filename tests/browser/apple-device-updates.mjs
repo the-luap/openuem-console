@@ -1,13 +1,13 @@
 import {checkDeadline} from './apple-update-deadlines.mjs';
 export default async function run(browser, record) {
-  for (const state of ['required', 'compliant', 'missing-build', 'stale', 'unmanaged', 'error', 'error-limited', 'no-policy', 'viewer', 'long', 'missing', 'deadline-pending', 'deadline-elapsed', 'deadline-stale', 'deadline-future', 'deadline-invalid', 'deadline-gap', 'deadline-fold']) {
+  for (const state of ['required', 'compliant', 'missing-build', 'stale', 'unmanaged', 'error', 'error-limited', 'no-policy', 'viewer', 'long', 'missing', 'deadline-pending', 'deadline-elapsed', 'deadline-stale', 'deadline-future', 'deadline-invalid', 'deadline-gap', 'deadline-fold', 'exception-active', 'exception-expired', 'exception-ended', 'exception-viewer']) {
     for (const width of [390, 768, 1440]) {
       await browser.visit('apple-device-update-' + state, width);
       const view = await browser.evaluate(`(() => {
         const main = document.querySelector('[data-device-update-assessment]');
         return {width:document.documentElement.scrollWidth, viewport:innerWidth, text:main.textContent,
           evidence:main.querySelector('[data-device-update-evidence]').textContent,
-          policy:main.querySelector('[data-device-update-policy]')?.textContent,
+          exception:main.querySelector('[data-update-exception-active]')?.textContent,links:[...main.querySelectorAll('a')].map(a=>({text:a.textContent,href:a.getAttribute('href')})),policy:main.querySelector('[data-device-update-policy]')?.textContent,
           deadline:main.querySelector('[data-update-deadline]')?{state:main.querySelector('[data-update-deadline]').dataset.updateDeadline,text:main.querySelector('[data-update-deadline]').textContent}:null,
           scripts:main.querySelectorAll('script').length,
           forms:[...main.querySelectorAll('form')].map(f=>({action:f.getAttribute('action'),csrf:f.elements.csrf?.value,expected:f.elements.expected_policy?.value,fields:f.querySelectorAll('[name="expected_policy"]').length}))};
@@ -27,8 +27,13 @@ export default async function run(browser, record) {
       if (state === 'required') browser.check(view.policy.includes('Update required') && view.evidence.includes('18.6.2'), 'Lower reported version lost required result');
       if (state === 'no-policy') browser.check(!view.policy && view.evidence.includes('18.7.1'), 'Policy removal hid OS evidence');
       checkDeadline(browser,state,view.deadline,false);
-      if (state === 'viewer') browser.check(view.forms.length === 0, 'Read-only viewer can submit update changes');
-      else if (state !== 'unmanaged') browser.check(view.forms.length === (state === 'no-policy' ? 1 : 2), 'Update action availability changed');
+      if(state.startsWith('exception-'))browser.check(!view.policy&&view.exception.includes('Temporary update exception'),'Exception lost current absence of policy');
+      if(state==='exception-active'||state==='exception-viewer')browser.check(view.exception.includes('New update policy assignments are paused')&&view.forms.length===0,'Active exception offers an update assignment');
+      if(state==='exception-expired')browser.check(view.exception.includes('exception has expired'),'Expired exception hidden');
+      if(state==='exception-ended')browser.check(view.exception.includes('exception was ended'),'Ended exception hidden');
+      if(state.startsWith('exception-')&&state!=='exception-viewer')browser.check(view.links.some(a=>a.text==='Manage update exceptions'&&a.href==='/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update-exceptions/review'),'Exception management link changes scope');
+      if (state === 'viewer'||state==='exception-viewer') browser.check(view.forms.length === 0, 'Read-only viewer can submit update changes');
+      else if (state !== 'unmanaged'&&state!=='exception-active') browser.check(view.forms.length === (state === 'no-policy'||state==='exception-expired'||state==='exception-ended' ? 1 : 2), 'Update action availability changed');
       browser.check(view.forms.every(f => f.action === '/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update' && f.csrf === 'owned-csrf'), 'Update form lost scope or CSRF');
       browser.check(view.forms.every(f => f.expected === 'a'.repeat(64) && f.fields === 1), 'Update form lost its exact reviewed configured policy');
       if (view.forms.length) {

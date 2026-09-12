@@ -330,8 +330,14 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 							<p>{ i18n.T(ctx,"updates.evidence_description") }</p>
 						</div>
 					</div>
+					if detail.UpdateAssessment!=nil {
+                        @appleUpdateExceptionSummary(detail.UpdateAssessment.Exception,detail.UpdateAssessment.ExceptionActive)
+                        if info.Can(access.ManageUpdates) && detail.UpdateAssessment.Scope.SiteID>0 {
+                            <a class="underline" href={ templ.URL(ScopedUpdateExceptionPath(detail.UpdateAssessment.Scope,detail.Device.ID)+"/review") }>Manage update exceptions</a>
+                        }
+                    }
 					if detail.Device.Status=="enrolled" {
-						if info.Can(access.ManageUpdates) && detail.UpdateAssessment!=nil && detail.UpdateAssessment.PolicyToken!="" {
+						if info.Can(access.ManageUpdates) && detail.UpdateAssessment!=nil && detail.UpdateAssessment.PolicyToken!="" && !detail.UpdateAssessment.ExceptionActive {
 							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/update") } class="grid gap-4 mt-4">
 								@CSRF(info)
 								<input type="hidden" name="expected_policy" value={ detail.UpdateAssessment.PolicyToken }/>

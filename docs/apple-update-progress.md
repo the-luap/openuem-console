@@ -16,6 +16,10 @@ An original assignment also offers [reviewed removal of matching policies](apple
 Its immutable removal receipts are separate from this current assessment. Later
 policy removal or replacement leaves the original OS target and cohort intact.
 
+[Temporary update exceptions](apple-update-exceptions.md) appear separately with
+an active-exception count. They do not rewrite original OS targets, deadline
+estimates or outcome evidence, and moved-device exception details are withheld.
+
 ## OS observations and result criteria
 
 Migration 047 adds a bounded current OS-observation row per native enrollment.
@@ -109,5 +113,5 @@ states at 390, 768 and 1440 pixels. The view offers no assignment or scheduling
 form. Broader package/build/browser and full Apple regression evidence is recorded
 in [implementation status](implementation-status.md).
 
-Persisted historical cohort snapshots, automatic promotion gates, exceptions,
+Persisted historical cohort snapshots, automatic promotion gates,
 deadline-aware escalation and physical-device acceptance remain separate work.

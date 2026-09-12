@@ -1096,7 +1096,15 @@ en:
     new_password_link_sent: "A new link to set the initial password has been sent"
     send_certificate: "Generate certificate"
     an_email_should_be_provided: "An email address must be provided"
+  apple_update_exceptions:
+    unavailable: "Update exception evidence is unavailable. Reload before retrying."
+    permission: "Your current permissions do not allow managing update exceptions in this scope."
+    missing: "This update exception or enrollment was not found in this site."
+    changed: "The reviewed policy, exception, device placement or notification capability changed. Review the current state before trying again."
+    invalid: "Submit one confirmed update exception action with a brief reason and, for a pause, a future expiry within 30 days."
+    site: "Select a device site to manage update exceptions."
   updates:
+    exception_blocks_assignment: "A temporary update exception is active. Review or end the exception before assigning an update policy."
     deadline_original_heading: "Original deadline estimate"
     deadline_current_heading: "Current policy deadline estimate"
     deadline_elapsed: "Estimated deadline elapsed"

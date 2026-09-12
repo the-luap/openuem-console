@@ -23,6 +23,8 @@ type UpdateAssessment struct {
 	Policy               *UpdatePolicy             `json:"-" xml:"-" yaml:"-"`
 	PolicyToken          string                    `json:"-" xml:"-" yaml:"-"`
 	Deadline             *UpdateDeadlineAssessment `json:"-" xml:"-" yaml:"-"`
+	Exception            *UpdateException          `json:"-" xml:"-" yaml:"-"`
+	ExceptionActive      bool                      `json:"-" xml:"-" yaml:"-"`
 	PolicyHasError       bool                      `json:"-" xml:"-" yaml:"-"`
 	PolicyErrorTruncated bool                      `json:"-" xml:"-" yaml:"-"`
 	Compliance           string                    `json:"-" xml:"-" yaml:"-"`
@@ -136,12 +138,20 @@ func (s *Store) AssessDeviceUpdate(ctx context.Context, actor string, permission
 	if err != nil {
 		return nil, err
 	}
+	assessment.Exception, err = s.currentUpdateException(ctx, tx, assessment.Scope, id)
+	if err != nil {
+		return nil, err
+	}
 	if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&assessment.AssessedAt); err != nil {
 		return nil, err
 	}
 	if assessment.Availability == "available" && !expiry.After(assessment.AssessedAt) {
 		assessment.Availability = "identity_expired"
 	}
+	if assessment.Exception != nil && assessment.Exception.CreatedAt.After(assessment.AssessedAt) {
+		return nil, ErrUpdateExceptionIntegrity
+	}
+	assessment.ExceptionActive = assessment.Exception.Active(assessment.AssessedAt)
 	assessment.Deadline = assessUpdateDeadline(assessment.Availability == "available", assessment.Policy, zone, assessment.AssessedAt)
 	if assessment.Policy != nil {
 		result, reason := assessUpdateOS(assessment.Availability, assessment.Observation, assessment.Policy.TargetVersion, assessment.Policy.TargetBuild, time.Time{}, assessment.AssessedAt)

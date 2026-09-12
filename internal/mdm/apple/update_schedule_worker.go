@@ -197,9 +197,9 @@ func (s *Store) processUpdateSchedule(ctx context.Context, permissions *access.S
 		switch {
 		case errors.Is(activationErr, access.ErrDenied):
 			phase, reason = "blocked", "authority_changed"
-		case errors.Is(activationErr, ErrConflict), errors.Is(activationErr, inventory.ErrGroupConflict), errors.Is(activationErr, inventory.ErrGroupInvalid), errors.Is(activationErr, inventory.ErrGroupSnapshotLarge):
+		case errors.Is(activationErr, ErrConflict), errors.Is(activationErr, ErrUpdateExceptionActive), errors.Is(activationErr, inventory.ErrGroupConflict), errors.Is(activationErr, inventory.ErrGroupInvalid), errors.Is(activationErr, inventory.ErrGroupSnapshotLarge):
 			phase, reason = "blocked", "review_changed"
-		case errors.Is(activationErr, ErrNotFound), errors.Is(activationErr, inventory.ErrNotFound), errors.Is(activationErr, ErrUnauthorized), errors.Is(activationErr, ErrUpdatePlanIntegrity), errors.Is(activationErr, ErrUpdatePlanGroupIntegrity):
+		case errors.Is(activationErr, ErrNotFound), errors.Is(activationErr, inventory.ErrNotFound), errors.Is(activationErr, ErrUnauthorized), errors.Is(activationErr, ErrUpdatePlanIntegrity), errors.Is(activationErr, ErrUpdatePlanGroupIntegrity), errors.Is(activationErr, ErrUpdateExceptionIntegrity):
 			phase, reason = "blocked", "source_unavailable"
 		default:
 			var pg *pgconn.PgError

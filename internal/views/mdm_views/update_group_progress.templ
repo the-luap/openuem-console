@@ -35,6 +35,7 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 					<p>Different configured policy: <strong>{ Number(progress.Counts.PolicyDifferent) }</strong></p>
 					<p>No configured update policy: <strong>{ Number(progress.Counts.PolicyAbsent) }</strong></p>
 					<p>Original enrollment unavailable: <strong>{ Number(progress.Counts.Unavailable) }</strong></p>
+					<p>Active update exceptions: <strong>{ Number(progress.Counts.ActiveExceptions) }</strong></p>
 					<p>Matching policy needs attention: <strong>{ Number(progress.Counts.PolicyAttention) }</strong></p>
 					<p>Matching values do not establish continuous ownership by this assignment. Policies may have been replaced or removed and later restored.</p>
 				</div>
@@ -87,6 +88,7 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 								<p>The current policy has error details. Open the device to review them.</p>
 							}
 						}
+						@appleUpdateExceptionSummary(device.Exception,device.ExceptionActive)
 						@appleUpdateDeadline(device.Deadline,true)
 						<p>Original notification: { updateGroupNotificationStatus(device.NotificationStatus) }</p>
 						if device.Availability!="unavailable" {

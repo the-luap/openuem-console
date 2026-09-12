@@ -1,6 +1,6 @@
 import {checkDeadline} from './apple-update-deadlines.mjs';
 export default async function run(browser,record) {
- for(const state of ['reported','required','unverified','different','removed','unavailable','attention','mixed','long','deadline-elapsed','deadline-fold','deadline-stale'])for(const width of [390,768,1440]){
+ for(const state of ['reported','required','unverified','different','removed','unavailable','attention','mixed','long','deadline-elapsed','deadline-fold','deadline-stale','exception-active'])for(const width of [390,768,1440]){
   await browser.visit('apple-update-progress-'+state,width);
   const view=await browser.evaluate(`(()=>{
    const main=document.querySelector('[data-update-group-progress]');
@@ -23,6 +23,7 @@ export default async function run(browser,record) {
   if(state==='deadline-elapsed')browser.check(view.deadlines.includes('Estimated deadline elapsed: 1')&&view.deadlines.includes('Original target still required after estimated deadline: 1'),'Elapsed deadline lost its independent fresh OS requirement');
   else browser.check(view.deadlines.includes('Original target still required after estimated deadline: 0'),'Unverified or pending deadline counted as elapsed');
   if(state==='deadline-fold')browser.check(view.deadlines.includes('Estimated deadline pending: 1'),'Repeated deadline counted as elapsed before latest instant');
+  if(state==='exception-active')browser.check(view.policy.includes('Active update exceptions: 1')&&first.text.includes('New update policy assignments are paused')&&first.text.includes('No update policy is currently configured'),'Cohort lost separate exception and policy state');
   if(width===390){await browser.evaluate("document.querySelector('[data-update-progress-device]').scrollIntoView({block:'center'})");await browser.capture('apple-update-progress-'+state+'-390');}
   record({name:'Apple cohort progress '+state,width,passed:true});
  }

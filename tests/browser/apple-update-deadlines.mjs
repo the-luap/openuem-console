@@ -1,5 +1,5 @@
 export function checkDeadline(browser,state,deadline,original) {
-  if(state==='no-policy') {
+  if(state==='no-policy'||(!original&&state.startsWith('exception-'))) {
     browser.check(!deadline,'Absent policy retained a deadline estimate');
     return;
   }
