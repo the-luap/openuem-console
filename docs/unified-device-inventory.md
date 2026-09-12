@@ -6,10 +6,13 @@ selected organization or site. Search covers names, serial numbers, models and
 reported OS versions. Platform filters distinguish iOS, iPadOS, macOS, Windows,
 Linux, all Apple devices and unidentified platforms.
 
-PostgreSQL applies the filter and sorts by case-insensitive name, source and
-identity before returning 25 rows. Equal names do not collapse identities or
-repeat entries on an unchanged dataset. **Next page** retains the scope and
-filters; **First page** restarts the query. Submitting the filter form also
+Choose names in ascending or descending order, or last contact with the newest
+or oldest report first. Devices without a reported contact time always follow
+devices with a known time. PostgreSQL applies the filter and order before
+returning 25 rows; name, source and identity resolve contact-time ties. Equal
+names do not collapse identities or repeat entries on an unchanged dataset.
+**Next page** retains the scope, filters and sorting; **First page** restarts the
+query. Submitting the filter form also
 restarts pagination. The count describes the displayed page, not the entire
 inventory. Native Windows search includes older enrollments beyond the former
 100-entry preview.
@@ -17,9 +20,11 @@ inventory. Native Windows search includes older enrollments beyond the former
 Each request reads a fresh database snapshot. Changing a name, scope or channel
 association between requests can change its position; pagination is not a frozen
 export. Cursor values only identify a position and are bound to the original
-scope, filters and enabled sources. They do not grant access. Requests reject
+scope, filters, sorting and enabled sources. They do not grant access. Requests reject
 unsupported filters, duplicate/unknown query fields, malformed cursors and
-oversized or invalid search text. Reads have a ten-second deadline.
+oversized or invalid search text. The raw query is bounded to 16 KiB and malformed
+URL encoding is rejected rather than silently discarding a filter. Reads have a
+ten-second deadline.
 
 The server rechecks current permissions and commits an `inventory.devices.list`
 audit event before returning data. Scope membership and the safe inventory
@@ -43,11 +48,12 @@ into audit records.
 
 Owned PostgreSQL evidence covers 55 equal-name entries, 105 native Windows
 enrollments plus a separate agent, literal wildcard/injection-shaped searches,
-platform projections, hidden assignments, current permissions, audit failure
+platform projections, equal contact times, missing-time pages in both directions,
+hidden assignments, current permissions, audit failure
 and organization scope. Existing registered console routes cover linked Macs,
 native Windows lifecycle and scope boundaries. Chrome cases cover first, next,
 empty and long-metadata pages at 390, 768 and 1440 pixels, keyboard activation,
 retained filter links and page overflow.
 
-Configurable sorting, shared device exports, bulk actions, dynamic groups and
+Shared device exports, bulk actions, dynamic groups and
 production-scale database performance acceptance remain separate roadmap work.

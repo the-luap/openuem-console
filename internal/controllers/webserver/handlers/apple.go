@@ -229,31 +229,25 @@ func renderApple(c echo.Context, component templ.Component) error {
 	return component.Render(c.Request().Context(), c.Response())
 }
 
-func desktopPlatform(os string) string {
-	switch strings.ToLower(strings.TrimSpace(os)) {
-	case "windows":
-		return "windows"
-	case "darwin", "macos", "mac os x":
-		return "macos"
-	case "linux":
-		return "linux"
-	default:
-		return "unknown"
-	}
-}
-
 func (h *Handler) UnifiedDevices(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
 	info, scope, err := h.appleInfo(c)
 	if err != nil {
 		return err
 	}
-	query := c.QueryParams()
+	if len(c.Request().URL.RawQuery) > 16<<10 {
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "mdm.devices.invalid_filter"))
+	}
+	query, err := url.ParseQuery(c.Request().URL.RawQuery)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "mdm.devices.invalid_filter"))
+	}
 	for key, values := range query {
-		if (key != "q" && key != "platform" && key != "after") || len(values) != 1 {
+		if (key != "q" && key != "platform" && key != "sort" && key != "after") || len(values) != 1 {
 			return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "mdm.devices.invalid_filter"))
 		}
 	}
-	filter := inventory.DeviceFilter{Platform: query.Get("platform"), Search: strings.TrimSpace(query.Get("q")), After: query.Get("after")}
+	filter := inventory.DeviceFilter{Platform: query.Get("platform"), Search: strings.TrimSpace(query.Get("q")), Sort: query.Get("sort"), After: query.Get("after")}
 	if strings.HasSuffix(c.Path(), "/ios") && filter.Platform == "" {
 		filter.Platform = "apple"
 	}
@@ -288,7 +282,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 		rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: platform, OSVersion: d.OSVersion, Model: d.Model, Serial: d.Serial, Status: state, LastSeen: d.LastSeen, URL: fmt.Sprintf("/tenant/%d/site/%d%s", d.TenantID, d.SiteID, path)})
 	}
 	pageURL := func(after string) string {
-		q := url.Values{"q": {filter.Search}, "platform": {filter.Platform}}
+		q := url.Values{"q": {filter.Search}, "platform": {filter.Platform}, "sort": {filter.Sort}}
 		if after != "" {
 			q.Set("after", after)
 		}
@@ -301,8 +295,7 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 	if page.Next != "" {
 		paging.Next = pageURL(page.Next)
 	}
-	c.Response().Header().Set("Cache-Control", "no-store")
-	return renderApple(c, mdm_views.Devices(c, info, rows, filter.Platform, filter.Search, h.AppleSetupError, paging))
+	return renderApple(c, mdm_views.Devices(c, info, rows, filter.Platform, filter.Search, filter.Sort, h.AppleSetupError, paging))
 }
 
 func (h *Handler) AppleSettings(c echo.Context) error {

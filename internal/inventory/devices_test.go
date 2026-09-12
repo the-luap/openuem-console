@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +99,7 @@ func TestDeviceListPaginationScopeAndAudit(t *testing.T) {
 func TestDeviceListSearchesNativeWindowsBeyondFirstHundred(t *testing.T) {
 	f := newSoftwareFixture(t)
 	ctx := t.Context()
+	require.NoError(t, f.client.Agent.UpdateOneID(f.id).SetLastContact(time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)).Exec(ctx))
 	store, err := windows.NewStoreWithMasterKey(f.db, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("w", 32))))
 	require.NoError(t, err)
 	require.NoError(t, store.Migrate(ctx))
@@ -130,24 +132,92 @@ func TestDeviceListSearchesNativeWindowsBeyondFirstHundred(t *testing.T) {
 			require.NotEmpty(t, page.Next)
 		}
 	}
-	seen := map[string]bool{}
-	filter := inventory.DeviceFilter{Platform: "windows"}
-	for {
-		page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, sources, filter)
-		require.NoError(t, err)
-		for _, d := range page.Entries {
-			require.False(t, seen[d.ID])
-			seen[d.ID] = true
+	for _, order := range []string{"", "name_desc", "recent", "oldest"} {
+		seen := map[string]bool{}
+		filter := inventory.DeviceFilter{Platform: "windows", Sort: order}
+		for {
+			page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, sources, filter)
+			require.NoError(t, err)
+			if len(seen) == 0 && (order == "recent" || order == "oldest") {
+				require.Equal(t, f.id, page.Entries[0].ID, "devices with missing contact time must follow reported contact times")
+			}
+			for _, d := range page.Entries {
+				require.False(t, seen[d.ID])
+				seen[d.ID] = true
+			}
+			if page.Next == "" {
+				break
+			}
+			filter.After = page.Next
 		}
-		if page.Next == "" {
-			break
-		}
-		filter.After = page.Next
+		require.Len(t, seen, 106, "native identities and the separate desktop identity must all remain visible")
 	}
-	require.Len(t, seen, 106, "native identities and the separate desktop identity must all remain visible")
 	page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, inventory.DeviceFilter{Search: "oldest"})
 	require.NoError(t, err)
 	require.Empty(t, page.Entries, "disabled source became visible")
+}
+
+func TestDeviceListSortOrdersAcrossContactTimeTies(t *testing.T) {
+	f := newSoftwareFixture(t)
+	ctx := t.Context()
+	base := time.Date(2026, 9, 1, 12, 0, 0, 123456000, time.UTC)
+	type entry struct {
+		id, name string
+		seen     time.Time
+	}
+	entries := []entry{}
+	for i := range 55 {
+		e := entry{id: fmt.Sprintf("sorted-%02d", i), name: fmt.Sprintf("Device %02d", 54-i), seen: base.Add(time.Duration(i/10) * time.Hour)}
+		entries = append(entries, e)
+		require.NoError(t, f.client.Agent.Create().SetID(e.id).SetHostname(e.name).SetOs("linux").SetLastContact(e.seen).SetAgentStatus(agent.AgentStatusEnabled).AddSiteIDs(f.scope.SiteID).Exec(ctx))
+	}
+	for _, order := range []string{"", "name_desc", "recent", "oldest"} {
+		t.Run(order, func(t *testing.T) {
+			expected := append([]entry(nil), entries...)
+			sort.Slice(expected, func(i, j int) bool {
+				a, b := expected[i], expected[j]
+				if (order == "recent" || order == "oldest") && !a.seen.Equal(b.seen) {
+					if order == "recent" {
+						return a.seen.After(b.seen)
+					}
+					return a.seen.Before(b.seen)
+				}
+				if order == "name_desc" {
+					return a.name > b.name
+				}
+				return a.name < b.name
+			})
+			filter := inventory.DeviceFilter{Platform: "linux", Sort: order}
+			ids := []string{}
+			for {
+				page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, filter)
+				require.NoError(t, err)
+				for _, d := range page.Entries {
+					ids = append(ids, d.ID)
+				}
+				if page.Next == "" {
+					break
+				}
+				filter.After = page.Next
+			}
+			want := make([]string, len(expected))
+			for i, d := range expected {
+				want[i] = d.id
+			}
+			require.Equal(t, want, ids)
+			filter.Sort = "invalid"
+			page, err := inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, filter)
+			require.ErrorIs(t, err, inventory.ErrReportFilter)
+			require.Nil(t, page)
+			filter.Sort = "recent"
+			if order == "recent" {
+				filter.Sort = ""
+			}
+			page, err = inventory.ReadDevices(ctx, f.db, f.permissions, "viewer", f.scope, inventory.DeviceSources{}, filter)
+			require.ErrorIs(t, err, inventory.ErrReportFilter, "a cursor must not be reused with another order")
+			require.Nil(t, page)
+		})
+	}
 }
 
 func TestDeviceListApplePlatformProjection(t *testing.T) {

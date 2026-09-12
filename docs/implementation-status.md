@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The unified device list now supports ascending/descending names and newest/
+  oldest contact times. Missing reports sort last in both time orders. The
+  database cursor preserves timestamp precision, name/source/identity ties and
+  the selected order; reusing a cursor with another order is rejected. The
+  localized selector resets paging on submission, while page links retain it.
+  Owned database cases cover equal times across page boundaries and more than
+  100 missing-time Windows entries without skipping or duplicating identities.
+  Route checks reject malformed URL encoding, unsupported/duplicate sort fields
+  and raw queries over 16 KiB. PostgreSQL, Linux handler/view/catalog and browser
+  checks pass; rejected list queries also prohibit caching.
+
 - [Unified device inventory](unified-device-inventory.md) now filters, orders and
   paginates the enabled desktop, Apple, canonical Mac and native Windows sources
   in PostgreSQL. Pages contain at most 25 safe rows; source/identity tie-breakers
@@ -72,7 +83,7 @@ the table's package summaries do not remove any detail from the roadmap.
   use the existing catalog. PostgreSQL inventory/audit race suites and registered
   Linux console routes pass, along with Linux handler/view/catalog race checks
   and the complete Linux build. Twenty-four Chrome cases cover new pagination
-  and existing management navigation. Broader sorting, exports, bulk actions and production
+  and existing management navigation. Exports, bulk actions and production
   load acceptance remain open.
 
 - The Apple update form now resolves its heading, instructions, release/deadline

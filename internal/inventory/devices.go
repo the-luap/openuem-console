@@ -19,7 +19,7 @@ import (
 // DeviceSources comes from enabled server stores, never from request parameters.
 type DeviceSources struct{ Apple, Windows bool }
 
-type DeviceFilter struct{ Platform, Search, After string }
+type DeviceFilter struct{ Platform, Search, Sort, After string }
 
 type DeviceEntry struct {
 	Kind, ID, Name, Platform, OSVersion, Serial, Model, Status, AgentStatus string
@@ -35,6 +35,7 @@ type DevicePage struct {
 
 type deviceCursor struct {
 	Binding, Name, Kind, ID string
+	Seen                    *time.Time
 }
 
 func (f DeviceFilter) Valid() bool {
@@ -43,11 +44,16 @@ func (f DeviceFilter) Valid() bool {
 	default:
 		return false
 	}
+	switch f.Sort {
+	case "", "name_desc", "recent", "oldest":
+	default:
+		return false
+	}
 	return len(f.Search) <= 256 && utf8.ValidString(f.Search) && strings.IndexFunc(f.Search, unicode.IsControl) < 0 && len(f.After) <= 8192
 }
 
 func deviceFilterBinding(scope access.Scope, sources DeviceSources, f DeviceFilter) string {
-	encoded, _ := json.Marshal([]any{1, scope.TenantID, scope.SiteID, sources, f.Platform, f.Search})
+	encoded, _ := json.Marshal([]any{2, scope.TenantID, scope.SiteID, sources, f.Platform, f.Search, f.Sort})
 	digest := sha256.Sum256(encoded)
 	return hex.EncodeToString(digest[:])
 }
@@ -112,14 +118,33 @@ func ReadDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	if sources.Windows {
 		branches = append(branches, windowsDeviceRows)
 	}
+	// Only fixed SQL fragments choose the ordering. All cursor values remain
+	// parameters, including the nullable time used by the contact-time orders.
+	const identityOrder = `sort_name,kind COLLATE "C",id COLLATE "C"`
+	const identityCursor = `($5 COLLATE "C",$6 COLLATE "C",$7 COLLATE "C")`
+	position := `(` + identityOrder + `)>` + identityCursor
+	order := identityOrder
+	args := []any{scope.TenantID, scope.SiteID, filter.Search, filter.Platform, cursor.Name, cursor.Kind, cursor.ID, filter.After != "", administrator}
+	switch filter.Sort {
+	case "name_desc":
+		position = `(` + identityOrder + `)<` + identityCursor
+		order = `sort_name DESC,kind COLLATE "C" DESC,id COLLATE "C" DESC`
+	case "recent", "oldest":
+		comparison, infinity, direction := "<", "-infinity", "DESC"
+		if filter.Sort == "oldest" {
+			comparison, infinity, direction = ">", "infinity", "ASC"
+		}
+		position = `(coalesce(last_seen,'` + infinity + `'::timestamptz)` + comparison + `coalesce($10::timestamptz,'` + infinity + `'::timestamptz) OR (last_seen IS NOT DISTINCT FROM $10::timestamptz AND ` + position + `))`
+		order = `last_seen ` + direction + ` NULLS LAST,` + identityOrder
+		args = append(args, cursor.Seen)
+	}
 	query := `WITH devices(kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid) AS (` + strings.Join(branches, " UNION ALL ") + `),
  filtered AS (SELECT *,lower(name) COLLATE "C" AS sort_name FROM devices
  WHERE ($4='' OR platform=$4 OR ($4='apple' AND kind IN ('apple','mac')))
  AND position(lower($3) in lower(name||' '||serial||' '||model||' '||os_version))>0)
  SELECT kind,id,tenant_id,site_id,name,platform,os_version,serial,model,status,agent_status,last_seen,valid,sort_name FROM filtered
- WHERE NOT $8::boolean OR (sort_name,kind COLLATE "C",id COLLATE "C")>($5 COLLATE "C",$6 COLLATE "C",$7 COLLATE "C")
- ORDER BY sort_name,kind COLLATE "C",id COLLATE "C" LIMIT 26`
-	rows, err := tx.QueryContext(ctx, query, scope.TenantID, scope.SiteID, filter.Search, filter.Platform, cursor.Name, cursor.Kind, cursor.ID, filter.After != "", administrator)
+ WHERE NOT $8::boolean OR ` + position + ` ORDER BY ` + order + ` LIMIT 26`
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +167,7 @@ func ReadDevices(ctx context.Context, db *sql.DB, permissions *access.Store, act
 	if len(page.Entries) > 25 {
 		page.Entries = page.Entries[:25]
 		last := page.Entries[24]
-		encoded, err := json.Marshal(deviceCursor{Binding: binding, Name: last.sortName, Kind: last.Kind, ID: last.ID})
+		encoded, err := json.Marshal(deviceCursor{Binding: binding, Name: last.sortName, Kind: last.Kind, ID: last.ID, Seen: last.LastSeen})
 		if err != nil || len(last.sortName) > 4096 || len(last.ID) > 255 {
 			return nil, errors.New("device inventory cursor exceeds supported metadata bounds")
 		}

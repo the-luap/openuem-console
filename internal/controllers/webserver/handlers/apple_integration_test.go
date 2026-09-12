@@ -256,9 +256,20 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 			}
 		}
 	}
-	rec = request("GET", base+"/devices?platform=android", "", nil)
-	if rec.Code != 400 {
-		t.Fatal("invalid filter widened device scope", rec.Code)
+	for _, query := range []string{"platform=android", "sort=invalid", "sort=recent&sort=oldest", "q=first&q=second", "after=invalid", "unknown=value", "q=%zz&platform=windows", "q=first;second", "q=" + strings.Repeat("x", 16385)} {
+		rec = request("GET", base+"/devices?"+query, "", nil)
+		if rec.Code != 400 {
+			t.Fatal("invalid device filter was accepted", query, rec.Code)
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("invalid device query is cacheable")
+		}
+	}
+	for _, order := range []string{"", "name_desc", "recent", "oldest"} {
+		rec = request("GET", base+"/devices?sort="+order, "", nil)
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Finance Windows") {
+			t.Fatal("device sort route failed", order, rec.Code)
+		}
 	}
 	form = url.Values{"csrf": {"console-test-token"}, "editor": {"passcode"}, "name": {"Company PIN"}, "identifier": {"eu.example.pin"}, "min_length": {"6"}}
 	rec = request("POST", base+"/ios/configurations", "application/x-www-form-urlencoded", []byte(form.Encode()))

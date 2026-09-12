@@ -14,7 +14,7 @@ templ CSRF(info *partials.CommonInfo) {
 	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
 }
 
-templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string, paging DevicePagination) {
+templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, sort, setupError string, paging DevicePagination) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "mdm.devices.title"), Url: partials.GetNavigationUrl(info, "/devices")}}, info)
@@ -33,6 +33,12 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 					<form method="get" action={ partials.GetNavigationUrl(info, "/devices") } class="flex flex-wrap items-end gap-4 mb-4">
 						<label>{ i18n.T(ctx, "mdm.devices.search") }<input class="uk-input" type="search" name="q" value={ search } maxlength="256" placeholder={ i18n.T(ctx, "mdm.devices.search_hint") }/></label>
 						<label>{ i18n.T(ctx, "mdm.devices.platform") }<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>{ i18n.T(ctx, "mdm.devices.platform_all") }</option><option value="windows" selected?={ platform=="windows" }>{ i18n.T(ctx, "mdm.devices.platform_windows") }</option><option value="linux" selected?={ platform=="linux" }>{ i18n.T(ctx, "mdm.devices.platform_linux") }</option><option value="macos" selected?={ platform=="macos" }>{ i18n.T(ctx, "mdm.devices.platform_macos") }</option><option value="ios" selected?={ platform=="ios" }>{ i18n.T(ctx, "mdm.devices.platform_ios") }</option><option value="ipados" selected?={ platform=="ipados" }>{ i18n.T(ctx, "mdm.devices.platform_ipados") }</option><option value="apple" selected?={ platform=="apple" }>{ i18n.T(ctx, "mdm.devices.platform_apple") }</option><option value="unknown" selected?={ platform=="unknown" }>{ i18n.T(ctx, "mdm.devices.platform_unknown") }</option></select></label>
+						<label>{ i18n.T(ctx, "mdm.devices.sort") }<select class="uk-select" name="sort">
+							<option value="" selected?={ sort=="" }>{ i18n.T(ctx, "mdm.devices.sort_name") }</option>
+							<option value="name_desc" selected?={ sort=="name_desc" }>{ i18n.T(ctx, "mdm.devices.sort_name_desc") }</option>
+							<option value="recent" selected?={ sort=="recent" }>{ i18n.T(ctx, "mdm.devices.sort_recent") }</option>
+							<option value="oldest" selected?={ sort=="oldest" }>{ i18n.T(ctx, "mdm.devices.sort_oldest") }</option>
+						</select></label>
 						<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx, "mdm.devices.filter") }</button>
 					</form>
 					<div class="overflow-x-auto">

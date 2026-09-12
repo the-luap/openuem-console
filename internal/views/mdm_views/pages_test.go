@@ -584,8 +584,8 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 		{"mac-filevault-validation-invalid", DeviceDetails(c, info, validationDetail("invalid")), []string{"does not unlock its volume", "Validate current recovery key"}},
 		{"mac-filevault-reader", DeviceDetails(c, &reader, filevault), []string{"FileVault disk encryption", "Profiles confirmed", "Not yet validated against the Mac volume"}},
 		{"mac-filevault-failed", DeviceDetails(c, info, filevaultFailure), []string{"Encryption activation was not queued", "Enable FileVault with recovery escrow"}},
-		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", "", DevicePagination{}), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "Apple profiles"}},
-		{"devices-native-preview", Devices(c, info, nil, "windows", "older device", "", DevicePagination{First: "/tenant/1/devices?platform=windows", Next: "/tenant/1/devices?platform=windows&after=owned"}), []string{"First page", "Next page", "Device list pages"}},
+		{"devices", Devices(c, info, []DeviceRow{{ID: "windows-1", Name: "Finance Windows", Platform: "windows", OSVersion: "Windows 11", Status: "agent", LastSeen: &now, URL: "/tenant/1/computers/windows-1"}, {ID: d.ID, Name: d.Name, Platform: "iOS", OSVersion: d.OSVersion, Serial: d.SerialNumber, Status: d.Status, LastSeen: d.LastSeen, URL: "/tenant/1/ios/" + d.ID}}, "", "", "", "", DevicePagination{}), []string{"Finance Windows", "Sales iPhone", "Windows software deployment", "Apple profiles"}},
+		{"devices-native-preview", Devices(c, info, nil, "windows", "older device", "", "", DevicePagination{First: "/tenant/1/devices?platform=windows", Next: "/tenant/1/devices?platform=windows&after=owned"}), []string{"First page", "Next page", "Device list pages"}},
 		{"device", DeviceDetails(c, info, detail), []string{"Configured update policy", "Target OS version: 18.7.1", "Target build: 22H100", "Deadline (device local time): 2026-10-01T18:00:00", "Last reported operating system", "Reported OS version: 18.6.2", "Reported build: 22G100", "Inventory reported:", "Installed apps", "Example app", "Enforce update policy", "test-csrf-token", `value="18.7.1/22H100"`, `value="18.7.1/22H6100"`, "Automatic renewal starts 30 days", "New push data received; awaiting command-channel confirmation", "New identity in use", strings.Repeat("2b", 32)}},
 		{"mac-device", DeviceDetails(c, info, macDetail), []string{"Target OS version: 15.1", "Target build: 24B1", "Reported OS version: 15.0", "Reported build: 24A335", "Design Mac", "Mac management readiness", "Apple silicon", "Not escrowed", "J313AP", "Wait for this Mac to escrow", "Remove update policy", "Device channel"}},
 		{"mac-linked", DeviceDetails(c, info, linked), []string{"Device identity", "Management channel history", "Open agent inventory", linked.Mac.ID}},
@@ -764,9 +764,9 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			for i := range 25 {
 				rows = append(rows, DeviceRow{ID: fmt.Sprint(i), Name: fmt.Sprintf("Owned device %02d", i), Platform: "iPadOS", OSVersion: "18.1", Serial: "OWNED-SERIAL", Model: "iPad13,4", Status: "enrolled", LastSeen: &now, URL: fmt.Sprintf("/tenant/1/site/1/ios/owned-%d", i)})
 			}
-			paging := DevicePagination{Next: "/tenant/1/site/1/devices?platform=ipados&q=Owned&after=owned-page"}
+			paging := DevicePagination{Next: "/tenant/1/site/1/devices?platform=ipados&q=Owned&sort=recent&after=owned-page"}
 			if state != "first" {
-				paging.First = "/tenant/1/site/1/devices?platform=ipados&q=Owned"
+				paging.First = "/tenant/1/site/1/devices?platform=ipados&q=Owned&sort=recent"
 			}
 			if state == "empty" {
 				rows, paging.Next = nil, ""
@@ -776,7 +776,7 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 				rows[0].Serial = strings.Repeat("X", 128)
 			}
 			var rendered bytes.Buffer
-			if err := Devices(c, info, rows, "ipados", "Owned", "", paging).Render(ctx, &rendered); err != nil {
+			if err := Devices(c, info, rows, "ipados", "Owned", "recent", "", paging).Render(ctx, &rendered); err != nil {
 				t.Fatal(err)
 			}
 			if dir := os.Getenv("APPLE_MDM_UI_ARTIFACTS"); dir != "" {
