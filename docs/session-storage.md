@@ -364,7 +364,9 @@ Successful replacement consumes the recovery/invitation records and deletes all
 owned sessions in the same transaction, generating durable revocation receipts.
 A previously loaded session cannot recreate itself afterward. Existing MFA
 configuration is preserved. Denied replacement leaves credentials, registration,
-source grants and session rows unchanged. A committed revocation observed after a
+source grants and session rows unchanged from their state when replacement starts.
+An earlier account lifecycle change can already have revoked the invitation.
+A committed revocation observed after a
 row-lock wait denies replacement; a rolled-back revocation permits valid work.
 
 Fifteen owned policy cases cover all three proof kinds; the baseline reproduced
@@ -374,6 +376,19 @@ source consumption, grant replay and preloaded-session retirement. The productio
 administrator password/recovery/invitation routes and concurrent initial-password
 replacement test also pass. Fixture invitations use the same password-link-sent
 registration state as administrator invitation issuance.
+
+The fourth session-generation migration adds `uem_account_invitation`, a
+`BEFORE UPDATE` trigger on `users`. Account ID, creation time, recipient email,
+password hash, password/OpenID mode, email-verification or registration changes
+clear `new_user_token` in the same transaction. Restoring those fields cannot
+revive the cleared invitation. Ordinary display metadata, invitation-only writes,
+upgrades and repeated startup preserve the current token. Startup validates the
+installed trigger under the existing migration lock and rejects missing or
+disabled revocation. This applies to initial-password and certificate-account
+invitations; it does not prevent privileged reinsertion of old credential data.
+Certificate-account issuance and confirmation also compare the exact stored token,
+recipient and creation time in a guarded transaction. See
+[account email confirmation](account-email-confirmation.md).
 
 The protected account-settings password change now uses the same transaction.
 Its handler verifies the current password, requires completed MFA when configured,

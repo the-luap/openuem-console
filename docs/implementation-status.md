@@ -76,9 +76,18 @@ the table's package summaries do not remove any detail from the roadmap.
   CSRF, model and locale race tests passed without external network access. Six
   isolated Chrome checks cover preview/completion at 390, 768 and 1440 px,
   keyboard submission and no page overflow. Completion copy now reflects account
-  setup rather than promising an obsolete review step. Persistent issued-token
-  replacement and permanent invalidation after restored account changes remain
-  open; these tests do not establish real SMTP or administrator PKI acceptance.
+  setup rather than promising an obsolete review step. The exact issued token is
+  now stored in plaintext/encrypted mode, replaced by a random-nonce resend and
+  consumed atomically. Migration 4 clears invitations on account lifecycle changes,
+  including direct database writes followed by restoration of ordinary account
+  fields. Concurrent resend, stale issuance, migration preservation/health and
+  restoration tests pass against PostgreSQL. Initial-password admission requires
+  its separate signed purpose and one-hour lifetime; confirmation proofs cannot
+  enter that workflow. The complete PostgreSQL session race suite, Linux handler,
+  CSRF/model/locale race suites, full Linux build and actual administrator
+  password/recovery/invitation routes pass with the new migration. These tests do
+  not establish real SMTP or administrator
+  PKI acceptance, or protection against privileged credential/schema tampering.
 
 - Email-confirmation admission now requires the generated HS512 token purpose,
   OpenUEM issuer, account ID, issue time and an unexpired lifetime of at most

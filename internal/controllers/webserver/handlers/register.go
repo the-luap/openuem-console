@@ -9,6 +9,7 @@ import (
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -192,7 +193,7 @@ func (h *Handler) SendRegister(c echo.Context) error {
 }
 
 func (h *Handler) generateEmailToken(uid string, subject string, hours int) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, emailTokenClaims(uid, subject, hours))
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, MyCustomClaims{RegisteredClaims: emailTokenClaims(uid, subject, hours), Nonce: uuid.NewString()})
 	return token.SignedString([]byte(h.JWTKey))
 }
 

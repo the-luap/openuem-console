@@ -18,6 +18,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/controllers/router/middleware"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/views/locales"
+	"github.com/open-uem/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,6 +80,7 @@ func TestEmailConfirmationRejectsInvalidProofAndAccountState(t *testing.T) {
 			}
 			encoded, err := jwt.NewWithClaims(method, proof).SignedString([]byte(h.JWTKey))
 			require.NoError(t, err)
+			require.NoError(t, client.User.UpdateOneID(before.ID).SetNewUserToken(encoded).Exec(ctx))
 			if name == "oversized" {
 				encoded += strings.Repeat("x", 8192)
 			}
@@ -149,6 +151,7 @@ func TestEmailConfirmationRejectsRecipientAndAccountReplacement(t *testing.T) {
 			h := &Handler{Model: &models.Model{Client: client}, JWTKey: strings.Repeat("j", 32)}
 			encoded, err := h.generateConfirmationToken(account)
 			require.NoError(t, err)
+			require.NoError(t, h.Model.StageEmailConfirmation(ctx, account, encoded))
 			if change == "address" {
 				require.NoError(t, client.User.UpdateOneID(account.ID).SetEmail("changed-private-recipient@example.test").Exec(ctx))
 			} else {
@@ -185,6 +188,7 @@ func TestEmailConfirmationRoutesRequireExplicitBoundedPOST(t *testing.T) {
 	h := &Handler{Model: &models.Model{Client: client}, JWTKey: strings.Repeat("j", 32)}
 	encoded, err := h.generateConfirmationToken(user)
 	require.NoError(t, err)
+	require.NoError(t, h.Model.StageEmailConfirmation(t.Context(), user, encoded))
 	e := echo.New()
 	e.Use(middleware.GetLocale)
 	e.Use(middleware.CSRF())
@@ -215,6 +219,7 @@ func TestEmailConfirmationRoutesRequireExplicitBoundedPOST(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, current.EmailVerified, "link scanner consumed confirmation")
 		require.Equal(t, user.Register, current.Register)
+		require.Equal(t, encoded, current.NewUserToken)
 	}
 	require.NotNil(t, cookie)
 	for _, method := range []string{http.MethodHead, http.MethodPut, http.MethodDelete} {
@@ -295,6 +300,7 @@ func TestEmailConfirmationRoutesRequireExplicitBoundedPOST(t *testing.T) {
 	current, err := client.User.Get(t.Context(), user.ID)
 	require.NoError(t, err)
 	require.True(t, current.EmailVerified)
+	require.Empty(t, current.NewUserToken)
 	require.Equal(t, openuem.REGISTER_SEND_CERTIFICATE, current.Register)
 	require.NotContains(t, complete.Body.String(), encoded)
 	require.Equal(t, http.StatusBadRequest, send(post()).Code)
@@ -303,5 +309,124 @@ func TestEmailConfirmationRoutesRequireExplicitBoundedPOST(t *testing.T) {
 		require.NoError(t, os.MkdirAll(directory, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(directory, "email-confirmation-preview.html"), preview.Body.Bytes(), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(directory, "email-confirmation-complete.html"), complete.Body.Bytes(), 0644))
+	}
+}
+
+func TestEmailConfirmationStoredGrantReplacementAndEncryption(t *testing.T) {
+	for _, encrypted := range []bool{false, true} {
+		t.Run(map[bool]string{false: "plaintext", true: "encrypted"}[encrypted], func(t *testing.T) {
+			client := enttest.Open(t, "sqlite3", "file:email-confirmation-grants?mode=memory&_fk=1")
+			t.Cleanup(func() { client.Close() })
+			ctx, err := locales.WithLocale(t.Context(), "en")
+			require.NoError(t, err)
+			require.NoError(t, client.Settings.Create().Exec(ctx))
+			account, err := client.User.Create().SetID("stored-confirmation-user").SetName("Stored confirmation user").SetEmail("original@example.test").Save(ctx)
+			require.NoError(t, err)
+			h := &Handler{Model: &models.Model{Client: client}, JWTKey: strings.Repeat("j", 32)}
+			if encrypted {
+				h.EncryptionMasterKey = strings.Repeat("k", 32)
+			}
+			issue := func() string {
+				current, err := h.Model.PendingEmailConfirmation(ctx, account.ID)
+				require.NoError(t, err)
+				encoded, err := h.generateConfirmationToken(current)
+				require.NoError(t, err)
+				stored := encoded
+				if encrypted {
+					stored, err = utils.EncryptSensitiveField(encoded, h.EncryptionMasterKey)
+					require.NoError(t, err)
+				}
+				require.NoError(t, h.Model.StageEmailConfirmation(ctx, current, stored))
+				return encoded
+			}
+			request := func(method, encoded string) error {
+				r := httptest.NewRequest(method, "/auth/confirm/owned", strings.NewReader("csrf=owned-csrf")).WithContext(ctx)
+				r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				c := echo.New().NewContext(r, httptest.NewRecorder())
+				c.Set("csrf", "owned-csrf")
+				c.SetParamNames("token")
+				c.SetParamValues(encoded)
+				return h.ConfirmEmail(c)
+			}
+			denied := func(encoded string) {
+				for _, method := range []string{http.MethodGet, http.MethodPost} {
+					var failure *echo.HTTPError
+					require.ErrorAs(t, request(method, encoded), &failure)
+					require.Equal(t, http.StatusBadRequest, failure.Code)
+				}
+				current, err := client.User.Get(ctx, account.ID)
+				require.NoError(t, err)
+				require.False(t, current.EmailVerified)
+				require.Equal(t, account.Register, current.Register)
+			}
+			first := issue()
+			require.NoError(t, request(http.MethodGet, first))
+			stale, err := h.Model.PendingEmailConfirmation(ctx, account.ID)
+			require.NoError(t, err)
+			second := issue()
+			firstClaims, err := h.parseEmailConfirmationToken(first)
+			require.NoError(t, err)
+			secondClaims, err := h.parseEmailConfirmationToken(second)
+			require.NoError(t, err)
+			require.NotEmpty(t, firstClaims.Nonce)
+			require.NotEqual(t, firstClaims.Nonce, secondClaims.Nonce)
+			require.ErrorIs(t, h.Model.StageEmailConfirmation(ctx, stale, "stale-issuer-token"), models.ErrEmailConfirmationState)
+			denied(first)
+			require.NoError(t, request(http.MethodGet, second))
+			require.NoError(t, h.Model.UpdateUser(account.ID, account.Name, "changed@example.test", "", ""))
+			require.NoError(t, h.Model.UpdateUser(account.ID, account.Name, account.Email, "", ""))
+			denied(second)
+			third := issue()
+			require.NoError(t, h.Model.UserSetRevokedCertificate(account.ID))
+			require.NoError(t, client.User.UpdateOneID(account.ID).SetRegister(account.Register).Exec(ctx))
+			denied(third)
+			fourth := issue()
+			require.NoError(t, request(http.MethodPost, fourth))
+			current, err := client.User.Get(ctx, account.ID)
+			require.NoError(t, err)
+			require.Empty(t, current.NewUserToken)
+			require.NoError(t, client.User.UpdateOneID(account.ID).SetEmailVerified(false).SetRegister(account.Register).Exec(ctx))
+			denied(fourth)
+		})
+	}
+}
+
+func TestInitialPasswordInvitationRejectsOtherTokenPurposesBeforeAccountAccess(t *testing.T) {
+	for _, name := range []string{"confirmation", "issuer", "method", "missing-expiry", "missing-issued", "long-lifetime", "missing-key"} {
+		t.Run(name, func(t *testing.T) {
+			ctx, err := locales.WithLocale(t.Context(), "en")
+			require.NoError(t, err)
+			h := &Handler{JWTKey: strings.Repeat("j", 32)}
+			claims := MyCustomClaims{RegisteredClaims: emailTokenClaims("owned-password-user", "New password", 1)}
+			method := jwt.SigningMethodHS512
+			switch name {
+			case "confirmation":
+				claims.Subject = emailConfirmationSubject
+			case "issuer":
+				claims.Issuer = "Other issuer"
+			case "method":
+				method = jwt.SigningMethodHS256
+			case "missing-expiry":
+				claims.ExpiresAt = nil
+			case "missing-issued":
+				claims.IssuedAt = nil
+			case "long-lifetime":
+				claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(2 * time.Hour))
+			case "missing-key":
+				h.JWTKey = ""
+			}
+			encoded, err := jwt.NewWithClaims(method, claims).SignedString([]byte(h.JWTKey))
+			require.NoError(t, err)
+			r := httptest.NewRequest(http.MethodGet, "/login/new?token="+url.QueryEscape(encoded), nil).WithContext(ctx)
+			w := httptest.NewRecorder()
+			c := echo.New().NewContext(r, w)
+			var result error
+			require.NotPanics(t, func() { result = h.LoginNewUser(c) })
+			var failure *echo.HTTPError
+			require.ErrorAs(t, result, &failure)
+			require.Equal(t, http.StatusForbidden, failure.Code)
+			require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+			require.Equal(t, "no-referrer", w.Header().Get("Referrer-Policy"))
+		})
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -730,28 +731,30 @@ func (h *Handler) CreateForgotPasswordSession(c echo.Context, user *ent.User) er
 }
 
 func (h *Handler) LoginNewUser(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Referrer-Policy", "no-referrer")
 	// 1. Parse token
 	tokenString := c.QueryParam("token")
 
 	if tokenString == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.token_invalid"))
+		return echo.NewHTTPError(http.StatusUnauthorized, i18n.T(c.Request().Context(), "login.invitation_invalid"))
+	}
+	if h.JWTKey == "" || len(tokenString) > 8192 {
+		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 
 	token, err := jwt.ParseWithClaims(tokenString, &MyCustomClaims{}, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
 		return []byte(h.JWTKey), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS512"}), jwt.WithExpirationRequired(), jwt.WithIssuer("OpenUEM"), jwt.WithSubject("New password"), jwt.WithIssuedAt())
 
-	if err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, "could not parse claims")
+	if err != nil || !token.Valid {
+		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 
 	if claims, ok := token.Claims.(*MyCustomClaims); ok {
 		// Is the token expired?
-		if claims.ExpiresAt == nil || time.Now().After(claims.ExpiresAt.Time) {
-			return echo.NewHTTPError(http.StatusForbidden, "token has expired, please contact your administrator to request a new email to set your initial password")
+		if claims.ID == "" || claims.IssuedAt == nil || claims.ExpiresAt == nil || !time.Now().Before(claims.ExpiresAt.Time) || !claims.ExpiresAt.After(claims.IssuedAt.Time) || claims.ExpiresAt.Sub(claims.IssuedAt.Time) > time.Hour {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 		}
 
 		// Get user from database
@@ -776,8 +779,8 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 			}
 		}
 
-		if user.NewUserToken != tokenString {
-			return echo.NewHTTPError(http.StatusForbidden, "token is not valid, please contact your administrator to request a new email to set your initial password")
+		if subtle.ConstantTimeCompare([]byte(user.NewUserToken), []byte(tokenString)) != 1 {
+			return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 		}
 
 		// Create a session as we'll require the user to change the password
@@ -800,7 +803,7 @@ func (h *Handler) LoginNewUser(c echo.Context) error {
 		return RenderLogin(c, login_views.LoginIndex(login_views.ChangePassword(tsSiteKey, tsSecretKey), csrfToken, isTurnstileEnabled))
 
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "unknown claims type, cannot proceed")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "login.invitation_invalid"))
 	}
 }
 

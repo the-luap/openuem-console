@@ -199,6 +199,9 @@ func (m *Model) UpdateUser(uid, name, email, phone, country string) error {
 	}
 
 	query := m.Client.User.UpdateOneID(uid).SetName(name).SetEmail(email).SetPhone(phone).SetCountry(country).SetModified(time.Now())
+	if email != u.Email {
+		query.SetNewUserToken("")
+	}
 	return query.Exec(context.Background())
 }
 
@@ -261,18 +264,37 @@ func EmailConfirmationBinding(account *ent.User) string {
 }
 
 func (m *Model) ConfirmEmail(ctx context.Context, account *ent.User) error {
-	if account == nil {
+	if account == nil || account.NewUserToken == "" {
 		return ErrEmailConfirmationState
 	}
+	return m.updateEmailConfirmation(ctx, account, "", true)
+}
+
+func (m *Model) StageEmailConfirmation(ctx context.Context, account *ent.User, token string) error {
+	if account == nil || token == "" {
+		return ErrEmailConfirmationState
+	}
+	return m.updateEmailConfirmation(ctx, account, token, false)
+}
+
+func (m *Model) updateEmailConfirmation(ctx context.Context, account *ent.User, token string, confirm bool) error {
 	tx, err := m.Client.Tx(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	updated, err := tx.User.Update().
+	currentToken := user.NewUserTokenEQ(account.NewUserToken)
+	if account.NewUserToken == "" {
+		currentToken = user.Or(currentToken, user.NewUserTokenIsNil())
+	}
+	change := tx.User.Update().
 		Where(emailConfirmationAccount(account.ID)...).
-		Where(user.Email(account.Email), user.CreatedEQ(account.Created)).
-		SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE).Save(ctx)
+		Where(user.Email(account.Email), user.CreatedEQ(account.Created), currentToken).
+		SetNewUserToken(token)
+	if confirm {
+		change.SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE)
+	}
+	updated, err := change.Save(ctx)
 	if err != nil {
 		return err
 	}
@@ -286,7 +308,7 @@ func (m *Model) ConfirmEmail(ctx context.Context, account *ent.User) error {
 }
 
 func (m *Model) UserSetRevokedCertificate(uid string) error {
-	return m.Client.User.Update().SetRegister(openuem_nats.REGISTER_REVOKED).Where(user.ID(uid)).Exec(context.Background())
+	return m.Client.User.Update().SetRegister(openuem_nats.REGISTER_REVOKED).SetNewUserToken("").Where(user.ID(uid)).Exec(context.Background())
 }
 
 func (m *Model) DeleteUser(uid string) error {

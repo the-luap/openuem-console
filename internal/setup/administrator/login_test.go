@@ -239,7 +239,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	if err := m.Client.User.Create().SetID("invited-admin").SetName("Invited administrator").SetPasswd(true).SetRegister(openuem.REGISTER_PASSWORD_LINK_SENT).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, handlers.MyCustomClaims{RegisteredClaims: jwt.RegisteredClaims{ID: "invited-admin", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))}})
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, handlers.MyCustomClaims{RegisteredClaims: jwt.RegisteredClaims{ID: "invited-admin", Issuer: "OpenUEM", Subject: "New password", IssuedAt: jwt.NewNumericDate(time.Now()), ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))}})
 	encoded, err := token.SignedString([]byte(h.JWTKey))
 	if err != nil {
 		t.Fatal(err)

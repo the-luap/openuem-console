@@ -378,6 +378,9 @@ func (suite *UserTestSuite) TestConfirmEmail() {
 	require.False(suite.T(), pending.EmailVerified)
 	require.Equal(suite.T(), "users.pending_email_confirmation", pending.Register)
 
+	require.NoError(suite.T(), suite.model.StageEmailConfirmation(suite.T().Context(), pending, "owned-confirmation-token"))
+	pending, err = suite.model.PendingEmailConfirmation(suite.T().Context(), pending.ID)
+	require.NoError(suite.T(), err)
 	require.NoError(suite.T(), suite.model.ConfirmEmail(suite.T().Context(), pending), "should confirm email")
 	confirmed, err := suite.model.GetUserById(pending.ID)
 	require.NoError(suite.T(), err, "should get confirmed email user")

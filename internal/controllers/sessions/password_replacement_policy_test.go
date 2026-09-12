@@ -65,6 +65,17 @@ func TestPasswordReplacementCannotOverrideCurrentPolicy(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				expectedInvitation := ""
+				if policy == "disabled passwords" {
+					expectedInvitation = user.NewUserToken
+				}
+				beforeReplacement, err := f.model.Client.User.Get(t.Context(), user.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if beforeReplacement.NewUserToken != expectedInvitation {
+					t.Fatal("account policy change did not revoke its invitation as expected")
+				}
 				sm := scs.New()
 				sm.Store = f.store
 				ctx, err := sm.Load(t.Context(), "")
@@ -86,7 +97,7 @@ func TestPasswordReplacementCannotOverrideCurrentPolicy(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if current.Hash != hash || current.Register != register || current.ForgotPasswordCode != user.ForgotPasswordCode || current.NewUserToken != user.NewUserToken {
+				if current.Hash != hash || current.Register != register || current.ForgotPasswordCode != user.ForgotPasswordCode || current.NewUserToken != beforeReplacement.NewUserToken {
 					t.Error("denied replacement changed credentials or registration")
 				}
 				if _, found, err := f.store.FindCtx(t.Context(), token); err != nil || !found {

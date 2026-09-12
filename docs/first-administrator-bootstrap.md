@@ -98,6 +98,11 @@ login/password-change workflow, then verifies login without the initial mount.
 
 For certificate accounts, [email confirmation](account-email-confirmation.md)
 uses a recipient-bound link, a read-only preview and explicit POST confirmation.
+Only the current stored invitation works. Resending replaces it; successful
+confirmation consumes it. Account lifecycle changes clear both certificate-account
+and initial-password invitations, even if the former account fields are restored.
+Initial-password links require their separate signed purpose and expire within
+one hour. Responses prevent caching and referrer disclosure.
 
 The real console password-change route now requires a verified server-session
 proof. Starting email recovery identifies the account but cannot authorize a

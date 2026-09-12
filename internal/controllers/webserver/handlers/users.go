@@ -10,6 +10,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/validator/v10"
@@ -389,7 +390,7 @@ func (h *Handler) SetEmailConfirmed(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage("user doesn't exist", false))
 	}
 
-	err = h.Model.Client.User.UpdateOneID(uid).SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_IN_REVIEW).Exec(context.Background())
+	err = h.Model.Client.User.UpdateOneID(uid).SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_IN_REVIEW).SetNewUserToken("").Exec(context.Background())
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
@@ -408,7 +409,7 @@ func (h *Handler) ApproveAccount(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "users.user_not_found"), true))
 	}
 
-	err = h.Model.Client.User.UpdateOneID(uid).SetRegister(openuem_nats.REGISTER_APPROVED).Exec(context.Background())
+	err = h.Model.Client.User.UpdateOneID(uid).SetRegister(openuem_nats.REGISTER_APPROVED).SetNewUserToken("").Exec(context.Background())
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "users.could_not_update_register", err.Error()), false))
 	}
@@ -450,7 +451,9 @@ func (h *Handler) AskForConfirmation(c echo.Context) error {
 }
 
 func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) error {
-	current, err := h.Model.PendingEmailConfirmation(c.Request().Context(), user.ID)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+	current, err := h.Model.PendingEmailConfirmation(ctx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -477,6 +480,16 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 
 	if h.NATSConnection == nil || !h.NATSConnection.IsConnected() {
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
+	}
+	stored := token
+	if h.EncryptionMasterKey != "" {
+		stored, err = utils.EncryptSensitiveField(token, h.EncryptionMasterKey)
+		if err != nil {
+			return err
+		}
+	}
+	if err = h.Model.StageEmailConfirmation(ctx, user, stored); err != nil {
+		return err
 	}
 
 	if err := h.PublishBroker("notification.confirm_email", data); err != nil {

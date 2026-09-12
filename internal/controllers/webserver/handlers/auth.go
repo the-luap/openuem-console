@@ -11,15 +11,18 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/views/register_views"
+	"github.com/open-uem/utils"
 )
 
 type MyCustomClaims struct {
 	jwt.RegisteredClaims
+	Nonce string `json:"nonce,omitempty"`
 }
 
 func (h *Handler) Auth(c echo.Context) error {
@@ -59,13 +62,18 @@ var errEmailConfirmationToken = errors.New("invalid email confirmation token")
 type emailConfirmationClaims struct {
 	jwt.RegisteredClaims
 	AccountBinding string `json:"account_binding"`
+	Nonce          string `json:"nonce"`
 }
 
 func (h *Handler) generateConfirmationToken(account *ent.User) (string, error) {
 	// Use a stored snapshot so the binding retains database timestamp precision.
+	if account == nil || h.JWTKey == "" {
+		return "", errEmailConfirmationToken
+	}
 	claims := emailConfirmationClaims{
 		RegisteredClaims: emailTokenClaims(account.ID, emailConfirmationSubject, 24),
 		AccountBinding:   models.EmailConfirmationBinding(account),
+		Nonce:            uuid.NewString(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS512, claims).SignedString([]byte(h.JWTKey))
 }
@@ -127,6 +135,25 @@ func (h *Handler) ConfirmEmail(c echo.Context) error {
 		return unavailable(err)
 	}
 	if subtle.ConstantTimeCompare([]byte(models.EmailConfirmationBinding(account)), []byte(claims.AccountBinding)) != 1 {
+		return invalid()
+	}
+	saved := account.NewUserToken
+	if saved == "" {
+		return invalid()
+	}
+	if h.EncryptionMasterKey != "" {
+		encrypted, err := utils.IsSensitiveFieldEncrypted(saved, h.EncryptionMasterKey)
+		if err != nil {
+			return unavailable(err)
+		}
+		if encrypted {
+			saved, err = utils.DecryptSensitiveField(saved, h.EncryptionMasterKey)
+			if err != nil {
+				return unavailable(err)
+			}
+		}
+	}
+	if subtle.ConstantTimeCompare([]byte(saved), []byte(c.Param("token"))) != 1 {
 		return invalid()
 	}
 	if c.Request().Method == http.MethodGet {

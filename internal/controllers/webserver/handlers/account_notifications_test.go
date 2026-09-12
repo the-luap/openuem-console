@@ -39,6 +39,8 @@ func TestAccountNotificationsUseConfiguredOriginAndRetainPasswordToken(t *testin
 	model := &models.Model{Client: client}
 	user, err := client.User.Create().SetID("owned-invitation-user").SetName("Owned invitation user").SetEmail("recipient@example.test").Save(t.Context())
 	require.NoError(t, err)
+	passwordUser, err := client.User.Create().SetID("owned-password-user").SetName("Owned password user").SetEmail("password-recipient@example.test").SetPasswd(true).SetRegister(openuem.REGISTER_PASSWORD_LINK_SENT).Save(t.Context())
+	require.NoError(t, err)
 	for _, origin := range []struct {
 		name string
 		h    *Handler
@@ -57,20 +59,24 @@ func TestAccountNotificationsUseConfiguredOriginAndRetainPasswordToken(t *testin
 			}
 			for _, requestOrigin := range []string{"", origin.want, "https://untrusted.invalid"} {
 				for _, kind := range []string{"confirmation", "password"} {
+					recipient := user
+					if kind == "password" {
+						recipient = passwordUser
+					}
 					t.Run(fmt.Sprintf("%s/%s/%s/encrypted=%t", origin.name, kind, requestOrigin, encrypted), func(t *testing.T) {
 						req := httptest.NewRequest(http.MethodPost, "/owned-notification", nil)
 						req.Header.Set("Origin", requestOrigin)
 						c := echo.New().NewContext(req, httptest.NewRecorder())
 						if kind == "confirmation" {
-							require.NoError(t, h.sendConfirmationEmail(c, user))
+							require.NoError(t, h.sendConfirmationEmail(c, recipient))
 						} else {
-							require.NoError(t, h.sendLinkToGeneratePassword(c, user))
+							require.NoError(t, h.sendLinkToGeneratePassword(c, recipient))
 						}
 						message, err := sub.NextMsg(5 * time.Second)
 						require.NoError(t, err)
 						var notification openuem.Notification
 						require.NoError(t, json.Unmarshal(message.Data, &notification))
-						require.Equal(t, user.Email, notification.To)
+						require.Equal(t, recipient.Email, notification.To)
 						target, err := url.Parse(notification.MessageActionURL)
 						require.NoError(t, err)
 						if target.Scheme+"://"+target.Host != origin.want || target.User != nil || target.Fragment != "" {
@@ -80,26 +86,26 @@ func TestAccountNotificationsUseConfiguredOriginAndRetainPasswordToken(t *testin
 						if kind == "password" {
 							require.Equal(t, "/login/new", target.Path)
 							encoded, subject = target.Query().Get("token"), "New password"
-							stored, err := client.User.Get(t.Context(), user.ID)
-							require.NoError(t, err)
-							saved := stored.NewUserToken
-							if encrypted {
-								require.NotEqual(t, encoded, saved, "invitation should be encrypted at rest")
-								saved, err = utils.DecryptSensitiveField(saved, h.EncryptionMasterKey)
-								require.NoError(t, err)
-							}
-							if saved == "" || saved != encoded {
-								t.Error("password notification lost its exact stored invitation")
-							}
 						} else {
 							require.True(t, strings.HasPrefix(target.Path, "/auth/confirm/"))
 							_, err = h.parseEmailConfirmationToken(encoded)
 							require.NoError(t, err, "generated confirmation must satisfy its consumer")
 						}
+						stored, err := client.User.Get(t.Context(), recipient.ID)
+						require.NoError(t, err)
+						saved := stored.NewUserToken
+						if encrypted {
+							require.NotEqual(t, encoded, saved, "invitation should be encrypted at rest")
+							saved, err = utils.DecryptSensitiveField(saved, h.EncryptionMasterKey)
+							require.NoError(t, err)
+						}
+						if saved == "" || saved != encoded {
+							t.Error("account notification lost its exact stored invitation")
+						}
 						claims := &jwt.RegisteredClaims{}
 						_, err = jwt.ParseWithClaims(encoded, claims, func(*jwt.Token) (any, error) { return []byte(h.JWTKey), nil }, jwt.WithValidMethods([]string{"HS512"}), jwt.WithExpirationRequired(), jwt.WithIssuer("OpenUEM"), jwt.WithSubject(subject))
 						require.NoError(t, err)
-						require.Equal(t, user.ID, claims.ID)
+						require.Equal(t, recipient.ID, claims.ID)
 					})
 				}
 			}

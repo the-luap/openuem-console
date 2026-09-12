@@ -22,7 +22,7 @@ func CSRF() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			original := c.Request()
-			if c.Path() == "/auth/confirm/:token" || strings.HasPrefix(original.URL.Path, "/auth/confirm/") {
+			if c.Path() == "/auth/confirm/:token" || strings.HasPrefix(original.URL.Path, "/auth/confirm/") || original.URL.Path == "/login/new" {
 				c.Response().Header().Set("Cache-Control", "no-store")
 				c.Response().Header().Set("Referrer-Policy", "no-referrer")
 			}

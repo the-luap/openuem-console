@@ -872,6 +872,7 @@ en:
     could_not_find_user: "Could not find the user account"
     personal_info_updated: "The personal info has been updated"
     token_invalid: "The token is not valid"
+    invitation_invalid: "This password invitation is invalid or has expired. Ask your administrator to send a new invitation."
     cannot_encrypt_new_user_token: "Cannot encrypt the new user token"
     cannot_decrypt_new_user_token: "Cannot decrypt the new user token"
     cannot_encrypt_forgot_code: "Cannot encrypt forgot code"
