@@ -7,6 +7,24 @@ import (
 	"time"
 )
 
+func TestLocalProofRetainsBoundGeneration(t *testing.T) {
+	now := time.Now()
+	for _, method := range []string{Password, Certificate} {
+		proof, err := Read(NewLocal("owned-user", method, "owned-credential", "owned server generation", now), "owned-user", now)
+		if err != nil || proof.Generation != "owned server generation" || proof.Credential != Digest("owned-credential") {
+			t.Fatal("local proof lost admission metadata", err)
+		}
+		for _, generation := range []string{"", strings.Repeat("x", 2049)} {
+			if NewLocal("owned-user", method, "credential", generation, now) != "" {
+				t.Fatal("local proof accepted unbounded or missing generation")
+			}
+		}
+	}
+	if NewLocal("owned-user", OpenID, "credential", "generation", now) != "" {
+		t.Fatal("OpenID accepted local generation construction")
+	}
+}
+
 func TestPrimaryProofIdentityMethodAndLifetime(t *testing.T) {
 	now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
 	for _, method := range []string{Password, Certificate, OpenID} {

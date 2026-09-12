@@ -25,6 +25,7 @@ type Proof struct {
 	UserID     string `json:"user"`
 	Method     string `json:"method"`
 	Credential string `json:"credential"`
+	Generation string `json:"generation,omitempty"`
 	IssuedAt   int64  `json:"issued"`
 	ExpiresAt  int64  `json:"expires"`
 }
@@ -35,7 +36,20 @@ func Digest(value string) string {
 }
 
 func New(userID, method, credential string, now time.Time) string {
-	proof := Proof{FlowID: uuid.NewString(), UserID: userID, Method: method, Credential: Digest(credential), IssuedAt: now.Unix(), ExpiresAt: now.Add(Lifetime).Unix()}
+	return newProof(userID, method, credential, "", now)
+}
+
+// NewLocal binds a verified local first factor to server-side generations
+// captured by its admission transaction. The generation is never form input.
+func NewLocal(userID, method, credential, generation string, now time.Time) string {
+	if generation == "" || len(generation) > 2048 || (method != Password && method != Certificate) {
+		return ""
+	}
+	return newProof(userID, method, credential, generation, now)
+}
+
+func newProof(userID, method, credential, generation string, now time.Time) string {
+	proof := Proof{FlowID: uuid.NewString(), UserID: userID, Method: method, Credential: Digest(credential), Generation: generation, IssuedAt: now.Unix(), ExpiresAt: now.Add(Lifetime).Unix()}
 	data, _ := json.Marshal(proof)
 	return string(data)
 }

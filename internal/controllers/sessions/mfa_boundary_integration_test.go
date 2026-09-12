@@ -227,14 +227,14 @@ func TestMFARejectsMissingExpiredOrChangedPrimaryProof(t *testing.T) {
 			}
 			sm.Put(ctx, "uid", user.ID)
 			sm.Put(ctx, "authentication-pending", true)
-			sm.Put(ctx, loginproof.SessionKey, loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now()))
+			sm.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, user, nil, time.Now()))
 			switch change {
 			case "missing":
 				sm.Remove(ctx, loginproof.SessionKey)
 			case "missing phase":
 				sm.Remove(ctx, "authentication-pending")
 			case "expired":
-				sm.Put(ctx, loginproof.SessionKey, loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now().Add(-loginproof.Lifetime)))
+				sm.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, user, nil, time.Now().Add(-loginproof.Lifetime)))
 			case "other account":
 				sm.Put(ctx, loginproof.SessionKey, loginproof.New("other-user", loginproof.Password, user.Hash, time.Now()))
 			case "changed password":

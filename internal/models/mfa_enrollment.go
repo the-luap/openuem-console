@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"errors"
 	"time"
@@ -9,17 +10,33 @@ import (
 	"github.com/alexedwards/argon2id"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
 )
 
 var ErrMFAState = errors.New("MFA enrollment or account authorization changed")
 
+// LocalMFAAuthorization retains the server-side first-factor proof and, for
+// certificate sign-in, its original TLS certificate. Never build it from forms.
+type LocalMFAAuthorization struct {
+	Proof       string
+	Certificate *x509.Certificate
+}
+
 // SaveTOTPSecretKey stages an unconfirmed secret against the account snapshot
 // whose authorization was checked. Confirmed enrollment must be disabled first.
 func (m *Model) SaveTOTPSecretKey(ctx context.Context, expected *ent.User, secret string) error {
+	return m.stageMFASecret(ctx, expected, secret, nil)
+}
+
+func (m *Model) StagePrimaryTOTPSecret(ctx context.Context, expected *ent.User, secret string, primary LocalMFAAuthorization) error {
+	return m.stageMFASecret(ctx, expected, secret, &primary)
+}
+
+func (m *Model) stageMFASecret(ctx context.Context, expected *ent.User, secret string, primary *LocalMFAAuthorization) error {
 	if expected == nil || expected.TotpSecretConfirmed || secret == "" || len(secret) > 4096 {
 		return ErrMFAState
 	}
-	return m.changeMFAState(ctx, expected, func(ctx context.Context, tx *sql.Tx) error {
+	return m.changeMFAState(ctx, expected, primary, func(ctx context.Context, tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `UPDATE users SET totp_secret=$2,modified=clock_timestamp() WHERE uid=$1`, expected.ID, secret)
 		return err
 	})
@@ -28,6 +45,14 @@ func (m *Model) SaveTOTPSecretKey(ctx context.Context, expected *ent.User, secre
 // SaveRecoveryCodes confirms the exact staged secret and replaces the full code
 // set in one transaction. Hashing finishes before any database locks are held.
 func (m *Model) SaveRecoveryCodes(parent context.Context, expected *ent.User, codes []string) error {
+	return m.confirmMFA(parent, expected, codes, nil)
+}
+
+func (m *Model) ConfirmPrimaryMFA(ctx context.Context, expected *ent.User, codes []string, primary LocalMFAAuthorization) error {
+	return m.confirmMFA(ctx, expected, codes, &primary)
+}
+
+func (m *Model) confirmMFA(parent context.Context, expected *ent.User, codes []string, primary *LocalMFAAuthorization) error {
 	if expected == nil || expected.TotpSecret == "" || expected.TotpSecretConfirmed || len(codes) != 10 {
 		return ErrMFAState
 	}
@@ -51,7 +76,7 @@ func (m *Model) SaveRecoveryCodes(parent context.Context, expected *ent.User, co
 		}
 		hashes[i] = hash
 	}
-	return m.changeMFAState(ctx, expected, func(ctx context.Context, tx *sql.Tx) error {
+	return m.changeMFAState(ctx, expected, primary, func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM recovery_codes WHERE user_recoverycodes=$1`, expected.ID); err != nil {
 			return err
 		}
@@ -68,7 +93,7 @@ func (m *Model) SaveRecoveryCodes(parent context.Context, expected *ent.User, co
 // Disable2FA removes the secret and its codes together, and retires sessions in
 // the same transaction. Deletion receipts prevent old session writers returning.
 func (m *Model) Disable2FA(ctx context.Context, expected *ent.User) error {
-	return m.changeMFAState(ctx, expected, func(ctx context.Context, tx *sql.Tx) error {
+	return m.changeMFAState(ctx, expected, nil, func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM recovery_codes WHERE user_recoverycodes=$1`, expected.ID); err != nil {
 			return err
 		}
@@ -82,7 +107,7 @@ func (m *Model) Disable2FA(ctx context.Context, expected *ent.User) error {
 
 // Configuration, account and code/session rows use the same lock order as other
 // credential mutations. The supplied snapshot must include stored ciphertext.
-func (m *Model) changeMFAState(parent context.Context, expected *ent.User, change func(context.Context, *sql.Tx) error) error {
+func (m *Model) changeMFAState(parent context.Context, expected *ent.User, primary *LocalMFAAuthorization, change func(context.Context, *sql.Tx) error) error {
 	if m.DB == nil || expected == nil || expected.ID == "" {
 		return ErrMFAState
 	}
@@ -128,8 +153,38 @@ func (m *Model) changeMFAState(parent context.Context, expected *ent.User, chang
 	if current.Register != nats.REGISTER_COMPLETE && current.Register != nats.REGISTER_APPROVED && !(!current.Passwd && !current.Openid && current.Register == nats.REGISTER_CERTIFICATE_SENT) {
 		return ErrMFAState
 	}
+	if primary != nil {
+		proof, err := loginproof.Read(primary.Proof, expected.ID, time.Now())
+		if err != nil || !current.Use2fa || current.Openid {
+			return ErrLocalSignIn
+		}
+		switch proof.Method {
+		case loginproof.Password:
+			if !current.Passwd || primary.Certificate != nil || proof.Credential != loginproof.Digest(current.Hash) {
+				return ErrLocalSignIn
+			}
+		case loginproof.Certificate:
+			if current.Passwd {
+				return ErrLocalSignIn
+			}
+			if err = lockUserCertificate(ctx, tx, expected.ID, primary.Certificate); err != nil {
+				return err
+			}
+			if proof.Credential != loginproof.Digest(string(primary.Certificate.Raw)) {
+				return ErrLocalSignIn
+			}
+		default:
+			return ErrLocalSignIn
+		}
+		if err = checkPrimaryGeneration(ctx, tx, expected.ID, proof.Method, primary.Certificate, proof.Generation); err != nil {
+			return err
+		}
+	}
 	if err = change(ctx, tx); err != nil {
 		return err
+	}
+	if primary != nil && primary.Certificate != nil && !primary.Certificate.NotAfter.After(time.Now()) {
+		return ErrLocalSignIn
 	}
 	return tx.Commit()
 }

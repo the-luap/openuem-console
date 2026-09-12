@@ -44,6 +44,19 @@ type Evidence struct {
 	secretDigest [32]byte
 }
 
+// PrimaryGeneration exposes only the generation carried by the verified
+// primary flow, so final local admission can compare it under source locks.
+func (e *Evidence) PrimaryGeneration(uid, method string, now time.Time) (string, error) {
+	if e == nil {
+		return "", ErrRejected
+	}
+	proof, err := loginproof.Read(e.primary, uid, now)
+	if err != nil || proof.Method != method || proof.Generation == "" {
+		return "", ErrRejected
+	}
+	return proof.Generation, nil
+}
+
 // TOTP returns the actual accepted counter with the existing 30-second,
 // six-digit SHA-1 policy and one-step clock skew.
 func TOTP(primary, uid, secret, passcode string, now time.Time) (*Evidence, error) {

@@ -61,6 +61,27 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Pending local MFA proofs now retain independent account, method and certificate
+  generations captured after first-factor admission commits. Every local MFA
+  entry point, source-locked enrollment write and final factor admission compares
+  those original identifiers; restored state cannot revive an earlier flow.
+  Normal required-MFA staging/confirmation preserves its pending account UUID,
+  while completed-session generations remain separate and stricter. Twenty-four
+  owned password/TLS baseline cases admitted obsolete primary flows, and four
+  additional cases changed enrollment using superseded primary authorization.
+  Regressions cover those boundaries, sixteen changes after TOTP/backup verification,
+  actual password/certificate first-time enrollment, generation-write rollback,
+  caller schemas, storage recovery, canceled waits, preceding-schema upgrade,
+  disabled triggers and fresh processes. Canonical TOTP replay checks still deny
+  fresh proofs after secret storage encoding changes. The focused enrollment/
+  generation suite passes in 23.877 seconds; the final complete session race suite
+  passes in 186.689 seconds, including the later certificate enrollment and retry
+  cases. The full Linux ARM64 session suite, console/OpenID routes, administrator
+  and startup checks, auth/security/router races and Linux build pass. Older local
+  pending proofs must restart after upgrade. Atomic OpenID enrollment binding,
+  broader step-up policies and domain transaction authorization remain separate.
+  See [pending local generations](session-storage.md#pending-local-authentication-generations).
+
 - Certificate registry generations now invalidate completed sessions even when
   ownership, purpose, serial, expiry or revocation is restored before the next
   request. A random UUID follows each registry record; exact deletion/recreation

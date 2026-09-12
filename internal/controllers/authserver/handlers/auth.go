@@ -61,14 +61,17 @@ func (h *Handler) Auth(c echo.Context) error {
 	}
 	if user.Use2fa {
 		values["authentication-pending"] = true
-		values[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.Certificate, string(cert.Raw), time.Now())
 	}
 	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {
 			return err
 		}
 		if user.Use2fa {
-			return h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInPendingMFA, nil)
+			generation, err := h.Model.BeginLocalMFA(ctx, user, loginproof.Certificate, cert)
+			if err == nil {
+				h.SessionManager.Manager.Put(ctx, loginproof.SessionKey, loginproof.NewLocal(user.ID, loginproof.Certificate, string(cert.Raw), generation, time.Now()))
+			}
+			return err
 		}
 		generation, err := h.Model.CompleteLocalSession(ctx, user, loginproof.Certificate, cert, nil)
 		if err == nil {

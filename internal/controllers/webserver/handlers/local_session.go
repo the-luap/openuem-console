@@ -33,18 +33,20 @@ func (h *Handler) validateLocalSession(ctx context.Context, c echo.Context, user
 	}
 	stage := models.LocalSignInCurrentSession
 	var err error
+	var primaryGeneration string
 	if h.SessionManager.Manager.GetBool(ctx, "authentication-pending") {
 		proof, proofErr := loginproof.Read(h.SessionManager.Manager.GetString(ctx, loginproof.SessionKey), user.ID, time.Now())
 		if proofErr != nil || proof.Method != method || !user.Use2fa || h.SessionManager.Manager.GetBool(ctx, "twofa") || password && proof.Credential != loginproof.Digest(user.Hash) {
 			return h.rejectLocalSession(c)
 		}
 		stage = models.LocalSignInPendingMFA
+		primaryGeneration = proof.Generation
 		if method == loginproof.Certificate {
 			cert, readErr := clientidentity.ReadSessionCertificate(h.SessionManager.Manager.GetString(ctx, clientidentity.SessionCertificateKey), user.ID, proof.Credential, time.Now())
 			if readErr != nil {
 				return h.rejectLocalSession(c)
 			}
-			err = h.Model.AdmitCertificateSignIn(ctx, user, cert, stage, nil)
+			err = h.Model.CheckLocalPrimary(ctx, user, method, cert, primaryGeneration)
 		}
 	}
 	if stage == models.LocalSignInCurrentSession {
@@ -59,7 +61,7 @@ func (h *Handler) validateLocalSession(ctx context.Context, c echo.Context, user
 			err = h.Model.CheckLocalSession(ctx, user, method, generation)
 		}
 	} else if method != loginproof.Certificate {
-		err = h.Model.AdmitLocalSignIn(ctx, user, method, stage)
+		err = h.Model.CheckLocalPrimary(ctx, user, method, nil, primaryGeneration)
 	}
 	if err == nil {
 		return nil

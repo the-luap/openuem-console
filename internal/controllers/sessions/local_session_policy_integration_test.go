@@ -209,7 +209,7 @@ func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {
 				_, credential := ownedConsoleCertificate(t, f.user.ID)
 				registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
 				f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
-				f.manager.Put(ctx, loginproof.SessionKey, loginproof.New(f.user.ID, loginproof.Certificate, string(credential.Leaf.Raw), time.Now()))
+				f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
 			}
 			admitted, err := localSessionRequest(f, ctx)
 			if admitted {

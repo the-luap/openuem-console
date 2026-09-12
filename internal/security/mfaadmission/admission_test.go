@@ -2,6 +2,7 @@ package mfaadmission
 
 import (
 	"encoding/base32"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,36 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/pquerna/otp/totp"
 )
+
+func TestEvidenceRetainsOnlyItsBoundPrimaryGeneration(t *testing.T) {
+	now := time.Now()
+	raw := loginproof.NewLocal("owned-user", loginproof.Password, "credential", "owned original generation", now)
+	evidence, err := Backup(raw, "owned-user", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if generation, err := evidence.PrimaryGeneration("owned-user", loginproof.Password, now); err != nil || generation != "owned original generation" {
+		t.Fatal("evidence lost its primary generation", err)
+	}
+	legacy, err := Backup(loginproof.New("owned-user", loginproof.Password, "credential", now), "owned-user", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []*Evidence{nil, legacy, {}} {
+		if _, err := invalid.PrimaryGeneration("owned-user", loginproof.Password, now); !errors.Is(err, ErrRejected) {
+			t.Fatal("unbound evidence exposed authority", err)
+		}
+	}
+	if _, err := evidence.PrimaryGeneration("other-user", loginproof.Password, now); !errors.Is(err, ErrRejected) {
+		t.Fatal("generation transferred to another user", err)
+	}
+	if _, err := evidence.PrimaryGeneration("owned-user", loginproof.Certificate, now); !errors.Is(err, ErrRejected) {
+		t.Fatal("generation transferred to another method", err)
+	}
+	if _, err := evidence.PrimaryGeneration("owned-user", loginproof.Password, now.Add(loginproof.Lifetime)); !errors.Is(err, ErrRejected) {
+		t.Fatal("expired evidence retained generation authority", err)
+	}
+}
 
 func TestTOTPEvidenceTracksAcceptedCounterAndCanonicalSecret(t *testing.T) {
 	now := time.Date(2026, 9, 12, 12, 0, 15, 0, time.UTC)

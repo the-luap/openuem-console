@@ -22,6 +22,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
+	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -30,6 +31,13 @@ import (
 func completedOwnedCertificateSession(t *testing.T, encrypted bool, factor string, expires ...time.Time) (accountPasswordFixture, context.Context, *x509.Certificate) {
 	t.Helper()
 	f, _ := prepareLocalSession(t, false, encrypted, factor != "none")
+	if factor == "enrollment" {
+		var err error
+		f.user, err = f.user.Update().SetTotpSecretConfirmed(false).Save(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := f.model.CreateDefaultTenantAndSite(); err != nil {
 		t.Fatal(err)
 	}
@@ -75,8 +83,23 @@ func completedOwnedCertificateSession(t *testing.T, encrypted bool, factor strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if factor != "none" {
-		code, err := totp.GenerateCode(f.user.TotpSecret, time.Now())
+	if factor != "none" && factor != "pending" {
+		secret := f.user.TotpSecret
+		if factor == "enrollment" {
+			req := httptest.NewRequest(http.MethodPost, "https://console.test/login/totpregister", nil).WithContext(ctx)
+			if err = f.handler.Register2FA(echo.New().NewContext(req, httptest.NewRecorder())); err != nil {
+				t.Fatal("certificate authenticator setup failed", err)
+			}
+			staged, err := f.model.Client.User.Get(t.Context(), f.user.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			secret, _, err = sessiontokens.Decode(staged.TotpSecret, f.key)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		code, err := totp.GenerateCode(secret, time.Now())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,6 +121,8 @@ func completedOwnedCertificateSession(t *testing.T, encrypted bool, factor strin
 		c := echo.New().NewContext(req, recorder)
 		if factor == "backup" {
 			err = f.handler.LoginTOTPBackupCheck(c)
+		} else if factor == "enrollment" {
+			err = f.handler.LoginTOTPConfirm(c)
 		} else {
 			err = f.handler.LoginTOTPValidate(c)
 		}
@@ -119,6 +144,9 @@ func completedOwnedCertificateSession(t *testing.T, encrypted bool, factor strin
 		}
 	}
 	f.token = token
+	if factor == "pending" {
+		return f, ctx, credential.Leaf
+	}
 	if f.manager.GetString(ctx, clientidentity.SessionCertificateKey) != clientidentity.EncodeSessionCertificate(credential.Leaf) || f.manager.Exists(ctx, loginproof.SessionKey) {
 		t.Fatal("completed certificate session did not retain only its original certificate evidence")
 	}

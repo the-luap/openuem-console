@@ -193,9 +193,8 @@ revocation and exact-record restoration in both storage modes and all three fact
 paths. Expanded tests also cover serial/expiry restoration, valid fresh admission,
 rollback and injected trigger failure, caller schema isolation, harmless edits,
 other-record isolation, repeated startup, disabled triggers, preceding-schema
-upgrade and fresh-process rejection after a revocation is removed. Pending
-certificate primary flows still perform their current certificate-registry checks;
-their initial evidence is not yet bound to these certificate generations.
+upgrade and fresh-process rejection after a revocation is removed. Pending local
+primary flows also retain certificate generations, as described below.
 
 ## Current local session policy
 
@@ -290,12 +289,64 @@ trigger failure, a caller with a different search path, repeated startup, disabl
 trigger rejection, exact account recreation, canceled credential waits, fresh
 processes and failed final session persistence with a valid retry.
 
-This stamps completed local sessions. Pending primary proofs still use their
-existing credential, lifetime and certificate-registry checks; they do not yet
-carry independent account/method generation stamps. OpenID uses its separate
+These stamps identify completed local sessions; pending local primary proofs use
+the independent account generation described below. OpenID uses its separate
 live policy and binding-revision checks. Completed certificate sessions also check
 their original lifetime, current registry and certificate generation; issuer/key
 identity and rotation remain open.
+
+## Pending local authentication generations
+
+Password and certificate first-factor admission now capture a separate pending
+account UUID, the current method UUID and, for certificates, the current registry
+UUID. These identifiers enter the new primary proof only after source-locked
+admission commits; session publication persists that proof before sending its
+cookie. The proof retains its own one-use flow UUID, credential digest and short
+lifetime. A completed-session generation cannot substitute for a pending one.
+
+Account identity, password, mode, required MFA, active secret and restrictive
+registration changes rotate the pending account generation. Disabling an already
+confirmed enrollment also rotates it. Normal staging and confirmation of required
+MFA preserve it so a valid first factor can finish enrollment; completed sessions
+retain their stricter, separate generation. Restoring any invalidating source
+value cannot restore the earlier pending UUID. Existing method and certificate
+generations similarly preserve brief policy or registry changes.
+
+Every local public MFA step and protected pending-session check compares the
+recorded generations under the configuration/account and, where needed,
+certificate/revocation locks. Local secret staging and recovery-code confirmation
+also check the original proof, credential, lifetime and generations inside their
+own mutation transaction. Verification before hashing or QR generation cannot
+authorize a later superseded write. Final MFA admission rechecks the generation
+carried by verified factor evidence before consuming its primary receipt and
+TOTP counter. It never adopts newly loaded generation metadata.
+
+Transient database errors or canceled waits permit retry with the same valid
+pending proof. Invalid or superseded evidence cannot configure MFA or complete
+sign-in; final publication failure clears authority using the existing shared
+publisher. Protected requests retire invalid pending sessions. The account and
+method checks do not replace one-use primary receipts or canonical TOTP counters.
+
+The third migration seeds the separate pending UUID without replacing completed
+account, method or certificate generations. Repeated startup preserves it and
+rejects a disabled/missing enforcement trigger or invalid generation column.
+Database credential writers need access to the added generation column. Stop all
+older console/auth writers before upgrade; older local pending proofs without
+generation metadata must restart sign-in.
+
+Twenty-four owned password/mutual-TLS baseline cases completed stale primary
+flows after restored policy, credentials, MFA or account identity. Four additional
+model cases reproduced stale authorization of MFA enrollment writes. Regressions
+cover those boundaries, changes after TOTP/backup verification, first-time
+password/certificate enrollment, storage failure and retry, rollback and injected
+generation-write failure, caller schema isolation, preceding-schema upgrade,
+disabled triggers and a fresh process checking the same database. Counter tests
+now obtain a fresh primary proof after storage-encoding changes and still reject
+replay of the same canonical TOTP key/counter.
+
+OpenID retains its separate policy and identity-binding checks. Atomic binding
+of OpenID enrollment writes, broader account-settings step-up policies and
+authorization within domain mutations remain separate work.
 
 ## Password replacement policy
 

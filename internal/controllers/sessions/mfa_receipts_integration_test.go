@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"os"
 	"os/exec"
@@ -18,6 +19,21 @@ import (
 	"github.com/open-uem/utils"
 	"github.com/pquerna/otp/totp"
 )
+
+// Model-only fixtures declare a verified first factor and capture its current
+// source generations. Separate handler fixtures exercise password and TLS proof.
+func ownedLocalPrimary(t *testing.T, m *models.Model, user *ent.User, cert *x509.Certificate, at time.Time) string {
+	t.Helper()
+	method, credential := loginproof.Password, user.Hash
+	if cert != nil {
+		method, credential = loginproof.Certificate, string(cert.Raw)
+	}
+	generation, err := m.BeginLocalMFA(t.Context(), user, method, cert)
+	if err != nil {
+		t.Fatal("owned primary admission failed", err)
+	}
+	return loginproof.NewLocal(user.ID, method, credential, generation, at)
+}
 
 func ownedMFAEvidence(t *testing.T, user *ent.User, proof string, at time.Time) *mfaadmission.Evidence {
 	t.Helper()
@@ -48,7 +64,7 @@ func TestMFAEvidenceCancellationRollsBackWrittenReceipts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof := loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now())
+	proof := ownedLocalPrimary(t, f.model, u, nil, time.Now())
 	evidence := ownedMFAEvidence(t, u, proof, time.Now())
 	if _, err = f.model.DB.ExecContext(t.Context(), `CREATE FUNCTION hold_mfa_confirmation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock_shared(712036484); RETURN NEW; END $$; CREATE TRIGGER hold_mfa_confirmation BEFORE UPDATE OF register ON users FOR EACH ROW EXECUTE FUNCTION hold_mfa_confirmation()`); err != nil {
 		t.Fatal(err)
@@ -116,7 +132,11 @@ func TestMFAFinalAdmissionRejectsMismatchedPrimaryEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, proof := range []struct{ uid, method, credential string }{{u.ID, loginproof.Password, "other credential"}, {"other", loginproof.Password, u.Hash}, {u.ID, loginproof.Certificate, u.Hash}} {
-		raw := loginproof.New(proof.uid, proof.method, proof.credential, time.Now())
+		generation, err := f.model.BeginLocalMFA(t.Context(), u, loginproof.Password, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw := loginproof.NewLocal(proof.uid, proof.method, proof.credential, generation, time.Now())
 		evidence, err := mfaadmission.TOTP(raw, proof.uid, u.TotpSecret, code, time.Now())
 		if err != nil {
 			t.Fatal(err)
@@ -124,6 +144,10 @@ func TestMFAFinalAdmissionRejectsMismatchedPrimaryEvidence(t *testing.T) {
 		if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, evidence); !errors.Is(err, mfaadmission.ErrRejected) {
 			t.Fatal("mismatched primary evidence admitted a session", err)
 		}
+	}
+	legacy := ownedMFAEvidence(t, u, loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now()), time.Now())
+	if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, legacy); !errors.Is(err, mfaadmission.ErrRejected) {
+		t.Fatal("legacy primary without generation was admitted", err)
 	}
 	if err = f.model.AdmitLocalSignIn(t.Context(), u, loginproof.Password, models.LocalSignInComplete); !errors.Is(err, mfaadmission.ErrRejected) {
 		t.Fatal("MFA completion admitted without evidence", err)
@@ -152,7 +176,7 @@ func TestMFAReceiptsRollBackWithFailedConfirmation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			proof := loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now())
+			proof := ownedLocalPrimary(t, f.model, u, nil, time.Now())
 			evidence := ownedMFAEvidence(t, u, proof, time.Now())
 			table, event := "users", "UPDATE OF register"
 			if failure == "primary" {
@@ -208,7 +232,7 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 		t.Fatal(err)
 	}
 	now := time.Now()
-	proof := loginproof.New(u.ID, loginproof.Password, u.Hash, now)
+	proof := ownedLocalPrimary(t, f.model, u, nil, now)
 	evidence := ownedMFAEvidence(t, u, proof, now)
 	if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, evidence); err != nil {
 		t.Fatal(err)
@@ -235,7 +259,7 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	proof = loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now())
+	proof = ownedLocalPrimary(t, f.model, u, nil, time.Now())
 	if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, ownedMFAEvidence(t, u, proof, now)); !errors.Is(err, mfaadmission.ErrRejected) {
 		t.Fatal("new flow or equivalent key encoding replayed TOTP", err)
 	}
@@ -252,6 +276,7 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
+	proof = ownedLocalPrimary(t, f.model, u, nil, time.Now())
 	encodedEvidence, err := mfaadmission.TOTP(proof, u.ID, plain, code, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -262,6 +287,10 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 	u, err = u.Update().SetTotpSecret(plain).Save(t.Context())
 	if err != nil {
 		t.Fatal(err)
+	}
+	proof = ownedLocalPrimary(t, f.model, u, nil, time.Now())
+	if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, ownedMFAEvidence(t, u, proof, now)); !errors.Is(err, mfaadmission.ErrRejected) {
+		t.Fatal("restored storage with a fresh primary generation replayed TOTP", err)
 	}
 	var receipts int
 	if err = f.model.DB.QueryRowContext(t.Context(), `SELECT count(*) FROM uem_mfa_primary_consumptions`).Scan(&receipts); err != nil || receipts != 1 {
@@ -276,7 +305,7 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherProof := loginproof.New(other.ID, loginproof.Password, other.Hash, time.Now())
+	otherProof := ownedLocalPrimary(t, f.model, other, nil, time.Now())
 	if err = f.model.CompleteMFASignIn(t.Context(), other, loginproof.Password, ownedMFAEvidence(t, other, otherProof, now)); err != nil {
 		t.Fatal("another account shared the replay counter", err)
 	}
@@ -284,7 +313,7 @@ func TestMFACountersSurviveStartupMigrationAndEquivalentSecretEncoding(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	newProof := loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now())
+	newProof := ownedLocalPrimary(t, f.model, u, nil, time.Now())
 	if err = f.model.CompleteMFASignIn(t.Context(), u, loginproof.Password, ownedMFAEvidence(t, u, newProof, time.Now())); err != nil {
 		t.Fatal("new authenticator inherited the old key's counter", err)
 	}
@@ -307,7 +336,7 @@ func TestMFAReceiptRestartChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, proof := range []string{os.Getenv("OPENUEM_MFA_RESTART_PROOF"), loginproof.New(u.ID, loginproof.Password, u.Hash, time.Now())} {
+	for _, proof := range []string{os.Getenv("OPENUEM_MFA_RESTART_PROOF"), ownedLocalPrimary(t, m, u, nil, time.Now())} {
 		evidence := ownedMFAEvidence(t, u, proof, time.Unix(seconds, 0))
 		if err = m.CompleteMFASignIn(t.Context(), u, loginproof.Password, evidence); !errors.Is(err, mfaadmission.ErrRejected) {
 			t.Fatal("fresh process accepted used MFA evidence", err)

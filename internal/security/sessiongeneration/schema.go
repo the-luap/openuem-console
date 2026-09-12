@@ -4,7 +4,7 @@ package sessiongeneration
 // their search path to this application schema, independently of later writers.
 // The installation marker preserves UUIDs and avoids replacing active triggers
 // during an ordinary repeated startup migration.
-const Schema = accountSchema + certificateSchema
+const Schema = accountSchema + certificateSchema + primarySchema
 
 const accountSchema = `
 SELECT pg_advisory_xact_lock(712036490);

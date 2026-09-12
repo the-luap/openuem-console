@@ -15,10 +15,26 @@ import (
 )
 
 func mfaMutationError(err error) error {
-	if errors.Is(err, models.ErrMFAState) {
+	if errors.Is(err, models.ErrMFAState) || errors.Is(err, models.ErrLocalSignIn) {
 		return echo.NewHTTPError(http.StatusConflict, "Account access or two-factor enrollment changed; sign in again.")
 	}
 	return echo.NewHTTPError(http.StatusServiceUnavailable, "Two-factor authentication could not be updated. Try again.")
+}
+
+func (h *Handler) localMFAAuthorization(c echo.Context, user *ent.User) (models.LocalMFAAuthorization, error) {
+	raw := h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey)
+	proof, err := loginproof.Read(raw, user.ID, time.Now())
+	if err != nil {
+		return models.LocalMFAAuthorization{}, models.ErrLocalSignIn
+	}
+	result := models.LocalMFAAuthorization{Proof: raw}
+	if proof.Method == loginproof.Certificate {
+		result.Certificate, err = clientidentity.ReadSessionCertificate(h.SessionManager.Manager.GetString(c.Request().Context(), clientidentity.SessionCertificateKey), user.ID, proof.Credential, time.Now())
+		if err != nil {
+			return models.LocalMFAAuthorization{}, models.ErrLocalSignIn
+		}
+	}
+	return result, nil
 }
 
 // Naming an account during recovery is not proof of its password, certificate
@@ -54,6 +70,12 @@ func (h *Handler) requirePrimaryAuthentication(c echo.Context) (*ent.User, error
 		if !settings.UsePasswd || !user.Passwd || user.Openid || user.Hash == "" || proof.Credential != loginproof.Digest(user.Hash) {
 			return deny()
 		}
+		if err = h.Model.CheckLocalPrimary(ctx, user, proof.Method, nil, proof.Generation); err != nil {
+			if errors.Is(err, models.ErrLocalSignIn) {
+				return deny()
+			}
+			return nil, echo.NewHTTPError(http.StatusServiceUnavailable, "Password sign-in verification is temporarily unavailable.")
+		}
 	case loginproof.Certificate:
 		if !settings.UseCertificates || user.Passwd || user.Openid {
 			return deny()
@@ -62,7 +84,7 @@ func (h *Handler) requirePrimaryAuthentication(c echo.Context) (*ent.User, error
 		if err != nil {
 			return deny()
 		}
-		if err = h.Model.AdmitCertificateSignIn(ctx, user, cert, models.LocalSignInPendingMFA, nil); err != nil {
+		if err = h.Model.CheckLocalPrimary(ctx, user, proof.Method, cert, proof.Generation); err != nil {
 			if errors.Is(err, models.ErrLocalSignIn) {
 				return deny()
 			}

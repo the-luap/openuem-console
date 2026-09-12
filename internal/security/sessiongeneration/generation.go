@@ -33,11 +33,21 @@ type Queryer interface {
 // Current reads generation identifiers. It does not authorize a user or verify
 // credentials; admission must hold the configuration and account locks first.
 func Current(ctx context.Context, q Queryer, uid, method string) (Stamp, error) {
+	return current(ctx, q, uid, method, "generation")
+}
+
+// CurrentPrimary reads the independent account generation for pending MFA.
+// Admission must already hold the same source locks as completed sessions.
+func CurrentPrimary(ctx context.Context, q Queryer, uid, method string) (Stamp, error) {
+	return current(ctx, q, uid, method, "primary_generation")
+}
+
+func current(ctx context.Context, q Queryer, uid, method, column string) (Stamp, error) {
 	stamp := Stamp{Version: 1, UserID: uid, Method: method}
 	if uid == "" || (method != loginproof.Password && method != loginproof.Certificate) {
 		return Stamp{}, ErrChanged
 	}
-	err := q.QueryRowContext(ctx, `SELECT a.generation::text,p.generation::text FROM uem_session_account_generations a CROSS JOIN uem_session_method_generations p WHERE a.user_id=$1 AND p.method=$2`, uid, method).Scan(&stamp.Account, &stamp.Policy)
+	err := q.QueryRowContext(ctx, `SELECT a.`+column+`::text,p.generation::text FROM uem_session_account_generations a CROSS JOIN uem_session_method_generations p WHERE a.user_id=$1 AND p.method=$2`, uid, method).Scan(&stamp.Account, &stamp.Policy)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Stamp{}, ErrChanged
 	}

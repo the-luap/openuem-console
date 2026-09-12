@@ -42,7 +42,7 @@ func TestCertificateMFARechecksRegistryAfterFactorVerification(t *testing.T) {
 					registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
 					f.manager.Put(ctx, "twofa", false)
 					f.manager.Put(ctx, "authentication-pending", true)
-					f.manager.Put(ctx, loginproof.SessionKey, loginproof.New(f.user.ID, loginproof.Certificate, string(credential.Leaf.Raw), time.Now()))
+					f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
 					f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 					if _, _, err := f.manager.Commit(ctx); err != nil {
 						t.Fatal(err)
@@ -173,7 +173,7 @@ func TestCertificatePendingSessionRechecksRegistry(t *testing.T) {
 			registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
 			f.manager.Put(ctx, "twofa", false)
 			f.manager.Put(ctx, "authentication-pending", true)
-			f.manager.Put(ctx, loginproof.SessionKey, loginproof.New(f.user.ID, loginproof.Certificate, string(credential.Leaf.Raw), time.Now()))
+			f.manager.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, f.user, credential.Leaf, time.Now()))
 			f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 			var err error
 			if unavailable {

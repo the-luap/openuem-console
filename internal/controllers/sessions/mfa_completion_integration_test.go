@@ -1,6 +1,7 @@
 package sessions_test
 
 import (
+	"crypto/x509"
 	"io"
 	"log"
 	"net/http"
@@ -75,14 +76,14 @@ func TestMFACompletionRejectsSecretReplacementDuringAdmission(t *testing.T) {
 					}
 					sm.Put(ctx, "uid", u.ID)
 					sm.Put(ctx, "authentication-pending", true)
-					primaryCredential := u.Hash
+					var primaryCertificate *x509.Certificate
 					if method == loginproof.Certificate {
 						_, credential := ownedConsoleCertificate(t, u.ID)
 						registerOwnedConsoleCertificate(t, f, credential.Leaf)
-						primaryCredential = string(credential.Leaf.Raw)
+						primaryCertificate = credential.Leaf
 						sm.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
 					}
-					sm.Put(ctx, loginproof.SessionKey, loginproof.New(u.ID, method, primaryCredential, time.Now()))
+					sm.Put(ctx, loginproof.SessionKey, ownedLocalPrimary(t, f.model, u, primaryCertificate, time.Now()))
 					token, _, err := sm.Commit(ctx)
 					if err != nil {
 						t.Fatal(err)

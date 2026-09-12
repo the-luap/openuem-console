@@ -52,6 +52,19 @@ func (m *Model) CheckLocalSession(ctx context.Context, expected *ent.User, metho
 	return m.admitLocalSignIn(ctx, expected, method, LocalSignInCurrentSession, nil, nil, generation, nil)
 }
 
+func (m *Model) BeginLocalMFA(ctx context.Context, expected *ent.User, method string, cert *x509.Certificate) (string, error) {
+	var issued string
+	err := m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, "", &issued)
+	return issued, err
+}
+
+func (m *Model) CheckLocalPrimary(ctx context.Context, expected *ent.User, method string, cert *x509.Certificate, generation string) error {
+	if generation == "" {
+		return ErrLocalSignIn
+	}
+	return m.admitLocalSignIn(ctx, expected, method, LocalSignInPendingMFA, nil, cert, generation, nil)
+}
+
 func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence, cert *x509.Certificate, generation string, issued *string) error {
 	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInCurrentSession {
 		return ErrLocalSignIn
@@ -133,6 +146,11 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 	if stage == LocalSignInPendingMFA && !mfa {
 		return ErrLocalSignIn
 	}
+	if stage == LocalSignInPendingMFA && generation != "" {
+		if err = checkPrimaryGeneration(ctx, tx, expected.ID, method, cert, generation); err != nil {
+			return err
+		}
+	}
 	if stage == LocalSignInComplete {
 		// TOTP and backup-code verification must still refer to the same
 		// enrollment when admission commits. Handlers retain stored ciphertext.
@@ -140,6 +158,13 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 			return ErrLocalSignIn
 		}
 		if mfa {
+			primary, err := evidence.PrimaryGeneration(expected.ID, method, time.Now())
+			if err != nil {
+				return err
+			}
+			if err = checkPrimaryGeneration(ctx, tx, expected.ID, method, cert, primary); err != nil {
+				return err
+			}
 			credential := ""
 			if method == loginproof.Password {
 				credential = loginproof.Digest(hash)
@@ -158,7 +183,11 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 	}
 	var stamp sessiongeneration.Stamp
 	if issued != nil {
-		stamp, err = sessiongeneration.Current(ctx, tx, expected.ID, method)
+		if stage == LocalSignInPendingMFA {
+			stamp, err = sessiongeneration.CurrentPrimary(ctx, tx, expected.ID, method)
+		} else {
+			stamp, err = sessiongeneration.Current(ctx, tx, expected.ID, method)
+		}
 		if err != nil {
 			return err
 		}
@@ -177,6 +206,33 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 	}
 	if issued != nil {
 		*issued = stamp.Encode()
+	}
+	return nil
+}
+
+func checkPrimaryGeneration(ctx context.Context, tx *sql.Tx, uid, method string, cert *x509.Certificate, generation string) error {
+	previous, err := sessiongeneration.Read(generation, uid, method)
+	if err != nil {
+		return ErrLocalSignIn
+	}
+	current, err := sessiongeneration.CurrentPrimary(ctx, tx, uid, method)
+	if err != nil {
+		return err
+	}
+	if previous.Account != current.Account || previous.Policy != current.Policy {
+		return ErrLocalSignIn
+	}
+	if method == loginproof.Certificate {
+		if cert == nil || cert.SerialNumber == nil {
+			return ErrLocalSignIn
+		}
+		certificate, err := sessiongeneration.CurrentCertificate(ctx, tx, cert.SerialNumber.Int64())
+		if err != nil {
+			return err
+		}
+		if previous.Certificate != certificate {
+			return ErrLocalSignIn
+		}
 	}
 	return nil
 }

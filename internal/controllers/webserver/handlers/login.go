@@ -269,7 +269,16 @@ func (h *Handler) Register2FA(c echo.Context) error {
 		}
 	}
 
-	if err := h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret); err != nil {
+	if user.Openid {
+		err = h.Model.SaveTOTPSecretKey(c.Request().Context(), user, totpSecret)
+	} else {
+		primary, authErr := h.localMFAAuthorization(c, user)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.StagePrimaryTOTPSecret(c.Request().Context(), user, totpSecret, primary)
+	}
+	if err != nil {
 		return mfaMutationError(err)
 	}
 
@@ -314,7 +323,16 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 	}
 
 	// Save recovery codes
-	if err := h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes); err != nil {
+	if user.Openid {
+		err = h.Model.SaveRecoveryCodes(c.Request().Context(), user, codes)
+	} else {
+		primary, authErr := h.localMFAAuthorization(c, user)
+		if authErr != nil {
+			return mfaMutationError(authErr)
+		}
+		err = h.Model.ConfirmPrimaryMFA(c.Request().Context(), user, codes, primary)
+	}
+	if err != nil {
 		return mfaMutationError(err)
 	}
 
@@ -476,8 +494,12 @@ func (h *Handler) LoginForgotPass(c echo.Context) error {
 }
 
 func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
-	return h.establishUserSession(c, user, false, map[string]any{loginproof.SessionKey: loginproof.New(user.ID, loginproof.Password, user.Hash, time.Now()), "authentication-pending": true}, func(ctx context.Context) error {
-		return h.Model.AdmitLocalSignIn(ctx, user, loginproof.Password, models.LocalSignInPendingMFA)
+	return h.establishUserSession(c, user, false, map[string]any{"authentication-pending": true}, func(ctx context.Context) error {
+		generation, err := h.Model.BeginLocalMFA(ctx, user, loginproof.Password, nil)
+		if err == nil {
+			h.SessionManager.Manager.Put(ctx, loginproof.SessionKey, loginproof.NewLocal(user.ID, loginproof.Password, user.Hash, generation, time.Now()))
+		}
+		return err
 	})
 }
 
