@@ -53,6 +53,9 @@ func TestLocalSessionRejectsChangedAccountAndMethodPolicy(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
+				if !password {
+					stampOwnedLocalCertificateSession(t, f, ctx)
+				}
 				switch change {
 				case "revoked":
 					err = f.user.Update().SetRegister(nats.REGISTER_REVOKED).Exec(t.Context())
@@ -155,6 +158,13 @@ func localSessionRequest(f accountPasswordFixture, ctx context.Context) (bool, e
 	return admitted, err
 }
 
+func stampOwnedLocalCertificateSession(t *testing.T, f accountPasswordFixture, ctx context.Context) {
+	t.Helper()
+	_, credential := ownedConsoleCertificate(t, f.user.ID)
+	registerOwnedConsoleCertificate(t, f.sessionFixture, credential.Leaf)
+	f.manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(credential.Leaf))
+}
+
 func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {
 	for _, encrypted := range []bool{false, true} {
 		for _, password := range []bool{false, true} {
@@ -162,6 +172,9 @@ func TestLocalSessionCurrentPolicyPreservesValidAndPendingFlows(t *testing.T) {
 				name := sessionMode(encrypted) + "/" + map[bool]string{false: "certificate", true: "password"}[password] + "/" + map[bool]string{false: "single factor", true: "MFA"}[mfa]
 				t.Run(name, func(t *testing.T) {
 					f, ctx := prepareLocalSession(t, password, encrypted, mfa)
+					if !password {
+						stampOwnedLocalCertificateSession(t, f, ctx)
+					}
 					for range 2 {
 						if admitted, err := localSessionRequest(f, ctx); err != nil || !admitted {
 							t.Fatal("valid local session was denied", err)
@@ -315,6 +328,9 @@ func TestLocalSessionPolicyRetirementThroughRegisteredRoute(t *testing.T) {
 		for _, password := range []bool{false, true} {
 			t.Run(sessionMode(encrypted)+"/"+map[bool]string{false: "certificate", true: "password"}[password], func(t *testing.T) {
 				f, ctx := prepareLocalSession(t, password, encrypted, true)
+				if !password {
+					stampOwnedLocalCertificateSession(t, f, ctx)
+				}
 				if _, _, err := f.manager.Commit(ctx); err != nil {
 					t.Fatal(err)
 				}

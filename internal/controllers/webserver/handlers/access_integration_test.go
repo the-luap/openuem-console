@@ -3,7 +3,12 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,9 +20,11 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent/certificate"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
 	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 )
@@ -41,6 +48,33 @@ func stampOwnedConsoleSession(t *testing.T, h *Handler, ctx context.Context, uid
 	h.SessionManager.Manager.Put(ctx, "uid", uid)
 	h.SessionManager.Manager.Put(ctx, "usepasswd", u.Passwd)
 	h.SessionManager.Manager.Put(ctx, sessiongeneration.SessionKey, stamp.Encode())
+	if !u.Passwd {
+		public, private, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		serial, err := rand.Int(rand.Reader, big.NewInt(1<<62))
+		if err != nil {
+			t.Fatal(err)
+		}
+		serial.Add(serial, big.NewInt(1))
+		now := time.Now()
+		leaf := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: uid}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
+		der, err := x509.CreateCertificate(rand.Reader, leaf, leaf, public, private)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, err := x509.ParseCertificate(der)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = h.Model.Client.Certificate.Create().SetID(serial.Int64()).SetUID(uid).SetType(certificate.TypeUser).SetExpiry(parsed.NotAfter).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		h.SessionManager.Manager.Put(ctx, clientidentity.SessionCertificateKey, clientidentity.EncodeSessionCertificate(parsed))
+	} else {
+		h.SessionManager.Manager.Remove(ctx, clientidentity.SessionCertificateKey)
+	}
 }
 
 // This runs on the complete real console router and the real Ent/Apple schemas,

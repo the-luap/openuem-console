@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Completed certificate sessions now retain their original public TLS certificate
+  through single-factor, TOTP and backup-code admission. Protected requests check
+  its lifetime and exact current registry ownership, purpose, expiry and local
+  revocation under the existing admission locks, alongside account/method
+  generations. Invalid or missing evidence retires the token; temporary registry
+  failure returns HTTP 503 and preserves a valid retry. Twenty-four owned
+  mutual-TLS/signed-OCSP baseline cases retained access after registry changes,
+  and an additional completed session outlived its actual certificate. All are
+  denied now. Tests cover published evidence reloading, malformed/foreign/missing
+  evidence, committed/rolled-back/canceled registry waits, fresh processes,
+  storage recovery and durable retirement. Focused certificate/local-policy
+  races pass in 40.102 seconds; the full session race suite passes in 127.650
+  seconds, and the full session suite also passes in an actual Linux ARM64
+  container. Auth/proof/router races, actual Linux console/OpenID routes and
+  the full Linux build pass. Existing completed certificate sessions without DER
+  must sign in again. Issuer/key identity, periodic OCSP refresh, CA rotation and
+  certificate-record generations remain broader work. See
+  [completed certificate sessions](session-storage.md#completed-certificate-sessions).
+
 - CI exposed missing `loginproof` inputs in the restricted gateway, ACME and
   release-tool container builds after certificate evidence introduced that
   dependency. Each build context and copy list now includes the package; gateway

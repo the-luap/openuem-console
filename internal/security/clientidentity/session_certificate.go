@@ -25,11 +25,22 @@ func EncodeSessionCertificate(cert *x509.Certificate) string {
 // ReadSessionCertificate binds the retained public certificate to the exact
 // first-factor proof and checks its lifetime before a pending MFA step.
 func ReadSessionCertificate(raw, uid, credential string, now time.Time) (*x509.Certificate, error) {
+	cert, err := DecodeSessionCertificate(raw, uid, now)
+	if err != nil || credential != loginproof.Digest(string(cert.Raw)) {
+		return nil, ErrCertificateBinding
+	}
+	return cert, nil
+}
+
+// DecodeSessionCertificate reads a public certificate retained by successful TLS
+// admission. Completed sessions keep this evidence independently of the shorter
+// pending primary proof. Callers must also check current registry authorization.
+func DecodeSessionCertificate(raw, uid string, now time.Time) (*x509.Certificate, error) {
 	if raw == "" || len(raw) > 24<<10 {
 		return nil, ErrCertificateBinding
 	}
 	der, err := base64.StdEncoding.Strict().DecodeString(raw)
-	if err != nil || len(der) > 16<<10 || credential != loginproof.Digest(string(der)) {
+	if err != nil || len(der) > 16<<10 {
 		return nil, ErrCertificateBinding
 	}
 	cert, err := x509.ParseCertificate(der)

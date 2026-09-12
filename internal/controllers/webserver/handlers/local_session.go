@@ -48,7 +48,16 @@ func (h *Handler) validateLocalSession(ctx context.Context, c echo.Context, user
 		}
 	}
 	if stage == models.LocalSignInCurrentSession {
-		err = h.Model.CheckLocalSession(ctx, user, method, h.SessionManager.Manager.GetString(ctx, sessiongeneration.SessionKey))
+		generation := h.SessionManager.Manager.GetString(ctx, sessiongeneration.SessionKey)
+		if method == loginproof.Certificate {
+			cert, readErr := clientidentity.DecodeSessionCertificate(h.SessionManager.Manager.GetString(ctx, clientidentity.SessionCertificateKey), user.ID, time.Now())
+			if readErr != nil {
+				return h.rejectLocalSession(c)
+			}
+			err = h.Model.CheckCertificateSession(ctx, user, cert, generation)
+		} else {
+			err = h.Model.CheckLocalSession(ctx, user, method, generation)
+		}
 	} else if method != loginproof.Certificate {
 		err = h.Model.AdmitLocalSignIn(ctx, user, method, stage)
 	}

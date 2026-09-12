@@ -92,7 +92,7 @@ func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, met
 		if !certificates || passwd || expected.Passwd {
 			return ErrLocalSignIn
 		}
-		if stage == LocalSignInPendingMFA || stage == LocalSignInComplete {
+		if stage == LocalSignInPendingMFA || stage == LocalSignInComplete || stage == LocalSignInCurrentSession {
 			if err = lockUserCertificate(ctx, tx, expected.ID, cert); err != nil {
 				return err
 			}

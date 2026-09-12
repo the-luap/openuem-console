@@ -106,8 +106,9 @@ the server-side session, bounded to 16 KiB. Its exact digest must match the
 primary proof; user identity, client-auth usage, serial and lifetime must remain
 valid. Public MFA authorization, the pending console challenge and final TOTP or
 backup-code admission recheck the registry. The final transaction also binds MFA
-evidence to the certificate digest. No private key is retained. The public
-certificate is discarded with pending state after successful completion.
+evidence to the certificate digest. No private key is retained. Successful
+completion retains the public certificate for subsequent protected requests,
+while discarding the consumed primary proof and other pending state.
 Older pending certificate sessions without this evidence must restart sign-in.
 All older console/authentication writers must stop before upgrade.
 
@@ -120,12 +121,47 @@ failure. Certificate parsing tests cover proof mismatch, malformed/oversized
 data, invalid serials and lifetime boundaries. Existing successful mutual-TLS,
 MFA and failure-cleanup fixtures now register their owned user certificates.
 
-These checks govern initial and pending/final MFA admission. Completed sessions
-still need original-certificate lifetime/revocation/rotation binding; the current
-local policy checks below do not retain the original certificate. The legacy
-registry also lacks issuer/key and account-generation identifiers. Certificate
-reissue, CA rotation and account deletion/recreation need those additional
-bindings before the full credential-lifecycle roadmap can be closed.
+Completed sessions repeat these registry checks as described below. The legacy
+registry still lacks issuer/key and certificate-generation identifiers. Certificate
+reissue, CA rotation and lifecycle identity remain broader work; completed local
+account deletion/recreation is separately covered by account generations.
+
+## Completed certificate sessions
+
+Successful certificate admission retains the exact public DER certificate in the
+new session, both without MFA and after TOTP or backup-code completion. It is
+saved before the cookie is published. The consumed primary proof is removed;
+completed sessions do not depend on that proof's shorter lifetime. No certificate
+is accepted from browser forms or headers as a replacement for this stored TLS
+evidence.
+
+Every protected certificate-session request decodes the bounded evidence and
+checks its account, client-auth purpose, serial and validity. The same local
+policy transaction then verifies account/method generations and the original
+certificate's exact current owner, purpose, expiry and local revocation state.
+Configuration/account locks precede the short revocation-table and certificate-row
+locks. The certificate lifetime is checked again before the transaction commits.
+The generic local-session model call cannot authorize a certificate session
+without its certificate.
+
+Missing/malformed evidence, an expired certificate or invalid registry state
+returns HTTP 401 and retires the session with permanent token receipts. Temporary
+registry errors or canceled waits return generic HTTP 503 without discarding
+otherwise valid evidence; rollback and recovery permit retry. Existing completed
+certificate sessions without retained DER must sign in again after upgrade.
+
+The owned baseline retained access in twenty-four changed-registry cases across
+both storage modes and all three factor paths, plus one actual certificate-expiry
+case. Tests now cover those denials, published evidence reloading, invalid stored
+evidence, committed/rolled-back/canceled ownership and revocation waits, unavailable
+storage and retry, fresh-process validation and permanent session retirement.
+Actual role/router fixtures explicitly retain owned certificate evidence too.
+
+These request checks use the local revocation registry; they do not periodically
+refresh OCSP or reverify the current issuer trust chain. Issuer/key identity,
+CA rotation, certificate-record generations and a registry change fully restored
+before any request remain separate lifecycle work. An already admitted domain
+operation still needs authorization inside its own transaction.
 
 ## Current local session policy
 
@@ -167,8 +203,8 @@ retirement in both storage modes. Synthetic role/browser fixtures now declare
 completed certificate accounts and the same method flag written by real sign-in.
 
 The generation checks below also bind completed sessions to the account and
-method state at admission. Original certificate expiry/revocation/rotation remains
-separate. Request-time checks cannot recall a domain action already admitted
+method state at admission. Certificate sessions additionally retain their original
+certificate and recheck the current registry. Request-time checks cannot recall a domain action already admitted
 before a later policy change; domain transactions must still enforce their own
 authorization boundaries.
 
@@ -223,8 +259,9 @@ processes and failed final session persistence with a valid retry.
 This stamps completed local sessions. Pending primary proofs still use their
 existing credential, lifetime and certificate-registry checks; they do not yet
 carry independent account/method generation stamps. OpenID uses its separate
-live policy and binding-revision checks. Original certificate lifetime, registry
-changes after completed sign-in, issuer/key identity and rotation remain open.
+live policy and binding-revision checks. Completed certificate sessions also check
+their original lifetime and current registry; issuer/key identity, certificate
+generations and rotation remain open.
 
 ## Password replacement policy
 

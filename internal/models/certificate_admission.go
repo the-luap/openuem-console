@@ -22,6 +22,12 @@ func (m *Model) AdmitCertificateSignIn(ctx context.Context, expected *ent.User, 
 	return m.admitLocalSignIn(ctx, expected, loginproof.Certificate, stage, evidence, cert, "", nil)
 }
 
+// CheckCertificateSession rechecks the original TLS certificate and current
+// generation under the same source locks used by final certificate admission.
+func (m *Model) CheckCertificateSession(ctx context.Context, expected *ent.User, cert *x509.Certificate, generation string) error {
+	return m.admitLocalSignIn(ctx, expected, loginproof.Certificate, LocalSignInCurrentSession, nil, cert, generation, nil)
+}
+
 func lockUserCertificate(ctx context.Context, tx *sql.Tx, uid string, cert *x509.Certificate) error {
 	if !clientidentity.CurrentUserCertificate(cert, uid, time.Now()) {
 		return ErrLocalSignIn

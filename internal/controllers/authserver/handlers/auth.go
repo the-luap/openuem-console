@@ -57,11 +57,11 @@ func (h *Handler) Auth(c echo.Context) error {
 	values := map[string]any{
 		"uid": user.ID, "username": user.Name, "email": user.Email, "usepasswd": user.Passwd, "twofa": false,
 		"user-agent": c.Request().UserAgent(), "ip-address": c.Request().RemoteAddr,
+		clientidentity.SessionCertificateKey: clientidentity.EncodeSessionCertificate(cert),
 	}
 	if user.Use2fa {
 		values["authentication-pending"] = true
 		values[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.Certificate, string(cert.Raw), time.Now())
-		values[clientidentity.SessionCertificateKey] = clientidentity.EncodeSessionCertificate(cert)
 	}
 	if err := h.SessionManager.Establish(c.Request().Context(), c.Response().Writer, values, func(ctx context.Context, token string) error {
 		if err := h.Model.AddUserToSession(ctx, token, uid, h.EncryptionMasterKey); err != nil {

@@ -332,7 +332,7 @@ func TestCertificateSessionAdmissionWithOwnedMutualTLS(t *testing.T) {
 	}
 }
 
-func ownedConsoleCertificate(t *testing.T, uid string) (*x509.Certificate, tls.Certificate) {
+func ownedConsoleCertificate(t *testing.T, uid string, expires ...time.Time) (*x509.Certificate, tls.Certificate) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -362,6 +362,9 @@ func ownedConsoleCertificate(t *testing.T, uid string) (*x509.Certificate, tls.C
 		t.Fatal(err)
 	}
 	leaf := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: uid}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, OCSPServer: []string{responder.URL}}
+	if len(expires) > 0 {
+		leaf.NotAfter = expires[0]
+	}
 	der, err = x509.CreateCertificate(rand.Reader, leaf, ca, &leafKey.PublicKey, key)
 	if err != nil {
 		t.Fatal(err)

@@ -50,8 +50,8 @@ func (h *Handler) establishUserSession(c echo.Context, user *ent.User, secondFac
 	})
 }
 
-// MFA completion may retain only an OpenID identity which still belongs to this
-// account and passes current binding/policy validation. Other old state is cleared.
+// MFA completion retains only the validated OpenID identity or original public
+// TLS certificate needed for subsequent authorization. Other old state is cleared.
 func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFactor bool, evidence *mfaadmission.Evidence) error {
 	if secondFactor != (evidence != nil) || user.Use2fa != secondFactor {
 		return mfaadmission.ErrRejected
@@ -86,6 +86,7 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 		if err != nil {
 			return err
 		}
+		extra = map[string]any{clientidentity.SessionCertificateKey: clientidentity.EncodeSessionCertificate(cert)}
 		confirm = func(ctx context.Context) error {
 			generation, err := h.Model.CompleteLocalSession(ctx, user, method, cert, evidence)
 			if err == nil {
