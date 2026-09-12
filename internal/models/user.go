@@ -3,6 +3,9 @@ package models
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +14,7 @@ import (
 
 	"github.com/alexedwards/argon2id"
 	ent "github.com/open-uem/ent"
+	"github.com/open-uem/ent/predicate"
 	"github.com/open-uem/ent/recoverycode"
 	"github.com/open-uem/ent/sessions"
 	"github.com/open-uem/ent/user"
@@ -239,14 +243,35 @@ func (m *Model) GetUserById(uid string) (*ent.User, error) {
 
 var ErrEmailConfirmationState = errors.New("account is not awaiting email confirmation")
 
-func (m *Model) ConfirmEmail(ctx context.Context, uid string) error {
+func emailConfirmationAccount(uid string) []predicate.User {
+	return []predicate.User{user.ID(uid), user.EmailVerified(false), user.Openid(false), user.Passwd(false), user.Register("users.pending_email_confirmation")}
+}
+
+func (m *Model) PendingEmailConfirmation(ctx context.Context, uid string) (*ent.User, error) {
+	return m.Client.User.Query().Where(emailConfirmationAccount(uid)...).Only(ctx)
+}
+
+func EmailConfirmationBinding(account *ent.User) string {
+	if account == nil {
+		return ""
+	}
+	encoded, _ := json.Marshal([]string{account.ID, account.Email, account.Created.UTC().Format(time.RFC3339Nano)})
+	digest := sha256.Sum256(encoded)
+	return hex.EncodeToString(digest[:])
+}
+
+func (m *Model) ConfirmEmail(ctx context.Context, account *ent.User) error {
+	if account == nil {
+		return ErrEmailConfirmationState
+	}
 	tx, err := m.Client.Tx(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	updated, err := tx.User.Update().
-		Where(user.ID(uid), user.EmailVerified(false), user.Openid(false), user.Passwd(false), user.Register("users.pending_email_confirmation")).
+		Where(emailConfirmationAccount(account.ID)...).
+		Where(user.Email(account.Email), user.CreatedEQ(account.Created)).
 		SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_SEND_CERTIFICATE).Save(ctx)
 	if err != nil {
 		return err

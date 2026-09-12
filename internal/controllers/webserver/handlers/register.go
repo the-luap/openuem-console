@@ -192,14 +192,17 @@ func (h *Handler) SendRegister(c echo.Context) error {
 }
 
 func (h *Handler) generateEmailToken(uid string, subject string, hours int) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.RegisteredClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, emailTokenClaims(uid, subject, hours))
+	return token.SignedString([]byte(h.JWTKey))
+}
+
+func emailTokenClaims(uid, subject string, hours int) jwt.RegisteredClaims {
+	return jwt.RegisteredClaims{
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(hours) * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		NotBefore: jwt.NewNumericDate(time.Now()),
 		Issuer:    "OpenUEM",
 		Subject:   subject,
 		ID:        uid,
-	})
-
-	return token.SignedString([]byte(h.JWTKey))
+	}
 }

@@ -22,6 +22,10 @@ func CSRF() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			original := c.Request()
+			if c.Path() == "/auth/confirm/:token" || strings.HasPrefix(original.URL.Path, "/auth/confirm/") {
+				c.Response().Header().Set("Cache-Control", "no-store")
+				c.Response().Header().Set("Referrer-Policy", "no-referrer")
+			}
 			switch original.Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 			default:
@@ -41,7 +45,7 @@ func CSRF() echo.MiddlewareFunc {
 				// the HTMX header and retain the configured global upload limit.
 				limit := int64(4 << 20)
 				route := strings.TrimPrefix(strings.TrimPrefix(c.Path(), "/tenant/:tenant/site/:site"), "/tenant/:tenant")
-				if route == "/myaccount/language" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
+				if route == "/auth/confirm/:token" || route == "/myaccount/language" || route == "/windows" || strings.HasPrefix(route, "/windows/") {
 					limit = 8192
 				}
 				request.Body = http.MaxBytesReader(c.Response(), request.Body, limit)

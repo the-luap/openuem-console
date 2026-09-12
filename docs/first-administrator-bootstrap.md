@@ -96,6 +96,9 @@ login/password-change workflow, then verifies login without the initial mount.
 
 ## Password replacement authorization
 
+For certificate accounts, [email confirmation](account-email-confirmation.md)
+uses a recipient-bound link, a read-only preview and explicit POST confirmation.
+
 The real console password-change route now requires a verified server-session
 proof. Starting email recovery identifies the account but cannot authorize a
 password change. A correct initial password, a verified unexpired recovery code,

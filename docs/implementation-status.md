@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Certificate-account email confirmation](account-email-confirmation.md) now
+  uses a read-only GET preview and explicit CSRF-protected POST. The registered
+  endpoint rejects other methods instead of reaching the protected fallback;
+  privacy headers also cover requests rejected by CSRF middleware. Native forms
+  have one body token, no query arguments and an 8 KiB bound, including chunked,
+  header-authenticated and already parsed input. New signed proofs bind the exact
+  recipient and stored account creation time; old unbound links need a resend.
+  Preview and mutation reject changed addresses and recreated account IDs, and
+  the transaction checks the same address/creation snapshot again. The sender
+  reloads the database snapshot before signing to preserve timestamp precision.
+  Registered-router, proof and recipient tests pass, as do PostgreSQL commit,
+  rollback, deadline/retry and concurrent-address-change tests. Linux handler,
+  CSRF, model and locale race tests passed without external network access. Six
+  isolated Chrome checks cover preview/completion at 390, 768 and 1440 px,
+  keyboard submission and no page overflow. Completion copy now reflects account
+  setup rather than promising an obsolete review step. Persistent issued-token
+  replacement and permanent invalidation after restored account changes remain
+  open; these tests do not establish real SMTP or administrator PKI acceptance.
+
 - Email-confirmation admission now requires the generated HS512 token purpose,
   OpenUEM issuer, account ID, issue time and an unexpired lifetime of at most
   24 hours. Empty signing configuration, malformed/oversized input and missing
@@ -75,9 +94,9 @@ the table's package summaries do not remove any detail from the roadmap.
   PostgreSQL row-lock tests cover committed revocation, rollback, request deadline
   and retry; they additionally reproduced and fixed an autocommit update that
   persisted after client cancellation. Full Linux handler/model/locale race tests
-  pass without external network access. The current GET still performs the
-  confirmation; explicit POST confirmation and durable recipient/token binding
-  remain the next work, so this is not complete account-invitation acceptance.
+  pass without external network access. At that stage GET still performed the
+  confirmation. The subsequent flow above adds explicit POST confirmation and
+  recipient binding; durable issued-token revocation remains open.
 
 - Account confirmation and initial-password notifications now use the configured
   console origin for public, proxy and direct installations. Empty or foreign
@@ -89,8 +108,8 @@ the table's package summaries do not remove any detail from the roadmap.
   pass on Darwin and Linux with race checks, verifying recipient, route, stored
   invitation, encryption and signed token subject/issuer/expiry. The Linux test
   container had no external network access and also passed the entire model suite.
-  No notification was delivered to a real mailbox; email-confirmation token
-  admission and its account-state binding remain a separate review.
+  No notification was delivered to a real mailbox. Subsequent confirmation-token
+  admission and recipient-binding changes are recorded separately above.
 
 - The two outstanding upstream user-test failures were reproduced and corrected
   without changing account behavior. The OpenID creation fixture now selects

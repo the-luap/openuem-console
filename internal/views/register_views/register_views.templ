@@ -355,9 +355,23 @@ templ RegisterSuccesful() {
 	</main>
 }
 
+templ EmailConfirmation(address, csrfToken, action string) {
+	<main id="main" class="flex items-center justify-center min-h-screen p-4">
+		<section class="uk-card uk-card-body uk-card-default w-full" style="max-width:28rem">
+			<h1 class="text-2xl font-bold">{ i18n.T(ctx, "authentication.email_confirmation_title") }</h1>
+			<p class="my-4" style="overflow-wrap:anywhere">{ i18n.T(ctx, "authentication.email_confirmation_address", address) }</p>
+			<p class="my-4">{ i18n.T(ctx, "authentication.email_confirmation_check") }</p>
+			<form method="post" action={ templ.URL(action) }>
+				<input type="hidden" name="csrf" value={ csrfToken }/>
+				<button type="submit" class="uk-button uk-button-primary w-full">{ i18n.T(ctx, "authentication.email_confirmation_submit") }</button>
+			</form>
+		</section>
+	</main>
+}
+
 templ EmailConfirmed() {
-	<main id="main" class="flex items-center justify-center h-screen">
-		<div class="uk-card uk-card-body uk-card-default w-1/4">
+	<main id="main" class="flex items-center justify-center min-h-screen p-4">
+		<div class="uk-card uk-card-body uk-card-default w-full" style="max-width:28rem">
 			<div class="flex flex-col gap-4">
 				<img
 					src="/assets/img/openuem.png"
@@ -366,14 +380,14 @@ templ EmailConfirmed() {
 				/>
 				<div class="gap-2 text-center">
 					<h1 class="text-2xl font-bold">{ i18n.T(ctx, "register.email_confirmed") }</h1>
-					<p class="text-justify text-muted-foreground my-2">
-						{ i18n.T(ctx, "register.email_confirmed_description") }
+					<p class="text-muted-foreground my-2">
+						{ i18n.T(ctx, "authentication.email_confirmation_complete") }
 					</p>
 				</div>
 				<div class="flex justify-center uk-margin w-full">
 					<a
 						href="/"
-						class="uk-button uk-button-primary text-white mt-6 mb-2"
+						class="uk-button uk-button-primary mt-6 mb-2"
 						type="button"
 						disabled
 					>

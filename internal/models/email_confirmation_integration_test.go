@@ -36,16 +36,22 @@ func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
 	m, err := New(u.String(), "pgx", "example.test")
 	require.NoError(t, err)
 	defer m.Close()
-	for _, outcome := range []string{"commit", "rollback", "deadline"} {
+	for _, outcome := range []string{"commit", "rollback", "deadline", "address"} {
 		t.Run(outcome, func(t *testing.T) {
 			uid := "confirmation-" + outcome
 			require.NoError(t, m.Client.User.Create().SetID(uid).SetName(uid).SetEmail(uid+"@example.test").Exec(t.Context()))
+			account, err := m.PendingEmailConfirmation(t.Context(), uid)
+			require.NoError(t, err)
 			tx, err := m.DB.BeginTx(t.Context(), nil)
 			require.NoError(t, err)
 			defer tx.Rollback()
 			var holder int
 			require.NoError(t, tx.QueryRowContext(t.Context(), `SELECT pg_backend_pid()`).Scan(&holder))
-			_, err = tx.ExecContext(t.Context(), `UPDATE users SET register=$1 WHERE uid=$2`, openuem.REGISTER_REVOKED, uid)
+			if outcome == "address" {
+				_, err = tx.ExecContext(t.Context(), `UPDATE users SET email=$1 WHERE uid=$2`, "changed@example.test", uid)
+			} else {
+				_, err = tx.ExecContext(t.Context(), `UPDATE users SET register=$1 WHERE uid=$2`, openuem.REGISTER_REVOKED, uid)
+			}
 			require.NoError(t, err)
 			wait := 10 * time.Second
 			if outcome == "deadline" {
@@ -54,7 +60,7 @@ func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), wait)
 			defer cancel()
 			result := make(chan error, 1)
-			go func() { result <- m.ConfirmEmail(ctx, uid) }()
+			go func() { result <- m.ConfirmEmail(ctx, account) }()
 			// Observe the real row-lock wait before releasing or timing out the
 			// request. The result must use the state committed by the blocker.
 			var blocked int
@@ -66,7 +72,7 @@ func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
 			}
 			require.Positive(t, blocked, "confirmation did not reach the owned account lock")
 			switch outcome {
-			case "commit":
+			case "commit", "address":
 				require.NoError(t, tx.Commit())
 			case "rollback":
 				require.NoError(t, tx.Rollback())
@@ -77,7 +83,7 @@ func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
 				t.Fatal("confirmation did not release its database operation")
 			}
 			switch outcome {
-			case "commit":
+			case "commit", "address":
 				require.ErrorIs(t, err, ErrEmailConfirmationState)
 			case "rollback":
 				require.NoError(t, err)
@@ -91,12 +97,16 @@ func TestEmailConfirmationPostgresTransitionAndDeadline(t *testing.T) {
 			require.Equal(t, outcome == "rollback", after.EmailVerified)
 			if outcome == "commit" {
 				require.Equal(t, openuem.REGISTER_REVOKED, after.Register)
+			} else if outcome == "address" {
+				require.Equal(t, "changed@example.test", after.Email)
+				require.Equal(t, "users.pending_email_confirmation", after.Register)
+				require.ErrorIs(t, m.ConfirmEmail(t.Context(), account), ErrEmailConfirmationState)
 			} else if outcome == "rollback" {
 				require.Equal(t, openuem.REGISTER_SEND_CERTIFICATE, after.Register)
-				require.ErrorIs(t, m.ConfirmEmail(t.Context(), uid), ErrEmailConfirmationState)
+				require.ErrorIs(t, m.ConfirmEmail(t.Context(), account), ErrEmailConfirmationState)
 			} else {
 				require.Equal(t, "users.pending_email_confirmation", after.Register)
-				require.NoError(t, m.ConfirmEmail(t.Context(), uid), "cancelled statement must leave confirmation retryable")
+				require.NoError(t, m.ConfirmEmail(t.Context(), account), "cancelled statement must leave confirmation retryable")
 			}
 		})
 	}

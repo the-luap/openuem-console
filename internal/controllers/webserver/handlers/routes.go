@@ -25,7 +25,9 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/tenant/:tenant/site/:site", h.Dashboard, h.IsAuthenticated)
 
 	e.GET("/auth", h.Auth)
-	e.GET("/auth/confirm/:token", h.ConfirmEmail)
+	// The handler explicitly rejects every method except GET and POST so
+	// unsupported methods cannot fall through to the protected route fallback.
+	e.Any("/auth/confirm/:token", h.ConfirmEmail)
 
 	e.GET("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
 	e.POST("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
