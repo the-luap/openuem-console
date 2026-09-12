@@ -107,11 +107,7 @@ templ AppleUpdatePlanGroupPreview(c echo.Context, info *partials.CommonInfo, pre
 						</form>
 					</div>
 				</section>
-				if profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID})=="site" {
-					@appleUpdateScheduleForm(info, preview, requestKey)
-				} else {
-					<p data-update-organization-immediate>Organization group updates apply immediately after confirmation. Scheduled assignments currently use site groups.</p>
-				}
+				@appleUpdateScheduleForm(info, preview, requestKey)
 			}
 		</main>
 	}

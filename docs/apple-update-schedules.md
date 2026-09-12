@@ -6,6 +6,8 @@ replacements. **Schedule this update** retains that review for a later start.
 Enter the absolute UTC time as `YYYY-MM-DDTHH:MM:SSZ`, an activation window of
 1–10,080 minutes, and explicitly confirm the source, selection, replacements and
 timing. The plan's update deadline remains local to each device.
+[Organization-source schedules](apple-update-organization-schedules.md) now retain
+the selected site intersection and recheck source read authority at activation.
 
 The server accepts activation up to 90 days ahead, with a one-minute past-time
 tolerance for submission. The server checks the activation window again after
@@ -17,7 +19,7 @@ Each site permits at most 256 pending schedules, including entries waiting to re
 Migration 046 stores immutable schedule identity, exact organization/site, client
 request UUID, original plan revision, creator and permission revision, creation
 time and activation window. A bounded 32 KiB authenticated encrypted intent
-retains the full original plan definition, group revision/name/rule, enabled
+retains the full original plan definition, group source scope/revision/name/rule, enabled
 inventory sources and 1–100 canonical native target IDs with their reviewed
 configured-policy tokens. The ordinary complete-group limit of 100 members still
 applies, including excluded management identities.
@@ -32,7 +34,7 @@ then serializes site admission counts and request identity. Exact retries return
 the original record before consulting mutable plan, group, device, catalog or
 server source configuration. They still require current authority and the original
 creator's permission revision. A changed actor, source revision, selection,
-policy token or timing under the same client request UUID returns a conflict.
+policy token, source kind or timing under the same client request UUID returns a conflict.
 Replaying a canceled or activated request cannot rearm it.
 
 ## Activation and atomic outcomes

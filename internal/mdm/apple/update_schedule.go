@@ -24,6 +24,7 @@ var ErrUpdateScheduleIntegrity = errors.New("Apple update schedule is unavailabl
 // UpdateSchedule retains the reviewed source and exact native selection. Its
 // activation window is an absolute instant; the plan's deadline is device-local.
 type UpdateSchedule struct {
+	GroupScope    Scope                      `json:"-" xml:"-" yaml:"-"`
 	ID            string                     `json:"-" xml:"-" yaml:"-"`
 	Scope         Scope                      `json:"-" xml:"-" yaml:"-"`
 	RequestKey    string                     `json:"-" xml:"-" yaml:"-"`
@@ -55,6 +56,7 @@ type updateStoredSchedule struct {
 	encryptedIntent, encryptedState []byte
 }
 type updateScheduleIntent struct {
+	GroupScope    *Scope `json:",omitempty"`
 	Version       int
 	Plan          updatePlanWire
 	PlanActor     string
@@ -123,8 +125,19 @@ func (s *Store) scanUpdateSchedule(row scanner) (*updateStoredSchedule, error) {
 		return nil, ErrUpdateScheduleIntegrity
 	}
 	var wire updateScheduleIntent
-	if decodeUpdateScheduleJSON(plain, &wire) != nil || wire.Version != 1 || wire.Plan.Version != 1 || !wire.Sources.Apple || !profileRevisionUUID(wire.ActivationKey) || wire.PlanCreatedAt.IsZero() || len(wire.PlanActor) < 1 || len(wire.PlanActor) > 255 || !profileRevisionUUID(wire.Group.ID) || wire.Group.Revision < 1 || wire.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: wire.Group.Name, Rule: wire.Group.Rule}).Valid() {
+	if decodeUpdateScheduleJSON(plain, &wire) != nil || (wire.Version != 1 && wire.Version != 2) || wire.Plan.Version != 1 || !wire.Sources.Apple || !profileRevisionUUID(wire.ActivationKey) || wire.PlanCreatedAt.IsZero() || len(wire.PlanActor) < 1 || len(wire.PlanActor) > 255 || !profileRevisionUUID(wire.Group.ID) || wire.Group.Revision < 1 || wire.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: wire.Group.Name, Rule: wire.Group.Rule}).Valid() {
 		return nil, ErrUpdateScheduleIntegrity
+	}
+	if wire.Version == 1 {
+		if wire.GroupScope != nil {
+			return nil, ErrUpdateScheduleIntegrity
+		}
+		r.GroupScope = r.Scope
+	} else {
+		if wire.GroupScope == nil || !validAppleGroupSourceScope(*wire.GroupScope, r.Scope) {
+			return nil, ErrUpdateScheduleIntegrity
+		}
+		r.GroupScope = *wire.GroupScope
 	}
 	d := wire.Plan
 	r.Plan.Scope, r.Plan.Actor, r.Plan.CreatedAt = r.Scope, wire.PlanActor, wire.PlanCreatedAt
@@ -151,7 +164,10 @@ func (s *Store) scanUpdateSchedule(row scanner) (*updateStoredSchedule, error) {
 }
 func (s *Store) sealUpdateScheduleIntent(r *updateStoredSchedule) error {
 	d := r.Plan.Definition
-	wire := updateScheduleIntent{Version: 1, Plan: updatePlanWire{Version: 1, Name: d.Name, Description: d.Description, Platform: d.Platform, TargetVersion: d.TargetVersion, TargetBuild: d.TargetBuild, Deadline: d.Deadline, DetailsURL: d.DetailsURL, Archived: d.Archived}, PlanActor: r.Plan.Actor, PlanCreatedAt: r.Plan.CreatedAt, Sources: r.sources, ActivationKey: r.activationKey}
+	if !validAppleGroupSourceScope(r.GroupScope, r.Scope) {
+		return ErrUpdateScheduleIntegrity
+	}
+	wire := updateScheduleIntent{Version: 2, GroupScope: &r.GroupScope, Plan: updatePlanWire{Version: 1, Name: d.Name, Description: d.Description, Platform: d.Platform, TargetVersion: d.TargetVersion, TargetBuild: d.TargetBuild, Deadline: d.Deadline, DetailsURL: d.DetailsURL, Archived: d.Archived}, PlanActor: r.Plan.Actor, PlanCreatedAt: r.Plan.CreatedAt, Sources: r.sources, ActivationKey: r.activationKey}
 	wire.Group.ID, wire.Group.Revision, wire.Group.Name, wire.Group.Rule = r.Group.ID, r.Group.Revision, r.Group.Name, r.Group.Rule
 	for _, target := range r.Targets {
 		wire.Targets = append(wire.Targets, struct{ DeviceID, PolicyToken string }{target.DeviceID, target.PolicyToken})
@@ -207,6 +223,13 @@ func (s *Store) writeUpdateSchedule(ctx context.Context, tx *sql.Tx, r *updateSt
 // ScheduleUpdatePlanFromGroup saves future intent without changing device
 // policy or reserving queue slots. Exact retries return the original record.
 func (s *Store) ScheduleUpdatePlanFromGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection, notBefore time.Time, activationWindow time.Duration) (*UpdateSchedule, error) {
+	return s.scheduleUpdatePlanFromGroupSource(ctx, actor, permissions, scope, scope, sources, planID, planRevision, groupID, groupRevision, requestKey, selection, notBefore, activationWindow)
+}
+
+func (s *Store) scheduleUpdatePlanFromGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, planID string, planRevision int, groupID string, groupRevision int, requestKey string, selection []UpdatePlanGroupSelection, notBefore time.Time, activationWindow time.Duration) (*UpdateSchedule, error) {
+	if !validAppleGroupSourceScope(groupScope, scope) {
+		return nil, ErrUpdateSchedule
+	}
 	targets, err := canonicalUpdateGroupSelection(selection)
 	if err != nil || !profileRevisionUUID(planID) || planRevision < 1 || planRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || notBefore.IsZero() || notBefore.Nanosecond()%1000 != 0 || activationWindow < time.Minute || activationWindow > 7*24*time.Hour || activationWindow%time.Second != 0 {
 		return nil, ErrUpdateSchedule
@@ -222,6 +245,11 @@ func (s *Store) ScheduleUpdatePlanFromGroup(ctx context.Context, actor string, p
 	if err = updatePlanAuthority(ctx, tx, permissions, actor, scope, access.ManageUpdates); err != nil {
 		return nil, err
 	}
+	if groupScope != scope {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}); err != nil {
+			return nil, err
+		}
+	}
 	var actorRevision int64
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT revision FROM uem_access_revisions WHERE user_id=$1),0)`, actor).Scan(&actorRevision); err != nil {
 		return nil, err
@@ -232,7 +260,7 @@ func (s *Store) ScheduleUpdatePlanFromGroup(ctx context.Context, actor string, p
 	}
 	previous, err := s.scanUpdateSchedule(tx.QueryRowContext(ctx, `SELECT `+updateScheduleColumns+` FROM mdm_apple_update_schedules WHERE tenant_id=$1 AND site_id=$2 AND request_key=$3 FOR SHARE`, scope.TenantID, scope.SiteID, requestKey))
 	if err == nil {
-		if previous.Actor != actor || previous.ActorRevision != actorRevision || previous.Plan.ID != planID || previous.Plan.Revision != planRevision || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(previous.Targets, targets) || !previous.NotBefore.Equal(notBefore) || previous.ExpiresAt.Sub(previous.NotBefore) != activationWindow {
+		if previous.GroupScope != groupScope || previous.Actor != actor || previous.ActorRevision != actorRevision || previous.Plan.ID != planID || previous.Plan.Revision != planRevision || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(previous.Targets, targets) || !previous.NotBefore.Equal(notBefore) || previous.ExpiresAt.Sub(previous.NotBefore) != activationWindow {
 			return nil, ErrConflict
 		}
 		if err = s.validateUpdateScheduleAssignment(ctx, tx, previous); err != nil {
@@ -252,7 +280,7 @@ func (s *Store) ScheduleUpdatePlanFromGroup(ctx context.Context, actor string, p
 	if !sources.Apple {
 		return nil, ErrUpdateSchedule
 	}
-	preview, err := s.inspectUpdatePlanGroup(ctx, tx, actor, permissions, scope, sources, planID, planRevision, groupID, groupRevision, false)
+	preview, err := s.inspectUpdatePlanGroupSourceWithPilot(ctx, tx, actor, permissions, scope, groupScope, sources, planID, planRevision, groupID, groupRevision, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +298,7 @@ func (s *Store) ScheduleUpdatePlanFromGroup(ctx context.Context, actor string, p
 	if count >= 256 {
 		return nil, ErrUpdateScheduleFull
 	}
-	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, Plan: preview.Plan, Group: ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}, Targets: targets, Actor: actor, ActorRevision: actorRevision, NotBefore: notBefore, ExpiresAt: notBefore.Add(activationWindow), Phase: "scheduled", Revision: 1, NextAttemptAt: notBefore}, sources: sources, activationKey: uuid.NewString()}
+	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{GroupScope: Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}, ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, Plan: preview.Plan, Group: ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}, Targets: targets, Actor: actor, ActorRevision: actorRevision, NotBefore: notBefore, ExpiresAt: notBefore.Add(activationWindow), Phase: "scheduled", Revision: 1, NextAttemptAt: notBefore}, sources: sources, activationKey: uuid.NewString()}
 	if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&r.CreatedAt); err != nil {
 		return nil, err
 	}

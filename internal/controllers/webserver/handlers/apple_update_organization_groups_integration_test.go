@@ -63,7 +63,7 @@ func exerciseAppleUpdateOrganizationGroups(t *testing.T, h *Handler, ctx context
 	page := request("organization-admin", "GET", preview, nil)
 	require.Contains(t, page.Body.String(), ids[0])
 	require.Contains(t, page.Body.String(), fmt.Sprintf("/tenant/%d/device-groups/%s", tenant, group.ID))
-	require.NotContains(t, page.Body.String(), `action="`+base+`/schedules"`)
+	require.Contains(t, page.Body.String(), `action="`+base+`/schedules"`)
 	form := url.Values{}
 	for _, field := range []string{"expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices"} {
 		m := regexp.MustCompile(`name="` + field + `" value="([^"]*)"`).FindStringSubmatch(page.Body.String())
@@ -72,7 +72,7 @@ func exerciseAppleUpdateOrganizationGroups(t *testing.T, h *Handler, ctx context
 	}
 	require.Equal(t, "organization", form.Get("group_source"))
 	require.True(t, strings.HasPrefix(form.Get("devices"), ids[0]+":"))
-	require.NotContains(t, page.Body.String(), "data-update-schedule-confirm")
+	require.Contains(t, page.Body.String(), "data-update-schedule-confirm")
 	require.Equal(t, 400, request("organization-admin", "POST", base+"/group-assignments", form).Code)
 	form.Set("confirmed", "yes")
 	require.Equal(t, 403, request("scoped-operator", "POST", base+"/group-assignments", form).Code)

@@ -7,12 +7,14 @@ rule only within the selected site and shows eligible native Apple enrollments,
 current policies that would be replaced, and exclusions within that site.
 Devices belonging to other sites are outside this action.
 
-Review the complete selection and explicitly confirm the immediate assignment.
+Review the complete selection and explicitly confirm the immediate assignment,
+or save a [scheduled activation](apple-update-organization-schedules.md) for a
+future UTC window.
 The same organization rule can be used in another site after a separate review.
 This action does not continuously reconcile membership or automatically assign
 updates across sites. **Site groups** retains the existing site-group workflow.
-Scheduled assignments and pilot promotion destination selectors currently use
-site groups; an organization-source preview does not offer a schedule form.
+Organization-source previews also offer a schedule form with the same reviewed
+selection. Pilot promotion destination selectors currently use site groups.
 
 ## Scope, authority and confirmation
 
@@ -59,8 +61,10 @@ rewrite is needed. Missing, foreign or invalid version-2 source scope is rejecte
 the authenticated encrypted intent protects source scope alongside original
 plan/group metadata and target evidence. All console instances reading new
 receipts need this reader. Profile receipts keep their existing version-2 format.
-Schedule and promotion parent formats remain unchanged, and their site-only
-child contracts explicitly reject a substituted organization-source receipt.
+Schedule parent intents now retain source scope as described in
+[organization-source scheduling](apple-update-organization-schedules.md); child
+source scope must match its parent. Promotion parent formats remain unchanged
+and reject a substituted organization-source destination receipt.
 
 History and [cohort progress](apple-update-progress.md) retain the original
 organization group name, rule and revision. Original target-site authority is
@@ -101,4 +105,5 @@ physical update/restart, APNs or live provider acceptance. Linux and macOS view,
 handler, router middleware and Linux webserver race checks pass, as does the full
 Linux build.
 
-The complete Apple PostgreSQL/race suite passes in 723.608 seconds.
+The immediate-source increment's complete Apple PostgreSQL/race suite passed in
+723.608 seconds; subsequent scheduling evidence is recorded separately.

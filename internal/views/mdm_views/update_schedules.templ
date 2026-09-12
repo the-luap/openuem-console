@@ -3,6 +3,7 @@ package mdm_views
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -14,6 +15,7 @@ templ appleUpdateScheduleForm(info *partials.CommonInfo, preview apple.UpdatePla
 			<p>Save the exact reviewed selection for later activation. The plan, group, eligible devices, existing policies and your permissions are checked again when it starts. Changed inputs block the schedule and require a new review.</p>
 			<form method="post" action={ partials.GetNavigationUrl(info, UpdateSchedulePath(preview.Plan.ID)) } class="grid gap-4" data-update-schedule-confirm>
 				@CSRF(info)
+				<input type="hidden" name="group_source" value={ profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}) }/>
 				<input type="hidden" name="expected_revision" value={ Number(preview.Plan.Revision) }/><input type="hidden" name="group_id" value={ preview.Group.ID }/><input type="hidden" name="group_revision" value={ Number(preview.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="devices" value={ updatePlanGroupFields(preview) }/>
 				<label class="grid gap-2" for="update-schedule-time">
 					Activate at (UTC)
@@ -64,7 +66,7 @@ templ AppleUpdateSchedule(c echo.Context, info *partials.CommonInfo, r apple.Upd
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					@appleUpdatePlanDefinition(r.Plan)
-					@appleProfileGroupSource(info, r.Group)
+					@appleProfileAssignmentGroupSource(info, r.Group, r.GroupScope)
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
@@ -75,7 +77,7 @@ templ AppleUpdateSchedule(c echo.Context, info *partials.CommonInfo, r apple.Upd
 					}
 				</div>
 			</section>
-			if r.Phase=="scheduled" || r.Phase=="waiting" {
+			if (r.Phase=="scheduled" || r.Phase=="waiting") && info.Can(access.ManageUpdates) && info.Can(access.ReadDevices) {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-4">
 						<h2 class="uk-card-title">Cancel before activation</h2>
@@ -104,6 +106,9 @@ templ AppleUpdateSchedules(c echo.Context, info *partials.CommonInfo, plan strin
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
 						<h2 class="uk-card-title">{ r.Plan.Definition.Name } · Revision { Number(r.Plan.Revision) }</h2>
 						<p>{ r.Group.Name } · Group revision { Number(r.Group.Revision) }</p>
+						if profileGroupSourceKind(r.GroupScope)=="organization" {
+							<p>Source: organization group · Target site: { info.SiteID }</p>
+						}
 						<p>{ updateScheduleStatus(r.Phase) } · { Number(len(r.Targets)) } native Apple devices</p>
 						<p>Activate at (UTC): { r.NotBefore.UTC().Format("2006-01-02 15:04:05") }</p>
 						<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateSchedulePath(plan)+"/"+r.ID)) }>Open original schedule</a>

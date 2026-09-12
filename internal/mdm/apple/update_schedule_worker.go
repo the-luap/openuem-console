@@ -94,6 +94,9 @@ func (s *Store) processUpdateSchedule(ctx context.Context, permissions *access.S
 	// Match cancellation's lock order. Even denied authority retains the shared
 	// permission lock while its old scheduled intent is retired.
 	authorizationErr := updatePlanAuthority(ctx, tx, permissions, before.Actor, before.Scope, access.ManageUpdates)
+	if authorizationErr == nil && before.GroupScope != before.Scope {
+		authorizationErr = permissions.AuthorizeTransaction(ctx, tx, before.Actor, access.ReadDevices, access.Scope{TenantID: before.GroupScope.TenantID, SiteID: before.GroupScope.SiteID})
+	}
 	if authorizationErr != nil && !errors.Is(authorizationErr, access.ErrDenied) && !errors.Is(authorizationErr, ErrNotFound) {
 		return "", authorizationErr
 	}
@@ -149,7 +152,7 @@ func (s *Store) processUpdateSchedule(ctx context.Context, permissions *access.S
 		return "", err
 	}
 	original := *r
-	receipt, activationErr := s.assignUpdatePlanGroupTransaction(ctx, tx, r.Actor, permissions, r.Scope, sources, r.Plan.ID, r.Plan.Revision, r.Group.ID, r.Group.Revision, r.activationKey, r.Targets)
+	receipt, activationErr := s.assignUpdatePlanGroupSourceTransaction(ctx, tx, r.Actor, permissions, r.Scope, r.GroupScope, sources, r.Plan.ID, r.Plan.Revision, r.Group.ID, r.Group.Revision, r.activationKey, r.Targets)
 	if activationErr == nil {
 		if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
 			return "", err

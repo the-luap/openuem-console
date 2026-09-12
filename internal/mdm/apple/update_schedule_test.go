@@ -68,7 +68,7 @@ func (f updateScheduleFixture) oldRecord(t *testing.T, created, notBefore, expir
 	t.Helper()
 	var revision int64
 	require.NoError(t, f.store.db.QueryRow(`SELECT COALESCE((SELECT revision FROM uem_access_revisions WHERE user_id='operator'),0)`).Scan(&revision))
-	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{ID: uuid.NewString(), Scope: f.scope, RequestKey: uuid.NewString(), Plan: *f.plan, Group: ProfileGroupSource{ID: f.group.ID, Revision: f.group.Revision, Name: f.group.Name, Rule: f.group.Rule}, Targets: f.selection, Actor: "operator", ActorRevision: revision, CreatedAt: created, NotBefore: notBefore, ExpiresAt: expires, Phase: "scheduled", Revision: 1, UpdatedAt: created, NextAttemptAt: notBefore}, sources: f.sources, activationKey: uuid.NewString()}
+	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{GroupScope: f.scope, ID: uuid.NewString(), Scope: f.scope, RequestKey: uuid.NewString(), Plan: *f.plan, Group: ProfileGroupSource{ID: f.group.ID, Revision: f.group.Revision, Name: f.group.Name, Rule: f.group.Rule}, Targets: f.selection, Actor: "operator", ActorRevision: revision, CreatedAt: created, NotBefore: notBefore, ExpiresAt: expires, Phase: "scheduled", Revision: 1, UpdatedAt: created, NextAttemptAt: notBefore}, sources: f.sources, activationKey: uuid.NewString()}
 	tx, err := f.store.db.BeginTx(t.Context(), nil)
 	require.NoError(t, err)
 	defer tx.Rollback()

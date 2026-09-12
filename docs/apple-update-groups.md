@@ -7,7 +7,7 @@ devices, current policies that would be replaced, and exclusions. An archived
 plan or group cannot start a new assignment. Original assignment history remains
 available after archival.
 [Organization-group sources](apple-update-organization-groups.md) can also be
-reviewed within the explicit target site for immediate assignments.
+reviewed within the explicit target site for immediate or scheduled assignments.
 
 ## Review and atomic confirmation
 
@@ -98,9 +98,9 @@ its own immutable replay evidence. Manual device policy removal also remains
 available. Only eligible target state is
 retained; excluded members are not a frozen historical snapshot. New plan revisions
 and later group edits do not change already assigned policies. [Organization-group
-intersections](apple-update-organization-groups.md) now support immediate
-assignments; organization-source schedules and richer predicates remain separate
-work.
+intersections](apple-update-organization-groups.md) now support immediate and
+[scheduled assignments](apple-update-organization-schedules.md). Richer predicates
+remain separate work.
 
 Owned PostgreSQL 17/race tests cover preview preservation, exact configured-policy
 tokens, progress-only changes, platform/prerequisite/release exclusions, complete

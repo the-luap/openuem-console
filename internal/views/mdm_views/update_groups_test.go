@@ -103,8 +103,8 @@ func TestAppleUpdateGroupPages(t *testing.T) {
 			confirming := state == "preview" || state == "existing" || state == "long"
 			require.Equal(t, confirming, strings.Contains(html, "data-update-group-confirm"))
 			if organization {
-				require.NotContains(t, html, "data-update-schedule-confirm")
-				require.NotContains(t, html, `action="/tenant/1/site/1/ios/update-plans/`+plan.ID+`/schedules"`)
+				require.Equal(t, confirming, strings.Contains(html, "data-update-schedule-confirm"))
+				require.Equal(t, confirming, strings.Contains(html, `action="/tenant/1/site/1/ios/update-plans/`+plan.ID+`/schedules"`))
 				if state == "choose" {
 					require.Contains(t, html, "source=organization")
 				}

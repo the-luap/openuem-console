@@ -40,7 +40,7 @@ func (h *Handler) AppleScheduleUpdatePlan(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	f, err := boundedDeviceManagementForm(c, "apple_update_schedules.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed", "not_before", "activation_window_minutes"}, 16<<10)
+	f, err := boundedDeviceManagementForm(c, "apple_update_schedules.invalid", []string{"csrf", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed", "not_before", "activation_window_minutes"}, 16<<10)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,15 @@ func (h *Handler) AppleScheduleUpdatePlan(c echo.Context) error {
 	if err != nil {
 		return appleUpdateScheduleFailure(c, err)
 	}
-	r, err := h.Apple.ScheduleUpdatePlanFromGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, f.Get("group_id"), groupRevision, f.Get("request_key"), selection, at, window)
+	organization, err := appleUpdateGroupSource(f.Get("group_source"))
+	if err != nil {
+		return appleUpdateScheduleFailure(c, err)
+	}
+	scheduleGroup := h.Apple.ScheduleUpdatePlanFromGroup
+	if organization {
+		scheduleGroup = h.Apple.ScheduleUpdatePlanFromOrganizationGroup
+	}
+	r, err := scheduleGroup(c.Request().Context(), h.appleActor(c), h.Access, scope, inventory.DeviceSources{Apple: true, Windows: h.Windows != nil}, c.Param("plan"), revision, f.Get("group_id"), groupRevision, f.Get("request_key"), selection, at, window)
 	if err != nil {
 		return appleUpdateScheduleFailure(c, err)
 	}

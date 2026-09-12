@@ -29,6 +29,7 @@ const fixtures = new Set([
  ...["choose","empty","preview","existing","excluded","assignment","history","empty-history","long"].map(state=>`apple-update-group-${state}`),
  ...["choose","empty","preview","existing","excluded","assignment","history","progress","receipt-site-operator","preview-site-operator","long","reader"].map(state=>`apple-update-group-organization-${state}`),
  ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long"].map(state=>`apple-update-schedule-${state}`),
+ ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long","site-operator","reader"].map(state=>`apple-update-schedule-organization-${state}`),
  ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long","deadline-elapsed","deadline-fold","deadline-stale","exception-active"].map(state=>`apple-update-progress-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`apple-update-plan-${state}`),
  ...["choose","empty","preview","remove","excluded","assignment","history","empty-history","long","catalog"].map(state=>`apple-profile-group-${state}`),

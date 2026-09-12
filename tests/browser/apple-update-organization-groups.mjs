@@ -4,7 +4,7 @@ export default async function run(browser,record) {
   const v=await browser.evaluate(`(()=>{const m=document.querySelector('[data-update-groups],[data-update-group-progress]');const f=m.querySelector('[data-update-group-confirm]');return {width:document.documentElement.scrollWidth,viewport:innerWidth,text:m.textContent,scripts:m.querySelectorAll('script').length,schedule:!!m.querySelector('[data-update-schedule-confirm]'),form:f?{action:f.getAttribute('action'),fields:Object.fromEntries(new FormData(f)),required:f.elements.confirmed.required}:null,links:[...m.querySelectorAll('a')].map(a=>({text:a.textContent,href:a.getAttribute('href')}))}})()`);
   browser.check(v.width<=v.viewport+1&&v.scripts===0,'Organization update group overflows or executes source markup');
   const editable=['preview','existing','long'].includes(state);
-  browser.check(!v.schedule,'Organization source offers unsupported scheduled assignment');
+  browser.check(v.schedule===editable,'Schedule action does not follow organization and target authority');
   browser.check(!!v.form===editable,'Read-only organization group exposes assignment');
   const profile='/tenant/1/site/1/ios/update-plans/70000000-0000-0000-0000-000000000001';
   if(state==='choose'||state==='empty') {
@@ -26,6 +26,16 @@ export default async function run(browser,record) {
    browser.check(await browser.evaluate('window.organizationGroupSubmissions.length')===0,'Unconfirmed organization update assignment submitted');
    await browser.evaluate("document.querySelector('[data-update-group-confirm]').elements.confirmed.focus()");await browser.space();await browser.tab();await browser.enter();
    const submitted=await browser.evaluate('window.organizationGroupSubmissions');browser.check(submitted.length===1&&submitted[0].confirmed==='yes'&&Object.entries(f.fields).every(([k,value])=>submitted[0][k]===value),'Keyboard assignment changed reviewed intersection');
+   const schedule=await browser.evaluate(`(()=>{window.scheduleForm=document.querySelector('[data-update-schedule-confirm]');return {form:!!scheduleForm,required:scheduleForm?.elements.confirmed.required,text:scheduleForm?.parentElement.textContent,action:scheduleForm?.getAttribute('action')};})()`);
+   browser.check(schedule.form&&schedule.required&&schedule.text.includes('absolute UTC')&&schedule.text.includes('local to each device')&&schedule.action.endsWith('/schedules'),'Schedule review lost UTC timing, current source or confirmation');
+   await browser.evaluate(`(()=>{scheduleForm.addEventListener('submit',event=>{event.preventDefault();window.scheduleFields=Object.fromEntries(new FormData(scheduleForm,event.submitter));});scheduleForm.elements.not_before.value='2026-09-15T18:00:00Z';scheduleForm.querySelector('button').focus();})()`);
+   await browser.enter();browser.check(await browser.evaluate('!window.scheduleFields'),'Unchecked schedule submitted');
+   await browser.evaluate("scheduleForm.elements.confirmed.checked=true;scheduleForm.elements.not_before.value='2026-09-15T18:00:00+02:00';scheduleForm.querySelector('button').focus()");await browser.enter();
+   browser.check(await browser.evaluate('!window.scheduleFields'),'Non-UTC schedule submitted');
+   await browser.evaluate("scheduleForm.elements.not_before.value='2026-09-15T18:00:00Z';scheduleForm.querySelector('button').focus()");await browser.enter();
+   const scheduled=await browser.evaluate('window.scheduleFields');
+   browser.check(scheduled&&scheduled.devices===f.fields.devices&&scheduled.expected_revision===f.fields.expected_revision&&scheduled.group_revision===f.fields.group_revision&&scheduled.request_key===f.fields.request_key&&scheduled.group_source==='organization'&&scheduled.csrf==='owned-csrf'&&scheduled.confirmed==='yes'&&scheduled.not_before==='2026-09-15T18:00:00Z'&&scheduled.activation_window_minutes==='60','Scheduled keyboard confirmation lost exact selection or timing');
+
   }
   if(width===390){await browser.evaluate("document.querySelector('[data-update-groups],[data-update-group-progress]').scrollIntoView({block:'start'})");await browser.capture('apple-update-group-organization-'+state+'-390');}
   record({name:'Apple organization update group '+state,width,passed:true});

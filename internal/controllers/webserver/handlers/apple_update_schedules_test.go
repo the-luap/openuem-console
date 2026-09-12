@@ -28,8 +28,8 @@ func TestAppleUpdateScheduleTimingRequiresExactUTCAndBoundedWindow(t *testing.T)
 	}
 }
 func TestAppleUpdateScheduleFormsRejectAmbiguousAndOversizedBodies(t *testing.T) {
-	allowed := []string{"csrf", "expected_revision", "group_id", "group_revision", "request_key", "devices", "confirmed", "not_before", "activation_window_minutes"}
-	valid := url.Values{"csrf": {"owned-csrf"}, "expected_revision": {"1"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"1"}, "request_key": {"30000000-0000-4000-8000-000000000001"}, "devices": {"10000000-0000-4000-8000-000000000001:" + strings.Repeat("a", 64)}, "confirmed": {"yes"}, "not_before": {"2026-09-15T18:00:00Z"}, "activation_window_minutes": {"60"}}
+	allowed := []string{"csrf", "expected_revision", "group_id", "group_revision", "group_source", "request_key", "devices", "confirmed", "not_before", "activation_window_minutes"}
+	valid := url.Values{"csrf": {"owned-csrf"}, "expected_revision": {"1"}, "group_id": {"20000000-0000-4000-8000-000000000001"}, "group_revision": {"1"}, "group_source": {"organization"}, "request_key": {"30000000-0000-4000-8000-000000000001"}, "devices": {"10000000-0000-4000-8000-000000000001:" + strings.Repeat("a", 64)}, "confirmed": {"yes"}, "not_before": {"2026-09-15T18:00:00Z"}, "activation_window_minutes": {"60"}}
 	for _, condition := range []string{"valid", "duplicate", "unknown", "query", "oversized", "encoding"} {
 		body, path := valid.Encode(), "/ios/update-plans/owned/schedules"
 		switch condition {

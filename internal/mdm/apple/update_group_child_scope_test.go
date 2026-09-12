@@ -7,16 +7,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUpdateGroupOrganizationSourceCannotReplaceSiteScheduleOrPromotionChild(t *testing.T) {
-	for _, parent := range []string{"schedule", "promotion"} {
+func TestUpdateGroupChildSourceMustMatchScheduleOrPromotionSource(t *testing.T) {
+	for _, parent := range []string{"schedule", "organization-schedule", "promotion"} {
 		t.Run(parent, func(t *testing.T) {
 			ctx := t.Context()
 			var f updateScheduleFixture
 			var child *UpdatePlanGroupAssignment
 			var reject func()
-			if parent == "schedule" {
-				f = ownedUpdateScheduleFixture(t)
-				schedule := f.schedule(t, time.Now().UTC().Truncate(time.Second))
+			if parent != "promotion" {
+				var schedule *UpdateSchedule
+				if parent == "organization-schedule" {
+					f = ownedOrganizationUpdateFixture(t)
+					schedule = ownedOrganizationSchedule(t, f, time.Now().UTC().Truncate(time.Second))
+				} else {
+					f = ownedUpdateScheduleFixture(t)
+					schedule = f.schedule(t, time.Now().UTC().Truncate(time.Second))
+				}
 				require.Equal(t, 1, f.process(t).Activated)
 				detail := f.details(t, schedule.ID)
 				var err error
@@ -41,7 +47,11 @@ func TestUpdateGroupOrganizationSourceCannotReplaceSiteScheduleOrPromotionChild(
 			}
 			// This owned corruption fixture changes only the authenticated source
 			// kind of an otherwise valid child. Parent evidence must reject it.
-			child.GroupScope = Scope{TenantID: f.scope.TenantID}
+			if parent == "organization-schedule" {
+				child.GroupScope = f.scope
+			} else {
+				child.GroupScope = Scope{TenantID: f.scope.TenantID}
+			}
 			encrypted, err := f.store.sealUpdateGroupAssignment(child)
 			require.NoError(t, err)
 			_, err = f.store.db.Exec(`ALTER TABLE mdm_apple_update_group_assignments DISABLE TRIGGER mdm_apple_keep_update_group_assignment`)

@@ -22,7 +22,7 @@ export default async function run(browser,record) {
    browser.check(await browser.evaluate('!window.scheduleFields'),'Non-UTC schedule submitted');
    await browser.evaluate("scheduleForm.elements.not_before.value='2026-09-15T18:00:00Z';scheduleForm.querySelector('button').focus()");await browser.enter();
    const scheduled=await browser.evaluate('window.scheduleFields');
-   browser.check(scheduled&&scheduled.devices===fields.devices&&scheduled.expected_revision===fields.expected_revision&&scheduled.group_revision===fields.group_revision&&scheduled.request_key===fields.request_key&&scheduled.csrf==='owned-csrf'&&scheduled.confirmed==='yes'&&scheduled.not_before==='2026-09-15T18:00:00Z'&&scheduled.activation_window_minutes==='60','Scheduled keyboard confirmation lost exact selection or timing');
+   browser.check(scheduled&&scheduled.devices===fields.devices&&scheduled.expected_revision===fields.expected_revision&&scheduled.group_revision===fields.group_revision&&scheduled.request_key===fields.request_key&&scheduled.group_source==='site'&&scheduled.csrf==='owned-csrf'&&scheduled.confirmed==='yes'&&scheduled.not_before==='2026-09-15T18:00:00Z'&&scheduled.activation_window_minutes==='60','Scheduled keyboard confirmation lost exact selection or timing');
    if(state==='existing')browser.check(view.text.includes('Existing policy will be replaced: 18.7')&&view.text.includes('22H90')&&view.text.includes('2026-11-01T18:00:00'),'Replacement preview hid the current policy');
    if(state==='preview')browser.check(view.text.includes('No existing update policy.'),'New assignment claimed an existing policy');
   }else browser.check(!view.form,'Read-only group state offers confirmation');

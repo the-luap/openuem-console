@@ -92,6 +92,8 @@ that review to the selected site intersection and retain the original source
 scope for receipts, progress and later cohort actions.
 [Scheduled Apple update activation](apple-update-schedules.md) retains that review
 and rechecks it in an absolute UTC activation window.
+[Organization-source schedules](apple-update-organization-schedules.md) additionally
+retain the source organization and recheck its read grant at activation.
 [Temporary update exceptions](apple-update-exceptions.md) now prevent new Apple
 update admission, and [reviewed pilot promotion](apple-update-promotions.md)
 retains original-pilot evidence with an explicitly approved destination group.
