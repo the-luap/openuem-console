@@ -260,8 +260,14 @@ to the hardware checklist below.
 An earlier comparison reproduced SMTP/user expectation failures at unmodified upstream commit
 `5604db7e4b4ac0fef5f95aad0ef279722966bd9d`:
 `TestUpdateSMTPSettings`, `TestAddOIDCUser`, and `TestConfirmEmail`.
-The SMTP settings regression is now fixed and `TestSMTPTestSuite` passes; this
-does not claim that the unrelated upstream user expectations have been resolved.
+The SMTP regression and user test expectations are now resolved. The OpenID test
+previously created a certificate account; it now selects OpenID and verifies the
+administrator-created account's first-login state and authentication flags. Email
+confirmation now starts with an actual pending certificate account and verifies
+the certificate-request state used by the existing flow. The user fixture closes
+its database through test cleanup. The entire model package passes locally with
+the race detector and is included in native console CI. These model checks do not
+establish real SMTP delivery or external identity-provider acceptance.
 
 Use the [certificate and network acceptance procedure](apple-network-acceptance.md)
 for issuance, EAP-TLS, IKEv2, ordered on-demand rules and Always On exceptions.

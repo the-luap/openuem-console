@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The two outstanding upstream user-test failures were reproduced and corrected
+  without changing account behavior. The OpenID creation fixture now selects
+  OpenID and verifies first-login, email-verification and authentication flags;
+  the email-confirmation test starts with an actual pending certificate account
+  and expects the existing certificate-request state. User fixtures now pass the
+  active test handle to the database helper and close their database on cleanup.
+  The entire `internal/models` package passed with the race detector (2.420 s),
+  including user, SMTP and Windows deployment tests. Native console CI now runs
+  that full model package with race checks. This resolves the recorded test
+  expectation gap, not real SMTP/provider or hardware acceptance.
+
 - Shared Apple state labels now resolve through `mdm.states` in the existing
   locale catalog, including the previously raw waiting status. Device, profile,
   command, user-channel, ADE and linked-Mac views pass their render context; the
