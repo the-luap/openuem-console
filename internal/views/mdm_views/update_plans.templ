@@ -96,6 +96,14 @@ templ AppleUpdatePlan(c echo.Context, info *partials.CommonInfo, plan apple.Upda
 				</div>
 			</section>
 			if info.Can(access.ManageUpdates) {
+				<div class="flex flex-wrap gap-4" data-update-plan-group-actions>
+					if !plan.Definition.Archived {
+						<a class="uk-button uk-button-default" href={templ.URL(UpdatePlanGroupChoiceURL(info,plan,""))}>Assign to a dynamic group</a>
+					}
+					<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,UpdatePlanGroupHistoryPath(plan.ID)))}>Group update history</a>
+				</div>
+			}
+			if info.Can(access.ManageUpdates) {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-4">
 						<h2 class="uk-card-title">Revise this plan</h2>

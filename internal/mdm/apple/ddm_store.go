@@ -94,21 +94,7 @@ func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 				return notFound(err)
 			}
 		}
-		if p != nil {
-			if err = ValidateUpdatePolicy(*d, *p); err != nil {
-				return err
-			}
-			if err = s.validateCatalogPolicy(ctx, tx, d, p); err != nil {
-				return err
-			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_update_policies(tenant_id,device_id,target_version,target_build,deadline,details_url) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(device_id) DO UPDATE SET target_version=excluded.target_version,target_build=excluded.target_build,deadline=excluded.deadline,details_url=excluded.details_url,status='pending',error='',updated_at=now()`, scope.TenantID, id, p.TargetVersion, p.TargetBuild, p.Deadline, p.DetailsURL)
-		} else {
-			_, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_update_policies WHERE tenant_id=$1 AND device_id=$2`, scope.TenantID, id)
-		}
-		if err != nil {
-			return err
-		}
-		if err = s.queueDeclarations(ctx, tx, d, p); err != nil {
+		if err = s.setDeviceUpdatePolicy(ctx, tx, d, p); err != nil {
 			return err
 		}
 		if err = audit(ctx, tx, scope.TenantID, actor, "apple.update.policy", id); err != nil {
@@ -116,6 +102,33 @@ func (s *Store) setUpdatePolicy(ctx context.Context, scope Scope, ids []string, 
 		}
 	}
 	return tx.Commit()
+}
+
+// setDeviceUpdatePolicy retains ordinary platform/catalog validation and queues
+// declarations for an already locked target. Callers own authority and audits.
+func (s *Store) setDeviceUpdatePolicy(ctx context.Context, tx *sql.Tx, d *Device, p *UpdatePolicy) error {
+	var err error
+	if d.Status != "enrolled" {
+		return errors.New("device must be enrolled")
+	}
+	if p != nil {
+		if err = ValidateUpdatePolicy(*d, *p); err != nil {
+			return err
+		}
+		if err = s.validateCatalogPolicy(ctx, tx, d, p); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO mdm_apple_update_policies(tenant_id,device_id,target_version,target_build,deadline,details_url) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(device_id) DO UPDATE SET target_version=excluded.target_version,target_build=excluded.target_build,deadline=excluded.deadline,details_url=excluded.details_url,status='pending',error='',updated_at=clock_timestamp()`, d.TenantID, d.ID, p.TargetVersion, p.TargetBuild, p.Deadline, p.DetailsURL)
+	} else {
+		_, err = tx.ExecContext(ctx, `DELETE FROM mdm_apple_update_policies WHERE tenant_id=$1 AND device_id=$2`, d.TenantID, d.ID)
+	}
+	if err != nil {
+		return err
+	}
+	if err = s.queueDeclarations(ctx, tx, d, p); err != nil {
+		return err
+	}
+	return nil
 }
 
 // queueDeclarations supersedes pending notifications using current capability

@@ -35,8 +35,9 @@ Device form templates retain their existing application and removal controls.
 
 Current policy state can still be replaced by another otherwise authorized
 submission; there is no policy revision precondition or immutable request receipt
-in this workflow. Group/ring targeting, scheduling, exceptions and promotion need
-their own reviewed source, current eligibility, exact selection and replay rules.
+in this workflow. [Immediate group assignments](apple-update-groups.md) now establish their own
+reviewed plan/group revisions, current-policy comparisons, exact eligible selection
+and immutable replay evidence. Scheduling, exceptions and promotion remain open.
 [Versioned Apple update plans](apple-update-plans.md) now provide a separate
 reviewed catalog; saving a plan does not assign it. A configured or active policy
 does not prove an installed update; the device page

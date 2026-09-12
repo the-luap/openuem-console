@@ -22,6 +22,10 @@ export default async function run(browser,record) {
     browser.check(await browser.evaluate(`planForm.getAttribute('action')==='/tenant/1/site/1/ios/update-plans${creating?'':'/70000000-0000-0000-0000-000000000001'}'`),'Plan save changed scope or source identity');
    }
    if(['detail','archived','viewer','long'].includes(state)) browser.check(view.text.includes('Previous <pilot>') && view.text.includes('22H90') && view.links.some(a=>a.endsWith('?before=2')),'Retained plan history or revision paging missing');
+   if(['detail','archived','viewer','long'].includes(state)) {
+    browser.check(view.links.some(a=>a.includes('/groups?revision=3'))===!['archived','viewer'].includes(state),'Plan group entry point lost archive, role or current revision checks');
+    browser.check(view.links.some(a=>a.endsWith('/group-assignments'))===(state!=='viewer'),'Plan original group history lost its role boundary');
+   }
    if(state==='empty')browser.check(view.text.includes('No Apple update plans'),'Empty plan catalog lost explanation');
    if(width===390)await browser.capture('apple-update-plan-'+state+'-390');
    record({name:'Apple update plan '+state,width,passed:true});

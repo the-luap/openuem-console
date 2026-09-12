@@ -6,9 +6,11 @@ information URL. Their names and descriptions distinguish intended rollout
 stages such as pilot and broad deployment. A plan is a reusable source; it is
 separate from each device's current policy and observed update result.
 
-The current change provides the plan catalog and revision history. Group
-assignment, scheduling, exceptions, promotion and per-cohort result tracking
-remain separate implementation work. The existing device action continues to use
+The catalog and revision history now connect to
+[immediate dynamic group assignments](apple-update-groups.md), with current
+eligibility, reviewed policy replacements and immutable original request evidence.
+Scheduling, exceptions, promotion and per-cohort result tracking remain separate
+implementation work. The existing device action continues to use
 [transaction-bound update policy admission](apple-update-policy-admission.md).
 Saving, revising or archiving a plan creates no device policy or notification.
 

@@ -19,6 +19,10 @@ func deviceExportForm(c echo.Context) (url.Values, error) {
 }
 
 func deviceManagementForm(c echo.Context, errorKey string, allowed []string) (url.Values, error) {
+	return boundedDeviceManagementForm(c, errorKey, allowed, 8192)
+}
+
+func boundedDeviceManagementForm(c echo.Context, errorKey string, allowed []string, limit int64) (url.Values, error) {
 	failure := func(status int) (url.Values, error) {
 		return nil, echo.NewHTTPError(status, i18n.T(c.Request().Context(), errorKey))
 	}
@@ -30,15 +34,15 @@ func deviceManagementForm(c echo.Context, errorKey string, allowed []string) (ur
 	if r.URL.RawQuery != "" || r.URL.ForceQuery {
 		return failure(http.StatusBadRequest)
 	}
-	if r.ContentLength > 8192 {
+	if r.ContentLength > limit {
 		return failure(http.StatusRequestEntityTooLarge)
 	}
-	r.Body = http.MaxBytesReader(c.Response(), r.Body, 8192)
+	r.Body = http.MaxBytesReader(c.Response(), r.Body, limit)
 	if err = r.ParseForm(); err != nil {
 		return failure(http.StatusBadRequest)
 	}
 	f := r.PostForm
-	if len(f.Encode()) > 8192 {
+	if int64(len(f.Encode())) > limit {
 		return failure(http.StatusRequestEntityTooLarge)
 	}
 	for key, values := range f {

@@ -80,8 +80,10 @@ other management identities shown as exclusions. Scheduled activation rechecks
 the original revision, native membership and enabled sources.
 [Immediate Apple System-profile assignments](apple-profile-groups.md) now preview
 current action eligibility, resolve canonical Mac channels, confirm exact native
-targets and retain immutable original request evidence. Software assignments,
-Apple scheduling/update rings, exceptions, broader conflict previews, pilot
+targets and retain immutable original request evidence.
+[Apple update plan assignments](apple-update-groups.md) additionally compare
+reviewed current policy values and explicitly confirm replacements. Software
+assignments, Apple scheduling, exceptions, broader conflict previews, pilot
 promotion and richer predicates remain roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale
 database acceptance and physical-device acceptance remain separate.

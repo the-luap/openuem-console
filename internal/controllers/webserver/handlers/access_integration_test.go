@@ -403,6 +403,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 			t.Fatal("sensitive read was not audited")
 		}
 	})
+	t.Run("Apple update group assignments", func(t *testing.T) {
+		exerciseAppleUpdateGroups(t, h, ctx, tenantID, siteID, request)
+	})
 	t.Run("Apple update plans", func(t *testing.T) {
 		exerciseAppleUpdatePlans(t, h, ctx, tenantID, siteID, request)
 	})

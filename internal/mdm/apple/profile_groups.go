@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"slices"
 	"time"
 
 	"github.com/open-uem/openuem-console/internal/inventory"
@@ -148,42 +147,11 @@ func (s *Store) stageProfileGroup(ctx context.Context, tx *sql.Tx, actor string,
 		return nil, ErrProfilePrerequisite
 	}
 	preview := &ProfileGroupPreview{Group: group.Group, ProfileID: p.ID, ProfileName: p.Name, ProfileRevision: p.Revision, Desired: desired, Targets: []ProfileGroupTarget{}, Excluded: []ProfileGroupTarget{}}
-	candidates := []ProfileGroupTarget{}
-	seen := map[string]bool{}
-	for _, entry := range group.Entries {
-		target := ProfileGroupTarget{Entry: entry}
-		switch entry.Kind {
-		case "apple":
-			target.DeviceID = entry.ID
-		case "mac":
-			err = tx.QueryRowContext(ctx, `SELECT mc.device_id FROM uem_mac_devices m JOIN uem_mac_mdm_channels mc ON mc.entity_id=m.id AND mc.retired_at IS NULL WHERE m.id=$1 AND m.tenant_id=$2 AND m.site_id=$3 FOR SHARE OF m,mc`, entry.ID, scope.TenantID, scope.SiteID).Scan(&target.DeviceID)
-			if errors.Is(err, sql.ErrNoRows) {
-				target.Reason = "apple_channel_unavailable"
-			} else if err != nil {
-				return nil, err
-			}
-		default:
-			target.Reason = "not_apple_mdm"
-		}
-		if target.Reason != "" {
-			preview.Excluded = append(preview.Excluded, target)
-			continue
-		}
-		if seen[target.DeviceID] {
-			return nil, ErrProfileGroup
-		}
-		seen[target.DeviceID] = true
-		candidates = append(candidates, target)
+	candidates, excluded, err := nativeAppleGroupCandidates(ctx, tx, scope, group.Entries)
+	if err != nil {
+		return nil, err
 	}
-	slices.SortFunc(candidates, func(a, b ProfileGroupTarget) int {
-		if a.DeviceID < b.DeviceID {
-			return -1
-		}
-		if a.DeviceID > b.DeviceID {
-			return 1
-		}
-		return 0
-	})
+	preview.Excluded = excluded
 	if _, err = tx.ExecContext(ctx, `SAVEPOINT apple_profile_group_preview`); err != nil {
 		return nil, err
 	}

@@ -124,6 +124,11 @@ func (h *Handler) RegisterApple(e *echo.Echo) {
 		g.POST("/ios/:id/revoke", h.AppleRevoke)
 		g.GET("/ios/update-plans", h.AppleUpdatePlans)
 		g.POST("/ios/update-plans", h.AppleSaveUpdatePlan)
+		g.GET("/ios/update-plans/:plan/groups", h.AppleUpdatePlanGroups)
+		g.GET("/ios/update-plans/:plan/groups/:group/preview", h.ApplePreviewUpdatePlanGroup)
+		g.POST("/ios/update-plans/:plan/group-assignments", h.AppleAssignUpdatePlanGroup)
+		g.GET("/ios/update-plans/:plan/group-assignments", h.AppleUpdatePlanGroupAssignments)
+		g.GET("/ios/update-plans/:plan/group-assignments/:assignment", h.AppleUpdatePlanGroupAssignment)
 		g.GET("/ios/update-plans/:plan", h.AppleUpdatePlan)
 		g.POST("/ios/update-plans/:plan", h.AppleSaveUpdatePlan)
 		g.POST("/ios/:id/update", h.AppleUpdate)
@@ -144,6 +149,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/ios/update-plans/:plan/group-assignments":
+				limit = 16 << 10
 			case "/ios/configurations/:id/assign":
 				limit = 64 << 10
 			case "/ios/configurations/:id/group-assignments", "/ios/:id/update", "/ios/update-plans", "/ios/update-plans/:plan":

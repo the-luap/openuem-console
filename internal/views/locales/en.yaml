@@ -146,6 +146,13 @@ en:
       candidate_expired: "The issued certificate expired before the device confirmed it. Check the current identity expiry and enroll the device again if needed."
       enrollment_inactive: "Renewal stopped because this enrollment is no longer active."
       attention: "Identity renewal needs attention. Review the enrollment and command status."
+  apple_update_groups:
+    invalid: "Review the current plan and group, then confirm the exact eligible device selection."
+    permission: "Your current permissions do not allow group update assignments in this site."
+    missing: "The plan, group or original assignment is unavailable in this site."
+    changed: "The plan, group, eligible selection or current device policies changed. Start a new review before assigning."
+    large: "This group exceeds 100 members or the supported inventory size. Narrow its rules before assigning."
+    unavailable: "The group update could not complete. Reload its original assignment history before retrying."
   apple_update_plans:
     title: "Apple update plans"
     invalid: "Reload the plan and review its name, platform, exact release, build and device-local deadline."

@@ -134,12 +134,12 @@ func TestCSRFLimitsWindowsFormsBeforeTokenExtraction(t *testing.T) {
 }
 
 func TestCSRFSmallFormsRejectWirePaddingWithEitherTokenPath(t *testing.T) {
-	for _, route := range []string{"/login/new", "/ios/:id/update", "/tenant/:tenant/site/:site/ios/update-plans", "/devices/export", "/device-groups", "/tenant/:tenant/site/:site/device-groups/:group", "/tenant/:tenant/site/:site/ios/configurations/:id/assign", "/tenant/:tenant/site/:site/ios/configurations/:id/group-assignments"} {
+	for _, route := range []string{"/login/new", "/ios/:id/update", "/tenant/:tenant/site/:site/ios/update-plans/:plan/group-assignments", "/tenant/:tenant/site/:site/ios/update-plans", "/devices/export", "/device-groups", "/tenant/:tenant/site/:site/device-groups/:group", "/tenant/:tenant/site/:site/ios/configurations/:id/assign", "/tenant/:tenant/site/:site/ios/configurations/:id/group-assignments"} {
 		for _, header := range []bool{false, true} {
 			e := echo.New()
 			e.Use(CSRF())
 			e.POST(route, func(echo.Context) error { t.Fatal("oversized normalized form reached handler"); return nil })
-			path := strings.NewReplacer(":tenant", "1", ":site", "11", ":id", "profile", ":group", "group").Replace(route)
+			path := strings.NewReplacer(":tenant", "1", ":site", "11", ":id", "profile", ":group", "group", ":plan", "plan").Replace(route)
 			token := strings.Repeat("a", 32)
 			body := "csrf=" + token + strings.Repeat("&", int(scopedFormLimit(route)))
 			r := httptest.NewRequest(http.MethodPost, "https://console.test"+path, strings.NewReader(body))
