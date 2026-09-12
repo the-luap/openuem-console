@@ -66,8 +66,34 @@ login clears its temporary certificate password. The forced-password lifecycle
 remains restricted and the protected administrator startup/password tests pass.
 
 These checks govern new local sign-in admission. They do not yet provide complete
-request-time local credential revalidation or fence every password-recovery and
-invitation mutation; those remain separate lifecycle requirements.
+request-time local credential revalidation ; the separate recovery/invitation checks below also apply to credential changes.
+
+## Password replacement policy
+
+Initial-password, email-recovery and invitation proofs must still match the
+current account when the new password is committed. Their five-second Read
+Committed transaction locks authentication configuration before the user, using
+the same lock order as local sign-in. Password authentication must remain enabled;
+the account must remain in password mode, outside OpenID mode, and in an approved,
+completed, password-link-sent or forced-password state. Initial-password proofs
+still require the forced-password state specifically. Revoked/review accounts and
+incompatible modes cannot be reactivated by an earlier recovery or invitation.
+
+The existing exact password/source digests, expiry and single-winner checks remain.
+Successful replacement consumes the recovery/invitation records and deletes all
+owned sessions in the same transaction, generating durable revocation receipts.
+A previously loaded session cannot recreate itself afterward. Existing MFA
+configuration is preserved. Denied replacement leaves credentials, registration,
+source grants and session rows unchanged. A committed revocation observed after a
+row-lock wait denies replacement; a rolled-back revocation permits valid work.
+
+Fifteen owned policy cases cover all three proof kinds; the baseline reproduced
+thirteen invalid replacements, including reactivation and unintended session
+removal. Positive recovery/invitation cases cover both storage modes, retained MFA,
+source consumption, grant replay and preloaded-session retirement. The production
+administrator password/recovery/invitation routes and concurrent initial-password
+replacement test also pass. Fixture invitations use the same password-link-sent
+registration state as administrator invitation issuance.
 
 ## MFA and recovery boundaries
 

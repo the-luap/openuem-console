@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Password-replacement transactions now check current method configuration,
+  account mode and registration before consuming initial-password, recovery or
+  invitation proofs. Earlier proofs cannot reactivate revoked/review accounts or
+  override a changed/disabled password method. Configuration and user locks use
+  the same order as local sign-in, within a five-second transaction deadline.
+  The owned baseline reproduced thirteen invalid replacements. Fifteen denial
+  cases, committed/rolled-back revocation waits, valid source consumption and
+  preloaded-session retirement pass in the full 31.479-second PostgreSQL/session
+  race suite. Existing MFA survives replacement. Actual Linux ARM64 administrator
+  recovery/invitation routes, console routes, auth/router race suites and full
+  console build pass. Request-time local credential checks and atomic MFA
+  persistence/one-use replay guarantees remain open.
+
 - Local password/certificate admission now locks current method configuration
   and account state before confirming login. Revoked/review accounts, incompatible
   account modes, disabled methods, changed password hashes and changed MFA
@@ -72,8 +85,8 @@ the table's package summaries do not remove any detail from the roadmap.
   first-login and pending-phase regressions pass in the full 26.272-second
   PostgreSQL/session race suite. Actual Linux ARM64 console routes, protected
   administrator password lifecycle and full console build pass. Request-time
-  local credential revalidation, recovery/invitation mutation fencing and atomic
-  MFA persistence remain open.
+  local credential revalidation and atomic MFA persistence remain open; recovery
+  mutation checks are described above.
 
 - Public MFA actions now require a fifteen-minute, account/method/credential-bound
   server-side primary-authentication proof. Password recovery cannot enroll or

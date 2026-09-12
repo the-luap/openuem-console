@@ -36,25 +36,9 @@ func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, met
 		return err
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT coalesce(use_passwd,false),coalesce(use_certificates,false) FROM authentications ORDER BY id LIMIT 2 FOR SHARE`)
+	passwords, certificates, err := lockLocalAuthenticationSettings(ctx, tx)
 	if err != nil {
 		return err
-	}
-	count := 0
-	var passwords, certificates bool
-	for rows.Next() {
-		if err = rows.Scan(&passwords, &certificates); err != nil {
-			rows.Close()
-			return err
-		}
-		count++
-	}
-	rows.Close()
-	if err = rows.Err(); err != nil {
-		return err
-	}
-	if count != 1 {
-		return ErrLocalSignIn
 	}
 	var passwd, openid, mfa, confirmed bool
 	var hash, register string
@@ -97,4 +81,29 @@ func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, met
 		}
 	}
 	return tx.Commit()
+}
+
+// All credential mutations lock configuration before users to share one lock order.
+func lockLocalAuthenticationSettings(ctx context.Context, tx *sql.Tx) (bool, bool, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT coalesce(use_passwd,false),coalesce(use_certificates,false) FROM authentications ORDER BY id LIMIT 2 FOR SHARE`)
+	if err != nil {
+		return false, false, err
+	}
+	count := 0
+	var passwords, certificates bool
+	for rows.Next() {
+		if err = rows.Scan(&passwords, &certificates); err != nil {
+			rows.Close()
+			return false, false, err
+		}
+		count++
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return false, false, err
+	}
+	if count != 1 {
+		return false, false, ErrLocalSignIn
+	}
+	return passwords, certificates, nil
 }

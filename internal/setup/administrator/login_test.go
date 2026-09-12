@@ -236,7 +236,7 @@ func TestProtectedAdministratorConsolePasswordLifecycle(t *testing.T) {
 	// scanning its GET link does not consume it. Bind the session to the exact
 	// encrypted invitation record and consume it with the password transaction.
 	h.JWTKey = jwtKey
-	if err := m.Client.User.Create().SetID("invited-admin").SetName("Invited administrator").SetPasswd(true).Exec(ctx); err != nil {
+	if err := m.Client.User.Create().SetID("invited-admin").SetName("Invited administrator").SetPasswd(true).SetRegister(openuem.REGISTER_PASSWORD_LINK_SENT).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, handlers.MyCustomClaims{RegisteredClaims: jwt.RegisteredClaims{ID: "invited-admin", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))}})

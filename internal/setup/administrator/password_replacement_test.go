@@ -13,6 +13,9 @@ import (
 
 func TestProtectedAdministratorPasswordReplacementTransaction(t *testing.T) {
 	m := accountModel(t)
+	if err := m.Client.Authentication.Create().SetUsePasswd(true).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	config := Config{UserID: "first-admin", PasswordFile: passwordFile(t, testPassword)}
 	if _, err := Initialize(ctx, m.DB, config); err != nil {

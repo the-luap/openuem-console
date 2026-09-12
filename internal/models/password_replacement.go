@@ -41,14 +41,29 @@ func (m *Model) ChangePasswordWithProof(ctx context.Context, userID, password st
 	if m.DB == nil || userID == "" || len(password) == 0 || len(password) > 1024 || len(proof.PasswordDigest) != 64 || !proof.ExpiresAt.After(time.Now()) {
 		return ErrPasswordReplacement
 	}
-	tx, err := m.DB.BeginTx(ctx, nil)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	tx, err := m.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return ErrPasswordReplacement
 	}
 	defer tx.Rollback()
+	passwords, _, err := lockLocalAuthenticationSettings(ctx, tx)
+	if err != nil || !passwords {
+		return ErrPasswordReplacement
+	}
+	var passwd, openid bool
 	var currentHash, register, code, invitation sql.NullString
 	var codeExpiry sql.NullTime
-	if err = tx.QueryRowContext(ctx, `SELECT hash,register,forgot_password_code,forgot_password_code_expires_at,new_user_token FROM users WHERE uid=$1 FOR UPDATE`, userID).Scan(&currentHash, &register, &code, &codeExpiry, &invitation); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT hash,register,forgot_password_code,forgot_password_code_expires_at,new_user_token,coalesce(passwd,false),coalesce(openid,false) FROM users WHERE uid=$1 FOR UPDATE`, userID).Scan(&currentHash, &register, &code, &codeExpiry, &invitation, &passwd, &openid); err != nil {
+		return ErrPasswordReplacement
+	}
+	if !passwd || openid {
+		return ErrPasswordReplacement
+	}
+	switch register.String {
+	case openuem.REGISTER_COMPLETE, openuem.REGISTER_APPROVED, openuem.REGISTER_PASSWORD_LINK_SENT, openuem.REGISTER_FORCE_PASSWORD_CHANGE:
+	default:
 		return ErrPasswordReplacement
 	}
 	if PasswordReplacementDigest(currentHash.String) != proof.PasswordDigest {
