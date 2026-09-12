@@ -219,8 +219,9 @@ Use the [reserved PostgreSQL fixture](native-windows-mdm.md#scoped-enrollment-cr
 No fixture installs a policy/certificate, changes Windows settings or executes a
 host command. [Scheduled assignments](native-windows-update-schedules.md) and
 [listener/worker registration](native-windows-operations.md) are now implemented.
-[Immediate site-group selection](native-windows-update-groups.md) is now available
-for ring assignments. Remaining work includes scheduled group evaluation,
+[Site-group selection](native-windows-update-groups.md) is available
+for immediate and scheduled ring assignments, with original group checks at activation.
+Remaining work includes
 pilot promotion gates, outgoing chunking
 for large trees, update console workflows,
 continuous compliance and async reconciliation, actual update/restart evidence,

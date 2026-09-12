@@ -16,9 +16,10 @@ reviewed future cohorts with UTC console previews, confirmed plan creation,
 protected history and cancellation before activation. The
 [optional Windows listener](native-windows-operations.md)
 now starts and stops that worker.
-[Immediate dynamic-group assignment](native-windows-update-groups.md) now captures
+[Immediate and scheduled dynamic-group assignment](native-windows-update-groups.md) captures
 a reviewed site group revision and its exact native Windows targets. Scheduled
-group evaluation, pilot-to-broad promotion gates, automatic reconciliation and end-user restart
+activation rechecks that revision, membership and enabled inventory sources.
+Pilot-to-broad promotion gates, automatic reconciliation and end-user restart
 communication remain implementation work.
 An explicit cohort supports manual pilot selection; it is not an automatic ring
 promotion system or proof that Windows patches were installed.

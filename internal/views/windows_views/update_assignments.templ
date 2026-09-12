@@ -32,16 +32,14 @@ templ UpdateAssignmentForm(c echo.Context, info *partials.CommonInfo, draft Upda
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					@assignmentSource(info, draft.Ring)
-					@updateGroupPreview(info, draft.Group)
+					@updateGroupPreview(info, draft.Group, draft.Scheduled)
 					<p class="my-3">Select the exact native Windows devices for this revision. The next step checks their site and identity, then shows every selected device for review.</p>
 					if draft.Scheduled {
 						<p>Confirmation saves a future activation plan. The server creates device runs only when the activation window opens and the original source, devices and creator still permit the assignment.</p>
 					} else {
 						<p>No commands are created until you confirm.</p>
 					}
-					if !draft.Scheduled {
-						<a class="uk-button uk-button-default my-4" href={ templ.URL(updateGroupSelectionURL(info, draft.Ring, draft.Form.Get("mode"), nil)) }>{ i18n.T(ctx,"windows_groups.choose") }</a>
-					}
+					<a class="uk-button uk-button-default my-4" href={ templ.URL(updateGroupSelectionURL(info, draft.Ring, draft.Form.Get("mode"), nil, draft.Scheduled)) }>{ i18n.T(ctx,"windows_groups.choose") }</a>
 					<form class="grid gap-4" method="post" action={ partials.GetNavigationUrl(info, assignmentPath(draft)+"/preview") }>
 						@mdm_views.CSRF(info)
 						@updateGroupFields(draft)
@@ -109,7 +107,7 @@ templ UpdateAssignmentPreview(c echo.Context, info *partials.CommonInfo, draft U
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					@assignmentSource(info, draft.Ring)
-					@updateGroupPreview(info, draft.Group)
+					@updateGroupPreview(info, draft.Group, draft.Scheduled)
 					<p class="my-3">Nothing has been queued by this preview. Confirm the exact revision, action and complete device list below.</p>
 					<dl class="uk-description-list"><dt>Action</dt><dd>{ updateMode(draft.Form.Get("mode")) }</dd><dt>Site</dt><dd>{ ringScope(info) }</dd><dt>Selected devices</dt><dd>{ fmt.Sprint(len(draft.Devices)) }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("hours") } hours</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd></dl>
 					if draft.Scheduled {

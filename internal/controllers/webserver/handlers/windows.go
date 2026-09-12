@@ -33,7 +33,7 @@ func windowsCapability(method, path string) (access.Capability, bool) {
 		case "/windows/:id/updates", "/windows/:id/updates/:run", "/windows/:id/updates/new",
 			"/windows/update-rings", "/windows/update-rings/new", "/windows/update-rings/:ring", "/windows/update-rings/:ring/edit",
 			"/windows/update-rings/:ring/assign", "/windows/update-rings/:ring/assign/groups", "/windows/update-rollouts/:rollout",
-			"/windows/update-rings/:ring/schedule", "/windows/update-schedules", "/windows/update-schedules/:schedule":
+			"/windows/update-rings/:ring/schedule", "/windows/update-rings/:ring/schedule/groups", "/windows/update-schedules", "/windows/update-schedules/:schedule":
 			return access.ManageUpdates, true
 		}
 	}
@@ -72,6 +72,7 @@ func (h *Handler) RegisterWindows(e *echo.Echo) {
 		g.POST("/windows/update-rings/:ring/assign/create", h.WindowsCreateUpdateAssignment)
 		g.GET("/windows/update-rollouts/:rollout", h.WindowsUpdateRollout)
 		g.GET("/windows/update-rings/:ring/schedule", h.WindowsNewUpdateSchedule)
+		g.GET("/windows/update-rings/:ring/schedule/groups", h.WindowsUpdateScheduleGroups)
 		g.POST("/windows/update-rings/:ring/schedule/preview", h.WindowsPreviewUpdateSchedule)
 		g.POST("/windows/update-rings/:ring/schedule/create", h.WindowsCreateUpdateSchedule)
 		g.GET("/windows/update-schedules", h.WindowsUpdateSchedules)

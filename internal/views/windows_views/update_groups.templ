@@ -12,9 +12,13 @@ import (
 	"net/url"
 )
 
-func updateGroupSelectionURL(info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, g *inventory.DeviceGroup) string {
+func updateGroupSelectionURL(info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, g *inventory.DeviceGroup, scheduled bool) string {
 	q := url.Values{"revision": {fmt.Sprint(ring.Revision)}, "mode": {mode}}
-	path := "/windows/update-rings/" + ring.RingID + "/assign"
+	action := "assign"
+	if scheduled {
+		action = "schedule"
+	}
+	path := "/windows/update-rings/" + ring.RingID + "/" + action
 	if g == nil {
 		path += "/groups"
 	} else {
@@ -24,10 +28,10 @@ func updateGroupSelectionURL(info *partials.CommonInfo, ring windows.UpdateRingR
 	return partials.GetNavigationUrl(info, path) + "?" + q.Encode()
 }
 
-templ UpdateAssignmentGroups(c echo.Context, info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, page *inventory.DeviceGroupPage, paging mdm_views.DevicePagination) {
+templ UpdateAssignmentGroups(c echo.Context, info *partials.CommonInfo, ring windows.UpdateRingRevision, mode string, page *inventory.DeviceGroupPage, paging mdm_views.DevicePagination, scheduled bool) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "windows_groups.choose"), Url: updateGroupSelectionURL(info, ring, mode, nil)}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "windows_groups.choose"), Url: updateGroupSelectionURL(info, ring, mode, nil, scheduled)}}, info)
 		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="windows-group-choice">
 			<div>
 				<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"windows_groups.choose") }</h1>
@@ -45,7 +49,7 @@ templ UpdateAssignmentGroups(c echo.Context, info *partials.CommonInfo, ring win
 							if g.Archived {
 								<p>{ i18n.T(ctx,"mdm.groups.archived") }</p>
 							} else {
-								<a class="uk-button uk-button-default" href={ templ.URL(updateGroupSelectionURL(info, ring, mode, &g)) }>{ i18n.T(ctx,"windows_groups.select") }</a>
+								<a class="uk-button uk-button-default" href={ templ.URL(updateGroupSelectionURL(info, ring, mode, &g, scheduled)) }>{ i18n.T(ctx,"windows_groups.select") }</a>
 							}
 						</article>
 					}
@@ -70,10 +74,13 @@ templ updateGroupSource(info *partials.CommonInfo, source *windows.UpdateGroupSo
 	}
 }
 
-templ updateGroupPreview(info *partials.CommonInfo, preview *windows.UpdateGroupPreview) {
+templ updateGroupPreview(info *partials.CommonInfo, preview *windows.UpdateGroupPreview, scheduled bool) {
 	if preview!=nil {
 		@updateGroupSource(info, &preview.Source)
 		<p class="uk-text-muted my-3">{ i18n.T(ctx,"windows_groups.review_help") }</p>
+		if scheduled {
+			<p class="uk-text-muted my-3">{ i18n.T(ctx,"windows_groups.schedule_help") }</p>
+		}
 		<div data-group-exclusions>
 			<h3 class="font-semibold">{ i18n.T(ctx,"windows_groups.excluded",len(preview.Excluded)) }</h3>
 			for _,entry:=range preview.Excluded {
@@ -84,7 +91,7 @@ templ updateGroupPreview(info *partials.CommonInfo, preview *windows.UpdateGroup
 }
 
 templ updateGroupFields(draft UpdateAssignmentDraft) {
-	if !draft.Scheduled && draft.Form.Get("group_id")!="" {
+	if draft.Form.Get("group_id")!="" {
 		<input type="hidden" name="group_id" value={ draft.Form.Get("group_id") }/>
 		<input type="hidden" name="group_revision" value={ draft.Form.Get("group_revision") }/>
 	}

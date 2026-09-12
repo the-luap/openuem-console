@@ -49,6 +49,12 @@ func (h *Handler) windowsAssignmentGroup(c echo.Context, scope access.Scope, for
 	return preview, nil
 }
 func (h *Handler) WindowsUpdateAssignmentGroups(c echo.Context) error {
+	return h.windowsUpdateAssignmentGroups(c, false)
+}
+func (h *Handler) WindowsUpdateScheduleGroups(c echo.Context) error {
+	return h.windowsUpdateAssignmentGroups(c, true)
+}
+func (h *Handler) windowsUpdateAssignmentGroups(c echo.Context, scheduled bool) error {
 	info, scope, err := h.windowsRingContext(c)
 	if err != nil {
 		return err
@@ -73,7 +79,11 @@ func (h *Handler) WindowsUpdateAssignmentGroups(c echo.Context) error {
 	if err != nil {
 		return groupError(c, err)
 	}
-	path := partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID+"/assign/groups")
+	action := "assign"
+	if scheduled {
+		action = "schedule"
+	}
+	path := partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID+"/"+action+"/groups")
 	pageURL := func(after string) string {
 		q := url.Values{"revision": {strconv.FormatInt(revision, 10)}, "mode": {mode}}
 		if after != "" {
@@ -88,7 +98,7 @@ func (h *Handler) WindowsUpdateAssignmentGroups(c echo.Context) error {
 	if groups.Next != "" {
 		paging.Next = pageURL(groups.Next)
 	}
-	return renderApple(c, windows_views.UpdateAssignmentGroups(c, info, *ring, mode, groups, paging))
+	return renderApple(c, windows_views.UpdateAssignmentGroups(c, info, *ring, mode, groups, paging, scheduled))
 }
 
 func windowsGroupFailure(c echo.Context, err error) error {

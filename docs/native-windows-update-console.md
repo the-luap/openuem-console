@@ -98,7 +98,7 @@ silently substitutes a newer revision.
 
 Enter 1–100 distinct native Windows UUIDs, one per line, from the selected site's
 native Windows inventory. This explicit list is separate from agent identities,
-reported hardware IDs. The immediate assignment form can also
+reported hardware IDs. Immediate and scheduled assignment forms can also
 [select a reviewed dynamic group](native-windows-update-groups.md). Blank internal lines, duplicate IDs,
 noncanonical UUIDs and more than 100 targets are rejected. The field is bounded
 to 4,000 bytes inside the existing 8 KiB body limit. LF and CRLF lists and ordinary

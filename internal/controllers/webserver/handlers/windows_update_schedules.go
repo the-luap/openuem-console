@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/views/windows_views"
 )
@@ -15,7 +16,7 @@ import (
 const windowsScheduleTimeLayout = "2006-01-02T15:04"
 
 func windowsScheduleNames() []string {
-	return []string{"ring_revision", "request_key", "mode", "hours", "devices", "not_before", "activation_minutes", "confirm_schedule"}
+	return []string{"ring_revision", "request_key", "mode", "hours", "devices", "not_before", "activation_minutes", "confirm_schedule", "group_id", "group_revision"}
 }
 
 // Parse only immutable timing syntax here. A new-work clock check belongs in
@@ -70,7 +71,19 @@ func (h *Handler) WindowsCreateUpdateSchedule(c echo.Context) error {
 	if form.Get("confirm_schedule") != "yes" {
 		return echo.NewHTTPError(400, "Review and confirm the exact revision, devices and activation window")
 	}
-	schedule, err := h.Windows.ScheduleUpdateRing(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", start, window, lifetime)
+	groupID, groupRevision, err := windowsAssignmentGroupReference(form)
+	if err != nil {
+		return windowsGroupFailure(c, err)
+	}
+	var schedule *windows.UpdateSchedule
+	if groupID != "" {
+		schedule, err = h.Windows.ScheduleUpdateRingFromGroup(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", start, window, lifetime, inventory.DeviceSources{Apple: h.Apple != nil, Windows: h.Windows != nil}, groupID, groupRevision)
+	} else {
+		schedule, err = h.Windows.ScheduleUpdateRing(c.Request().Context(), h.appleActor(c), scope, c.Param("ring"), revision, form.Get("request_key"), targets, form.Get("mode") == "remove", start, window, lifetime)
+	}
+	if errors.Is(err, windows.ErrUpdateGroup) || errors.Is(err, windows.ErrUpdateGroupConflict) || errors.Is(err, windows.ErrUpdateGroupLarge) {
+		return windowsGroupFailure(c, err)
+	}
 	if err != nil {
 		return windowsScheduleFailure(err)
 	}

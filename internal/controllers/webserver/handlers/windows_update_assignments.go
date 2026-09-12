@@ -91,10 +91,7 @@ func (h *Handler) windowsNewAssignment(c echo.Context, scheduled bool) error {
 	if err != nil {
 		return err
 	}
-	allowed := []string{"revision", "mode"}
-	if !scheduled {
-		allowed = append(allowed, "group", "group_revision")
-	}
+	allowed := []string{"revision", "mode", "group", "group_revision"}
 	query, err := groupQuery(c, allowed...)
 	if err != nil {
 		return groupError(c, err)
@@ -174,14 +171,12 @@ func (h *Handler) windowsPreviewAssignment(c echo.Context, scheduled bool) error
 		draft.Error = parseErr.Error()
 		return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))
 	}
-	if !scheduled {
-		draft.Group, err = h.windowsAssignmentGroup(c, scope, form)
-		if err != nil {
-			return err
-		}
-		if draft.Group != nil && !slices.Equal(draft.Group.Targets, targets) {
-			return windowsGroupFailure(c, windows.ErrUpdateGroupConflict)
-		}
+	draft.Group, err = h.windowsAssignmentGroup(c, scope, form)
+	if err != nil {
+		return err
+	}
+	if draft.Group != nil && !slices.Equal(draft.Group.Targets, targets) {
+		return windowsGroupFailure(c, windows.ErrUpdateGroupConflict)
 	}
 	if form.Get("edit_assignment") == "yes" {
 		return renderApple(c, windows_views.UpdateAssignmentForm(c, info, draft))

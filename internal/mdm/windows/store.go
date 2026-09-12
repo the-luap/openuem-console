@@ -11,6 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
@@ -21,9 +22,10 @@ var (
 )
 
 type Store struct {
-	db          *sql.DB
-	permissions *access.Store
-	secrets     *authoritySecretBox
+	groupSources inventory.DeviceSources
+	db           *sql.DB
+	permissions  *access.Store
+	secrets      *authoritySecretBox
 }
 
 func NewStore(db *sql.DB) (*Store, error) {
@@ -34,7 +36,7 @@ func NewStore(db *sql.DB) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db, permissions: permissions}, nil
+	return &Store{db: db, permissions: permissions, groupSources: inventory.DeviceSources{Windows: true}}, nil
 }
 
 // NewStoreWithMasterKey enables protected CA operations. The key is a canonical
@@ -124,4 +126,16 @@ func (s *Store) authorizeInvitationConsole(ctx context.Context, tx *sql.Tx, acto
 func auditInvitation(ctx context.Context, tx *sql.Tx, invitation EnrollmentInvitation, actor, action string) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO mdm_windows_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,$4,$5)`, invitation.TenantID, invitation.SiteID, actor, action, invitation.ID)
 	return err
+}
+
+// WithGroupInventorySources returns a configured copy for a server's enabled
+// inventory stores. Configure it before starting the maintenance worker; the
+// original store and any existing worker retain their own immutable settings.
+func (s *Store) WithGroupInventorySources(sources inventory.DeviceSources) *Store {
+	if s == nil {
+		return nil
+	}
+	configured := *s
+	configured.groupSources = sources
+	return &configured
 }

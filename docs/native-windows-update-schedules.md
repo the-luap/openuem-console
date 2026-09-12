@@ -8,8 +8,10 @@ rollouts. Concurrent workers and process restarts cannot activate one plan twice
 
 The [optional Windows listener](native-windows-operations.md) now starts the
 worker at server startup and cancels it during shutdown. Reviewed console forms,
-protected history and pending-plan cancellation are available. Dynamic group
-selection and pilot promotion gates remain implementation work. This is scheduled policy
+protected history and pending-plan cancellation are available. Reviewed
+[dynamic group selection](native-windows-update-groups.md) rechecks the original
+revision and native Windows membership at activation. Pilot promotion gates
+remain implementation work. This is scheduled policy
 assignment, not evidence of patch installation or an automatic patch rollout gate.
 
 ## Schedule from the console
@@ -21,6 +23,12 @@ date/time in **UTC**, a window of 1–10,080 whole minutes and a per-device admi
 lifetime of 1–168 whole hours. The browser's localized date display does not
 convert the entered time from its local timezone. The preview displays both UTC
 window boundaries, including date rollover, and every selected device.
+
+Alternatively, choose devices from a dynamic site group. The form shows its
+revision, rules, native Windows targets and excluded management identities.
+Targets are read-only; choosing the group again starts a fresh draft. Creation
+and activation both recheck the reviewed native membership. A changed group or
+enabled inventory source configuration blocks the plan and requires new review.
 
 The preview uses the same scoped, audited source/device checks as immediate
 assignment. It preserves invalid drafts and shows each current certificate's
@@ -58,6 +66,7 @@ or under `/tenant/:tenant` and `/tenant/:tenant/site/:site`:
 | Method and path | Behavior |
 | --- | --- |
 | `GET /windows/update-rings/:ring/schedule?revision=N&mode=apply` | Draft a reviewed schedule; mode may also be `remove` |
+| `GET /windows/update-rings/:ring/schedule/groups?revision=N&mode=apply` | Choose a dynamic group revision in the selected site |
 | `POST /windows/update-rings/:ring/schedule/preview` | Validate/review timing and all devices, or return to editing |
 | `POST /windows/update-rings/:ring/schedule/create` | Confirm and save immutable future intent |
 | `GET /windows/update-schedules` | Audited site history |
@@ -95,6 +104,7 @@ and restart acceptance still required.
 | API | Behavior |
 | --- | --- |
 | `ScheduleUpdateRing` | Saves immutable source/target/timing intent; exact request retries return the same plan |
+| `ScheduleUpdateRingFromGroup` | Additionally captures the reviewed group revision and enabled inventory sources; activation rechecks exact native membership |
 | `UpdateScheduleDetails` | Audited original targets, timing, state, reason and activated rollout link |
 | `UpdateSchedules` | Audited site history; at most 100 plans per page, offset at most 100,000 |
 | `CancelUpdateSchedule` | Requires the reviewed state revision; cancels only scheduled/waiting plans |
@@ -128,7 +138,8 @@ sent/unknown outcome boundaries.
 Queue capacity failure records `device_queue_full`. Admission lifetime expiry
 records `admission_deadline_expired`; neither preserves partially inserted runs.
 Blocked reasons distinguish authority changes, scope changes, ring assignment
-conflicts and unavailable devices. A terminal state cannot be rewritten into an
+conflicts, unavailable devices, changed groups (`group_changed`) and changed
+inventory source configuration (`group_sources_changed`). A terminal state cannot be rewritten into an
 active plan. Attempt and state revision counters remain visible in protected
 reads, with append-only audit events.
 
@@ -156,6 +167,13 @@ State encryption also binds phase, revision, attempts, backoff, update/completio
 times and rollout link. SQL triggers preserve immutable intent and terminal
 history; foreign keys bind one activated rollout to its original schedule.
 
+Version-2 encrypted target intent adds the exact group source and enabled stores.
+Legacy explicit-target intent remains version 1. Group/source fields in a legacy
+plan, missing group/source fields in a version-2 plan and invalid group metadata
+are rejected. No additional schema migration is required; older readers cannot
+process version-2 group plans. Server startup supplies the same inventory source
+configuration to console admission and the maintenance worker.
+
 A scheduled rollout gets a deterministic activation request UUID and a separate
 schedule binding in its encrypted purpose. Before its device commands can be
 delivered, replayed or read, source proof checks the authenticated activated plan,
@@ -164,7 +182,21 @@ Direct assignment retries cannot borrow a scheduled rollout identity. Existing
 immediate ring cohorts and direct update runs retain their original encryption
 purposes and exact protocol replay across migration.
 
+Group source proof also requires the cohort's original ID, revision, name and
+rules to match its protected activated plan. Later group edits do not affect an
+already admitted cohort. Exact creation replay preserves the original plan even
+after a source configuration change; it cannot create new work or rearm history.
+
 ## Verification
+
+The group extension passes the complete actual Linux PostgreSQL 17/race suite
+(190.222 seconds), registered console routes, Linux handler/view/catalog race
+checks and the full Linux build. Thirty-six group browser cases include scheduled
+source selection, UTC timing, confirmation, history and both blocked causes at
+390/768/1440 pixels; 42 existing group/list/navigation cases also pass. Additional
+database tests cover group changes, source configuration changes, original
+provenance during delivery, protected intent rejection and late audit rollback.
+The following timing and workflow evidence describes earlier scheduling changes.
 
 Synthetic PostgreSQL tests cover future/due timing, parallel workers, restart,
 exactly-once activation, ring/permission/device changes, cancellation locking,

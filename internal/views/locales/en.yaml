@@ -1,5 +1,8 @@
 en:
   windows_groups:
+    schedule_help: "The group revision, selected native Windows members and enabled inventory sources are checked again when the activation window opens. A changed selection blocks the plan and requires a new review. No new members are added automatically."
+    group_changed: "The reviewed group revision or native Windows membership changed before activation. Review the current group and create a new plan."
+    sources_changed: "The enabled inventory sources changed before activation. Review the current group and create a new plan."
     selected_help: "These device IDs come from the selected group revision. Choose the group again to refresh its members."
     choose: "Choose devices from a dynamic group"
     choice_help: "Choose an active group in this site. The next step selects its native Windows members and lists other management identities as exclusions. The complete group must contain no more than 100 devices."

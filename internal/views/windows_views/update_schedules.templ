@@ -26,11 +26,21 @@ templ UpdateSchedules(c echo.Context, info *partials.CommonInfo, rows []UpdateSc
 							<caption class="sr-only">Update schedules in this site</caption><thead><tr><th scope="col">Ring / schedule</th><th scope="col">Action / devices</th><th scope="col">Status</th><th scope="col">Activation window (UTC)</th></tr></thead>
 							<tbody>
 								for _,row:=range rows {
-									<tr><td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules/"+row.Schedule.ID)) }>{ row.Name } · Revision { fmt.Sprint(row.Schedule.RingRevision) }</a><div class="text-sm">{ row.Schedule.ID }</div></td><td>{ updateMode(row.Schedule.Mode) }<div>{ fmt.Sprint(len(row.Schedule.Targets)) } devices</div></td><td>{ scheduleState(row.Schedule.Phase) }</td><td><div>From{ " " }
-										@ScheduleTime(row.Schedule.NotBefore)
-									</div><div>Until{ " " }
-										@ScheduleTime(row.Schedule.ExpiresAt)
-									</div></td></tr>
+									<tr>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules/"+row.Schedule.ID)) }>{ row.Name } · Revision { fmt.Sprint(row.Schedule.RingRevision) }</a><div class="text-sm">{ row.Schedule.ID }</div></td>
+										<td>{ updateMode(row.Schedule.Mode) }<div>{ fmt.Sprint(len(row.Schedule.Targets)) } devices</div></td>
+										<td>{ scheduleState(row.Schedule.Phase) }</td>
+										<td>
+											<div>
+												From{ " " }
+												@ScheduleTime(row.Schedule.NotBefore)
+											</div>
+											<div>
+												Until{ " " }
+												@ScheduleTime(row.Schedule.ExpiresAt)
+											</div>
+										</td>
+									</tr>
 								}
 							</tbody>
 						</table>
@@ -64,27 +74,54 @@ templ UpdateSchedule(c echo.Context, info *partials.CommonInfo, schedule windows
 				<div class="uk-card-body">
 					<h2 class="uk-card-title">{ scheduleState(schedule.Phase) }</h2>
 					if schedule.Reason!="" {
-						<p class="my-3">{ scheduleReason(schedule.Reason) }</p>
+						<p class="my-3">{ scheduleReason(ctx,schedule.Reason) }</p>
 					}
-					<dl class="uk-description-list"><dt>Schedule ID</dt><dd>{ schedule.ID }</dd><dt>Action</dt><dd>{ updateMode(schedule.Mode) }</dd><dt>Activate no earlier than</dt><dd>
-						@ScheduleTime(schedule.NotBefore)
-					</dd><dt>Activation window closes</dt><dd>
-						@ScheduleTime(schedule.ExpiresAt)
-					</dd><dt>Per-device admission lifetime after activation</dt><dd>{ fmt.Sprint(int64(schedule.Lifetime/time.Second)) } seconds</dd><dt>Created</dt><dd>
-						@ScheduleTime(schedule.CreatedAt)
-					</dd><dt>Created by</dt><dd>{ schedule.CreatedBy }</dd><dt>State revision</dt><dd>{ fmt.Sprint(schedule.Revision) }</dd><dt>Last state update</dt><dd>
-						@ScheduleTime(schedule.UpdatedAt)
-					</dd><dt>Activation attempts</dt><dd>{ fmt.Sprint(schedule.Attempts) }</dd></dl>
+					<dl class="uk-description-list">
+						<dt>Schedule ID</dt>
+						<dd>{ schedule.ID }</dd>
+						<dt>Action</dt>
+						<dd>{ updateMode(schedule.Mode) }</dd>
+						<dt>Activate no earlier than</dt>
+						<dd>
+							@ScheduleTime(schedule.NotBefore)
+						</dd>
+						<dt>Activation window closes</dt>
+						<dd>
+							@ScheduleTime(schedule.ExpiresAt)
+						</dd>
+						<dt>Per-device admission lifetime after activation</dt>
+						<dd>{ fmt.Sprint(int64(schedule.Lifetime/time.Second)) } seconds</dd>
+						<dt>Created</dt>
+						<dd>
+							@ScheduleTime(schedule.CreatedAt)
+						</dd>
+						<dt>Created by</dt>
+						<dd>{ schedule.CreatedBy }</dd>
+						<dt>State revision</dt>
+						<dd>{ fmt.Sprint(schedule.Revision) }</dd>
+						<dt>Last state update</dt>
+						<dd>
+							@ScheduleTime(schedule.UpdatedAt)
+						</dd>
+						<dt>Activation attempts</dt>
+						<dd>{ fmt.Sprint(schedule.Attempts) }</dd>
+					</dl>
 					if canCancelSchedule(schedule) {
-						<dl class="uk-description-list"><dt>Next attempt no earlier than</dt><dd>
-							@ScheduleTime(schedule.NextAttemptAt)
-						</dd></dl>
+						<dl class="uk-description-list">
+							<dt>Next attempt no earlier than</dt>
+							<dd>
+								@ScheduleTime(schedule.NextAttemptAt)
+							</dd>
+						</dl>
 						<p>The worker rechecks the original creator, ring and devices before creating all device runs together. Queue capacity is not reserved. Waiting plans may retry only within their activation window.</p>
 					}
 					if schedule.CompletedAt!=nil {
-						<dl class="uk-description-list"><dt>Plan reached its terminal state</dt><dd>
-							@ScheduleTime(*schedule.CompletedAt)
-						</dd></dl>
+						<dl class="uk-description-list">
+							<dt>Plan reached its terminal state</dt>
+							<dd>
+								@ScheduleTime(*schedule.CompletedAt)
+							</dd>
+						</dl>
 					}
 					if schedule.RolloutID!="" {
 						<a class="uk-button uk-button-primary my-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rollouts/"+schedule.RolloutID)) }>Open activated device runs</a>
@@ -106,6 +143,7 @@ templ UpdateSchedule(c echo.Context, info *partials.CommonInfo, schedule windows
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body">
 					@assignmentSource(info, ring)
+					@updateGroupSource(info, schedule.Group)
 					<p class="my-3">These are the originally reviewed settings. Later ring edits do not replace this plan's source. Removal uses the selected configuration nodes; other sources' effective values may remain.</p>
 					@ringPolicyValues(ring.Policy)
 				</div>

@@ -74,10 +74,11 @@ Eighteen Chrome cases cover list, empty, detail, archived, viewer and long text
 at 390, 768 and 1440 pixels, including keyboard submission and revision links.
 The twelve existing device-list and twelve navigation cases also pass.
 
-[Immediate native Windows ring assignments](native-windows-update-groups.md) now
+[Immediate and scheduled native Windows ring assignments](native-windows-update-groups.md) now
 capture reviewed site group revisions and exact native Windows target sets, with
-other management identities shown as exclusions. Apple/software assignments,
-scheduled group evaluation, exceptions, broader conflict previews, pilot promotion
+other management identities shown as exclusions. Scheduled activation rechecks
+the original revision, native membership and enabled sources. Apple/software assignments,
+exceptions, broader conflict previews, pilot promotion
 and richer predicates remain
 roadmap work. Those operations must establish their own action eligibility,
 current authorization and revision-bound target evidence. Production-scale

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
@@ -38,7 +39,8 @@ type updateStoredRollout struct {
 }
 
 type updateRolloutTargets struct {
-	Group   *updateGroupIntent `json:",omitempty"`
+	Sources *inventory.DeviceSources `json:",omitempty"`
+	Group   *updateGroupIntent       `json:",omitempty"`
 	Version int
 	Devices []string
 }
@@ -96,7 +98,7 @@ func (s *Store) openUpdateRollout(r *updateStoredRollout) error {
 	}
 	defer clear(plain)
 	var decoded updateRolloutTargets
-	if decodeSyncMLProtectedJSON(plain, &decoded) != nil || (decoded.Version != 1 && decoded.Version != 2) || (decoded.Version == 1 && decoded.Group != nil) || (decoded.Version == 2 && (!validUpdateGroupSource(decoded.Group.source()) || r.ScheduleID != "")) {
+	if decodeSyncMLProtectedJSON(plain, &decoded) != nil || (decoded.Version != 1 && decoded.Version != 2) || (decoded.Version == 1 && decoded.Group != nil) || (decoded.Version == 2 && !validUpdateGroupSource(decoded.Group.source())) || decoded.Sources != nil {
 		return ErrAuthoritySecret
 	}
 	targets, err := canonicalUpdateTargets(decoded.Devices)
@@ -248,14 +250,14 @@ func (s *Store) assignUpdateRingTx(ctx context.Context, tx *sql.Tx, actor string
 	}
 	var groupSource *UpdateGroupSource
 	if group != nil {
-		if schedule != nil {
-			return nil, ErrUpdateGroup
-		}
 		preview, err := s.updateGroupPreviewTx(ctx, tx, actor, scope, group.Sources, group.ID, group.Revision)
 		if err != nil {
 			return nil, err
 		}
 		if !slices.Equal(preview.Targets, targets) {
+			return nil, ErrUpdateGroupConflict
+		}
+		if schedule != nil && (schedule.Group == nil || *schedule.Group != preview.Source) {
 			return nil, ErrUpdateGroupConflict
 		}
 		groupSource = &preview.Source

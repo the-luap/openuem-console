@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
@@ -19,30 +20,32 @@ var ErrUpdateScheduleConflict = errors.New("native Windows update schedule revis
 var ErrUpdateScheduleFull = errors.New("native Windows update schedule limit reached")
 
 type UpdateSchedule struct {
-	ID                string        `json:"-" xml:"-"`
-	Scope             access.Scope  `json:"-" xml:"-"`
-	RequestKey        string        `json:"-" xml:"-"`
-	RingID            string        `json:"-" xml:"-"`
-	RingRevision      int64         `json:"-" xml:"-"`
-	CreatedBy         string        `json:"-" xml:"-"`
-	CreatedByRevision int64         `json:"-" xml:"-"`
-	Mode              string        `json:"-" xml:"-"`
-	Lifetime          time.Duration `json:"-" xml:"-"`
-	CreatedAt         time.Time     `json:"-" xml:"-"`
-	NotBefore         time.Time     `json:"-" xml:"-"`
-	ExpiresAt         time.Time     `json:"-" xml:"-"`
-	Targets           []string      `json:"-" xml:"-"`
-	Phase             string        `json:"-" xml:"-"`
-	Revision          int64         `json:"-" xml:"-"`
-	UpdatedAt         time.Time     `json:"-" xml:"-"`
-	NextAttemptAt     time.Time     `json:"-" xml:"-"`
-	Attempts          int           `json:"-" xml:"-"`
-	CompletedAt       *time.Time    `json:"-" xml:"-"`
-	RolloutID         string        `json:"-" xml:"-"`
-	Reason            string        `json:"-" xml:"-"`
+	Group             *UpdateGroupSource `json:"-" xml:"-"`
+	ID                string             `json:"-" xml:"-"`
+	Scope             access.Scope       `json:"-" xml:"-"`
+	RequestKey        string             `json:"-" xml:"-"`
+	RingID            string             `json:"-" xml:"-"`
+	RingRevision      int64              `json:"-" xml:"-"`
+	CreatedBy         string             `json:"-" xml:"-"`
+	CreatedByRevision int64              `json:"-" xml:"-"`
+	Mode              string             `json:"-" xml:"-"`
+	Lifetime          time.Duration      `json:"-" xml:"-"`
+	CreatedAt         time.Time          `json:"-" xml:"-"`
+	NotBefore         time.Time          `json:"-" xml:"-"`
+	ExpiresAt         time.Time          `json:"-" xml:"-"`
+	Targets           []string           `json:"-" xml:"-"`
+	Phase             string             `json:"-" xml:"-"`
+	Revision          int64              `json:"-" xml:"-"`
+	UpdatedAt         time.Time          `json:"-" xml:"-"`
+	NextAttemptAt     time.Time          `json:"-" xml:"-"`
+	Attempts          int                `json:"-" xml:"-"`
+	CompletedAt       *time.Time         `json:"-" xml:"-"`
+	RolloutID         string             `json:"-" xml:"-"`
+	Reason            string             `json:"-" xml:"-"`
 }
 
 type updateStoredSchedule struct {
+	groupSources inventory.DeviceSources
 	UpdateSchedule
 	encryptedTargets []byte
 	encryptedState   []byte
@@ -90,7 +93,7 @@ func (s *Store) openUpdateSchedule(r *updateStoredSchedule) error {
 	}
 	defer clear(plain)
 	var targetSet updateRolloutTargets
-	if decodeSyncMLProtectedJSON(plain, &targetSet) != nil || targetSet.Version != 1 || targetSet.Group != nil {
+	if decodeSyncMLProtectedJSON(plain, &targetSet) != nil || (targetSet.Version != 1 && targetSet.Version != 2) || (targetSet.Version == 1 && (targetSet.Group != nil || targetSet.Sources != nil)) || (targetSet.Version == 2 && (!validUpdateGroupSource(targetSet.Group.source()) || targetSet.Sources == nil || !targetSet.Sources.Windows)) {
 		return ErrAuthoritySecret
 	}
 	targets, err := canonicalUpdateTargets(targetSet.Devices)
@@ -107,12 +110,16 @@ func (s *Store) openUpdateSchedule(r *updateStoredSchedule) error {
 		return ErrAuthoritySecret
 	}
 	r.Targets, r.Reason = targets, state.Reason
+	r.Group = targetSet.Group.source()
+	if targetSet.Sources != nil {
+		r.groupSources = *targetSet.Sources
+	}
 	return nil
 }
 
 func updateScheduleReason(reason string) bool {
 	switch reason {
-	case "", "device_queue_full", "authority_changed", "ring_assignment_conflict", "admission_deadline_expired", "device_unavailable", "scope_changed", "activation_window_expired", "canceled_by_operator":
+	case "group_changed", "group_sources_changed", "", "device_queue_full", "authority_changed", "ring_assignment_conflict", "admission_deadline_expired", "device_unavailable", "scope_changed", "activation_window_expired", "canceled_by_operator":
 		return true
 	default:
 		return false
@@ -170,7 +177,7 @@ func (s *Store) validateUpdateRolloutSchedule(ctx context.Context, tx *sql.Tx, r
 	if err := s.openUpdateSchedule(r); err != nil {
 		return err
 	}
-	if r.Phase != "activated" || r.RolloutID != rollout.ID || r.RingID != rollout.RingID || r.RingRevision != rollout.RingRevision || r.CreatedBy != rollout.CreatedBy || r.CreatedByRevision != rollout.CreatedByRevision || r.Mode != rollout.Mode || r.Lifetime != rollout.Lifetime || !slices.Equal(r.Targets, rollout.targets) || rollout.RequestKey != updateScheduleRolloutRequest(r.ID) || rollout.CreatedAt.Before(r.NotBefore) || rollout.CreatedAt.Before(r.CreatedAt) || r.CompletedAt == nil || rollout.CreatedAt.After(*r.CompletedAt) || !r.CompletedAt.Before(r.ExpiresAt) {
+	if !sameUpdateGroupSource(r.Group, rollout.Group) || r.Phase != "activated" || r.RolloutID != rollout.ID || r.RingID != rollout.RingID || r.RingRevision != rollout.RingRevision || r.CreatedBy != rollout.CreatedBy || r.CreatedByRevision != rollout.CreatedByRevision || r.Mode != rollout.Mode || r.Lifetime != rollout.Lifetime || !slices.Equal(r.Targets, rollout.targets) || rollout.RequestKey != updateScheduleRolloutRequest(r.ID) || rollout.CreatedAt.Before(r.NotBefore) || rollout.CreatedAt.Before(r.CreatedAt) || r.CompletedAt == nil || rollout.CreatedAt.After(*r.CompletedAt) || !r.CompletedAt.Before(r.ExpiresAt) {
 		return ErrAuthoritySecret
 	}
 	return nil
@@ -179,6 +186,10 @@ func (s *Store) validateUpdateRolloutSchedule(ctx context.Context, tx *sql.Tx, r
 // ScheduleUpdateRing saves reviewed future intent without reserving device queue
 // slots or changing device settings. Timing is an absolute instant, not local DST.
 func (s *Store) ScheduleUpdateRing(ctx context.Context, actor string, scope access.Scope, ringID string, ringRevision int64, requestKey string, devices []string, remove bool, notBefore time.Time, activationWindow, runLifetime time.Duration) (*UpdateSchedule, error) {
+	return s.scheduleUpdateRing(ctx, actor, scope, ringID, ringRevision, requestKey, devices, remove, notBefore, activationWindow, runLifetime, nil)
+}
+
+func (s *Store) scheduleUpdateRing(ctx context.Context, actor string, scope access.Scope, ringID string, ringRevision int64, requestKey string, devices []string, remove bool, notBefore time.Time, activationWindow, runLifetime time.Duration, group *updateGroupSelection) (*UpdateSchedule, error) {
 	if s == nil || s.db == nil {
 		return nil, ErrStore
 	}
@@ -216,7 +227,7 @@ func (s *Store) ScheduleUpdateRing(ctx context.Context, actor string, scope acce
 		if err := s.openUpdateSchedule(previous); err != nil {
 			return nil, err
 		}
-		if previous.RingID != ringID || previous.RingRevision != ringRevision || previous.CreatedBy != actor || previous.CreatedByRevision != permissionRevision || previous.Mode != mode || previous.Lifetime != runLifetime || !previous.NotBefore.Equal(notBefore) || previous.ExpiresAt.Sub(previous.NotBefore) != activationWindow || !slices.Equal(previous.Targets, targets) {
+		if !matchesUpdateGroupSelection(previous.Group, group) || previous.RingID != ringID || previous.RingRevision != ringRevision || previous.CreatedBy != actor || previous.CreatedByRevision != permissionRevision || previous.Mode != mode || previous.Lifetime != runLifetime || !previous.NotBefore.Equal(notBefore) || previous.ExpiresAt.Sub(previous.NotBefore) != activationWindow || !slices.Equal(previous.Targets, targets) {
 			return nil, ErrUpdateScheduleConflict
 		}
 		if err := auditUpdateSchedule(ctx, tx, previous, actor, "schedule.replayed"); err != nil {
@@ -243,6 +254,20 @@ func (s *Store) ScheduleUpdateRing(ctx context.Context, actor string, scope acce
 	if !remove && (current != ringRevision || !ring.Enabled) {
 		return nil, ErrUpdateRingConflict
 	}
+	var groupSource *UpdateGroupSource
+	if group != nil {
+		if group.Sources != s.groupSources {
+			return nil, ErrUpdateGroupConflict
+		}
+		preview, err := s.updateGroupPreviewTx(ctx, tx, actor, scope, group.Sources, group.ID, group.Revision)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Equal(preview.Targets, targets) {
+			return nil, ErrUpdateGroupConflict
+		}
+		groupSource = &preview.Source
+	}
 	for _, device := range targets {
 		if err := s.authorizeWindowsConsole(ctx, tx, actor, access.ManageUpdates, scope, device, false); err != nil {
 			return nil, err
@@ -262,7 +287,7 @@ func (s *Store) ScheduleUpdateRing(ctx context.Context, actor string, scope acce
 	if count >= 256 {
 		return nil, ErrUpdateScheduleFull
 	}
-	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, RingID: ringID, RingRevision: ringRevision, CreatedBy: actor, CreatedByRevision: permissionRevision, Mode: mode, Lifetime: runLifetime, NotBefore: notBefore, ExpiresAt: notBefore.Add(activationWindow), Targets: targets, Phase: "scheduled", Revision: 1, NextAttemptAt: notBefore}}
+	r := &updateStoredSchedule{UpdateSchedule: UpdateSchedule{Group: groupSource, ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, RingID: ringID, RingRevision: ringRevision, CreatedBy: actor, CreatedByRevision: permissionRevision, Mode: mode, Lifetime: runLifetime, NotBefore: notBefore, ExpiresAt: notBefore.Add(activationWindow), Targets: targets, Phase: "scheduled", Revision: 1, NextAttemptAt: notBefore}}
 	if err := tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&r.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -270,7 +295,14 @@ func (s *Store) ScheduleUpdateRing(ctx context.Context, actor string, scope acce
 		return nil, ErrUpdateSchedule
 	}
 	r.UpdatedAt = r.CreatedAt
-	data, err := json.Marshal(updateRolloutTargets{Version: 1, Devices: targets})
+	intent := updateRolloutTargets{Version: 1, Devices: targets}
+	if group != nil {
+		r.groupSources = group.Sources
+		intent.Version = 2
+		intent.Group = sealUpdateGroupSource(groupSource)
+		intent.Sources = &r.groupSources
+	}
+	data, err := json.Marshal(intent)
 	if err != nil {
 		return nil, ErrUpdateSchedule
 	}

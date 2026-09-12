@@ -1,8 +1,11 @@
 package windows_views
 
 import (
-	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"context"
 	"time"
+
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
 )
 
 type UpdateScheduleTarget struct {
@@ -36,8 +39,12 @@ func scheduleState(state string) string {
 	}
 }
 
-func scheduleReason(reason string) string {
+func scheduleReason(ctx context.Context, reason string) string {
 	switch reason {
+	case "group_changed":
+		return i18n.T(ctx, "windows_groups.group_changed")
+	case "group_sources_changed":
+		return i18n.T(ctx, "windows_groups.sources_changed")
 	case "device_queue_full":
 		return "A selected device's queue is full"
 	case "authority_changed":

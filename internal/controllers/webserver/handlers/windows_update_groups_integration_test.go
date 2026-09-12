@@ -75,7 +75,7 @@ func exerciseWindowsGroupAssignments(t *testing.T, h *Handler, ctx context.Conte
 	for _, query := range []string{"?revision=1&group=%zz", "?revision=1&group_revision=1", "?revision=1&group=" + group.ID, "?revision=1&group_revision=1&group_revision=2&group=" + group.ID} {
 		require.Equal(t, 400, request("scoped-operator", "GET", base+query, nil).Code)
 	}
-	// Schedules have their own fixed-target review; group fields cannot be ignored.
+	// Schedule forms reject the immediate assignment confirmation field.
 	scheduled := strings.TrimSuffix(base, "assign") + "schedule/preview"
 	form.Set("not_before", time.Now().UTC().Add(time.Hour).Format(windowsScheduleTimeLayout))
 	form.Set("activation_minutes", "60")

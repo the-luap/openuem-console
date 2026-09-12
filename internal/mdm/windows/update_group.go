@@ -164,3 +164,21 @@ func matchesUpdateGroupSelection(source *UpdateGroupSource, selection *updateGro
 	}
 	return source != nil && source.ID == selection.ID && source.Revision == selection.Revision
 }
+
+func sameUpdateGroupSource(a, b *UpdateGroupSource) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// ScheduleUpdateRingFromGroup stores the reviewed group source and enabled
+// stores alongside the exact targets. Activation must revalidate both.
+func (s *Store) ScheduleUpdateRingFromGroup(ctx context.Context, actor string, scope access.Scope, ringID string, ringRevision int64, requestKey string, devices []string, remove bool, notBefore time.Time, activationWindow, runLifetime time.Duration, sources inventory.DeviceSources, groupID string, groupRevision int) (*UpdateSchedule, error) {
+	if !sources.Windows || !canonicalInvitationID(groupID) || groupRevision < 1 || groupRevision > 2147483647 {
+		return nil, ErrUpdateGroup
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return s.scheduleUpdateRing(ctx, actor, scope, ringID, ringRevision, requestKey, devices, remove, notBefore, activationWindow, runLifetime, &updateGroupSelection{ID: groupID, Revision: groupRevision, Sources: sources})
+}

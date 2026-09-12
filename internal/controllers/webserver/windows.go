@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/open-uem/nats/enrollment/keyfile"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 )
@@ -116,6 +117,7 @@ func (w *WebServer) startWindows(certFile, keyFile string, identity clientidenti
 	if err != nil {
 		return errors.New("native Windows encrypted registry configuration is invalid")
 	}
+	store = store.WithGroupInventorySources(inventory.DeviceSources{Apple: w.Handler.Apple != nil, Windows: true})
 	public, err := windows.NewProtocolHandler(store, config.options, identity)
 	if err != nil {
 		return errors.New("native Windows protocol configuration is invalid")

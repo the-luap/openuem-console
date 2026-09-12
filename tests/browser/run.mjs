@@ -77,7 +77,7 @@ try {
         [managementNavigation,12],
         [deviceList,12],
         [deviceGroups,18],
-        [windowsUpdateGroups,18],
+        [windowsUpdateGroups,36],
         [oidcAccounts,18],
         [accountLanguage,30],
         [timestamps,21],

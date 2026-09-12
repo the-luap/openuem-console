@@ -10,6 +10,8 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
+var errUpdateGroupSourcesChanged = errors.New("Windows group inventory sources changed")
+
 var errUpdateActivationExpired = errors.New("Windows update activation window expired")
 
 type UpdateScheduleProgress struct {
@@ -197,6 +199,10 @@ func (s *Store) processUpdateSchedule(ctx context.Context, id string) (string, e
 			phase, reason = "waiting", "device_queue_full"
 		case errors.Is(activationErr, ErrCSPDeadline):
 			phase, reason = "waiting", "admission_deadline_expired"
+		case errors.Is(activationErr, errUpdateGroupSourcesChanged):
+			phase, reason = "blocked", "group_sources_changed"
+		case errors.Is(activationErr, ErrUpdateGroupConflict), errors.Is(activationErr, ErrUpdateGroup), errors.Is(activationErr, ErrUpdateGroupLarge):
+			phase, reason = "blocked", "group_changed"
 		case errors.Is(activationErr, ErrUpdateRingConflict):
 			phase, reason = "blocked", "ring_assignment_conflict"
 		case errors.Is(activationErr, access.ErrDenied):
@@ -229,7 +235,15 @@ func (s *Store) finishUpdateScheduleAttempt(ctx context.Context, tx *sql.Tx, r *
 }
 
 func (s *Store) activateUpdateSchedule(ctx context.Context, tx *sql.Tx, r *updateStoredSchedule) (*UpdateRollout, error) {
-	rollout, err := s.assignUpdateRingTx(ctx, tx, r.CreatedBy, r.Scope, r.RingID, r.RingRevision, updateScheduleRolloutRequest(r.ID), r.Targets, r.Mode == "remove", r.Lifetime, r, nil)
+	var group *updateGroupSelection
+	if r.Group != nil {
+		if r.groupSources != s.groupSources {
+			return nil, errUpdateGroupSourcesChanged
+		}
+		group = &updateGroupSelection{ID: r.Group.ID, Revision: r.Group.Revision, Sources: s.groupSources}
+	}
+
+	rollout, err := s.assignUpdateRingTx(ctx, tx, r.CreatedBy, r.Scope, r.RingID, r.RingRevision, updateScheduleRolloutRequest(r.ID), r.Targets, r.Mode == "remove", r.Lifetime, r, group)
 	if err != nil {
 		return nil, err
 	}

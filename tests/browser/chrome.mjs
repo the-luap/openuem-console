@@ -23,7 +23,7 @@ const assetRoot = realpathSync(
 const fixtures = new Set([
  ...["first","next","empty","long"].map(state=>`device-list-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`device-groups-${state}`),
- ...["choose","empty","form","preview","history","long"].map(state=>`windows-group-${state}`),
+ ...["choose","empty","form","preview","history","long","schedule-choose","schedule-form","schedule-preview","schedule-history","schedule-group-changed","schedule-sources-changed"].map(state=>`windows-group-${state}`),
  ...["unlinked","active","disabled","ineligible","long","provider_disabled"].map(state=>`oidc-accounts-${state}`),
  ...["viewer","operator","organization_admin","administrator"].map(role=>`management-navigation-${role}`),
  ...["viewer","operator"].flatMap(role=>["first","next","empty","long"].map(state=>`desktop-memory-${state}-${role}`)),
