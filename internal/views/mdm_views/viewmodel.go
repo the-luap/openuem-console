@@ -16,6 +16,8 @@ type DeviceRow struct {
 	LastSeen                                                  *time.Time
 }
 
+type DevicePagination struct{ First, Next string }
+
 type Detail struct {
 	MacAdmin         *apple.MacAdminAccount
 	MacAdminKeys     []apple.MacAdminKey

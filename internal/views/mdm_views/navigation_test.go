@@ -54,7 +54,7 @@ func TestManagementNavigationRetainsScopedRoleLinksAndCatalogFallback(t *testing
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "navigation-reader", Grants: []access.Grant{{Role: role, Scope: scope}}}, SM: &sessions.SessionManager{Manager: sm}, TenantID: "1", SiteID: "1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Example organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 			c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/1/devices", nil).WithContext(ctx), httptest.NewRecorder())
 			var body bytes.Buffer
-			if err = Devices(c, info, nil, "", "", "", false).Render(ctx, &body); err != nil {
+			if err = Devices(c, info, nil, "", "", "", DevicePagination{}).Render(ctx, &body); err != nil {
 				t.Fatal(err)
 			}
 			html := body.String()

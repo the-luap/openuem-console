@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Unified device inventory](unified-device-inventory.md) now filters, orders and
+  paginates the enabled desktop, Apple, canonical Mac and native Windows sources
+  in PostgreSQL. Pages contain at most 25 safe rows; source/identity tie-breakers
+  preserve equal-name devices. Native Windows search no longer stops at the most
+  recent 100 enrollments. Current permission checks and the inventory-list audit
+  share the transaction, and a failed audit returns no page. Delegated readers
+  retain ambiguity protection; administrators can still inspect ambiguous agent
+  assignments without duplicate rows. List copy and fixed validation guidance
+  use the existing catalog. PostgreSQL inventory/audit race suites and registered
+  Linux console routes pass, along with Linux handler/view/catalog race checks
+  and the complete Linux build. Twenty-four Chrome cases cover new pagination
+  and existing management navigation. Broader sorting, exports, bulk actions and production
+  load acceptance remain open.
+
 - The Apple update form now resolves its heading, instructions, release/deadline
   labels, empty-catalog help, catalog timestamp caption and action buttons through
   the existing `updates` locale catalog. The missing-release validation uses the

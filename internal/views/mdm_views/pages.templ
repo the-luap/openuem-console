@@ -14,33 +14,30 @@ templ CSRF(info *partials.CommonInfo) {
 	<input type="hidden" name="csrf" value={ info.CSRFToken }/>
 }
 
-templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string, nativeWindowsLimited bool) {
+templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platform, search, setupError string, paging DevicePagination) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "mdm.devices.title"), Url: partials.GetNavigationUrl(info, "/devices")}}, info)
 		<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" id="device-management">
 			<div>
-				<h1 class="text-2xl font-semibold">Device management</h1>
-				<p class="uk-text-muted mt-2">Windows, Linux, Mac, iPhone and iPad inventory in one place. Open a device for the actions supported by its platform.</p>
+				<h1 class="text-2xl font-semibold">{ i18n.T(ctx, "mdm.devices.heading") }</h1>
+				<p class="uk-text-muted mt-2">{ i18n.T(ctx, "mdm.devices.description") }</p>
 				@Navigation(info)
 			</div>
 			if setupError!="" {
 				<div role="status" class="uk-alert uk-alert-warning">{ setupError }</div>
 			}
 			<section class="uk-card uk-card-default">
-				<div class="uk-card-header"><h2 class="uk-card-title">{ fmt.Sprintf("Devices · %d",len(rows)) }</h2></div>
+				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx, "mdm.devices.page_count",len(rows)) }</h2></div>
 				<div class="uk-card-body">
 					<form method="get" action={ partials.GetNavigationUrl(info, "/devices") } class="flex flex-wrap items-end gap-4 mb-4">
-						<label>Search<input class="uk-input" type="search" name="q" value={ search } placeholder="Name, serial, model or OS version"/></label>
-						<label>Platform<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>All platforms</option><option value="windows" selected?={ platform=="windows" }>Windows</option><option value="linux" selected?={ platform=="linux" }>Linux</option><option value="macos" selected?={ platform=="macos" }>macOS</option><option value="ios" selected?={ platform=="ios" }>iOS</option><option value="ipados" selected?={ platform=="ipados" }>iPadOS</option><option value="apple" selected?={ platform=="apple" }>All Apple MDM devices</option><option value="unknown" selected?={ platform=="unknown" }>Platform not yet identified</option></select></label>
-						<button type="submit" class="uk-button uk-button-primary">Filter</button>
+						<label>{ i18n.T(ctx, "mdm.devices.search") }<input class="uk-input" type="search" name="q" value={ search } maxlength="256" placeholder={ i18n.T(ctx, "mdm.devices.search_hint") }/></label>
+						<label>{ i18n.T(ctx, "mdm.devices.platform") }<select class="uk-select" name="platform"><option value="" selected?={ platform=="" }>{ i18n.T(ctx, "mdm.devices.platform_all") }</option><option value="windows" selected?={ platform=="windows" }>{ i18n.T(ctx, "mdm.devices.platform_windows") }</option><option value="linux" selected?={ platform=="linux" }>{ i18n.T(ctx, "mdm.devices.platform_linux") }</option><option value="macos" selected?={ platform=="macos" }>{ i18n.T(ctx, "mdm.devices.platform_macos") }</option><option value="ios" selected?={ platform=="ios" }>{ i18n.T(ctx, "mdm.devices.platform_ios") }</option><option value="ipados" selected?={ platform=="ipados" }>{ i18n.T(ctx, "mdm.devices.platform_ipados") }</option><option value="apple" selected?={ platform=="apple" }>{ i18n.T(ctx, "mdm.devices.platform_apple") }</option><option value="unknown" selected?={ platform=="unknown" }>{ i18n.T(ctx, "mdm.devices.platform_unknown") }</option></select></label>
+						<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx, "mdm.devices.filter") }</button>
 					</form>
-					if nativeWindowsLimited {
-						<p class="uk-text-muted mb-4">This view searches the 100 most recent native Windows enrollments in this scope. Open <a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows")) }>Native Windows management</a> to browse and search the full inventory by site.</p>
-					}
 					<div class="overflow-x-auto">
 						<table class="uk-table uk-table-divider uk-table-hover">
-							<thead><tr><th>Device</th><th>Platform / OS</th><th>Model</th><th>Serial number</th><th>Management</th><th>Last contact</th></tr></thead>
+							<thead><tr><th>{ i18n.T(ctx, "mdm.devices.device") }</th><th>{ i18n.T(ctx, "mdm.devices.platform_os") }</th><th>{ i18n.T(ctx, "mdm.devices.model") }</th><th>{ i18n.T(ctx, "mdm.devices.serial") }</th><th>{ i18n.T(ctx, "mdm.devices.management") }</th><th>{ i18n.T(ctx, "mdm.devices.last_contact") }</th></tr></thead>
 							<tbody>
 								for _,d:=range rows {
 									<tr>
@@ -63,8 +60,19 @@ templ Devices(c echo.Context, info *partials.CommonInfo, rows []DeviceRow, platf
 							</tbody>
 						</table>
 					</div>
+					if paging.Next!="" || paging.First!="" {
+						<nav class="flex flex-wrap gap-4 mt-4" aria-label={ i18n.T(ctx, "mdm.devices.pagination") }>
+							if paging.First!="" {
+								<a class="uk-button uk-button-default" href={ templ.URL(paging.First) }>{ i18n.T(ctx, "mdm.devices.first_page") }</a>
+							}
+							if paging.Next!="" {
+								<a class="uk-button uk-button-default" rel="next" href={ templ.URL(paging.Next) }>{ i18n.T(ctx, "mdm.devices.next_page") }</a>
+							}
+						</nav>
+					}
+
 					if len(rows)==0 {
-						<p class="uk-text-muted my-6">No devices match this view. Enroll an Apple or Windows device, or install and admit a desktop agent to get started.</p>
+						<p class="uk-text-muted my-6">{ i18n.T(ctx, "mdm.devices.empty") }</p>
 					}
 				</div>
 			</section>

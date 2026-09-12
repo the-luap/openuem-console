@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +17,11 @@ import (
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/agent"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/security/access"
-	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/mdm_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
-	"github.com/open-uem/openuem-console/internal/views/windows_views"
 )
 
 func (h *Handler) RegisterApple(e *echo.Echo) {
@@ -249,100 +247,62 @@ func (h *Handler) UnifiedDevices(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	rows := []mdm_views.DeviceRow{}
-	nativeWindowsLimited := false
-	platform := c.QueryParam("platform")
-	if strings.HasSuffix(c.Path(), "/ios") && platform == "" {
-		platform = "apple"
-	}
-	switch platform {
-	case "", "apple", "ios", "ipados", "macos", "windows", "linux", "unknown":
-	default:
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid platform filter")
-	}
-	search := strings.ToLower(strings.TrimSpace(c.QueryParam("q")))
-	mdmAliases, agentAliases := map[string]string{}, map[string]string{}
-	if h.Apple != nil && (platform == "" || platform == "apple" || platform == "macos") {
-		mdmAliases, agentAliases, err = h.Apple.MacAliases(c.Request().Context(), scope)
-		if err != nil {
-			return err
-		}
-		macs, e := h.Apple.MacDevices(c.Request().Context(), scope)
-		if e != nil {
-			return e
-		}
-		for _, m := range macs {
-			state := "MDM: " + mdm_views.StateLabel(c.Request().Context(), m.MDMStatus) + " · Agent: " + mdm_views.StateLabel(c.Request().Context(), m.AgentStatus)
-			seen := m.LastSeen
-			if m.AgentSeen != nil && (seen == nil || m.AgentSeen.After(*seen)) {
-				seen = m.AgentSeen
-			}
-			rows = append(rows, mdm_views.DeviceRow{ID: m.ID, Name: m.Name, Platform: "macOS", OSVersion: m.OSVersion, Model: m.Model, Serial: m.Serial, Status: state, LastSeen: seen, URL: partials.GetNavigationUrl(info, "/mac/"+m.ID)})
+	query := c.QueryParams()
+	for key, values := range query {
+		if (key != "q" && key != "platform" && key != "after") || len(values) != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "mdm.devices.invalid_filter"))
 		}
 	}
-	if platform == "" || platform == "windows" || platform == "macos" || platform == "linux" || platform == "unknown" {
-		p := partials.PaginationAndSort{SortBy: "nickname", SortOrder: "asc"}
-		computers, err := h.Model.GetComputersByPage(p, filters.AgentFilter{}, info)
-		if err != nil {
-			return err
-		}
-		for _, d := range computers {
-			if agentAliases[d.ID] != "" {
-				continue
-			}
-			if platform != "" && platform != desktopPlatform(d.OS) {
-				continue
-			}
-			name := d.Nickname
-			if name == "" {
-				name = d.Hostname
-			}
-			seen := d.LastContact
-			deviceURL := partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(d.ID))
-			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: name, Platform: d.OS, OSVersion: d.Version, Serial: d.Serial, Model: d.Model, Status: "agent", LastSeen: &seen, URL: deviceURL})
-		}
+	filter := inventory.DeviceFilter{Platform: query.Get("platform"), Search: strings.TrimSpace(query.Get("q")), After: query.Get("after")}
+	if strings.HasSuffix(c.Path(), "/ios") && filter.Platform == "" {
+		filter.Platform = "apple"
 	}
-	if h.Apple != nil && platform != "windows" && platform != "linux" {
-		devices, err := h.Apple.Devices(c.Request().Context(), scope)
-		if err != nil {
-			return err
-		}
-		for _, d := range devices {
-			if mdmAliases[d.ID] != "" {
-				continue
-			}
-			if platform != "" && platform != "apple" && platform != string(d.Family()) {
-				continue
-			}
-			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: d.Platform(), OSVersion: d.OSVersion, Serial: d.SerialNumber, Model: d.Model, Status: d.Status, LastSeen: d.LastSeen, URL: partials.GetNavigationUrl(info, "/ios/"+d.ID)})
-		}
+	page, err := inventory.ReadDevices(c.Request().Context(), h.Model.DB, h.Access, h.appleActor(c),
+		access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, inventory.DeviceSources{Apple: h.Apple != nil, Windows: h.Windows != nil}, filter)
+	switch {
+	case errors.Is(err, inventory.ErrReportFilter):
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.T(c.Request().Context(), "mdm.devices.invalid_filter"))
+	case errors.Is(err, access.ErrDenied):
+		return echo.NewHTTPError(http.StatusForbidden, i18n.T(c.Request().Context(), "mdm.devices.permission_denied"))
+	case err != nil:
+		return echo.NewHTTPError(http.StatusServiceUnavailable, i18n.T(c.Request().Context(), "mdm.devices.unavailable"))
 	}
-	if h.Windows != nil && (platform == "" || platform == "windows") {
-		devices, err := h.Windows.Devices(c.Request().Context(), h.appleActor(c), access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}, "", 0, 100)
-		if err != nil {
-			return windowsFailure(err)
+	rows := make([]mdm_views.DeviceRow, 0, len(page.Entries))
+	for _, d := range page.Entries {
+		path := "/computers/" + url.PathEscape(d.ID)
+		state := d.Status
+		switch d.Kind {
+		case "apple":
+			path = "/ios/" + d.ID
+		case "mac":
+			path = "/mac/" + d.ID
+			state = i18n.T(c.Request().Context(), "mdm.devices.mac_channels", mdm_views.StateLabel(c.Request().Context(), d.Status), mdm_views.StateLabel(c.Request().Context(), d.AgentStatus))
+		case "windows":
+			path = "/windows/" + d.ID
+			state = i18n.T(c.Request().Context(), "mdm.devices."+d.Status)
 		}
-		nativeWindowsLimited = len(devices) == 100
-		for _, d := range devices {
-			// Native MDM and agent identities remain separate until a verified
-			// association exists. Enrollment hints cannot merge their authority.
-			rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: "windows", OSVersion: d.OSVersion, Status: "Native MDM: " + windows_views.DeviceStatus(d), URL: fmt.Sprintf("/tenant/%d/site/%d/windows/%s", d.TenantID, d.SiteID, d.ID)})
+		platform := i18n.T(c.Request().Context(), "mdm.devices.platform_"+d.Platform)
+		if d.Kind == "apple" && d.Platform == "unknown" {
+			platform = i18n.T(c.Request().Context(), "mdm.devices.platform_apple_unknown")
 		}
+		rows = append(rows, mdm_views.DeviceRow{ID: d.ID, Name: d.Name, Platform: platform, OSVersion: d.OSVersion, Model: d.Model, Serial: d.Serial, Status: state, LastSeen: d.LastSeen, URL: fmt.Sprintf("/tenant/%d/site/%d%s", d.TenantID, d.SiteID, path)})
 	}
-	filtered := rows[:0]
-	for _, r := range rows {
-		if search == "" || strings.Contains(strings.ToLower(r.Name+" "+r.Serial+" "+r.Model+" "+r.OSVersion), search) {
-			filtered = append(filtered, r)
+	pageURL := func(after string) string {
+		q := url.Values{"q": {filter.Search}, "platform": {filter.Platform}}
+		if after != "" {
+			q.Set("after", after)
 		}
+		return partials.GetNavigationUrl(info, "/devices") + "?" + q.Encode()
 	}
-	rows = filtered
-	sort.Slice(rows, func(i, j int) bool { return strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name) })
-	if h.Apple != nil {
-		if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "inventory.list", "devices"); err != nil {
-			return err
-		}
+	paging := mdm_views.DevicePagination{}
+	if filter.After != "" {
+		paging.First = pageURL("")
 	}
-	return renderApple(c, mdm_views.Devices(c, info, rows, platform, search, h.AppleSetupError, nativeWindowsLimited))
+	if page.Next != "" {
+		paging.Next = pageURL(page.Next)
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return renderApple(c, mdm_views.Devices(c, info, rows, filter.Platform, filter.Search, h.AppleSetupError, paging))
 }
 
 func (h *Handler) AppleSettings(c echo.Context) error {

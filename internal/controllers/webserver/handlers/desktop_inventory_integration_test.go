@@ -140,7 +140,7 @@ func exerciseDesktopInventoryPermissions(t *testing.T, h *Handler, ctx context.C
 	if err = h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM uem_inventory_audit WHERE tenant_id=$1 AND site_id=$2 AND actor='scoped-viewer' AND action='inventory.desktop.read' AND resource_id='windows-fixture'`, tenant, site).Scan(&count); err != nil || count != 12 {
 		t.Fatal("read audit has incorrect device scope", count, err)
 	}
-	filter := audit.Filter{Scope: access.Scope{TenantID: tenant, SiteID: site}, Source: "inventory", From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Minute)}
+	filter := audit.Filter{Scope: access.Scope{TenantID: tenant, SiteID: site}, Source: "inventory", Action: "inventory.desktop.read", From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Minute)}
 	page, err := h.Audit.List(ctx, "organization-admin", filter, "")
 	if err != nil || len(page.Events) != 37 {
 		t.Fatal("inventory reads missing from scoped audit", page, err)

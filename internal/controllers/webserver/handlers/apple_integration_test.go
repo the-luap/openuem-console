@@ -36,6 +36,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/sessiongeneration"
 	"github.com/open-uem/openuem-console/internal/views/locales"
 )
@@ -142,6 +143,13 @@ func TestNativeAppleConsoleRoutesWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = permissions.Bootstrap(ctx, "apple-console-admin"); err != nil {
+		t.Fatal(err)
+	}
+	audits, err := audit.NewStore(m.DB, permissions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = audits.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
 	h := &Handler{Access: permissions, Model: m, Apple: store, SessionManager: &sessions.SessionManager{Manager: sm}, Version: "0.11.0", ServerReleasesFolder: releases}
