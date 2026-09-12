@@ -28,13 +28,20 @@ func TestAppleDeviceUpdateAssessmentPages(t *testing.T) {
 	ctx, err = sm.Load(ctx, "")
 	require.NoError(t, err)
 	sm.Put(ctx, "uid", "owned-operator")
-	for _, state := range []string{"required", "compliant", "missing-build", "stale", "unmanaged", "error", "error-limited", "no-policy", "viewer", "long", "missing"} {
+	for _, state := range []string{"required", "compliant", "missing-build", "stale", "unmanaged", "error", "error-limited", "no-policy", "viewer", "long", "missing", "deadline-pending", "deadline-elapsed", "deadline-stale", "deadline-future", "deadline-invalid", "deadline-gap", "deadline-fold"} {
 		t.Run(state, func(t *testing.T) {
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "owned-operator", Grants: []access.Grant{{Role: access.Operator, Scope: access.Scope{TenantID: 1, SiteID: 1}}}}, SM: &sessions.SessionManager{Manager: sm}, CSRFToken: "owned-csrf", TenantID: "1", SiteID: "1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Owned organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 			now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
+			if state == "deadline-fold" {
+				now = time.Date(2026, 10, 25, 1, 0, 0, 0, time.UTC)
+			}
 			d := &apple.Device{ID: "10000000-0000-0000-0000-000000000001", Name: "Owned update phone", Model: "iPhone16,1", OSVersion: "18.5", BuildVersion: "22F999", Status: "enrolled", Supervised: true, CertificateExpiresAt: now.AddDate(1, 0, 0), InventoryAt: &now}
 			policy := &apple.UpdatePolicy{TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00", Status: "waiting"}
 			a := &apple.UpdateAssessment{PolicyToken: strings.Repeat("a", 64), DeviceID: d.ID, Availability: "available", Observation: &apple.OSObservation{Version: "18.7.1", Build: "22H100", Source: "declarative_status", RecordedAt: now.Add(-time.Hour)}, Policy: policy, Compliance: "compliant", AssessedAt: now}
+			a.Deadline, _ = ownedDeadlineViewFixture(state, now)
+			if _, local := ownedDeadlineViewFixture(state, now); local != "" {
+				policy.Deadline = local
+			}
 			switch state {
 			case "required":
 				a.Compliance, a.Observation.Version, a.Observation.Build = "update_required", "18.6.2", "22G100"
@@ -49,7 +56,7 @@ func TestAppleDeviceUpdateAssessmentPages(t *testing.T) {
 			case "error-limited":
 				policy.Status, a.PolicyHasError, a.PolicyErrorTruncated = "failed", true, true
 			case "no-policy":
-				a.Policy, a.Compliance = nil, ""
+				a.Policy, a.Compliance, a.Deadline = nil, "", nil
 			case "viewer":
 				info.Principal.Grants[0].Role = access.Viewer
 			case "long":

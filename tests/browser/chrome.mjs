@@ -22,10 +22,10 @@ const assetRoot = realpathSync(
 );
 const fixtures = new Set([
  ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),
- ...["required","compliant","missing-build","stale","unmanaged","error","error-limited","no-policy","viewer","long","missing"].map(state=>`apple-device-update-${state}`),
+ ...["required","compliant","missing-build","stale","unmanaged","error","error-limited","no-policy","viewer","long","missing","deadline-pending", "deadline-elapsed", "deadline-stale", "deadline-future", "deadline-invalid", "deadline-gap", "deadline-fold"].map(state=>`apple-device-update-${state}`),
  ...["choose","empty","preview","existing","excluded","assignment","history","empty-history","long"].map(state=>`apple-update-group-${state}`),
  ...["scheduled","waiting","activated","blocked","expired","canceled","history","empty-history","long"].map(state=>`apple-update-schedule-${state}`),
- ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long"].map(state=>`apple-update-progress-${state}`),
+ ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long","deadline-elapsed","deadline-fold","deadline-stale"].map(state=>`apple-update-progress-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`apple-update-plan-${state}`),
  ...["choose","empty","preview","remove","excluded","assignment","history","empty-history","long","catalog"].map(state=>`apple-profile-group-${state}`),
  ...["first","next","empty","long"].map(state=>`device-list-${state}`),

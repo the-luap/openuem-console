@@ -61,6 +61,23 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple update deadline estimates](apple-update-deadlines.md) now use bounded
+  authenticated Device Information time-zone observations for individual current
+  policies and immutable original-cohort deadlines. Missing/stale/future evidence
+  and skipped local times remain unverified; repeated times remain pending until
+  their latest possible instant. OS outcomes remain independent, and the final
+  cohort count requires OS evidence at or after that instant. Original/current
+  policy and moved-device tests pass with the collection, version-gate and DST
+  cases. The complete Apple PostgreSQL/race run passes in 604.668 seconds; the
+  subsequent stricter post-deadline OS counter passes the targeted regression in
+  8.027 seconds. macOS/Linux package race tests, registered Linux routes and the
+  full Linux build pass. All 216 relevant Chrome cases pass; the final counter
+  explanation passes 90 repeated device/cohort cases and view race tests in
+  1.990 seconds. The Linux test binary also passes DST/query-gate cases in a
+  minimal Alpine container without installed zone rules or a Go root, using
+  embedded fallback data. Apple's macOS query/response schema discrepancy and
+  physical acceptance remain explicit; escalation and promotion remain open.
+
 - [Reviewed Apple update group removal](apple-update-group-removals.md) now
   retains an original assignment's native targets, excludes changed or unavailable
   policies, binds notification availability to confirmation and records atomic

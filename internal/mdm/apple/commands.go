@@ -674,6 +674,9 @@ func (s *Store) ingestInventory(ctx context.Context, tx *sql.Tx, d *Device, kind
 		if err != nil {
 			return err
 		}
+		if err = recordTimeZoneObservation(ctx, tx, next, info["TimeZone"]); err != nil {
+			return err
+		}
 		// A minimal first check-in can omit the OS version. Once inventory
 		// identifies it, request the newly supported fields and commands now.
 		if !slices.Equal(inventoryKindsFor(*d), inventoryKindsFor(*next)) || !slices.Equal(inventoryQueriesFor(*d), inventoryQueriesFor(*next)) {

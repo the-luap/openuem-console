@@ -1,5 +1,6 @@
+import {checkDeadline} from './apple-update-deadlines.mjs';
 export default async function run(browser, record) {
-  for (const state of ['required', 'compliant', 'missing-build', 'stale', 'unmanaged', 'error', 'error-limited', 'no-policy', 'viewer', 'long', 'missing']) {
+  for (const state of ['required', 'compliant', 'missing-build', 'stale', 'unmanaged', 'error', 'error-limited', 'no-policy', 'viewer', 'long', 'missing', 'deadline-pending', 'deadline-elapsed', 'deadline-stale', 'deadline-future', 'deadline-invalid', 'deadline-gap', 'deadline-fold']) {
     for (const width of [390, 768, 1440]) {
       await browser.visit('apple-device-update-' + state, width);
       const view = await browser.evaluate(`(() => {
@@ -7,6 +8,7 @@ export default async function run(browser, record) {
         return {width:document.documentElement.scrollWidth, viewport:innerWidth, text:main.textContent,
           evidence:main.querySelector('[data-device-update-evidence]').textContent,
           policy:main.querySelector('[data-device-update-policy]')?.textContent,
+          deadline:main.querySelector('[data-update-deadline]')?{state:main.querySelector('[data-update-deadline]').dataset.updateDeadline,text:main.querySelector('[data-update-deadline]').textContent}:null,
           scripts:main.querySelectorAll('script').length,
           forms:[...main.querySelectorAll('form')].map(f=>({action:f.getAttribute('action'),csrf:f.elements.csrf?.value,expected:f.elements.expected_policy?.value,fields:f.querySelectorAll('[name="expected_policy"]').length}))};
       })()`);
@@ -24,6 +26,7 @@ export default async function run(browser, record) {
       if (state === 'error-limited') browser.check(view.policy.includes('exceed the display limit'), 'Oversized error lost its bounded notice');
       if (state === 'required') browser.check(view.policy.includes('Update required') && view.evidence.includes('18.6.2'), 'Lower reported version lost required result');
       if (state === 'no-policy') browser.check(!view.policy && view.evidence.includes('18.7.1'), 'Policy removal hid OS evidence');
+      checkDeadline(browser,state,view.deadline,false);
       if (state === 'viewer') browser.check(view.forms.length === 0, 'Read-only viewer can submit update changes');
       else if (state !== 'unmanaged') browser.check(view.forms.length === (state === 'no-policy' ? 1 : 2), 'Update action availability changed');
       browser.check(view.forms.every(f => f.action === '/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update' && f.csrf === 'owned-csrf'), 'Update form lost scope or CSRF');

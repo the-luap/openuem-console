@@ -67,12 +67,37 @@ func exerciseAppleUpdateForms(t *testing.T, h *Handler, ctx context.Context, ten
 		return section
 	}
 	section := readAssessment()
+	require.Contains(t, section, `data-update-deadline="unverified"`)
+	require.Contains(t, section, "No usable device time zone was reported")
 	require.True(t, strings.Contains(section, "No usable OS observation"))
 	require.False(t, strings.Contains(section, "Reported OS version:"), "Merged inventory was used as packet evidence")
 	_, err = h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_apple_os_observations(device_id,version,build,source,recorded_at) VALUES($1,'18.7.1','22H100','declarative_status',clock_timestamp())`, invite.DeviceID)
 	require.NoError(t, err)
 	section = readAssessment()
 	require.True(t, strings.Contains(section, "Up to date") && strings.Contains(section, "Reported build: 22H100"))
+	// Owned projections exercise the registered viewer route; authenticated
+	// collection and rollback are covered in the Apple protocol tests.
+	_, err = h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_apple_timezone_observations(device_id,name,source,recorded_at) VALUES($1,'UTC','device_information',clock_timestamp())`, invite.DeviceID)
+	require.NoError(t, err)
+	for _, example := range []struct {
+		state  string
+		offset time.Duration
+	}{{"elapsed", -time.Hour}, {"pending", time.Hour}} {
+		_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET deadline=$2 WHERE device_id=$1`, invite.DeviceID, time.Now().UTC().Add(example.offset).Format("2006-01-02T15:04:05"))
+		require.NoError(t, err)
+		section = readAssessment()
+		require.Contains(t, section, `data-update-deadline="`+example.state+`"`)
+		require.Contains(t, section, "Reported device time zone: UTC")
+		require.Contains(t, section, "Up to date")
+	}
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_update_policies SET deadline=$2 WHERE device_id=$1`, invite.DeviceID, stored.Deadline)
+	require.NoError(t, err)
+	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_timezone_observations SET recorded_at=clock_timestamp()-interval '25 hours' WHERE device_id=$1`, invite.DeviceID)
+	require.NoError(t, err)
+	section = readAssessment()
+	require.Contains(t, section, `data-deadline-reason="stale_timezone"`)
+	require.NotContains(t, section, "Estimated deadline (UTC):")
+	require.Contains(t, section, "Up to date")
 	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_os_observations SET build='' WHERE device_id=$1`, invite.DeviceID)
 	require.NoError(t, err)
 	section = readAssessment()

@@ -170,6 +170,9 @@ func (d Device) macUpdateReason(now time.Time) string {
 
 func inventoryQueriesFor(d Device) []string {
 	queries := []string{"UDID", "DeviceName", "OSVersion", "BuildVersion", "ModelName", "Model", "ProductName", "SerialNumber"}
+	if supportsTimeZoneQuery(d) {
+		queries = append(queries, "TimeZone")
+	}
 	if d.Family() == PlatformMacOS {
 		if CompareVersions(d.OSVersion, "10.15") >= 0 {
 			queries = append(queries, "IsSupervised")

@@ -6,9 +6,9 @@ links to that same original receipt. The assessment retains the receipt's exact
 native enrollment IDs and original plan definition. Current group membership,
 plan edits and archival cannot change the assessed cohort.
 
-Two independent sets of counts distinguish reported OS results from configured
-policy. A device can report the target OS while its policy has since been
-replaced or removed. An acknowledged declarative-management notification does
+Independent sets of counts distinguish reported OS results, configured policy
+and [estimated deadline timing](apple-update-deadlines.md). A device can report
+the target OS while its policy has since been replaced or removed. An acknowledged declarative-management notification does
 not establish installation, and the report does not attribute an OS change to
 this particular assignment.
 
@@ -85,8 +85,10 @@ prohibit caching. Unknown query fields are rejected.
 The assessment timestamp and counts describe current state under the held locks.
 They are not persisted historical outcome snapshots. OS and policy counters are
 independent; attention and availability counters can overlap configuration counts.
-An update-required result is not labeled overdue because the policy deadline is
-device-local and the assessment does not invent a device timezone.
+Deadline estimates require a valid, fresh reported device time zone. Unknown
+zones remain unverified. The original target still required after the estimated
+deadline count also requires an OS report at or after the latest possible
+deadline instant; pre-deadline evidence cannot establish that result.
 
 ## Validation and remaining work
 

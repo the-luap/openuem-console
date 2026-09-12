@@ -16,17 +16,18 @@ type OSObservation struct {
 	RecordedAt time.Time `json:"-" xml:"-" yaml:"-"`
 }
 type UpdateAssessment struct {
-	Scope                Scope          `json:"-" xml:"-" yaml:"-"`
-	DeviceID             string         `json:"-" xml:"-" yaml:"-"`
-	Availability         string         `json:"-" xml:"-" yaml:"-"`
-	Observation          *OSObservation `json:"-" xml:"-" yaml:"-"`
-	Policy               *UpdatePolicy  `json:"-" xml:"-" yaml:"-"`
-	PolicyToken          string         `json:"-" xml:"-" yaml:"-"`
-	PolicyHasError       bool           `json:"-" xml:"-" yaml:"-"`
-	PolicyErrorTruncated bool           `json:"-" xml:"-" yaml:"-"`
-	Compliance           string         `json:"-" xml:"-" yaml:"-"`
-	Reason               string         `json:"-" xml:"-" yaml:"-"`
-	AssessedAt           time.Time      `json:"-" xml:"-" yaml:"-"`
+	Scope                Scope                     `json:"-" xml:"-" yaml:"-"`
+	DeviceID             string                    `json:"-" xml:"-" yaml:"-"`
+	Availability         string                    `json:"-" xml:"-" yaml:"-"`
+	Observation          *OSObservation            `json:"-" xml:"-" yaml:"-"`
+	Policy               *UpdatePolicy             `json:"-" xml:"-" yaml:"-"`
+	PolicyToken          string                    `json:"-" xml:"-" yaml:"-"`
+	Deadline             *UpdateDeadlineAssessment `json:"-" xml:"-" yaml:"-"`
+	PolicyHasError       bool                      `json:"-" xml:"-" yaml:"-"`
+	PolicyErrorTruncated bool                      `json:"-" xml:"-" yaml:"-"`
+	Compliance           string                    `json:"-" xml:"-" yaml:"-"`
+	Reason               string                    `json:"-" xml:"-" yaml:"-"`
+	AssessedAt           time.Time                 `json:"-" xml:"-" yaml:"-"`
 }
 
 func (OSObservation) String() string        { return "[protected Apple OS observation]" }
@@ -131,12 +132,17 @@ func (s *Store) AssessDeviceUpdate(ctx context.Context, actor string, permission
 	if err == nil {
 		assessment.Observation = observation
 	}
+	zone, err := currentTimeZoneObservation(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
 	if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&assessment.AssessedAt); err != nil {
 		return nil, err
 	}
 	if assessment.Availability == "available" && !expiry.After(assessment.AssessedAt) {
 		assessment.Availability = "identity_expired"
 	}
+	assessment.Deadline = assessUpdateDeadline(assessment.Availability == "available", assessment.Policy, zone, assessment.AssessedAt)
 	if assessment.Policy != nil {
 		result, reason := assessUpdateOS(assessment.Availability, assessment.Observation, assessment.Policy.TargetVersion, assessment.Policy.TargetBuild, time.Time{}, assessment.AssessedAt)
 		assessment.Reason = reason

@@ -40,6 +40,16 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 				</div>
 			</section>
 			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-3" data-update-deadline-counts>
+					<h2 class="uk-card-title">Original deadline estimates</h2>
+					<p>Estimated deadline elapsed: <strong>{ Number(progress.Counts.DeadlineElapsed) }</strong></p>
+					<p>Estimated deadline pending: <strong>{ Number(progress.Counts.DeadlinePending) }</strong></p>
+					<p>Deadline timing unverified: <strong>{ Number(progress.Counts.DeadlineUnverified) }</strong></p>
+					<p>Original target still required after estimated deadline: <strong>{ Number(progress.Counts.UpdateRequiredAfterDeadline) }</strong></p>
+					<p>These estimates use the original plan's device-local deadline and a device time zone reported within the last 24 hours. The final count also requires fresh OS evidence after admission and at or after the latest estimated deadline. Current policy replacements do not change the original deadline.</p>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					@appleUpdatePlanDefinition(progress.Assignment.Plan)
 					@appleProfileGroupSource(info, progress.Assignment.Group)
@@ -77,6 +87,7 @@ templ AppleUpdateGroupProgress(c echo.Context, info *partials.CommonInfo, progre
 								<p>The current policy has error details. Open the device to review them.</p>
 							}
 						}
+						@appleUpdateDeadline(device.Deadline,true)
 						<p>Original notification: { updateGroupNotificationStatus(device.NotificationStatus) }</p>
 						if device.Availability!="unavailable" {
 							<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+device.DeviceID)) }>Open current device state</a>

@@ -36,7 +36,7 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.NoError(t, err)
 	_, err = h.Model.DB.ExecContext(ctx, `UPDATE mdm_apple_software_catalog SET document=$1,fetched_at=clock_timestamp() WHERE singleton=true`, catalog)
 	require.NoError(t, err)
-	plan, err := h.Apple.SaveUpdatePlan(ctx, "scoped-operator", h.Access, scope, "", 0, apple.UpdatePlanDefinition{Name: "Owned <group update>", Platform: "ios", TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00"})
+	plan, err := h.Apple.SaveUpdatePlan(ctx, "scoped-operator", h.Access, scope, "", 0, apple.UpdatePlanDefinition{Name: "Owned <group update>", Platform: "ios", TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: time.Now().UTC().Add(-time.Hour).Format("2006-01-02T15:04:05")})
 	require.NoError(t, err)
 	group, err := inventory.SaveDeviceGroup(ctx, h.Model.DB, h.Access, "scoped-operator", access.Scope{TenantID: tenant, SiteID: site}, "", 0, inventory.DeviceGroupDefinition{Name: "Owned <update group>", Rule: inventory.DeviceGroupRule{Search: "Owned group update target"}})
 	require.NoError(t, err)
@@ -81,6 +81,7 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.Equal(t, "no-store", progressPage.Header().Get("Cache-Control"))
 	require.Contains(t, progressPage.Body.String(), "Current cohort progress")
 	require.Contains(t, progressPage.Body.String(), "No usable OS observation")
+	require.Contains(t, progressPage.Body.String(), `data-deadline-reason="no_timezone"`)
 	require.Equal(t, 400, request("scoped-operator", "GET", progressPath+"?record=yes", nil).Code)
 	// Owned protocol-observation projection for the actual registered read path.
 	// The Apple package separately exercises authenticated status ingestion.
@@ -90,6 +91,18 @@ func exerciseAppleUpdateGroups(t *testing.T, h *Handler, ctx context.Context, te
 	require.Equal(t, 200, progressPage.Code)
 	require.Contains(t, progressPage.Body.String(), "Target or newer OS reported")
 	require.Contains(t, progressPage.Body.String(), "Reported OS: 18.7.1")
+	_, err = h.Model.DB.ExecContext(ctx, `INSERT INTO mdm_apple_timezone_observations(device_id,name,source,recorded_at) VALUES($1,'UTC','device_information',clock_timestamp())`, invite.DeviceID)
+	require.NoError(t, err)
+	policy.Deadline = time.Now().UTC().Add(time.Hour).Format("2006-01-02T15:04:05")
+	require.NoError(t, h.Apple.SetUpdatePolicyWithAccess(ctx, scope, []string{invite.DeviceID}, &policy, "scoped-operator", h.Access))
+	progressPage = request("scoped-operator", "GET", progressPath, nil)
+	require.Equal(t, 200, progressPage.Code)
+	require.Contains(t, progressPage.Body.String(), `data-update-deadline="elapsed"`)
+	require.Contains(t, progressPage.Body.String(), "A different update policy is currently configured.")
+	require.Contains(t, progressPage.Body.String(), "Original target still required after estimated deadline: <strong>0</strong>")
+	currentPage := request("scoped-viewer", "GET", fmt.Sprintf("/tenant/%d/site/%d/ios/%s", tenant, site, invite.DeviceID), nil)
+	require.Equal(t, 200, currentPage.Code)
+	require.Contains(t, currentPage.Body.String(), `data-update-deadline="pending"`)
 
 	definition := plan.Definition
 	definition.Archived = true

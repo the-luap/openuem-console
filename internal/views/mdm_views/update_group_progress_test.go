@@ -30,18 +30,25 @@ func TestAppleUpdateGroupProgressPages(t *testing.T) {
 	require.NoError(t, err)
 	sm.Put(ctx, "uid", "owned-operator")
 	scope := access.Scope{TenantID: 1, SiteID: 1}
-	for _, state := range []string{"reported", "required", "unverified", "different", "removed", "unavailable", "attention", "mixed", "long"} {
+	for _, state := range []string{"reported", "required", "unverified", "different", "removed", "unavailable", "attention", "mixed", "long", "deadline-elapsed", "deadline-fold", "deadline-stale"} {
 		t.Run(state, func(t *testing.T) {
 			info := &partials.CommonInfo{Principal: access.Principal{UserID: "owned-operator", Grants: []access.Grant{{Role: access.Operator, Scope: scope}}}, SM: &sessions.SessionManager{Manager: sm}, CSRFToken: "owned-csrf", TenantID: "1", SiteID: "1", CurrentVersion: "0.11.0", LatestVersion: "0.11.0", Tenants: []*ent.Tenant{{ID: 1, Description: "Owned organization"}}, Sites: []*ent.Site{{ID: 1, Description: "Berlin"}}}
 			now := time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC)
+			if state == "deadline-fold" {
+				now = time.Date(2026, 10, 25, 1, 0, 0, 0, time.UTC)
+			}
 			observed := now.Add(-time.Minute)
 			plan := apple.UpdatePlan{ID: "70000000-0000-0000-0000-000000000001", Scope: apple.Scope{TenantID: 1, SiteID: 1}, Revision: 2, Actor: "owned-operator", CreatedAt: now.Add(-3 * time.Hour), Definition: apple.UpdatePlanDefinition{Name: "Owned <progress pilot>", Platform: "ios", TargetVersion: "18.7.1", TargetBuild: "22H100", Deadline: "2026-10-01T18:00:00"}}
 			policy := plan.Definition.Policy()
 			policy.Status = "enforced"
 			receipt := apple.UpdatePlanGroupAssignment{ID: "40000000-0000-0000-0000-000000000001", Plan: plan, Scope: plan.Scope, CreatedAt: now.Add(-time.Hour), Group: apple.ProfileGroupSource{ID: "30000000-0000-0000-0000-000000000001", Revision: 3, Name: "Owned <progress group>", Rule: inventory.DeviceGroupRule{Search: "Owned"}}}
 			d := apple.UpdateGroupDeviceProgress{DeviceID: "10000000-0000-0000-0000-000000000001", Name: "Owned <progress phone>", Availability: "available", PolicyState: "matches", CurrentPolicy: &policy, NotificationStatus: "acknowledged", ReportedVersion: "18.7.1", ReportedBuild: "22H100", ReportSource: "declarative_status", RecordedAt: &observed, Result: "target_reported"}
+			d.Deadline, _ = ownedDeadlineViewFixture(state, now)
+			if _, local := ownedDeadlineViewFixture(state, now); local != "" {
+				receipt.Plan.Definition.Deadline, policy.Deadline = local, local
+			}
 			switch state {
-			case "required":
+			case "required", "deadline-elapsed":
 				d.Result = "update_required"
 				d.ReportedVersion = "18.6.2"
 				d.ReportedBuild = "22G100"
@@ -88,6 +95,17 @@ func TestAppleUpdateGroupProgressPages(t *testing.T) {
 			}
 			for _, device := range p.Devices {
 				p.Counts.Total++
+				switch device.Deadline.State {
+				case "pending":
+					p.Counts.DeadlinePending++
+				case "elapsed":
+					p.Counts.DeadlineElapsed++
+					if device.Result == "update_required" {
+						p.Counts.UpdateRequiredAfterDeadline++
+					}
+				default:
+					p.Counts.DeadlineUnverified++
+				}
 				switch device.Result {
 				case "target_reported":
 					p.Counts.TargetReported++

@@ -300,6 +300,9 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 								<p>{ i18n.T(ctx, "updates.deadline_local", Show(detail.Policy.Deadline)) }</p>
 								<p>{ i18n.T(ctx, "updates.compliance", StateLabel(ctx, detail.Compliance)) }</p>
 								<p>{ i18n.T(ctx, "updates.device_status", StateLabel(ctx, detail.Policy.Status)) }</p>
+								if detail.UpdateAssessment!=nil {
+									@appleUpdateDeadline(detail.UpdateAssessment.Deadline,false)
+								}
 								if detail.UpdateAssessment!=nil && detail.UpdateAssessment.Reason!="" {
 									<p role="status">{ deviceUpdateAssessmentReason(ctx,detail.UpdateAssessment.Reason) }</p>
 								}

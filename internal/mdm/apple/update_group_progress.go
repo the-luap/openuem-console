@@ -11,30 +11,35 @@ import (
 )
 
 type UpdateGroupDeviceProgress struct {
-	DeviceID           string        `json:"-" xml:"-" yaml:"-"`
-	Name               string        `json:"-" xml:"-" yaml:"-"`
-	Availability       string        `json:"-" xml:"-" yaml:"-"`
-	PolicyState        string        `json:"-" xml:"-" yaml:"-"`
-	CurrentPolicy      *UpdatePolicy `json:"-" xml:"-" yaml:"-"`
-	PolicyHasError     bool          `json:"-" xml:"-" yaml:"-"`
-	NotificationStatus string        `json:"-" xml:"-" yaml:"-"`
-	ReportedVersion    string        `json:"-" xml:"-" yaml:"-"`
-	ReportedBuild      string        `json:"-" xml:"-" yaml:"-"`
-	ReportSource       string        `json:"-" xml:"-" yaml:"-"`
-	RecordedAt         *time.Time    `json:"-" xml:"-" yaml:"-"`
-	Result             string        `json:"-" xml:"-" yaml:"-"`
-	Reason             string        `json:"-" xml:"-" yaml:"-"`
+	DeviceID           string                    `json:"-" xml:"-" yaml:"-"`
+	Name               string                    `json:"-" xml:"-" yaml:"-"`
+	Availability       string                    `json:"-" xml:"-" yaml:"-"`
+	PolicyState        string                    `json:"-" xml:"-" yaml:"-"`
+	CurrentPolicy      *UpdatePolicy             `json:"-" xml:"-" yaml:"-"`
+	PolicyHasError     bool                      `json:"-" xml:"-" yaml:"-"`
+	NotificationStatus string                    `json:"-" xml:"-" yaml:"-"`
+	ReportedVersion    string                    `json:"-" xml:"-" yaml:"-"`
+	ReportedBuild      string                    `json:"-" xml:"-" yaml:"-"`
+	ReportSource       string                    `json:"-" xml:"-" yaml:"-"`
+	RecordedAt         *time.Time                `json:"-" xml:"-" yaml:"-"`
+	Result             string                    `json:"-" xml:"-" yaml:"-"`
+	Reason             string                    `json:"-" xml:"-" yaml:"-"`
+	Deadline           *UpdateDeadlineAssessment `json:"-" xml:"-" yaml:"-"`
 }
 type UpdateGroupProgressCounts struct {
-	Total           int `json:"-" xml:"-" yaml:"-"`
-	TargetReported  int `json:"-" xml:"-" yaml:"-"`
-	UpdateRequired  int `json:"-" xml:"-" yaml:"-"`
-	Unverified      int `json:"-" xml:"-" yaml:"-"`
-	PolicyMatches   int `json:"-" xml:"-" yaml:"-"`
-	PolicyDifferent int `json:"-" xml:"-" yaml:"-"`
-	PolicyAbsent    int `json:"-" xml:"-" yaml:"-"`
-	PolicyAttention int `json:"-" xml:"-" yaml:"-"`
-	Unavailable     int `json:"-" xml:"-" yaml:"-"`
+	Total                       int `json:"-" xml:"-" yaml:"-"`
+	TargetReported              int `json:"-" xml:"-" yaml:"-"`
+	UpdateRequired              int `json:"-" xml:"-" yaml:"-"`
+	Unverified                  int `json:"-" xml:"-" yaml:"-"`
+	PolicyMatches               int `json:"-" xml:"-" yaml:"-"`
+	PolicyDifferent             int `json:"-" xml:"-" yaml:"-"`
+	PolicyAbsent                int `json:"-" xml:"-" yaml:"-"`
+	PolicyAttention             int `json:"-" xml:"-" yaml:"-"`
+	Unavailable                 int `json:"-" xml:"-" yaml:"-"`
+	DeadlineElapsed             int `json:"-" xml:"-" yaml:"-"`
+	DeadlinePending             int `json:"-" xml:"-" yaml:"-"`
+	DeadlineUnverified          int `json:"-" xml:"-" yaml:"-"`
+	UpdateRequiredAfterDeadline int `json:"-" xml:"-" yaml:"-"`
 }
 type UpdateGroupProgress struct {
 	Assignment UpdatePlanGroupAssignment   `json:"-" xml:"-" yaml:"-"`
@@ -83,6 +88,12 @@ func assessUpdateGroupResult(d *UpdateGroupDeviceProgress, plan UpdatePlan, admi
 	d.Result, d.Reason = assessUpdateOS(d.Availability, observation, plan.Definition.TargetVersion, plan.Definition.TargetBuild, admitted, now)
 }
 
+// A report before the estimated deadline cannot establish that the target was
+// still missing after it. Other OS/deadline counts remain independent.
+func updateRequirementAfterDeadline(d UpdateGroupDeviceProgress) bool {
+	return d.Result == "update_required" && d.RecordedAt != nil && d.Deadline != nil && d.Deadline.State == "elapsed" && d.Deadline.Latest != nil && !d.RecordedAt.Before(*d.Deadline.Latest)
+}
+
 // UpdatePlanGroupProgress assesses current state for the exact original native
 // cohort. It never expands the group, rewrites its receipt or attributes an OS
 // installation to an acknowledged declaration notification.
@@ -109,10 +120,12 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 	}
 	progress := &UpdateGroupProgress{Assignment: *receipt, Devices: make([]UpdateGroupDeviceProgress, 0, len(receipt.Commands))}
 	expires := make([]time.Time, 0, len(receipt.Commands))
+	zones := make([]*TimeZoneObservation, 0, len(receipt.Commands))
 	for _, command := range receipt.Commands {
 		d := UpdateGroupDeviceProgress{DeviceID: command.Selection.DeviceID, Availability: "unavailable", PolicyState: "unknown", NotificationStatus: "unavailable"}
 		var enrolled bool
 		var expiry time.Time
+		var zone *TimeZoneObservation
 		var version, build, source, notification sql.NullString
 		err = tx.QueryRowContext(ctx, `SELECT CASE WHEN octet_length(d.name)<=512 THEN d.name ELSE '' END,d.status='enrolled',d.certificate_expires_at,o.version,o.build,o.source,o.recorded_at,CASE WHEN octet_length(c.status)<=64 THEN c.status ELSE NULL END FROM mdm_apple_devices d LEFT JOIN mdm_apple_os_observations o ON o.device_id=d.id LEFT JOIN mdm_apple_commands c ON c.id=$4 AND c.device_id=d.id AND c.tenant_id=d.tenant_id AND c.request_type='DeclarativeManagement' WHERE d.id=$1 AND d.tenant_id=$2 AND d.site_id=$3 FOR SHARE OF d`, d.DeviceID, scope.TenantID, scope.SiteID, command.CommandID).Scan(&d.Name, &enrolled, &expiry, &version, &build, &source, &d.RecordedAt, &notification)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -131,6 +144,10 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 			if err != nil {
 				return nil, err
 			}
+			zone, err = currentTimeZoneObservation(ctx, tx, d.DeviceID)
+			if err != nil {
+				return nil, err
+			}
 			d.PolicyState = "absent"
 			if d.CurrentPolicy != nil {
 				d.PolicyState = "different"
@@ -142,6 +159,7 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 		}
 		progress.Devices = append(progress.Devices, d)
 		expires = append(expires, expiry)
+		zones = append(zones, zone)
 	}
 	if err = tx.QueryRowContext(ctx, `SELECT clock_timestamp()`).Scan(&progress.AssessedAt); err != nil {
 		return nil, err
@@ -152,6 +170,19 @@ func (s *Store) UpdatePlanGroupProgress(ctx context.Context, actor string, permi
 			d.Availability = "identity_expired"
 		}
 		assessUpdateGroupResult(d, receipt.Plan, receipt.CreatedAt, progress.AssessedAt)
+		originalPolicy := receipt.Plan.Definition.Policy()
+		d.Deadline = assessUpdateDeadline(d.Availability == "available", &originalPolicy, zones[i], progress.AssessedAt)
+		switch d.Deadline.State {
+		case "elapsed":
+			progress.Counts.DeadlineElapsed++
+			if updateRequirementAfterDeadline(*d) {
+				progress.Counts.UpdateRequiredAfterDeadline++
+			}
+		case "pending":
+			progress.Counts.DeadlinePending++
+		default:
+			progress.Counts.DeadlineUnverified++
+		}
 		progress.Counts.Total++
 		switch d.Result {
 		case "target_reported":

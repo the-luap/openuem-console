@@ -28,6 +28,12 @@ observation recorded after the original admission and retains that receipt's
 original targets. Neither view proves that a particular assignment installed an
 update, nor replaces physical-device acceptance.
 
+The current policy also has a [deadline estimate](apple-update-deadlines.md)
+derived from a fresh reported device time zone. Missing or unresolvable timing
+stays unknown; repeated local times remain pending until their latest possible
+instant. The zone, source and recording time are shown independently of OS
+compliance and policy delivery status.
+
 ## Authority and consistency
 
 `AssessDeviceUpdate` requires current `ReadDevices` authority, including for a
@@ -67,6 +73,7 @@ and the following read is denied. Registered console tests exercise the actual
 viewer route, missing and complete observations, absent builds, escaped and
 oversized errors, fixed source-failure responses and policy removal.
 
-Eleven rendered states are checked in Chrome at 390, 768 and 1440 pixels. These
+Eighteen rendered states are checked in Chrome at 390, 768 and 1440 pixels. These
 checks verify separate policy/OS evidence, absence of merged inventory fallback,
-bounded long-text layout, scoped CSRF forms and read-only viewer behavior.
+time-zone freshness and DST uncertainty, bounded long-text layout, scoped CSRF
+forms and read-only viewer behavior.
