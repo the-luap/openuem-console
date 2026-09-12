@@ -1,4 +1,18 @@
 en:
+  apple_errors:
+    push_problem: "Review the current push status and Apple push settings."
+    push_failed: "Wake-up notification failed. Check outbound network access and Apple push settings."
+    push_invalid: "The push token is no longer valid. Wait for a new token update from the device."
+    request: "The Apple management request could not be processed. Check the selected resource and form values, then refresh the page to check its status."
+    setup: "Apple management settings could not be saved. Refresh the page to check the current configuration. If the problem continues, contact your administrator."
+    organization: "Select an organization."
+    public_url: "Enter an HTTPS origin for the public MDM URL, without a path, query or credentials."
+    organization_name: "Enter an organization name of at most 255 characters."
+    key_pair: "Select a matching APNs certificate and private key."
+    topic_missing: "Select a certificate that contains an Apple MDM push topic."
+    validity: "The APNs certificate must be within its validity period."
+    topic_changed: "APNs renewal must preserve the existing push topic."
+    url_in_use: "The public MDM URL cannot change while enrollments or active ADE profiles use it."
   http_errors:
     internal: "The request could not be completed. Refresh the page to check its status. If the problem continues, contact your administrator."
     upstream: "A required service is unavailable. Refresh the page to check the request status."

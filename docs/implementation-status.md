@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Apple management now also redacts failures outside the shared HTTP error page.
+  The generic Apple adapter and setup banner no longer display unknown exception
+  text. Stable push-setting validation identities retain specific organization,
+  public URL, key-pair, validity and renewal guidance while stripping wrapped
+  details. Existing fixed certificate/connection and Mac-binding messages remain
+  available. New device push outcomes store fixed diagnostics, retaining the
+  accepted/failed/invalid-token classification and token-generation race guards.
+  Both device and user-channel views derive localized guidance from the push
+  status rather than rendering stored raw diagnostics, including older rows.
+  Baselines exposed eight adapter/setup responses, five storage outcomes and four
+  rendered device/user-channel views. Tests exercise unknown transport/database/
+  cryptographic causes, wrapped known errors, look-alike untyped errors, English
+  fallback, stable backend validation identities and rendered remediation text.
+  The final owned PostgreSQL/APNs race tests pass in 19.962 seconds; view, locale
+  and handler race tests, native/OpenID Linux route tests and the full Linux build
+  also pass.
+  Historical raw database values are not rewritten by this change; the UI no
+  longer displays them. Other legacy error paths remain within UX-01/SEC-01 scope.
+
 - Shared HTTP error pages now keep server exception text and nested internal
   errors out of browser responses. The owned baseline exposed a synthetic private
   URL/token or internal database error across nine status codes. Server failures

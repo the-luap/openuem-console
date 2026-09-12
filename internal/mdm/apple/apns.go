@@ -110,15 +110,7 @@ func (s *Store) PushPending(ctx context.Context) error {
 				client.CloseIdleConnections()
 			}
 		}
-		status, detail := "accepted", ""
-		if err != nil {
-			status = "failed"
-			detail = err.Error()
-		}
-		var pushErr *PushError
-		if errors.As(err, &pushErr) && (pushErr.Status == 410 || pushErr.Reason == "BadDeviceToken" || pushErr.Reason == "DeviceTokenNotForTopic") {
-			status = "invalid_token"
-		}
+		status, detail := devicePushOutcome(err)
 		if err = s.recordPushOutcome(ctx, id, encryptedToken, encryptedMagic, status, detail); err != nil {
 			return err
 		}
@@ -168,4 +160,17 @@ func (s *Store) Run(ctx context.Context, logger *slog.Logger) {
 		case <-ticker.C:
 		}
 	}
+}
+
+func devicePushOutcome(err error) (string, string) {
+	status, detail := "accepted", ""
+	if err != nil {
+		status = "failed"
+		detail = "Unable to wake device"
+	}
+	var pushErr *PushError
+	if errors.As(err, &pushErr) && (pushErr.Status == 410 || pushErr.Reason == "BadDeviceToken" || pushErr.Reason == "DeviceTokenNotForTopic") {
+		status, detail = "invalid_token", "Device push token is no longer valid; wait for a new TokenUpdate"
+	}
+	return status, detail
 }

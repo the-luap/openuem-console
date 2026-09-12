@@ -30,7 +30,7 @@ func (h *Handler) AppleMacBinding(c echo.Context) error {
 		err = h.Apple.RequestMacBinding(c.Request().Context(), scope, id, h.appleActor(c))
 	}
 	if err != nil {
-		return macBindingFailure(err)
+		return macBindingFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -49,14 +49,17 @@ func (h *Handler) MacDevice(c echo.Context) error {
 	}
 	mac, err := h.Apple.MacDevice(c.Request().Context(), scope, id)
 	if err != nil {
-		return macBindingFailure(err)
+		return macBindingFailure(c, err)
 	}
 	return h.renderAppleDevice(c, info, scope, mac.MDMID, mac)
 }
 
-func macBindingFailure(err error) error {
-	if errors.Is(err, apple.ErrNotFound) || errors.Is(err, apple.ErrConflict) || errors.Is(err, apple.ErrMacBinding) {
-		return appleFailure(err)
+func macBindingFailure(c echo.Context, err error) error {
+	if errors.Is(err, apple.ErrNotFound) || errors.Is(err, apple.ErrConflict) {
+		return appleFailure(c, err)
+	}
+	if errors.Is(err, apple.ErrMacBinding) {
+		return echo.NewHTTPError(http.StatusBadRequest, apple.ErrMacBinding.Error())
 	}
 	return echo.NewHTTPError(http.StatusInternalServerError, "Mac management channels are unavailable. Try again later.")
 }

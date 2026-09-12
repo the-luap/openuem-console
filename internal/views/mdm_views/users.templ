@@ -62,7 +62,7 @@ templ UserDetails(c echo.Context, info *partials.CommonInfo, detail UserDetail) 
 						<dd>{ StateLabel(detail.User.PushStatus) }</dd>
 						if detail.User.PushError!="" {
 							<dt>Push result</dt>
-							<dd>{ detail.User.PushError }</dd>
+							<dd>{ pushErrorText(c, detail.User.PushStatus) }</dd>
 						}
 						<dt>Profile inventory</dt>
 						<dd>

@@ -202,15 +202,16 @@ func appleID(c echo.Context) (string, error) {
 	}
 	return id, nil
 }
-func appleFailure(err error) error {
+func appleFailure(c echo.Context, err error) error {
 	if errors.Is(err, apple.ErrNotFound) {
 		return echo.NewHTTPError(404, "Resource not found")
 	}
 	if errors.Is(err, apple.ErrConflict) {
 		return echo.NewHTTPError(409, "This resource changed. Reload and try again.")
 	}
-	return echo.NewHTTPError(400, err.Error())
+	return echo.NewHTTPError(400, appleErrorText(c, "apple_errors.request"))
 }
+
 func appleRedirect(c echo.Context, info *partials.CommonInfo, path string) error {
 	return c.Redirect(http.StatusSeeOther, partials.GetNavigationUrl(info, path))
 }
@@ -356,15 +357,15 @@ func (h *Handler) AppleSettings(c echo.Context) error {
 		}
 		cert, err := readAppleUpload(c, "push_certificate", 64<<10)
 		if err != nil {
-			return appleFailure(err)
+			return appleFailure(c, err)
 		}
 		key, err := readAppleUpload(c, "push_key", 64<<10)
 		if err != nil {
-			return appleFailure(err)
+			return appleFailure(c, err)
 		}
 		err = h.Apple.Configure(c.Request().Context(), apple.Settings{TenantID: scope.TenantID, Organization: c.FormValue("organization"), PublicURL: c.FormValue("public_url"), PushCertificate: cert, PushKey: key}, h.appleActor(c))
 		if err != nil {
-			setupError = err.Error()
+			setupError = appleSetupMessage(c, err)
 		} else {
 			message = "APNs connection verified and Apple push credentials saved. You can now create an enrollment invitation."
 		}
@@ -446,13 +447,13 @@ func (h *Handler) AppleInvite(c echo.Context) error {
 	if scope.SiteID == 0 || c.FormValue("site_id") != "" {
 		site, err := strconv.Atoi(c.FormValue("site_id"))
 		if err != nil {
-			return appleFailure(errors.New("select a site"))
+			return appleFailure(c, errors.New("select a site"))
 		}
 		if c.Param("site") != "" && site != scope.SiteID {
 			return echo.NewHTTPError(403, "Enrollment site does not match the selected scope")
 		}
 		if _, err = h.Model.GetSiteById(scope.TenantID, site); err != nil {
-			return appleFailure(apple.ErrNotFound)
+			return appleFailure(c, apple.ErrNotFound)
 		}
 		scope.SiteID = site
 	}
@@ -464,7 +465,7 @@ func (h *Handler) AppleInvite(c echo.Context) error {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, "Enrollment or device security management permission denied")
 		}
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return renderApple(c, mdm_views.Invitation(c, info, invite))
@@ -484,7 +485,7 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 	}
 	entity, err := h.Apple.MacForMDM(c.Request().Context(), scope, id)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	if entity != "" {
 		return appleRedirect(c, info, "/mac/"+entity)
@@ -495,23 +496,23 @@ func (h *Handler) AppleDevice(c echo.Context) error {
 func (h *Handler) renderAppleDevice(c echo.Context, info *partials.CommonInfo, scope apple.Scope, id string, mac *apple.MacDevice) error {
 	d, err := h.Apple.Device(c.Request().Context(), scope, id)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	detail := mdm_views.Detail{Device: d, Mac: mac}
 	detail.ADE, err = h.Apple.ADEDeviceEnrollment(c.Request().Context(), scope, id)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	if detail.ADE != nil && info.Can(access.ReadSoftware) {
 		detail.ADEApplications, err = h.Apple.ADEApplications(c.Request().Context(), scope, id)
 		if err != nil {
-			return appleFailure(err)
+			return appleFailure(c, err)
 		}
 	}
 	if detail.ADE != nil && info.Can(access.ReadProfiles) {
 		detail.ADEPlatformSSO, err = h.Apple.ADEPlatformSSOStatus(c.Request().Context(), scope, id)
 		if err != nil {
-			return appleFailure(err)
+			return appleFailure(c, err)
 		}
 	}
 	if mac != nil && info.Can(access.ReadDevices) {
@@ -620,7 +621,7 @@ func (h *Handler) AppleRefresh(c echo.Context) error {
 		return err
 	}
 	if err = h.Apple.RefreshInventory(c.Request().Context(), scope, id, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -641,7 +642,7 @@ func (h *Handler) AppleRevoke(c echo.Context) error {
 		return echo.NewHTTPError(400, "Confirm that this enrollment should lose server access")
 	}
 	if err = h.Apple.RevokeEnrollment(c.Request().Context(), scope, id, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -753,17 +754,17 @@ func (h *Handler) AppleSaveProfile(c echo.Context) error {
 		data, err = apple.BuildProfile(c.FormValue("name"), c.FormValue("identifier"), c.FormValue("editor"), settings)
 	}
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	id := c.FormValue("profile_id")
 	revision, _ := strconv.Atoi(c.FormValue("revision"))
 	if id != "" {
 		if _, err = uuid.Parse(id); err != nil {
-			return appleFailure(apple.ErrNotFound)
+			return appleFailure(c, apple.ErrNotFound)
 		}
 	}
 	if _, err = h.Apple.SaveProfile(c.Request().Context(), scope.TenantID, id, revision, data, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/configurations")
 }
@@ -782,7 +783,7 @@ func (h *Handler) AppleDownloadProfile(c echo.Context) error {
 	}
 	p, err := h.Apple.Profile(c.Request().Context(), scope.TenantID, id)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	if err := h.Apple.RecordRead(c.Request().Context(), scope, h.appleActor(c), "profile.download", id); err != nil {
@@ -819,10 +820,10 @@ func (h *Handler) AppleAssignProfile(c echo.Context) error {
 	}
 	ids, err := selectedAppleIDs(c)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	if err = h.Apple.AssignProfile(c.Request().Context(), scope, id, ids, c.FormValue("desired"), h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	if len(ids) == 1 {
 		return appleRedirect(c, info, "/ios/"+ids[0])
@@ -843,7 +844,7 @@ func (h *Handler) AppleDeleteProfile(c echo.Context) error {
 		return err
 	}
 	if err = h.Apple.DeleteProfile(c.Request().Context(), scope.TenantID, id, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/configurations")
 }
@@ -873,7 +874,7 @@ func (h *Handler) AppleUpdate(c echo.Context) error {
 		policy = &apple.UpdatePolicy{TargetVersion: version, TargetBuild: build, Deadline: deadline, DetailsURL: c.FormValue("details_url")}
 	}
 	if err = h.Apple.SetUpdatePolicy(c.Request().Context(), scope, []string{id}, policy, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -892,10 +893,10 @@ func (h *Handler) AppleRetryCommand(c echo.Context) error {
 	}
 	command := c.Param("command")
 	if _, err = uuid.Parse(command); err != nil {
-		return appleFailure(apple.ErrNotFound)
+		return appleFailure(c, apple.ErrNotFound)
 	}
 	if err = h.Apple.RetryCommand(c.Request().Context(), scope, id, command, h.appleActor(c)); err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }

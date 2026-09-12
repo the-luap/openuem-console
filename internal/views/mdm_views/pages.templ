@@ -250,7 +250,7 @@ templ DeviceDetails(c echo.Context, info *partials.CommonInfo, detail Detail) {
 						<dd>
 							{ StateLabel(detail.Device.PushStatus) }
 							if detail.Device.PushError!="" {
-								<span role="status">{ " · "+detail.Device.PushError }</span>
+								<span role="status">{ " · "+pushErrorText(c, detail.Device.PushStatus) }</span>
 							}
 						</dd>
 					</dl>

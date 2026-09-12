@@ -73,15 +73,15 @@ func PushTopic(cert *x509.Certificate) string {
 
 func validatePushOrganization(c *Settings) error {
 	if c.TenantID <= 0 {
-		return errors.New("organization is required")
+		return ErrPushOrganization
 	}
 	u, err := url.Parse(c.PublicURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
-		return errors.New("public MDM URL must be an HTTPS origin without a path, query or credentials")
+		return ErrPushPublicURL
 	}
 	c.PublicURL = strings.TrimRight(c.PublicURL, "/")
 	if c.Organization == "" || len(c.Organization) > 255 {
-		return errors.New("organization name is required")
+		return ErrPushOrganizationName
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (s *Store) validatePushSettings(c *Settings) error {
 	c.PushCertificate = verified
 	pair, err := tls.X509KeyPair(c.PushCertificate, c.PushKey)
 	if err != nil {
-		return errors.New("invalid APNs certificate/key pair")
+		return ErrPushKeyPair
 	}
 	cert, err := x509.ParseCertificate(pair.Certificate[0])
 	if err != nil {
@@ -105,10 +105,10 @@ func (s *Store) validatePushSettings(c *Settings) error {
 	}
 	c.Topic = PushTopic(cert)
 	if c.Topic == "" {
-		return errors.New("certificate does not contain an Apple MDM push topic")
+		return ErrPushTopicMissing
 	}
 	if time.Now().Before(cert.NotBefore) || !time.Now().Before(cert.NotAfter) {
-		return errors.New("APNs certificate is not currently valid")
+		return ErrPushValidity
 	}
 	c.PushExpiresAt = cert.NotAfter
 	return nil
@@ -147,7 +147,7 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 	}
 	if err == nil {
 		if oldTopic != c.Topic {
-			return errors.New("APNs renewal must preserve the existing push topic")
+			return ErrPushTopicChanged
 		}
 		if oldURL != c.PublicURL {
 			var active bool
@@ -155,7 +155,7 @@ func (s *Store) configurePushTx(ctx context.Context, tx *sql.Tx, c Settings, act
 				return err
 			}
 			if active {
-				return errors.New("the public MDM URL cannot change while enrollments or active ADE profiles use it")
+				return ErrPushURLInUse
 			}
 		}
 		c.CACertificate = oldCA

@@ -32,7 +32,7 @@ func applePKCS12Data(c echo.Context) ([]byte, error) {
 	}
 	data, err := readAppleUpload(c, "identity", apple.MaxPKCS12Bytes)
 	if err != nil {
-		return nil, appleFailure(err)
+		return nil, appleFailure(c, err)
 	}
 	settings := map[string]any{"PayloadScope": f.Get("payload_scope"), "IdentityData": data, "Password": f.Get("password")}
 	for field, key := range map[string]string{"key_extractable": "KeyIsExtractable", "all_apps_access": "AllowAllAppsAccess"} {
@@ -46,7 +46,7 @@ func applePKCS12Data(c echo.Context) ([]byte, error) {
 	}
 	result, err := apple.BuildProfile(f.Get("name"), f.Get("identifier"), "apple-pkcs12", settings)
 	if err != nil {
-		return nil, appleFailure(err)
+		return nil, appleFailure(c, err)
 	}
 	return result, nil
 }

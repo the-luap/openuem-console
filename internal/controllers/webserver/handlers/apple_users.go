@@ -10,7 +10,7 @@ import (
 func appleUserID(c echo.Context) (string, error) {
 	id, err := uuid.Parse(c.Param("user"))
 	if err != nil {
-		return "", appleFailure(apple.ErrNotFound)
+		return "", appleFailure(c, apple.ErrNotFound)
 	}
 	return id.String(), nil
 }
@@ -33,11 +33,11 @@ func (h *Handler) AppleUser(c echo.Context) error {
 	}
 	d, err := h.Apple.Device(c.Request().Context(), scope, id)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	u, err := h.Apple.User(c.Request().Context(), scope, id, userID)
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	detail := mdm_views.UserDetail{Device: d, User: u}
 	detail.Commands, err = h.Apple.UserCommands(c.Request().Context(), scope, id, userID)
@@ -81,13 +81,13 @@ func (h *Handler) AppleUserAction(c echo.Context) error {
 	case "/ios/:id/users/:user/profiles":
 		profileID, parseErr := uuid.Parse(c.FormValue("profile_id"))
 		if parseErr != nil {
-			return appleFailure(apple.ErrNotFound)
+			return appleFailure(c, apple.ErrNotFound)
 		}
 		err = h.Apple.AssignUserProfile(c.Request().Context(), scope, id, userID, profileID.String(), c.FormValue("desired"), actor)
 	case "/ios/:id/users/:user/commands/:command/retry":
 		commandID, parseErr := uuid.Parse(c.Param("command"))
 		if parseErr != nil {
-			return appleFailure(apple.ErrNotFound)
+			return appleFailure(c, apple.ErrNotFound)
 		}
 		err = h.Apple.RetryUserCommand(c.Request().Context(), scope, id, userID, commandID.String(), actor)
 	case "/ios/:id/users/:user/pause":
@@ -98,7 +98,7 @@ func (h *Handler) AppleUserAction(c echo.Context) error {
 		return echo.NewHTTPError(404)
 	}
 	if err != nil {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id+"/users/"+userID)
 }

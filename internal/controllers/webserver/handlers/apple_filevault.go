@@ -26,7 +26,7 @@ func (h *Handler) AppleFileVault(c echo.Context) error {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, "FileVault management permission denied")
 		}
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -45,13 +45,13 @@ func (h *Handler) AppleFileVaultValidate(c echo.Context) error {
 	}
 	key, err := uuid.Parse(c.Param("key"))
 	if err != nil {
-		return appleFailure(apple.ErrNotFound)
+		return appleFailure(c, apple.ErrNotFound)
 	}
 	if err = h.Apple.RequestFileVaultValidation(c.Request().Context(), scope, id, key.String(), h.appleActor(c), h.Access); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, "FileVault validation permission denied")
 		}
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -70,13 +70,13 @@ func (h *Handler) AppleFileVaultRotate(c echo.Context) error {
 	}
 	key, err := uuid.Parse(c.Param("key"))
 	if err != nil {
-		return appleFailure(apple.ErrNotFound)
+		return appleFailure(c, apple.ErrNotFound)
 	}
 	if err = h.Apple.RequestFileVaultRotation(c.Request().Context(), scope, id, key.String(), h.appleActor(c), h.Access); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, "FileVault rotation permission denied")
 		}
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/"+id)
 }
@@ -103,14 +103,14 @@ func (h *Handler) AppleFileVaultKey(c echo.Context) error {
 	}
 	keyID, err := uuid.Parse(c.Param("key"))
 	if err != nil {
-		return appleFailure(apple.ErrNotFound)
+		return appleFailure(c, apple.ErrNotFound)
 	}
 	key, err := h.Apple.RevealFileVaultKey(c.Request().Context(), scope, id, keyID.String(), h.appleActor(c), h.Access)
 	if err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return echo.NewHTTPError(http.StatusForbidden, "Recovery retrieval permission denied")
 		}
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	defer clear(key)
 	return c.Blob(http.StatusOK, "text/plain; charset=utf-8", key)

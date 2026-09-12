@@ -10,7 +10,7 @@ import (
 
 // Database and cryptographic errors may carry implementation details. New push
 // request routes return fixed messages instead of displaying underlying errors.
-func applePushRequestFailure(err error) error {
+func applePushRequestFailure(c echo.Context, err error) error {
 	if errors.Is(err, apple.ErrPushConnection) {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, apple.ErrPushConnection.Error())
 	}
@@ -24,7 +24,7 @@ func applePushRequestFailure(err error) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apple.ErrVendorRequest.Error())
 	}
 	if errors.Is(err, apple.ErrNotFound) || errors.Is(err, apple.ErrConflict) {
-		return appleFailure(err)
+		return appleFailure(c, err)
 	}
 	return echo.NewHTTPError(http.StatusBadRequest, "The push request could not be processed. Check the organization, request status and certificate. Revoke unused requests if five are already pending.")
 }
@@ -43,10 +43,10 @@ func (h *Handler) AppleAttachVendorRequest(c echo.Context) error {
 	}
 	data, err := readAppleUpload(c, "vendor_request", apple.MaxVendorPortalRequest)
 	if err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	if err = h.Apple.AttachVendorRequest(c.Request().Context(), scope.TenantID, id, data, h.appleActor(c)); err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/setup")
 }
@@ -65,7 +65,7 @@ func (h *Handler) AppleVendorPortalRequest(c echo.Context) error {
 	}
 	data, err := h.Apple.VendorPortalRequest(c.Request().Context(), scope.TenantID, id, h.appleActor(c))
 	if err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
@@ -87,7 +87,7 @@ func (h *Handler) AppleCreatePushRequest(c echo.Context) error {
 	}
 	_, err = h.Apple.CreatePushRequest(c.Request().Context(), scope.TenantID, c.FormValue("organization"), c.FormValue("public_url"), c.FormValue("apple_account"), h.appleActor(c))
 	if err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/setup")
 }
@@ -106,7 +106,7 @@ func (h *Handler) ApplePushRequestCSR(c echo.Context) error {
 	}
 	csr, err := h.Apple.PushRequestCSR(c.Request().Context(), scope.TenantID, id, h.appleActor(c))
 	if err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
@@ -128,7 +128,7 @@ func (h *Handler) AppleRevokePushRequest(c echo.Context) error {
 		return err
 	}
 	if err = h.Apple.RevokePushRequest(c.Request().Context(), scope.TenantID, id, h.appleActor(c)); err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/setup")
 }
@@ -147,10 +147,10 @@ func (h *Handler) AppleImportPushCertificate(c echo.Context) error {
 	}
 	cert, err := readAppleUpload(c, "push_certificate", 64<<10)
 	if err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	if err = h.Apple.ImportPushCertificate(c.Request().Context(), scope.TenantID, id, cert, h.appleActor(c)); err != nil {
-		return applePushRequestFailure(err)
+		return applePushRequestFailure(c, err)
 	}
 	return appleRedirect(c, info, "/ios/setup")
 }

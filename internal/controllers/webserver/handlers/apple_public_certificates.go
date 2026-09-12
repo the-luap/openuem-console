@@ -32,11 +32,11 @@ func applePublicCertificateData(c echo.Context) ([]byte, error) {
 	}
 	data, err := readAppleUpload(c, "certificate", apple.MaxPublicCertificateBytes)
 	if err != nil {
-		return nil, appleFailure(err)
+		return nil, appleFailure(c, err)
 	}
 	result, err := apple.BuildProfile(f.Get("name"), f.Get("identifier"), "apple-certificates", map[string]any{"PayloadScope": f.Get("payload_scope"), "CertificateData": data})
 	if err != nil {
-		return nil, appleFailure(err)
+		return nil, appleFailure(c, err)
 	}
 	return result, nil
 }

@@ -755,6 +755,29 @@ func TestManagementPagesRenderSafeFormsAndInventory(t *testing.T) {
 			}
 		})
 	}
+
+	for _, status := range []string{"failed", "invalid_token"} {
+		failedDevice := *d
+		failedDevice.PushStatus, failedDevice.PushError = status, "Post https://push.example.test/3/device/owned-private-push-canary"
+		failedUser := *user
+		failedUser.PushStatus, failedUser.PushError = status, failedDevice.PushError
+		for _, component := range []templ.Component{DeviceDetails(c, info, Detail{Device: &failedDevice}), UserDetails(c, info, UserDetail{Device: &mac, User: &failedUser})} {
+			var rendered bytes.Buffer
+			if err = component.Render(ctx, &rendered); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(rendered.String(), "owned-private-push-canary") || strings.Contains(rendered.String(), "push.example.test") {
+				t.Error("stored push diagnostics exposed a private transport URL", status)
+			}
+			guidance := "Wake-up notification failed"
+			if status == "invalid_token" {
+				guidance = "Wait for a new token update"
+			}
+			if !strings.Contains(rendered.String(), guidance) {
+				t.Error("stored push state lost its safe guidance", status)
+			}
+		}
+	}
 	malicious := *d
 	malicious.Name = `<script>alert("xss")</script>`
 	detail.Device = &malicious
