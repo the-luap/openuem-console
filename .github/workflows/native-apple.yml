@@ -173,7 +173,7 @@ jobs:
       - name: Protocol, persistence and TLS
         run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/mdm/apple ./internal/notifications ./internal/controllers/webserver
       - name: Gateway identity, route isolation, certificate login and CSRF
-        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/sessiontokens ./internal/security/loginproof ./internal/security/audit ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/... ./internal/controllers/sessions
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/sessiontokens ./internal/security/loginproof ./internal/security/mfaadmission ./internal/security/audit ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/... ./internal/controllers/sessions
       - name: Legacy session token decoder fuzzing
         run: go test -run '^$' -fuzz='^FuzzSessionTokenDecoder$' -fuzztime=15s -parallel=2 ./internal/security/sessiontokens
       - name: Existing Windows deployment and SMTP settings models

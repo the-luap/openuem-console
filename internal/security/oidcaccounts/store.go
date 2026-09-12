@@ -17,6 +17,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 )
 
 var (
@@ -62,6 +63,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO uem_oidc_migrations VALUES ('001_bindings')`); err != nil {
 			return err
 		}
+	}
+	if _, err = tx.ExecContext(ctx, mfaadmission.Schema); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

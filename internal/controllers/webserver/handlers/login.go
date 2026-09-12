@@ -24,6 +24,7 @@ import (
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -299,8 +300,8 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 		return mfaMutationError(err)
 	}
 
-	valid := totp.Validate(passcode, secret)
-	if !valid {
+	evidence, err := mfaadmission.TOTP(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, secret, passcode, time.Now())
+	if err != nil {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
@@ -318,7 +319,7 @@ func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
 	// 2FA has been enabled
 	h.AuthLogger.Printf("user %s has enabled 2FA", username)
 
-	if err := h.completeUserSession(c, user, true); err != nil {
+	if err := h.completeUserSession(c, user, true, evidence); err != nil {
 		return sessionAdmissionError(err, "Second-factor session could not be completed.")
 	}
 
@@ -381,14 +382,14 @@ func (h *Handler) LoginTOTPValidate(c echo.Context) error {
 		return mfaMutationError(err)
 	}
 
-	valid := totp.Validate(passcode, secret)
-	if !valid {
+	evidence, err := mfaadmission.TOTP(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, secret, passcode, time.Now())
+	if err != nil {
 		log.Println("[ERROR]: the TOTP code is not valid")
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_setup"), true))
 	}
 
 	// Access granted
-	return h.AccessGranted(c, user)
+	return h.accessGranted(c, user, evidence)
 }
 
 func (h *Handler) LoginTOTPBackupRequest(c echo.Context) error {
@@ -448,8 +449,11 @@ func (h *Handler) LoginTOTPBackupCheck(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.totp_wrong_recovery_code"), true))
 	}
 
-	// Access granted
-	return h.AccessGranted(c, user)
+	evidence, err := mfaadmission.Backup(h.SessionManager.Manager.GetString(c.Request().Context(), loginproof.SessionKey), user.ID, time.Now())
+	if err != nil {
+		return sessionAdmissionError(err, "Second-factor session could not be completed.")
+	}
+	return h.accessGranted(c, user, evidence)
 }
 
 func (h *Handler) LoginForgotPass(c echo.Context) error {
@@ -476,7 +480,11 @@ func (h *Handler) NewSession(c echo.Context, user *ent.User) error {
 }
 
 func (h *Handler) AccessGranted(c echo.Context, user *ent.User) error {
-	if err := h.completeUserSession(c, user, user.Use2fa); err != nil {
+	return h.accessGranted(c, user, nil)
+}
+
+func (h *Handler) accessGranted(c echo.Context, user *ent.User, evidence *mfaadmission.Evidence) error {
+	if err := h.completeUserSession(c, user, user.Use2fa, evidence); err != nil {
 		return sessionAdmissionError(err, "Sign-in session could not be completed.")
 	}
 

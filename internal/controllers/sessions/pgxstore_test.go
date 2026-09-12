@@ -40,12 +40,20 @@ func blockedCleanup(t *testing.T, f sessionFixture) *sessions.PostgresStore {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(2 * time.Second)
-	for f.pool.Stat().AcquiredConns() == 0 && time.Now().Before(deadline) {
+	for {
+		var waiting bool
+		if err = f.model.DB.QueryRowContext(t.Context(), `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND query LIKE 'DELETE FROM %')`, f.pool.Config().ConnConfig.RuntimeParams["application_name"]).Scan(&waiting); err != nil {
+			store.StopCleanup()
+			t.Fatal(err)
+		}
+		if waiting {
+			break
+		}
+		if time.Now().After(deadline) {
+			store.StopCleanup()
+			t.Fatal("cleanup never reached its blocked database attempt")
+		}
 		time.Sleep(time.Millisecond)
-	}
-	if f.pool.Stat().AcquiredConns() == 0 {
-		store.StopCleanup()
-		t.Fatal("cleanup never started its database attempt")
 	}
 	return store
 }

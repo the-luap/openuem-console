@@ -9,6 +9,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 )
 
 var ErrLocalSignIn = errors.New("local sign-in policy or credentials changed")
@@ -26,6 +27,17 @@ const (
 // was checked. Configuration is locked before the account, so confirmation cannot
 // undo revocation or silently accept a changed password, mode or MFA requirement.
 func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage) error {
+	return m.admitLocalSignIn(parent, expected, method, stage, nil)
+}
+
+func (m *Model) CompleteMFASignIn(parent context.Context, expected *ent.User, method string, evidence *mfaadmission.Evidence) error {
+	if evidence == nil {
+		return mfaadmission.ErrRejected
+	}
+	return m.admitLocalSignIn(parent, expected, method, LocalSignInComplete, evidence)
+}
+
+func (m *Model) admitLocalSignIn(parent context.Context, expected *ent.User, method string, stage LocalSignInStage, evidence *mfaadmission.Evidence) error {
 	if m.DB == nil || expected == nil || expected.ID == "" || (method != loginproof.Password && method != loginproof.Certificate) || stage < LocalSignInCheck || stage > LocalSignInPasswordReplacement {
 		return ErrLocalSignIn
 	}
@@ -77,6 +89,17 @@ func (m *Model) AdmitLocalSignIn(parent context.Context, expected *ent.User, met
 		// enrollment when admission commits. Handlers retain stored ciphertext.
 		if mfa && (!confirmed || secret != expected.TotpSecret) {
 			return ErrLocalSignIn
+		}
+		if mfa {
+			credential := ""
+			if method == loginproof.Password {
+				credential = loginproof.Digest(hash)
+			}
+			if err = mfaadmission.Consume(ctx, tx, expected.ID, method, credential, evidence); err != nil {
+				return err
+			}
+		} else if evidence != nil {
+			return mfaadmission.ErrRejected
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE users SET register=$2,cert_clear_password='',modified=clock_timestamp() WHERE uid=$1`, expected.ID, nats.REGISTER_COMPLETE); err != nil {
 			return err

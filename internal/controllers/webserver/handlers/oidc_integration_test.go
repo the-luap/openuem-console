@@ -377,7 +377,11 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 			if missing {
 				request(b, "/fixture/remove-identity")
 			}
-			code, err := totp.GenerateCode(secret, time.Now())
+			codeTime := time.Now()
+			if missing {
+				codeTime = codeTime.Add(30 * time.Second)
+			}
+			code, err := totp.GenerateCode(secret, codeTime)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -400,6 +404,16 @@ func runOIDCConsoleWithOwnedProvider(t *testing.T, encrypted bool) {
 			}
 			if rec = request(b, "/myaccount"); rec.Code != 200 {
 				t.Fatal("completed OpenID MFA could not access protected route", rec.Code)
+			}
+			replayed := browser{}
+			if rec = request(replayed, begin(replayed, "valid", "oidc-reader")); rec.Code != 302 {
+				t.Fatal("cannot create a second owned primary flow", rec.Code)
+			}
+			if rec = request(replayed, "/fixture/complete-mfa?confirm-code="+url.QueryEscape(code)); rec.Code != 401 || request(replayed, "/fixture/session").Body.String() != "" {
+				t.Fatal("fresh OpenID primary flow reused a consumed TOTP counter", rec.Code)
+			}
+			if rec = request(b, "/myaccount"); rec.Code != 200 {
+				t.Fatal("replay retired the valid completed session", rec.Code)
 			}
 		}
 	})

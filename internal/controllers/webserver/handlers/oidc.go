@@ -469,7 +469,7 @@ func (h *Handler) CreateSession(c echo.Context, user *ent.User, identity *oidcac
 		extra[loginproof.SessionKey] = loginproof.New(user.ID, loginproof.OpenID, string(identityJSON), time.Now())
 	}
 	return h.establishUserSession(c, user, false, extra, func(ctx context.Context) error {
-		return h.OIDCAccounts.AdmitSession(ctx, *identity, user, false)
+		return h.OIDCAccounts.AdmitSession(ctx, *identity, user, nil)
 	})
 }
 

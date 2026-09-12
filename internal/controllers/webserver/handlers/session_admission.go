@@ -9,10 +9,14 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/models"
 	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
 )
 
 func sessionAdmissionError(err error, message string) error {
+	if errors.Is(err, mfaadmission.ErrRejected) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Two-factor sign-in expired or was already used. Sign in again with a new code.")
+	}
 	if errors.Is(err, models.ErrLocalSignIn) || errors.Is(err, oidcaccounts.ErrIdentity) || errors.Is(err, oidcaccounts.ErrConflict) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Account access or sign-in requirements changed; sign in again.")
 	}
@@ -45,13 +49,19 @@ func (h *Handler) establishUserSession(c echo.Context, user *ent.User, secondFac
 
 // MFA completion may retain only an OpenID identity which still belongs to this
 // account and passes current binding/policy validation. Other old state is cleared.
-func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFactor bool) error {
+func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFactor bool, evidence *mfaadmission.Evidence) error {
+	if secondFactor != (evidence != nil) || user.Use2fa != secondFactor {
+		return mfaadmission.ErrRejected
+	}
 	var extra map[string]any
 	method := loginproof.Certificate
 	if user.Passwd {
 		method = loginproof.Password
 	}
 	confirm := func(ctx context.Context) error {
+		if secondFactor {
+			return h.Model.CompleteMFASignIn(ctx, user, method, evidence)
+		}
 		return h.Model.AdmitLocalSignIn(ctx, user, method, models.LocalSignInComplete)
 	}
 	if user.Openid {
@@ -61,7 +71,7 @@ func (h *Handler) completeUserSession(c echo.Context, user *ent.User, secondFact
 		}
 		extra = map[string]any{oidcSessionKey: h.SessionManager.Manager.GetString(c.Request().Context(), oidcSessionKey)}
 		confirm = func(ctx context.Context) error {
-			return h.OIDCAccounts.AdmitSession(ctx, *identity, user, secondFactor)
+			return h.OIDCAccounts.AdmitSession(ctx, *identity, user, evidence)
 		}
 	}
 	return h.establishUserSession(c, user, secondFactor, extra, confirm)

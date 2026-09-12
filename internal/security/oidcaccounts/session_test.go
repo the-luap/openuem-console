@@ -64,7 +64,7 @@ func TestOIDCSessionUsesLiveIdentityRevisionAndPolicy(t *testing.T) {
 	if err = f.s.ValidateSession(ctx, *session); !errors.Is(err, oidcaccounts.ErrIdentity) {
 		t.Fatal("revoked account session accepted", err)
 	}
-	if err = f.s.AdmitSession(ctx, *session, account, false); err == nil {
+	if err = f.s.AdmitSession(ctx, *session, account, nil); err == nil {
 		t.Fatal("login confirmation reactivated revoked account")
 	}
 	if err = f.m.Client.User.UpdateOneID("reader").SetRegister(nats.REGISTER_IN_REVIEW).Exec(ctx); err != nil {

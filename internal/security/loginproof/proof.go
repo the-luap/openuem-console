@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const SessionKey = "login-primary"
@@ -19,6 +21,7 @@ const Lifetime = 15 * time.Minute
 var ErrInvalid = errors.New("primary authentication is missing, changed or expired")
 
 type Proof struct {
+	FlowID     string `json:"flow"`
 	UserID     string `json:"user"`
 	Method     string `json:"method"`
 	Credential string `json:"credential"`
@@ -32,7 +35,7 @@ func Digest(value string) string {
 }
 
 func New(userID, method, credential string, now time.Time) string {
-	proof := Proof{UserID: userID, Method: method, Credential: Digest(credential), IssuedAt: now.Unix(), ExpiresAt: now.Add(Lifetime).Unix()}
+	proof := Proof{FlowID: uuid.NewString(), UserID: userID, Method: method, Credential: Digest(credential), IssuedAt: now.Unix(), ExpiresAt: now.Add(Lifetime).Unix()}
 	data, _ := json.Marshal(proof)
 	return string(data)
 }
@@ -43,6 +46,10 @@ func Read(raw, userID string, now time.Time) (Proof, error) {
 		return proof, ErrInvalid
 	}
 	if proof.Method != Password && proof.Method != Certificate && proof.Method != OpenID {
+		return proof, ErrInvalid
+	}
+	flow, err := uuid.Parse(proof.FlowID)
+	if err != nil || flow.Version() != 4 || flow.Variant() != uuid.RFC4122 || flow.String() != proof.FlowID {
 		return proof, ErrInvalid
 	}
 	decoded, err := hex.DecodeString(proof.Credential)

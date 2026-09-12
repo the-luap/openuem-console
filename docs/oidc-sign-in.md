@@ -137,6 +137,12 @@ can confirm an unchanged pending-review account; it cannot undo review newly
 imposed on an approved account. Pending MFA and a newly confirmed enrollment remain
 valid stages of the normal sign-in flow.
 
+Completed OpenID MFA also consumes a unique primary-flow receipt and, for TOTP,
+advances the authenticator's sign-in counter in that transaction. Preloaded pending
+sessions and newly verified primary flows cannot reuse consumed evidence. See
+[one-use MFA evidence](session-storage.md#one-use-mfa-sign-in-evidence) for upgrade,
+retry and retention behavior.
+
 On failure, authentication values are cleared before bounded session cleanup,
 so a cleanup error or the session middleware's later save cannot issue the
 failed account's authenticated session. This is failure-safe admission, not a

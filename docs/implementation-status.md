@@ -61,6 +61,27 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- MFA sign-in now consumes a unique primary-flow UUID and the accepted TOTP
+  counter in the final account-confirmation transaction. Password, certificate
+  and OpenID paths share the same persisted checks; one primary flow cannot be
+  completed repeatedly with different backup codes, and new primary flows cannot
+  reuse a consumed TOTP counter. Counter identity uses the decoded authenticator
+  key, so equivalent spelling or encrypted storage does not reset it. The owned
+  baseline admitted four sessions in each of four replay cases; controlled
+  concurrent handlers now admit one. Tests cover failed/canceled receipt writes,
+  rollback and retry, newer counters, account/key independence, repeated startup
+  migration and a fresh process reading the same database. Actual OpenID routes
+  reject replay while preserving the valid completed session. Identity-store
+  races pass in 5.215 seconds; the complete session race suite passes in 63.781
+  seconds, alongside proof/auth/router races, Linux ARM64 console/administrator
+  routes, startup migration and the full build. The first full run exposed an
+  older cleanup test's connection-sampling race; it now waits for the owned
+  blocked SQL operation and passes with the full suite. Older pending flows must
+  restart after upgrade, all older writers must stop, and receipt retention/growth
+  remains operational work. This covers sign-in; broader local session credential
+  checks and account-settings step-up semantics remain separate work. See
+  [MFA replay protection](session-storage.md#one-use-mfa-sign-in-evidence).
+
 - OpenID callback and MFA confirmation now run final admission in the identity
   store's transaction. Configuration, binding namespace and account locks recheck
   the exact policy, active identity/revision, account registration/mode and MFA

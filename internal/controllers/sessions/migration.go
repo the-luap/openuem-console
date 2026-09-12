@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 	"github.com/open-uem/openuem-console/internal/security/sessiontokens"
 	"github.com/open-uem/utils"
 )
@@ -64,6 +65,9 @@ func (p *PostgresStore) Migrate(ctx context.Context) error {
 			return err
 		}
 	} else {
+		return err
+	}
+	if _, err = tx.Exec(ctx, mfaadmission.Schema); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {

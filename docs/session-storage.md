@@ -39,7 +39,7 @@ disabled method, inactive/revised binding or changed MFA requirements/secrets.
 The actual TLS-provider/router fixtures now reject those changes before issuing
 a cookie. Store tests cover initial auto-approval, pending and completed enrollment,
 plus canceled and committed/rolled-back binding-lock waits. These checks govern
-admission; durable primary-proof consumption and TOTP replay counters remain open.
+admission; the shared one-use evidence described below also covers MFA completion.
 
 Owned regressions reproduced inherited authority and usable cookies after failed
 owner association or login confirmation. Tests cover same-account reauthentication,
@@ -138,11 +138,9 @@ code and first enrollment, plus actual certificate and OpenID MFA completion.
 Proof identity, method, lifetime, size and malformed-state tests run in CI; database
 checks cover changed credentials and disabled/revoked state.
 
-Enrollment persistence uses the transactions described below. Durable one-use
-primary-proof consumption, TOTP replay counters and request-time local credential
-revalidation remain open. A request which
-already loaded its primary proof may still race another completion; removing the
-proof from the completed session alone is not a durable consumption receipt.
+Enrollment persistence and one-use sign-in evidence use the transactions described
+below. A preloaded pending session cannot bypass primary-flow or TOTP consumption.
+Complete request-time local credential revalidation remains separate work.
 
 ## Atomic MFA enrollment
 
@@ -179,8 +177,11 @@ and the actual account-settings and public password/MFA handlers.
 Database confirmation and delivery of the response or a new session are separate
 operations. If response delivery or later session admission fails after commit,
 MFA remains configured; the codes cannot be redisplayed because only their hashes
-are stored. The configured authenticator remains usable. These transactions do
-not provide durable consumption of a pending primary proof or TOTP replay counters.
+are stored. The configured authenticator remains usable. These enrollment transactions do not
+confirm the later sign-in or deliver its response. Completed sign-in consumes its
+primary proof and TOTP counter in the separate confirmation transaction below.
+Protected account-settings code verification is not a new sign-in and does not
+claim a login counter.
 
 ## Single-use recovery codes
 
@@ -207,7 +208,53 @@ unused state on canceled waits and rejected writes, and permit valid retries.
 Actual backup-code handlers repeat the four-request test and storage-failure
 checks with plaintext and encrypted session stores. These guarantees concern a
 stored recovery-code record. Enrollment/code-set replacement is covered above;
-durable one-use primary proofs and TOTP counters remain separate work.
+one-use primary proofs and TOTP counters are covered below.
+
+## One-use MFA sign-in evidence
+
+Every new `login-primary` proof has a random UUID in addition to its account,
+method, credential digest and fifteen-minute lifetime. Two primary authentications
+within the same second have different identities. Pending sessions created before
+this change lack the UUID and must restart primary sign-in after the upgrade.
+
+Final password, certificate and OpenID MFA confirmation consumes that UUID in
+`uem_mfa_primary_consumptions` inside the same transaction as account confirmation.
+Only one request can insert its receipt. This also rejects simultaneous use of
+one primary flow with distinct valid backup codes. The earlier recovery-code
+transaction remains separate: a code already consumed stays used if later primary
+admission loses or fails.
+
+TOTP sign-in records the actual accepted counter in `uem_mfa_totp_counters`, keyed
+by account and a digest of the decoded authenticator key. Validation retains the
+existing six-digit SHA-1, thirty-second period and one-step clock-skew policy.
+The conditional update accepts only a counter greater than the last committed
+counter for that key. Different base32 spelling, ciphertext changes, session
+renewal or process restart cannot create a fresh counter for the same key. A
+newer valid counter, another account or a new authenticator key remains usable.
+Neither the passcode nor plaintext authenticator key is stored in these tables.
+
+Primary receipt, counter advancement and final account confirmation commit or
+roll back together. A storage error or cancellation after evidence insertion
+cannot burn the flow or counter; a later retry can succeed. Once committed, the
+evidence remains consumed even if HTTP delivery fails. Replay or expiration
+returns HTTP 401, clears the failed session, and requires a new sign-in attempt
+with a new code. This does not retire an independently completed valid session.
+
+Session and identity-store startup migrations create the shared tables under a
+common migration lock. Stop all older console and certificate-authentication
+writers before upgrading: older versions do not consume these receipts and a
+mixed deployment cannot provide the guarantee. Migration and session cleanup
+preserve both tables. Receipts and per-key counters are retained permanently for
+now; their growth and any future retention scheme require operational acceptance.
+
+The owned baseline admitted four sessions for one primary flow with distinct
+backup codes, and four for one TOTP counter with distinct primary flows, in both
+session storage modes. Controlled admission barriers now produce exactly one
+winner. Tests cover transaction failures, cancellation after receipt insertion,
+valid retry, a newer counter, independent accounts/keys, equivalent and encrypted
+key representations, repeated migration and a fresh process using the same owned
+database. OpenID store concurrency and the actual TLS-provider/console routes
+also reject consumed evidence while preserving the valid completed session.
 
 ## Durable deletion
 

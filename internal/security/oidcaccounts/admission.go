@@ -3,17 +3,21 @@ package oidcaccounts
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/security/loginproof"
+	"github.com/open-uem/openuem-console/internal/security/mfaadmission"
 )
 
 // AdmitSession confirms a verified OpenID account only while its exact identity,
 // policy and MFA state still authorize the pending or completed session. The
 // caller publishes a cookie only after this transaction succeeds.
-func (s *Store) AdmitSession(parent context.Context, identity Session, expected *ent.User, secondFactor bool) error {
+func (s *Store) AdmitSession(parent context.Context, identity Session, expected *ent.User, evidence *mfaadmission.Evidence) error {
+	secondFactor := evidence != nil
 	if expected == nil || expected.ID == "" || !expected.Openid || expected.Passwd || identity.UserID != expected.ID || identity.Revision <= 0 || !validIdentity(identity.Policy.Issuer, identity.Subject) || secondFactor && !expected.Use2fa {
 		return ErrIdentity
 	}
@@ -62,6 +66,15 @@ func (s *Store) AdmitSession(parent context.Context, identity Session, expected 
 	initialApproval := !secondFactor && policy.AutoApprove && current.Register == nats.REGISTER_IN_REVIEW && expected.Register == nats.REGISTER_IN_REVIEW
 	if !approved && !initialApproval {
 		return ErrIdentity
+	}
+	if secondFactor {
+		identityJSON, err := json.Marshal(identity)
+		if err != nil {
+			return err
+		}
+		if err = mfaadmission.Consume(ctx, tx, expected.ID, loginproof.OpenID, loginproof.Digest(string(identityJSON)), evidence); err != nil {
+			return err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE users SET register=$2,cert_clear_password='',modified=clock_timestamp() WHERE uid=$1`, expected.ID, nats.REGISTER_COMPLETE); err != nil {
 		return err

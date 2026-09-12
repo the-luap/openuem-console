@@ -27,6 +27,7 @@ func TestPrimaryProofIdentityMethodAndLifetime(t *testing.T) {
 	}
 	valid, _ := Read(New("owned-user", Password, "credential", now), "owned-user", now)
 	for _, mutate := range []func(*Proof){
+		func(p *Proof) { p.FlowID = "" }, func(p *Proof) { p.FlowID = "not-a-flow" },
 		func(p *Proof) { p.Method = "recovery" }, func(p *Proof) { p.Credential = "00" },
 		func(p *Proof) { p.IssuedAt = 0 }, func(p *Proof) { p.ExpiresAt++ },
 	} {
@@ -41,5 +42,17 @@ func TestPrimaryProofIdentityMethodAndLifetime(t *testing.T) {
 		if _, err := Read(raw, "owned-user", now); err == nil {
 			t.Fatal("missing or oversized proof accepted")
 		}
+	}
+}
+
+func TestPrimaryFlowsAreDistinctWithinTheSameSecond(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	seen := make(map[string]bool)
+	for range 32 {
+		proof, err := Read(New("owned-user", Password, "owned-credential", now), "owned-user", now)
+		if err != nil || seen[proof.FlowID] {
+			t.Fatal("separate authentications shared one flow", err)
+		}
+		seen[proof.FlowID] = true
 	}
 }
