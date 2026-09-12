@@ -31,6 +31,7 @@ const fixtures = new Set([
  ...["reported","required","unverified","different","removed","unavailable","attention","mixed","long","deadline-elapsed","deadline-fold","deadline-stale","exception-active"].map(state=>`apple-update-progress-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`apple-update-plan-${state}`),
  ...["choose","empty","preview","remove","excluded","assignment","history","empty-history","long","catalog"].map(state=>`apple-profile-group-${state}`),
+ ...["choose","empty","preview","remove","excluded","assignment","history","reader","receipt-site-operator","long"].map(state=>`apple-profile-group-organization-${state}`),
  ...["first","next","empty","long"].map(state=>`device-list-${state}`),
  ...["list","empty","detail","archived","viewer","long"].map(state=>`device-groups-${state}`),
  ...["choose","empty","form","preview","history","long","schedule-choose","schedule-form","schedule-preview","schedule-history","schedule-group-changed","schedule-sources-changed"].map(state=>`windows-group-${state}`),
@@ -163,9 +164,11 @@ export async function withChrome({ fixtureRoot, artifactRoot }, run) {
     abort.abort(new Error("Browser regression interrupted"));
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
+  // The full rendered matrix exceeds 1,000 cases. Startup, CDP calls and
+  // individual browser events retain their separate short deadlines.
   const deadline = setTimeout(
-    () => abort.abort(new Error("Browser regression exceeded three minutes")),
-    180000,
+    () => abort.abort(new Error("Browser regression exceeded eight minutes")),
+    480000,
   );
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {

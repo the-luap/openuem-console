@@ -30,6 +30,7 @@ type ProfileGroupCommand struct {
 }
 
 type ProfileGroupAssignment struct {
+	GroupScope      Scope                 `json:"-" xml:"-" yaml:"-"`
 	ID              string                `json:"-" xml:"-" yaml:"-"`
 	Scope           Scope                 `json:"-" xml:"-" yaml:"-"`
 	RequestKey      string                `json:"-" xml:"-" yaml:"-"`
@@ -52,6 +53,7 @@ func (ProfileGroupAssignment) String() string     { return "[protected Apple gro
 func (v ProfileGroupAssignment) GoString() string { return v.String() }
 
 type profileGroupIntent struct {
+	GroupScope  *Scope `json:",omitempty"`
 	Version     int
 	ProfileName string
 	Group       struct {
@@ -84,8 +86,19 @@ func (s *Store) readProfileGroupAssignment(row scanner) (*ProfileGroupAssignment
 	var intent profileGroupIntent
 	decoder := json.NewDecoder(bytes.NewReader(plain))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&intent) != nil || decoder.Decode(new(any)) != io.EOF || intent.Version != 1 || !profileRevisionUUID(intent.Group.ID) || intent.Group.Revision < 1 || intent.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: intent.Group.Name, Rule: intent.Group.Rule}).Valid() || len(intent.Targets) < 1 || len(intent.Targets) > 100 {
+	if decoder.Decode(&intent) != nil || decoder.Decode(new(any)) != io.EOF || (intent.Version != 1 && intent.Version != 2) || !profileRevisionUUID(intent.Group.ID) || intent.Group.Revision < 1 || intent.Group.Revision > 2147483647 || !(inventory.DeviceGroupDefinition{Name: intent.Group.Name, Rule: intent.Group.Rule}).Valid() || len(intent.Targets) < 1 || len(intent.Targets) > 100 {
 		return nil, ErrProfileGroupIntegrity
+	}
+	if intent.Version == 1 {
+		if intent.GroupScope != nil {
+			return nil, ErrProfileGroupIntegrity
+		}
+		r.GroupScope = r.Scope
+	} else {
+		if intent.GroupScope == nil || !validProfileGroupSourceScope(*intent.GroupScope, r.Scope) {
+			return nil, ErrProfileGroupIntegrity
+		}
+		r.GroupScope = *intent.GroupScope
 	}
 	previous := ""
 	commands := map[string]bool{}
@@ -102,7 +115,10 @@ func (s *Store) readProfileGroupAssignment(row scanner) (*ProfileGroupAssignment
 }
 
 func (s *Store) sealProfileGroupAssignment(r *ProfileGroupAssignment) ([]byte, error) {
-	intent := profileGroupIntent{Version: 1, ProfileName: r.ProfileName}
+	if !validProfileGroupSourceScope(r.GroupScope, r.Scope) {
+		return nil, ErrProfileGroupIntegrity
+	}
+	intent := profileGroupIntent{Version: 2, ProfileName: r.ProfileName, GroupScope: &r.GroupScope}
 	intent.Group.ID, intent.Group.Revision, intent.Group.Name, intent.Group.Rule = r.Group.ID, r.Group.Revision, r.Group.Name, r.Group.Rule
 	for _, target := range r.Commands {
 		intent.Targets = append(intent.Targets, struct{ DeviceID, CommandID string }{target.DeviceID, target.CommandID})
@@ -147,6 +163,13 @@ func auditProfileGroupAssignment(ctx context.Context, tx *sql.Tx, r *ProfileGrou
 // An exact request retry reads its original receipt before resolving current
 // group/catalog state, so it cannot silently repeat or rewrite old device work.
 func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, requestKey string, deviceIDs []string, desired string) (*ProfileGroupAssignment, error) {
+	return s.assignProfileFromGroupSource(ctx, actor, permissions, scope, scope, sources, profileID, profileRevision, groupID, groupRevision, requestKey, deviceIDs, desired)
+}
+
+func (s *Store) assignProfileFromGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, requestKey string, deviceIDs []string, desired string) (*ProfileGroupAssignment, error) {
+	if !validProfileGroupSourceScope(groupScope, scope) {
+		return nil, ErrProfileGroup
+	}
 	if !sources.Apple || !profileRevisionUUID(profileID) || profileRevision < 1 || profileRevision > 2147483647 || !profileRevisionUUID(groupID) || groupRevision < 1 || groupRevision > 2147483647 || !profileRevisionUUID(requestKey) || (desired != "installed" && desired != "removed") || len(deviceIDs) < 1 || len(deviceIDs) > 100 {
 		return nil, ErrProfileGroup
 	}
@@ -168,6 +191,11 @@ func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permis
 	if err != nil {
 		return nil, err
 	}
+	if groupScope != scope {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ReadDevices, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}); err != nil {
+			return nil, err
+		}
+	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684629904,hashtext($1))`, fmt.Sprintf("%d/%d/%s", scope.TenantID, scope.SiteID, requestKey)); err != nil {
 		return nil, err
 	}
@@ -177,7 +205,7 @@ func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permis
 		for i, command := range previous.Commands {
 			original[i] = command.DeviceID
 		}
-		if previous.Actor != actor || previous.ActorRevision != permissionRevision || previous.ProfileID != profileID || previous.ProfileRevision != profileRevision || previous.Desired != desired || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(original, targets) {
+		if previous.GroupScope != groupScope || previous.Actor != actor || previous.ActorRevision != permissionRevision || previous.ProfileID != profileID || previous.ProfileRevision != profileRevision || previous.Desired != desired || previous.Group.ID != groupID || previous.Group.Revision != groupRevision || !slices.Equal(original, targets) {
 			return nil, ErrConflict
 		}
 		if err = auditProfileGroupAssignment(ctx, tx, previous, actor, "replayed"); err != nil {
@@ -191,7 +219,7 @@ func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permis
 	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
-	staged, err := s.stageProfileGroup(ctx, tx, actor, permissions, scope, sources, profileID, profileRevision, groupID, groupRevision, desired)
+	staged, err := s.stageProfileGroupSource(ctx, tx, actor, permissions, scope, groupScope, sources, profileID, profileRevision, groupID, groupRevision, desired)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +230,7 @@ func (s *Store) AssignProfileFromGroup(ctx context.Context, actor string, permis
 	if !slices.Equal(current, targets) {
 		return nil, ErrConflict
 	}
-	r := &ProfileGroupAssignment{ID: uuid.NewString(), Scope: scope, RequestKey: requestKey, ProfileID: profileID, ProfileRevision: profileRevision, ProfileName: staged.ProfileName, Actor: actor, ActorRevision: permissionRevision, Desired: desired, Group: ProfileGroupSource{ID: staged.Group.ID, Revision: staged.Group.Revision, Name: staged.Group.Name, Rule: staged.Group.Rule}}
+	r := &ProfileGroupAssignment{ID: uuid.NewString(), Scope: scope, GroupScope: groupScope, RequestKey: requestKey, ProfileID: profileID, ProfileRevision: profileRevision, ProfileName: staged.ProfileName, Actor: actor, ActorRevision: permissionRevision, Desired: desired, Group: ProfileGroupSource{ID: staged.Group.ID, Revision: staged.Group.Revision, Name: staged.Group.Name, Rule: staged.Group.Rule}}
 	for _, target := range staged.Targets {
 		r.Commands = append(r.Commands, ProfileGroupCommand{DeviceID: target.DeviceID, CommandID: target.commandID})
 		if err = audit(ctx, tx, scope.TenantID, actor, "apple.profile."+desired, profileID+"/"+target.DeviceID); err != nil {

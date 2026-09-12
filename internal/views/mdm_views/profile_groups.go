@@ -7,10 +7,12 @@ import (
 
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
 type ProfileGroupChoice struct {
+	Organization                    bool
 	ProfileID, ProfileName, Desired string
 	Revision                        int
 }
@@ -22,6 +24,9 @@ func profileGroupSiteSelected(info *partials.CommonInfo) bool {
 
 func ProfileGroupChoiceURL(info *partials.CommonInfo, choice ProfileGroupChoice, after string) string {
 	q := url.Values{"revision": {strconv.Itoa(choice.Revision)}, "desired": {choice.Desired}}
+	if choice.Organization {
+		q.Set("source", "organization")
+	}
 	if after != "" {
 		q.Set("after", after)
 	}
@@ -30,6 +35,9 @@ func ProfileGroupChoiceURL(info *partials.CommonInfo, choice ProfileGroupChoice,
 
 func profileGroupPreviewURL(info *partials.CommonInfo, choice ProfileGroupChoice, group inventory.DeviceGroup) string {
 	q := url.Values{"revision": {strconv.Itoa(choice.Revision)}, "desired": {choice.Desired}, "group_revision": {strconv.Itoa(group.Revision)}}
+	if choice.Organization {
+		q.Set("source", "organization")
+	}
 	return partials.GetNavigationUrl(info, "/ios/configurations/"+choice.ProfileID+"/groups/"+group.ID+"/preview") + "?" + q.Encode()
 }
 
@@ -68,4 +76,25 @@ func profileGroupExclusion(reason string) string {
 	default:
 		return "This member cannot receive the selected action."
 	}
+}
+
+func profileOrganizationGroupsAllowed(info *partials.CommonInfo) bool {
+	tenant, err := strconv.Atoi(info.TenantID)
+	return err == nil && tenant > 0 && info.Principal.Can(access.ReadDevices, access.Scope{TenantID: tenant})
+}
+func profileGroupSourceChoiceURL(info *partials.CommonInfo, choice ProfileGroupChoice, organization bool) string {
+	choice.Organization = organization
+	return ProfileGroupChoiceURL(info, choice, "")
+}
+func profileGroupSourceKind(scope apple.Scope) string {
+	if scope.TenantID > 0 && scope.SiteID == 0 {
+		return "organization"
+	}
+	return "site"
+}
+func profileGroupManageURL(info *partials.CommonInfo, organization bool) string {
+	if organization {
+		return "/tenant/" + info.TenantID + "/device-groups"
+	}
+	return partials.GetNavigationUrl(info, "/device-groups")
 }

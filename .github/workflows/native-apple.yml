@@ -152,7 +152,7 @@ jobs:
       - name: Chrome startup lifecycle and diagnostics
         run: node --test tests/browser/chrome-startup.test.mjs
       - name: Certificate, network and inventory forms in Chrome
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: node tests/browser/run.mjs
         env:
           APPLE_MDM_UI_ARTIFACTS: ${{ runner.temp }}/apple-mdm-ui

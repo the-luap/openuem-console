@@ -29,6 +29,7 @@ import deviceList from "./device-list.mjs";
 import deviceGroups from "./device-groups.mjs";
 import windowsUpdateGroups from "./windows-update-groups.mjs";
 import appleProfileAssignments from "./apple-profile-assignments.mjs";
+import appleProfileOrganizationGroups from "./apple-profile-organization-groups.mjs";
 import appleProfileGroups from "./apple-profile-groups.mjs";
 import appleUpdatePlans from "./apple-update-plans.mjs";
 import appleUpdateGroups from "./apple-update-groups.mjs";
@@ -91,6 +92,7 @@ try {
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
         [appleProfileGroups,30],
+        [appleProfileOrganizationGroups,30],
         [appleUpdatePlans,18],
         [appleUpdateGroups,27],
         [appleUpdateSchedules,27],

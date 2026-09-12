@@ -81,6 +81,10 @@ the original revision, native membership and enabled sources.
 [Immediate Apple System-profile assignments](apple-profile-groups.md) now preview
 current action eligibility, resolve canonical Mac channels, confirm exact native
 targets and retain immutable original request evidence.
+[Organization-source profile assignments](apple-profile-organization-groups.md)
+now evaluate organization rules within an explicitly selected site and retain
+the source and target scopes separately. Organization-wide source read authority
+is required; the complete bound applies to the site intersection.
 [Apple update plan assignments](apple-update-groups.md) additionally compare
 reviewed current policy values and explicitly confirm replacements.
 [Scheduled Apple update activation](apple-update-schedules.md) retains that review

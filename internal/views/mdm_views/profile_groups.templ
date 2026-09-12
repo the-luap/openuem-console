@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -13,7 +14,22 @@ templ AppleProfileGroups(c echo.Context, info *partials.CommonInfo, choice Profi
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
 		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Choose a dynamic group", Url: ProfileGroupChoiceURL(info, choice, "")}}, info)
 		<main id="device-management" data-profile-groups="choose" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-			<div><h1 class="text-2xl font-semibold">Choose a dynamic group</h1><p>{ profileGroupAction(choice.Desired)+": "+choice.ProfileName+" · Revision "+Number(choice.Revision) }</p><p>Only groups in the selected site are listed. The next step checks every member and shows eligible native Apple devices and exclusions.</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups")) }>Manage dynamic groups</a></div>
+			<div class="grid gap-3" style="overflow-wrap:anywhere;">
+				<h1 class="text-2xl font-semibold">Choose a dynamic group</h1>
+				<p>{ profileGroupAction(choice.Desired)+": "+choice.ProfileName+" · Revision "+Number(choice.Revision) }</p>
+				if choice.Organization {
+					<p data-profile-organization-source>Organization groups are listed. The next step evaluates the group's current rule only within the selected target site. Devices from other sites are outside this action.</p>
+				} else {
+					<p>Only groups in the selected site are listed. The next step checks every member and shows eligible native Apple devices and exclusions.</p>
+				}
+				<nav aria-label="Profile group source" class="flex flex-wrap gap-3">
+					<a class="underline" href={ templ.URL(profileGroupSourceChoiceURL(info, choice, false)) }>Site groups</a>
+					if profileOrganizationGroupsAllowed(info) {
+						<a class="underline" href={ templ.URL(profileGroupSourceChoiceURL(info, choice, true)) }>Organization groups</a>
+					}
+				</nav>
+				<a class="underline" href={ templ.URL(profileGroupManageURL(info, choice.Organization)) }>Manage dynamic groups</a>
+			</div>
 			for _, group := range page.Groups {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
@@ -28,7 +44,11 @@ templ AppleProfileGroups(c echo.Context, info *partials.CommonInfo, choice Profi
 				</section>
 			}
 			if len(page.Groups)==0 {
-				<p>No dynamic groups in this site. Create a group before assigning this profile.</p>
+				if choice.Organization {
+					<p>No dynamic groups in this organization. Create an organization group or choose a site group.</p>
+				} else {
+					<p>No dynamic groups in this site. Create a group before assigning this profile.</p>
+				}
 			}
 			@GroupPaging(paging, "Dynamic group pages")
 		</main>
@@ -44,17 +64,35 @@ templ appleProfileGroupSource(info *partials.CommonInfo, source apple.ProfileGro
 	</div>
 }
 
+templ appleProfileAssignmentGroupSource(info *partials.CommonInfo, source apple.ProfileGroupSource, scope apple.Scope) {
+	<div data-profile-group-source style="overflow-wrap:anywhere;">
+		<h3 class="font-semibold">Original group source</h3>
+		<p>{ source.Name } · Revision { Number(source.Revision) }</p>
+		<p>{ "Platform: "+Show(source.Rule.Platform)+" · Inventory search: "+Show(source.Rule.Search) }</p>
+		if profileGroupSourceKind(scope)=="organization" {
+			<p data-profile-organization-source>Organization group. Only the selected target site's members are included; devices in other sites are outside this assignment.</p>
+			<p>Target site: { info.SiteID } · Organization: { info.TenantID }</p>
+			if profileOrganizationGroupsAllowed(info) {
+				<a class="underline" href={ templ.URL(profileGroupManageURL(info, true) + "/" + source.ID) }>Open the current organization group and its history</a>
+			}
+		} else {
+			<p>Group and target belong to the selected site.</p>
+			<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups/"+source.ID)) }>Open the current group and its history</a>
+		}
+	</div>
+}
+
 templ AppleProfileGroupPreview(c echo.Context, info *partials.CommonInfo, preview apple.ProfileGroupPreview, requestKey string) {
 	@layout.Base("devices", info) {
 		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
-		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Review group assignment", Url: ProfileGroupChoiceURL(info, ProfileGroupChoice{ProfileID: preview.ProfileID, ProfileName: preview.ProfileName, Revision: preview.ProfileRevision, Desired: preview.Desired}, "")}}, info)
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple profiles", Url: partials.GetNavigationUrl(info, "/ios/configurations")}, {Title: "Review group assignment", Url: ProfileGroupChoiceURL(info, ProfileGroupChoice{Organization: preview.Group.Scope.TenantID > 0 && preview.Group.Scope.SiteID == 0, ProfileID: preview.ProfileID, ProfileName: preview.ProfileName, Revision: preview.ProfileRevision, Desired: preview.Desired}, "")}}, info)
 		<main id="device-management" data-profile-groups="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 			<div><h1 class="text-2xl font-semibold">Review group assignment</h1><p>No device work has been saved. Confirmation rechecks the profile revision, group and complete eligible selection.</p></div>
 			<section class="uk-card uk-card-default">
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					<h2 class="uk-card-title">{ preview.ProfileName } · Revision { Number(preview.ProfileRevision) }</h2>
 					<p>{ profileGroupAction(preview.Desired) }</p>
-					@appleProfileGroupSource(info, apple.ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule})
+					@appleProfileAssignmentGroupSource(info, apple.ProfileGroupSource{ID: preview.Group.ID, Revision: preview.Group.Revision, Name: preview.Group.Name, Rule: preview.Group.Rule}, apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID})
 					<p>Some profiles reserve settings or certificate identities that cannot be shared. Review excluded devices before confirming the eligible selection.</p>
 				</div>
 			</section>
@@ -77,11 +115,12 @@ templ AppleProfileGroupPreview(c echo.Context, info *partials.CommonInfo, previe
 					}
 				</div>
 			</section>
-			if len(preview.Targets)>0 {
+			if len(preview.Targets)>0 && info.Can(access.AssignProfiles) && info.Can(access.ReadDevices) {
 				<section class="uk-card uk-card-default">
 					<div class="uk-card-body">
 						<form method="post" action={ partials.GetNavigationUrl(info, ProfileGroupHistoryPath(preview.ProfileID)) } class="grid gap-4" data-profile-group-confirm>
 							@CSRF(info)
+							<input type="hidden" name="group_source" value={ profileGroupSourceKind(apple.Scope{TenantID: preview.Group.Scope.TenantID, SiteID: preview.Group.Scope.SiteID}) }/>
 							<input type="hidden" name="expected_revision" value={ Number(preview.ProfileRevision) }/><input type="hidden" name="group_id" value={ preview.Group.ID }/><input type="hidden" name="group_revision" value={ Number(preview.Group.Revision) }/><input type="hidden" name="request_key" value={ requestKey }/><input type="hidden" name="desired" value={ preview.Desired }/><input type="hidden" name="devices" value={ profileGroupDeviceFields(preview) }/>
 							<p>Only the eligible devices listed above receive this action. Profile delivery and the later device report determine its result. Later catalog revisions can update existing profile assignments.</p>
 							<label><input type="checkbox" class="uk-checkbox" name="confirmed" value="yes" required/> Apply this exact profile action to the eligible devices listed above.</label>
@@ -104,7 +143,7 @@ templ AppleProfileGroupAssignment(c echo.Context, info *partials.CommonInfo, ass
 				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
 					<h2 class="uk-card-title">{ assignment.ProfileName } · Revision { Number(assignment.ProfileRevision) }</h2>
 					<p>{ profileGroupAction(assignment.Desired) }</p>
-					@appleProfileGroupSource(info, assignment.Group)
+					@appleProfileAssignmentGroupSource(info, assignment.Group, assignment.GroupScope)
 					<dl class="uk-description-list">
 						<dt>Confirmed by</dt>
 						<dd>{ assignment.Actor }</dd>
@@ -142,6 +181,9 @@ templ AppleProfileGroupAssignments(c echo.Context, info *partials.CommonInfo, pr
 					<div class="uk-card-body grid gap-3" style="overflow-wrap:anywhere;">
 						<h2 class="uk-card-title">{ item.ProfileName } · Revision { Number(item.ProfileRevision) }</h2>
 						<p>{ profileGroupAction(item.Desired) } · { item.Group.Name } · Group revision { Number(item.Group.Revision) }</p>
+      if profileGroupSourceKind(item.GroupScope)=="organization" {
+       <p>Source: organization group · Target site: {info.SiteID}</p>
+      }
 						<p>
 							@Timestamp(&item.CreatedAt)
 						</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, ProfileGroupHistoryPath(profile)+"/"+item.ID)) }>Open original assignment</a>

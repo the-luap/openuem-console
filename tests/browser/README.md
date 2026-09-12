@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 1140 cases:
+headless Chrome session. The runner covers 1170 cases:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
@@ -21,6 +21,7 @@ headless Chrome session. The runner covers 1140 cases:
 | Dynamic device groups | List/empty/detail/archived/viewer/long metadata × three widths; scoped revision links and keyboard saves | 18 |
 | Windows group assignments | Six immediate and six scheduled states × three widths; exclusions, source revisions, blocked-plan causes and explicit keyboard confirmation | 36 |
 | Apple profile assignments | Catalog, older assignment and unavailable source × three widths; exact source revision and keyboard apply/removal | 9 |
+| Apple organization profile groups | Ten source chooser, site intersection, apply/removal, history, reader and long metadata states × three widths; original source scope and keyboard confirmation | 30 |
 | Apple profile groups | Site catalog, chooser, empty chooser, apply/removal previews, exclusions, original receipt, populated/empty history and long metadata × three widths; immutable fields and keyboard confirmation | 30 |
 | Apple update plans | List, empty, detail, archived, viewer and long metadata × three widths; exact revisions, retained history and keyboard saving | 18 |
 | Apple update groups | Chooser, empty chooser, new/replacement previews, exclusions, original receipt, populated/empty history and long metadata × three widths; exact policy tokens and keyboard confirmation | 27 |
@@ -41,6 +42,10 @@ headless Chrome session. The runner covers 1140 cases:
 | Windows dispatch | Install/remove review, pending, delivered, observed, restart, uncertain, reader, cancelled, expired, failed and rejected start × three widths | 36 |
 | Windows software checks | Install/remove review, empty, pending, delivered, observed, drifted, unknown, waiting, unavailable, cancelled, expired, reader and paged × three widths | 42 |
 | WinGet sources | Empty, pending, other owner, reader, site, expired, withdrawn, approved, focused, paged, compatible/incompatible review, expired/withdrawn/approved review and derived revision and authority changes × three widths | 51 |
+
+The full matrix has an eight-minute browser deadline and a ten-minute CI step
+limit. Startup, CDP commands and individual events keep their shorter independent
+timeouts. The former three-minute total became too short as the matrix grew.
 
 Widths are 390, 768 and 1440 pixels. The tests check browser validation, clearing
 incompatible certificate selections, exact form values, required review, keyboard

@@ -3,6 +3,9 @@
 Select a site, open **Apple profiles**, and use **Apply to a dynamic group** or
 **Remove from a dynamic group** beside a System profile. The chooser retains the
 current profile revision and lists that site's [dynamic groups](dynamic-device-groups.md).
+[Organization groups](apple-profile-organization-groups.md) can now be selected
+separately and intersected with the explicit target site, with organization-wide
+read permission.
 Archived groups cannot start new work. Group assignment history remains available
 from the profile catalog and each saved request's URL.
 
@@ -37,7 +40,7 @@ confirmed target set. An empty eligible selection has no confirmation form.
 Only the reviewed eligible selection is fixed by confirmation. Excluded members
 are not captured as a retained snapshot. Group membership and device reports can
 change after confirmation; this is an immediate assignment, not ongoing dynamic
-group reconciliation. Organization groups, scheduled Apple profile assignments,
+group reconciliation. Scheduled Apple profile assignments,
 profile exceptions and richer rule predicates remain separate work.
 [Apple update groups](apple-update-groups.md), [scheduled updates](apple-update-schedules.md),
 [temporary update exceptions](apple-update-exceptions.md) and
@@ -50,7 +53,8 @@ Apple migration 043 adds immutable group assignment receipts. An encrypted,
 authenticated intent retains the original profile name, group ID/revision/name/rule
 and exact native device/command IDs. Associated data binds that intent to its
 request, receipt ID, organization, site, actor, permission revision, profile
-revision, action and recording time. SQL rejects receipt updates and deletion.
+revision, action and recording time. New intent version 2 retains the source
+group scope separately; version-1 receipts retain their original site source. SQL rejects receipt updates and deletion.
 There is no plaintext copy of the group name, rule or target list in the receipt.
 
 Repeating the exact request returns its original receipt, including after later

@@ -86,6 +86,10 @@ func (v ProfileGroupPreview) GoString() string { return v.String() }
 // the read audits commit: no device commands or resource claims become visible.
 // Native IDs determine evaluation order, including conflicts between members.
 func (s *Store) PreviewProfileGroup(ctx context.Context, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, desired string) (*ProfileGroupPreview, error) {
+	return s.previewProfileGroupSource(ctx, actor, permissions, scope, scope, sources, profileID, profileRevision, groupID, groupRevision, desired)
+}
+
+func (s *Store) previewProfileGroupSource(ctx context.Context, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, desired string) (*ProfileGroupPreview, error) {
 	if permissions == nil || scope.TenantID <= 0 || scope.SiteID <= 0 {
 		return nil, access.ErrDenied
 	}
@@ -103,7 +107,7 @@ func (s *Store) PreviewProfileGroup(ctx context.Context, actor string, permissio
 	if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.AssignProfiles, permissionScope); err != nil {
 		return nil, err
 	}
-	preview, err := s.stageProfileGroup(ctx, tx, actor, permissions, scope, sources, profileID, profileRevision, groupID, groupRevision, desired)
+	preview, err := s.stageProfileGroupSource(ctx, tx, actor, permissions, scope, groupScope, sources, profileID, profileRevision, groupID, groupRevision, desired)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +134,12 @@ func (s *Store) PreviewProfileGroup(ctx context.Context, actor string, permissio
 // Preview rolls that work back; confirmed admission must match the reviewed
 // targets before retaining it. Callers hold current assignment authority.
 func (s *Store) stageProfileGroup(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, desired string) (*ProfileGroupPreview, error) {
+	return s.stageProfileGroupSource(ctx, tx, actor, permissions, scope, scope, sources, profileID, profileRevision, groupID, groupRevision, desired)
+}
+
+func (s *Store) stageProfileGroupSource(ctx context.Context, tx *sql.Tx, actor string, permissions *access.Store, scope, groupScope Scope, sources inventory.DeviceSources, profileID string, profileRevision int, groupID string, groupRevision int, desired string) (*ProfileGroupPreview, error) {
 	permissionScope := access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}
-	group, err := inventory.DeviceGroupSnapshotTransaction(ctx, tx, permissions, actor, permissionScope, sources, groupID, groupRevision)
+	group, err := inventory.DeviceGroupIntersectionTransaction(ctx, tx, permissions, actor, access.Scope{TenantID: groupScope.TenantID, SiteID: groupScope.SiteID}, permissionScope, sources, groupID, groupRevision)
 	if err != nil {
 		return nil, err
 	}
