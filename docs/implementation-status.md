@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Apple profile assignment](apple-profile-revisions.md#current-assignment-authority)
+  now rechecks current console assignment permissions inside the command/audit
+  transaction and holds the permission/account locks until commit. Organization
+  and current target-site ownership checks prevent a moved site from authorizing
+  stale native inventory. Both apply and removal use the bounded entry point.
+  Owned PostgreSQL/race tests cover role/scope denial, concurrent permission and
+  site changes and rollback after the final device's audit failure. The broader
+  profile/certificate/ACME/SSO/VPN/policy regression selection passes in 65.932
+  seconds. Registered Linux console routes, handler/catalog race checks on
+  Linux and macOS and the full Linux build pass. Reviewed manual source
+  revisions and Apple group provenance remain
+  separate implementation work.
+
 - [Scheduled Windows group assignments](native-windows-update-groups.md) now
   capture the reviewed site group revision, exact native Windows targets and
   enabled inventory sources in encrypted future intent. Activation rechecks all

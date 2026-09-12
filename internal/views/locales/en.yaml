@@ -147,6 +147,7 @@ en:
       enrollment_inactive: "Renewal stopped because this enrollment is no longer active."
       attention: "Identity renewal needs attention. Review the enrollment and command status."
   apple_errors:
+    assignment_permission: "Your current permissions do not allow profile assignment in this scope."
     push_problem: "Review the current push status and Apple push settings."
     push_failed: "Wake-up notification failed. Check outbound network access and Apple push settings."
     push_invalid: "The push token is no longer valid. Wait for a new token update from the device."

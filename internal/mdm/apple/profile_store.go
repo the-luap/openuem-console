@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
+
+	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
 var ErrProfilePrerequisite = errors.New("profile assignment prerequisites are not met")
@@ -264,7 +267,24 @@ func (s *Store) assignWithADERequirement(ctx context.Context, tx *sql.Tx, d *Dev
 	return err
 }
 
+// AssignProfile is the trusted in-process entry point. Console requests use
+// AssignProfileWithAccess to retain their current authority until commit.
 func (s *Store) AssignProfile(ctx context.Context, scope Scope, id string, deviceIDs []string, desired, actor string) error {
+	return s.assignProfile(ctx, scope, id, deviceIDs, desired, actor, nil)
+}
+
+// AssignProfileWithAccess binds the console actor's current assignment authority
+// to the command/audit transaction. Callers must authenticate the session first.
+func (s *Store) AssignProfileWithAccess(ctx context.Context, scope Scope, id string, deviceIDs []string, desired, actor string, permissions *access.Store) error {
+	if permissions == nil {
+		return access.ErrDenied
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return s.assignProfile(ctx, scope, id, deviceIDs, desired, actor, permissions)
+}
+
+func (s *Store) assignProfile(ctx context.Context, scope Scope, id string, deviceIDs []string, desired, actor string, permissions *access.Store) error {
 	if err := scope.Validate(); err != nil {
 		return err
 	}
@@ -279,6 +299,15 @@ func (s *Store) AssignProfile(ctx context.Context, scope Scope, id string, devic
 		return err
 	}
 	defer tx.Rollback()
+	if permissions != nil {
+		if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.AssignProfiles, access.Scope{TenantID: scope.TenantID, SiteID: scope.SiteID}); err != nil {
+			return err
+		}
+		var tenant int
+		if err = tx.QueryRowContext(ctx, `SELECT id FROM tenants WHERE id=$1 FOR SHARE`, scope.TenantID).Scan(&tenant); err != nil {
+			return notFound(err)
+		}
+	}
 	p, err := s.scanProfile(tx.QueryRowContext(ctx, `SELECT `+profileColumns+` FROM mdm_apple_profiles WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, scope.TenantID, id))
 	if err != nil {
 		return err
@@ -297,6 +326,14 @@ func (s *Store) AssignProfile(ctx context.Context, scope Scope, id string, devic
 		}
 		if d.Status != "enrolled" {
 			return errors.New("all selected devices must be enrolled")
+		}
+		if permissions != nil {
+			// A site can move independently of historical native inventory. Lock
+			// its current ownership before admitting work for any selected device.
+			var site int
+			if err = tx.QueryRowContext(ctx, `SELECT id FROM sites WHERE id=$1 AND tenant_sites=$2 FOR SHARE`, d.SiteID, scope.TenantID).Scan(&site); err != nil {
+				return notFound(err)
+			}
 		}
 		if err = s.assign(ctx, tx, d, p, desired); err != nil {
 			return err

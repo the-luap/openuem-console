@@ -767,7 +767,10 @@ func (h *Handler) AppleAssignProfile(c echo.Context) error {
 	if err != nil {
 		return appleFailure(c, err)
 	}
-	if err = h.Apple.AssignProfile(c.Request().Context(), scope, id, ids, c.FormValue("desired"), h.appleActor(c)); err != nil {
+	if err = h.Apple.AssignProfileWithAccess(c.Request().Context(), scope, id, ids, c.FormValue("desired"), h.appleActor(c), h.Access); err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return echo.NewHTTPError(http.StatusForbidden, appleErrorText(c, "apple_errors.assignment_permission"))
+		}
 		return appleFailure(c, err)
 	}
 	if len(ids) == 1 {

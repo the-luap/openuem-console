@@ -61,6 +61,30 @@ SSO, successful profile verification still does not establish provider
 registration, credential synchronization or successful sign-in. Review old
 provider tokens and other credentials before restoring them.
 
+## Current assignment authority
+
+The console's device-channel apply/remove actions use
+`AssignProfileWithAccess`. This entry point rechecks the authenticated actor's
+current `profiles.assign` authority inside the same transaction that changes
+assignments, commands and audits. Shared permission and account locks remain
+held until commit. A pending permission replacement completes before admission
+can read the new grants; a removed grant returns a fixed 403 response.
+
+The transaction also locks the original organization and checks each selected
+device's current site ownership. A moved site cannot authorize old native
+inventory in its previous organization, including for a server administrator or
+an organization-wide request. Device locks and existing profile prerequisite,
+ADE ownership and reservation checks remain part of admission. A failure on any
+target or audit leaves the whole selection unchanged. Console admission has a
+ten-second deadline.
+
+Owned PostgreSQL/race cases cover all four roles, missing authority, organization
+and site scope, pending permission replacement, concurrent site movement and
+rollback after the final device's audit fails. The existing profile, certificate,
+ACME, SSO, VPN and policy regression selection also passes. This change covers
+current admission; it does not bind the existing manual form to a reviewed
+profile revision or add group provenance. Those controls are subsequent work.
+
 ## Validation and remaining integration
 
 Local PostgreSQL checks apply all 29 actual migrations in an isolated transaction
