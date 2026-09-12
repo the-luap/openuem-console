@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Authenticator setup and recovery-code confirmation responses now use
+  `Cache-Control: no-store` in public sign-in and protected account settings.
+  The policy is set before validation and survives rendering. Eight real handler
+  responses previously allowed cache storage; both storage-mode lifecycles now
+  reject that behavior and still render their exact generated secrets and ten
+  recovery codes. Registered protected routes cover CSRF, continued access during
+  staging and session retirement after activation. These integration races pass
+  in 7.823 seconds, their actual Linux ARM64 execution passes, and renderer policy
+  races pass in 2.032 seconds. Existing HTMX history exclusions remain in place;
+  no layout or code-generation changes were needed. See
+  [atomic MFA enrollment](session-storage.md#atomic-mfa-enrollment).
+
 - Completed certificate sessions now retain their original public TLS certificate
   through single-factor, TOTP and backup-code admission. Protected requests check
   its lifetime and exact current registry ownership, purpose, expiry and local

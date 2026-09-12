@@ -18,6 +18,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/nats"
+	"github.com/open-uem/openuem-console/internal/controllers/router"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
 	console "github.com/open-uem/openuem-console/internal/controllers/webserver/handlers"
 	"github.com/open-uem/openuem-console/internal/models"
@@ -25,6 +26,86 @@ import (
 	"github.com/open-uem/utils"
 	"github.com/pquerna/otp/totp"
 )
+
+func TestMFAAccountEnrollmentThroughProtectedRoutes(t *testing.T) {
+	for _, encrypted := range []bool{false, true} {
+		t.Run(sessionMode(encrypted), func(t *testing.T) {
+			f, ctx := prepareLocalSession(t, true, encrypted, false)
+			if _, _, err := f.manager.Commit(ctx); err != nil {
+				t.Fatal(err)
+			}
+			e := router.New(f.handler.SessionManager, "console.test", "443", "1M")
+			f.handler.Register(e, 3)
+			e.GET("/fixture/csrf", func(c echo.Context) error { return c.String(http.StatusOK, c.Get("csrf").(string)) })
+			e.GET("/fixture/authority", func(c echo.Context) error { return c.String(http.StatusOK, "owned protected response") }, f.handler.IsAuthenticated)
+			cookies := map[string]*http.Cookie{f.manager.Cookie.Name: {Name: f.manager.Cookie.Name, Value: f.token}}
+			request := func(method, path string, form url.Values) *httptest.ResponseRecorder {
+				t.Helper()
+				req := httptest.NewRequest(method, "https://console.test"+path, strings.NewReader(form.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Set("Origin", "https://console.test")
+				for _, cookie := range cookies {
+					req.AddCookie(cookie)
+				}
+				rec := httptest.NewRecorder()
+				e.ServeHTTP(rec, req)
+				for _, cookie := range rec.Result().Cookies() {
+					if cookie.MaxAge < 0 {
+						delete(cookies, cookie.Name)
+					} else {
+						cookies[cookie.Name] = cookie
+					}
+				}
+				return rec
+			}
+			csrf := request(http.MethodGet, "/fixture/csrf", nil)
+			if csrf.Code != http.StatusOK || csrf.Body.Len() == 0 {
+				t.Fatal("MFA route fixture did not issue CSRF evidence")
+			}
+			if rec := request(http.MethodPost, "/myaccount/enable2fa", url.Values{"current-password": {accountOldPassword}}); rec.Code != http.StatusForbidden {
+				t.Fatal("MFA enrollment accepted a missing CSRF token", rec.Code)
+			}
+			unchanged, err := f.model.Client.User.Get(t.Context(), f.user.ID)
+			if err != nil || unchanged.TotpSecret != f.user.TotpSecret || unchanged.Use2fa {
+				t.Fatal("rejected enrollment changed MFA", err)
+			}
+			rec := request(http.MethodPost, "/myaccount/enable2fa", url.Values{"csrf": {csrf.Body.String()}, "current-password": {accountOldPassword}})
+			if rec.Code != http.StatusOK || rec.Result().Header.Get("Cache-Control") != "no-store" {
+				t.Fatal("protected authenticator setup failed or permits storage", rec.Code)
+			}
+			staged, err := f.model.Client.User.Get(t.Context(), f.user.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			secret, wasEncrypted, err := sessiontokens.Decode(staged.TotpSecret, f.key)
+			if err != nil || wasEncrypted != encrypted || !strings.Contains(rec.Body.String(), secret) {
+				t.Fatal("protected setup did not show its persisted authenticator secret", err)
+			}
+			if rec = request(http.MethodGet, "/fixture/authority", nil); rec.Code != http.StatusOK {
+				t.Fatal("staging an authenticator invalidated the existing session", rec.Code)
+			}
+			code, err := totp.GenerateCode(secret, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec = request(http.MethodPost, "/myaccount/register2fa", url.Values{"csrf": {csrf.Body.String()}, "confirm-code": {code}})
+			if rec.Code != http.StatusOK || rec.Result().Header.Get("Cache-Control") != "no-store" {
+				t.Fatal("protected MFA confirmation failed or permits storage", rec.Code)
+			}
+			shown := regexp.MustCompile(`[A-Z2-9]{4}(?:-[A-Z2-9]{4}){3}`).FindAllString(rec.Body.String(), -1)
+			unique := map[string]bool{}
+			for _, value := range shown {
+				unique[value] = true
+			}
+			if len(unique) != 10 {
+				t.Fatal("protected confirmation did not show ten recovery codes")
+			}
+			if rec = request(http.MethodGet, "/fixture/authority", nil); rec.Code != http.StatusUnauthorized || cookies[f.manager.Cookie.Name] != nil {
+				t.Fatal("MFA activation did not retire the preceding single-factor session", rec.Code)
+			}
+		})
+	}
+}
 
 func ownedRecoveryCodes() []string {
 	codes := make([]string, 10)
@@ -210,9 +291,12 @@ func TestMFAEnrollmentAccountHandlersPreserveEncryptedSnapshot(t *testing.T) {
 				c.Set("csrf", "owned-form-token")
 				return c, recorder
 			}
-			c, _ := newRequest(url.Values{"current-password": {password}})
+			c, recorder := newRequest(url.Values{"current-password": {password}})
 			if err = h.Enable2FA(c); err != nil {
 				t.Fatal("account setup failed", err)
+			}
+			if recorder.Result().Header.Get("Cache-Control") != "no-store" {
+				t.Error("account authenticator secret response permits storage")
 			}
 			staged, err := f.model.Client.User.Get(t.Context(), u.ID)
 			if err != nil {
@@ -226,9 +310,12 @@ func TestMFAEnrollmentAccountHandlersPreserveEncryptedSnapshot(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			c, recorder := newRequest(url.Values{"confirm-code": {code}})
+			c, recorder = newRequest(url.Values{"confirm-code": {code}})
 			if err = h.Enabled2FA(c); err != nil {
 				t.Fatal("account confirmation failed", err)
+			}
+			if recorder.Result().Header.Get("Cache-Control") != "no-store" {
+				t.Error("account recovery-code response permits storage")
 			}
 			shown := regexp.MustCompile(`[A-Z2-9]{4}(?:-[A-Z2-9]{4}){3}`).FindAllString(recorder.Body.String(), -1)
 			unique := map[string]bool{}

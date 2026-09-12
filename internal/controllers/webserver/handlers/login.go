@@ -224,6 +224,7 @@ func (h *Handler) LoginPasswordChange(c echo.Context) error {
 }
 
 func (h *Handler) Register2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	user, err := h.requirePrimaryAuthentication(c)
 	if err != nil {
 		return err
@@ -276,6 +277,7 @@ func (h *Handler) Register2FA(c echo.Context) error {
 }
 
 func (h *Handler) LoginTOTPConfirm(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	authorized, err := h.requirePrimaryAuthentication(c)
 	if err != nil {
 		return err

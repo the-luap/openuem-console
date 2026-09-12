@@ -149,6 +149,7 @@ func (h *Handler) MyAccountPassword(c echo.Context) error {
 }
 
 func (h *Handler) Enable2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))
@@ -221,6 +222,7 @@ func (h *Handler) Enable2FA(c echo.Context) error {
 }
 
 func (h *Handler) Enabled2FA(c echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	username := h.SessionManager.Manager.GetString(c.Request().Context(), "uid")
 	if username == "" {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "login.username_empty"), true))

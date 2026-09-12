@@ -148,8 +148,12 @@ func TestPasswordMFALifecycleRequiresFreshPrimaryAuthentication(t *testing.T) {
 					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 					return echo.New().NewContext(req, httptest.NewRecorder())
 				}
-				if err = h.LoginPasswordAuth(newRequest(url.Values{"username": {user.ID}, "password": {password}})); err != nil {
+				firstFactor := newRequest(url.Values{"username": {user.ID}, "password": {password}})
+				if err = h.LoginPasswordAuth(firstFactor); err != nil {
 					t.Fatal("valid first factor failed", err)
+				}
+				if step == "enrollment" && firstFactor.Response().Writer.(*httptest.ResponseRecorder).Result().Header.Get("Cache-Control") != "no-store" {
+					t.Error("sign-in authenticator secret response permits storage")
 				}
 				if _, err = loginproof.Read(sm.GetString(ctx, loginproof.SessionKey), user.ID, time.Now()); err != nil || sm.GetBool(ctx, "twofa") {
 					t.Fatal("password did not create a bounded MFA flow", err)
@@ -182,6 +186,9 @@ func TestPasswordMFALifecycleRequiresFreshPrimaryAuthentication(t *testing.T) {
 				}
 				if err != nil {
 					t.Fatal("valid second factor failed", err)
+				}
+				if step == "enrollment" && c.Response().Writer.(*httptest.ResponseRecorder).Result().Header.Get("Cache-Control") != "no-store" {
+					t.Error("sign-in recovery-code response permits storage")
 				}
 				if !sm.GetBool(ctx, "twofa") || sm.Exists(ctx, loginproof.SessionKey) || sm.Token(ctx) == firstToken {
 					t.Fatal("MFA did not consume primary flow and renew session")

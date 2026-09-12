@@ -376,6 +376,16 @@ decoder; it preserves the stored ciphertext used by the transaction comparison.
 New recovery codes use unbiased random character selection and reject duplicates.
 Conflicting state returns HTTP 409; storage failure returns a generic HTTP 503.
 
+Both public sign-in and protected account settings mark authenticator setup and
+recovery-code confirmation responses `Cache-Control: no-store` before validation
+or rendering. The shared renderers preserve that policy; `no-cache` alone would
+permit storage of the secret, QR image or recovery codes. Eight owned baseline
+responses lacked this restriction. The full handler lifecycles now verify it in
+both storage modes while still showing the generated secret and ten distinct
+codes. Actual protected routes also verify CSRF rejection, valid session access
+during secret staging and retirement of the preceding single-factor session
+after confirmation. Existing MFA markup excludes these views from HTMX history.
+
 The owned baseline reproduced partial code replacement, code loss on failed
 removal and overwrite of confirmed enrollment. Tests cover failure at insertion,
 confirmation and session deletion; concurrent confirmation for password,
