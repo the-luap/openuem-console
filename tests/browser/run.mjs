@@ -31,6 +31,7 @@ import organizationTags from "./organization-tags.mjs";
 import tagColors from "./tag-colors.mjs";
 import desktopTags from "./desktop-tags.mjs";
 import profileStatus from "./profile-status.mjs";
+import taskStatus from "./task-status.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
 import profileDeletion from "./profile-deletion.mjs";
@@ -105,6 +106,7 @@ try {
         [tagColors,3],
         [desktopTags,18],
         [profileStatus,18],
+        [taskStatus,18],
         [profileAudience,18],
         [profileMetadata,36],
         [profileDeletion,24],

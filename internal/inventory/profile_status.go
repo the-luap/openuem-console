@@ -47,7 +47,15 @@ func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, perm
 	if err != nil {
 		return nil, err
 	}
-	fail := func(err error) (*sql.Tx, error) { tx.Rollback(); return nil, err }
+	if err = lockLegacyProfileAudience(ctx, tx, scope, profileID, writeAudience); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	return tx, nil
+}
+
+func lockLegacyProfileAudience(ctx context.Context, tx *sql.Tx, scope access.Scope, profileID int64, writeAudience bool) error {
+	var err error
 	// Count all audience edges, including associations hidden by the route.
 	lock := `LOCK TABLE tenant_profiles,site_profiles IN SHARE MODE`
 	if writeAudience {
@@ -56,7 +64,7 @@ func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, perm
 		lock = `LOCK TABLE tenant_profiles,site_profiles IN SHARE ROW EXCLUSIVE MODE`
 	}
 	if _, err = tx.ExecContext(ctx, lock); err != nil {
-		return fail(err)
+		return err
 	}
 	var current int64
 	err = tx.QueryRowContext(ctx, `SELECT p.id FROM profiles p WHERE p.id=$1
@@ -66,12 +74,12 @@ func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, perm
  AND ($3::bigint=0 OR EXISTS(SELECT 1 FROM site_profiles WHERE profile_id=p.id AND site_id=$3))
  FOR UPDATE OF p`, profileID, scope.TenantID, scope.SiteID).Scan(&current)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fail(ErrNotFound)
+		return ErrNotFound
 	}
 	if err != nil {
-		return fail(err)
+		return err
 	}
-	return tx, nil
+	return nil
 }
 
 func SetProfileEnabled(parent context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, profileID int64, enabled bool) error {

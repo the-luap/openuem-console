@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task status](task-status.md) now changes only the disabled flag with
+  current server authority, exact profile audience, locked/rechecked task
+  ownership and an atomic scoped audit receipt. The registered-route baseline
+  reproduced a site task changed through a global route. Failed audit,
+  cancellation, ambiguous audiences and a task moved while waiting for its
+  original profile cannot change state. The response updates only its native
+  button and accessible status indicator, preserving unsaved editor fields,
+  keyboard focus, paging and task order. The full inventory PostgreSQL/race suite
+  passes in 72.363 seconds and the full audit suite in 13.666 seconds. Registered
+  Apple/OIDC routes, affected macOS/Linux race checks and full Linux builds pass.
+  All 18 focused browser cases pass; the final complete 1,500-case Chrome matrix
+  passes in 85.856 seconds. Task reordering and legacy GET order initialization,
+  other task mutations, delegated access and device acceptance remain open.
 - [Legacy profile cloning](profile-cloning.md) now holds current server
   authority, the complete source audience and tasks, and the destination parent
   through one profile/task/association/audit transaction. The actual route

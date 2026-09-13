@@ -1,0 +1,67 @@
+package profiles_views
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ TaskStatusAction(t *ent.Task, p partials.PaginationAndSort, info *partials.CommonInfo, feedback string) {
+	<form id={ fmt.Sprintf("task-status-action-%d", t.ID) }>
+		<input type="hidden" name="page" value={ strconv.Itoa(p.CurrentPage) }/>
+		<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
+		<input type="hidden" name="sortBy" value={ p.SortBy }/>
+		<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
+		<button id={ fmt.Sprintf("task-status-button-%d", t.ID) } type="button" class="flex w-full items-center gap-2 px-4 py-2 text-left" hx-post={ taskStatusPath(t, info) } hx-target="closest form" hx-swap="outerHTML" hx-push-url="false" hx-disabled-elt="this">
+			if t.Disabled {
+				<uk-icon hx-history="false" icon="check" custom-class="h-5 w-5" uk-cloak></uk-icon>
+				{ i18n.T(ctx,"tasks.enable") }
+			} else {
+				<uk-icon hx-history="false" icon="x" custom-class="h-5 w-5" uk-cloak></uk-icon>
+				{ i18n.T(ctx,"tasks.disable") }
+			}
+		</button>
+		<span role="status" class="sr-only">{ feedback }</span>
+	</form>
+}
+
+templ TaskStatusIndicator(id int, disabled bool, outOfBand bool) {
+	<span
+		role="img"
+		aria-label={ i18n.T(ctx, taskStatusLabel(disabled)) }
+		id={ fmt.Sprintf("task-status-state-%d", id) }
+		data-disabled={ strconv.FormatBool(disabled) }
+		if outOfBand {
+			hx-swap-oob="outerHTML"
+		}
+	>
+		if disabled {
+			@partials.Crossmark()
+		} else {
+			@partials.Checkmark()
+		}
+	</span>
+}
+
+templ TaskStatusResponse(t *ent.Task, p partials.PaginationAndSort, info *partials.CommonInfo, feedback string) {
+	@TaskStatusAction(t, p, info, feedback)
+	@TaskStatusIndicator(t.ID, t.Disabled, true)
+}
+
+func taskStatusPath(t *ent.Task, info *partials.CommonInfo) string {
+	action := "disable"
+	if t.Disabled {
+		action = "enable"
+	}
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/%s", t.ID, action))
+}
+
+func taskStatusLabel(disabled bool) string {
+	if disabled {
+		return "task_status.disabled"
+	}
+	return "task_status.enabled"
+}

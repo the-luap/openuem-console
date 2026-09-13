@@ -467,10 +467,6 @@ func (m *Model) DeleteTask(profileID int, taskID int) error {
 	return m.Client.Task.Update().Where(task.OrderGT(currentTask.Order)).AddOrder(-1).Exec(context.Background())
 }
 
-func (m *Model) EnableTask(taskID int, disabled bool) error {
-	return m.Client.Task.UpdateOneID(taskID).SetDisabled(disabled).Exec(context.Background())
-}
-
 func (m *Model) MoveTask(taskID int, currentOrder int, newOrder int) error {
 	t, err := m.Client.Task.Query().WithProfile().Where(task.ID(taskID)).Only(context.Background())
 	if err != nil {

@@ -26,7 +26,7 @@ const fixtures = new Set([
   ...["global","organization","site","long"].map(state=>`profile-deletion-${state}`),
   ...["global","organization","site"].flatMap(scope=>["none","all","tags","all-with-tags"].map(state=>`profile-metadata-${scope}-${state}`)),
   "profile-audience-actions",
-  "profile-status-actions",
+  "profile-status-actions", "task-status-actions",
   "desktop-tag-actions",
  ...["preview","empty","different","mixed","unavailable","no-notification","receipt","receipt-no-notification","history","empty-history","long"].map(state=>`apple-update-removal-${state}`),
  ...["plans", "empty-plans", "groups", "empty-groups", "ready", "overlap", "unknown", "stale", "error", "exception", "post-exception", "different-policy", "unavailable", "incompatible", "pilot-only", "viewer", "receipt", "history", "empty-history", "long"].map(state=>`apple-update-promotion-${state}`),

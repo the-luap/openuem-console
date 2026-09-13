@@ -88,7 +88,7 @@ func CSRF() echo.MiddlewareFunc {
 // Header tokens retain the same bound on these explicitly enumerated forms.
 func scopedFormLimit(path string) int64 {
 	route := strings.TrimPrefix(strings.TrimPrefix(path, "/tenant/:tenant/site/:site"), "/tenant/:tenant")
-	if route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
+	if route == "/tasks/:id/enable" || route == "/tasks/:id/disable" || route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
 		return 8192
 	}
 	if route == "/ios/update-plans/:plan/group-assignments/:assignment/promotions" || route == "/ios/update-plans/:plan/group-assignments/:assignment/removals" || route == "/ios/update-plans/:plan/group-assignments" || route == "/ios/update-plans/:plan/schedules" {

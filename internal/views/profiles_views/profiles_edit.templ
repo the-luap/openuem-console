@@ -141,11 +141,7 @@ templ EditProfile(c echo.Context, p partials.PaginationAndSort, profile *ent.Pro
 										</td>
 										<td class="items-center !align-middle">{ t.Version }</td>
 										<td class="items-center !align-middle">
-											if  t.Disabled {
-												@partials.Crossmark()
-											} else {
-												@partials.Checkmark()
-											}
+											@TaskStatusIndicator(t.ID, t.Disabled, false)
 										</td>
 										<td
 											class="items-center !align-middle"
@@ -218,27 +214,9 @@ templ EditProfile(c echo.Context, p partials.PaginationAndSort, profile *ent.Pro
 															><uk-icon hx-history="false" icon="chevron-down" custom-class="h-6 w-6 -ml-1" uk-cloack></uk-icon>{ i18n.T(ctx, "tasks.move_down") }</a>
 														</li>
 													}
-													if t.Disabled {
-														<li>
-															<a
-																hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d/enable", t.ID)))) }
-																hx-target="#main"
-																hx-swap="outerHTML"
-																hx-push-url="false"
-																class="flex items-center gap-2 py-2 px-4"
-															><uk-icon hx-history="false" icon="check" custom-class="h-5 w-5 mx-auto" uk-cloack></uk-icon>{ i18n.T(ctx, "tasks.enable") }</a>
-														</li>
-													} else {
-														<li>
-															<a
-																hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d/disable", t.ID)))) }
-																hx-target="#main"
-																hx-swap="outerHTML"
-																hx-push-url="false"
-																class="flex items-center gap-2 py-2 px-4"
-															><uk-icon hx-history="false" icon="x" custom-class="h-5 w-5 mx-auto" uk-cloack></uk-icon>{ i18n.T(ctx, "tasks.disable") }</a>
-														</li>
-													}
+													<li>
+														@TaskStatusAction(t, p, commonInfo, "")
+													</li>
 													<li>
 														<a
 															hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d/clone", t.ID)))) }

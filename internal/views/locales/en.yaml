@@ -1,4 +1,11 @@
 en:
+  task_status:
+    invalid: "Reopen the profile and choose the task status action again."
+    not_found: "The task is no longer in a profile in this scope."
+    denied: "Only a server administrator can change legacy task status."
+    unavailable: "The task status result is unavailable. Refresh the profile before trying again."
+    enabled: "Task enabled."
+    disabled: "Task disabled."
   profile_cloning:
     invalid: "Enter a valid profile name and destination."
     not_found: "The source profile or destination is no longer available in this scope."
