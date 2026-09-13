@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [SMTP settings and delivery](smtp-settings.md) now provides exact global or
+  organization scope, held server administration, secret-free reviews, explicit
+  password actions and atomic revision/audit checks. Startup migration is
+  bounded, audited and resumable; duplicate global settings are rejected. Saved
+  test messages have permanent attempt evidence before SMTP, including replay
+  after rollback/restart and audit retention. Account workers read current global
+  configuration and use bounded TLS sessions without mutating ciphertext.
+  Console reminders share bounded configuration reads and the legacy decoder.
+  Owned database, route, browser and transport validation is recorded in the
+  linked document. Production mailbox acceptance, other provider/user secrets
+  and key rotation remain open.
+
 - [Reviewed manual desktop execution](manual-desktop-execution.md) now provides
   current server/site/source authorization, bounded choices, native confirmation,
   durable UUID-bound intent and one independently recorded delivery attempt.

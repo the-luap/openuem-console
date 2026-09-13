@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"database/sql"
+	"errors"
 	"net/url"
 	"os"
 	"strings"
@@ -60,6 +61,18 @@ func TestSMTPOrganizationConfigurationWithPostgres(t *testing.T) {
 		if err != nil || cfg.host != tc.host {
 			t.Fatal("incorrect SMTP scope", cfg.host, err)
 		}
+	}
+	if _, err = db.Exec(`UPDATE settings SET smtp_password=repeat('x',100000) WHERE tenant_settings=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = readSettings(t.Context(), db, 1); !errors.Is(err, ErrConfiguration) {
+		t.Fatal("oversized organization secret was accepted or fell back to global")
+	}
+	if _, err = readSettings(t.Context(), db, 2); err != nil {
+		t.Fatal("unrelated organization was affected by oversized secret")
+	}
+	if _, err = db.Exec(`UPDATE settings SET smtp_password='' WHERE tenant_settings=1`); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = db.Exec(`UPDATE settings SET smtp_server='' WHERE tenant_settings=1`); err != nil {
 		t.Fatal(err)

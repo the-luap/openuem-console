@@ -34,6 +34,7 @@ const (
 	ManageCertificates   Capability = "certificates.manage"
 	ReadAudit            Capability = "audit.read"
 	ManageAuditRetention Capability = "audit.retention.manage"
+	ManageSettings       Capability = "settings.manage"
 	ManageAccess         Capability = "access.manage"
 )
 
@@ -93,7 +94,7 @@ func roleAllows(role Role, capability Capability) bool {
 		return role == Operator || role == TenantAdmin || role == Administrator
 	case ManageTags, RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, ManageWindowsCSP, RetrieveRecoveryKeys, ManageSoftware:
 		return role == TenantAdmin || role == Administrator
-	case ManageAccess:
+	case ManageAccess, ManageSettings:
 		return role == Administrator
 	default:
 		return false

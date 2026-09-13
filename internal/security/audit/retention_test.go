@@ -23,7 +23,7 @@ func TestRetentionGlobalPolicyIsIndependentAndCanBeDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(preview.Counts) != 3 || preview.Counts["access"] == 0 || preview.Counts["activity"] != 1 {
+	if len(preview.Counts) != 4 || preview.Counts["access"] == 0 || preview.Counts["activity"] != 1 {
 		t.Fatal("global preview included organization events", preview.Counts)
 	}
 	if err = s.ApplyRetention(t.Context(), "admin", global, preview.ID, preview.Token); err != nil {

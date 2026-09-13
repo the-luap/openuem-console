@@ -1,161 +1,125 @@
 package admin_views
 
 import (
-	"fmt"
-	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
-	"github.com/open-uem/ent"
-	smtpsettings "github.com/open-uem/ent/settings"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"strconv"
+	"time"
 )
 
-templ SMTPSettings(c echo.Context, settings *ent.Settings, agentsExists, serversExists bool, commonInfo *partials.CommonInfo, tenantName string) {
-	if commonInfo.TenantID == "-1" {
-		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Global Config"), Url: "/admin/users"}, {Title: "SMTP Settings", Url: "/admin/smtp"}}, commonInfo)
-	} else {
-		@partials.Header(c, []partials.Breadcrumb{{Title: tenantName, Url: string(templ.URL(fmt.Sprintf("/tenant/%s/admin/tags", commonInfo.TenantID)))}, {Title: "SMTP Settings", Url: string(templ.URL(fmt.Sprintf("/tenant/%s/admin/smtp", commonInfo.TenantID)))}}, commonInfo)
-	}
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-		<div class="uk-width-1-2@m uk-card uk-card-default">
-			<div class="uk-card-body uk-flex uk-flex-column gap-4">
-				@ConfigNavbar("smtp", agentsExists, serversExists, commonInfo)
-				<div id="success" class="hidden"></div>
-				<div id="error" class="hidden"></div>
-				<div class="uk-width-1-2@m uk-card uk-card-default">
-					<div class="uk-card-header">
-						<h3 class="uk-card-title">{ i18n.T(ctx, "smtp.title") } </h3>
-						<p class="uk-margin-small-top uk-text-small">
-							{ i18n.T(ctx, "smtp.description") }
-							if commonInfo.TenantID != "-1" {
-								{ i18n.T(ctx, "settings.tenant") }
-							}
-						</p>
-					</div>
-					<div class="uk-card-body">
-						<form class="mt-6">
-							<input type="hidden" name="settingsId" value={ strconv.Itoa(settings.ID) }/>
-							<div class="flex gap-8">
-								<fieldset class="uk-fieldset w-1/6">
-									<legend class="uk-legend">{ i18n.T(ctx, "smtp.server_fieldset") }</legend>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="server">{ i18n.T(ctx, "smtp.server") }</label>
-										<input id="server" name="server" type="text" spellcheck="false" class="uk-input" value={ settings.SMTPServer } placeholder={ i18n.T(ctx, "smtp.server_placeholder") }/>
-									</div>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="port">{ i18n.T(ctx, "smtp.port") }</label>
-										<input
-											id="port"
-											name="port"
-											type="number"
-											class="uk-input"
-											value={ strconv.Itoa(settings.SMTPPort) }
-											placeholder={ i18n.T(ctx, "smtp.port_placeholder") }
-											_="on keyup 
-												if my.value is '465' then 
-													set #encryption.value to 'smtps'
-												end
-												if my.value is '587' then 
-													set #encryption.value to 'starttls'
-												end
-											end"
-										/>
-									</div>
-								</fieldset>
-								<fieldset class="uk-fieldset w-1/6">
-									<legend class="uk-legend">{ i18n.T(ctx, "smtp.auth_fieldset") }</legend>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="user">{ i18n.T(ctx, "smtp.user") }</label>
-										<input id="user" name="user" type="text" spellcheck="false" class="uk-input" value={ settings.SMTPUser } placeholder={ i18n.T(ctx, "smtp.user_placeholder") }/>
-									</div>
-									<div class="uk-margin flex flex-col">
-										<label class="uk-form-label" for="password">{ i18n.T(ctx, "smtp.password") }</label>
-										<div class="uk-inline">
-											<input id="password" name="password" type="password" class="uk-input mt-1" value={ settings.SMTPPassword } placeholder={ i18n.T(ctx, "smtp.password_placeholder") }/>
-											<button
-												class="uk-form-icon uk-form-icon-flip"
-												type="button"
-												_="
-													on click 
-														if #reveal-password@icon is 'eye' then
-															set #reveal-password@icon to 'eye-off'
-															set #password@type to 'text'
-														else
-															set #reveal-password@icon to 'eye'
-															set #password@type to 'password'
-														end
-													end
-												"
-											>
-												<uk-icon id="reveal-password" icon="eye" class="uk-text-muted mt-1"></uk-icon>
-											</button>
-										</div>
-									</div>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="auth">{ i18n.T(ctx, "smtp.auth_type") }</label>
-										<select id="auth" name="auth" class="uk-select">
-											for _, authType := range AuthTypes {
-												<option selected?={ settings.SMTPAuth == authType }>{ authType }</option>
-											}
-										</select>
-									</div>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="encryption">{ i18n.T(ctx, "smtp.encryption_type") }</label>
-										<select id="encryption" name="encryption" class="uk-select">
-											<option selected?={ settings.SMTPEncryptionType == smtpsettings.SMTPEncryptionTypeNone } value={ smtpsettings.SMTPEncryptionTypeNone.String() }>{ i18n.T(ctx, "smtp.encryption_none") }</option>
-											<option selected?={ settings.SMTPEncryptionType == smtpsettings.SMTPEncryptionTypeSmtps } value={ smtpsettings.SMTPEncryptionTypeSmtps.String() }>{ i18n.T(ctx, "smtp.encryption_smtps") }</option>
-											<option selected?={ settings.SMTPEncryptionType == smtpsettings.SMTPEncryptionTypeStarttls } value={ smtpsettings.SMTPEncryptionTypeStarttls.String() }>{ i18n.T(ctx, "smtp.encryption_starttls") }</option>
-										</select>
-									</div>
-								</fieldset>
-								<fieldset class="uk-fieldset w-1/6">
-									<legend class="uk-legend">{ i18n.T(ctx, "smtp.from_fieldset") }</legend>
-									<div class="uk-margin">
-										<label class="uk-form-label" for="mail-from">{ i18n.T(ctx, "smtp.from_fieldset") }</label>
-										<input id="mail-from" name="mail-from" type="text" class="uk-input" value={ settings.MessageFrom } placeholder={ i18n.T(ctx, "smtp.from_placeholder") }/>
-									</div>
-								</fieldset>
-							</div>
-							<div class="flex gap-2">
-								<button
-									class="uk-button uk-button-primary flex items-center gap-2"
-									type="submit"
-									if commonInfo.TenantID == "-1" {
-										hx-post="/admin/smtp"
-									} else {
-										hx-post={ string(templ.URL(fmt.Sprintf("/tenant/%s/admin/smtp", commonInfo.TenantID))) }
-									}
-									hx-push-url="false"
-									hx-target="#main"
-									hx-swap="outerHTML"
-									hx-indicator="#save-smtp-spinner"
-								>
-									<span class="ml-2">{ i18n.T(ctx, "Save") }</span>
-									<uk-icon id="save-smtp-spinner" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-								</button>
-								<button
-									class="uk-button uk-button-secondary flex items-center gap-2"
-									type="button"
-									if commonInfo.TenantID == "-1" {
-										hx-post="/admin/smtp/test"
-									} else {
-										hx-post={ string(templ.URL(fmt.Sprintf("/tenant/%s/admin/smtp/test", commonInfo.TenantID))) }
-									}
-									hx-push-url="false"
-									hx-target="#main"
-									hx-swap="outerHTML"
-									hx-indicator="#test-smtp-spinner"
-								>
-									<span class="ml-2">{ i18n.T(ctx, "smtp.test") }</span>
-									<uk-icon id="test-smtp-spinner" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-								</button>
-							</div>
-						</form>
-					</div>
+var AuthTypes = []string{"NOAUTH", "LOGIN", "PLAIN", "XOAUTH2", "SCRAM-SHA-256"}
+
+templ SMTPSettings(c echo.Context, review *consolesettings.SMTPReview, info *partials.CommonInfo, base string, saved bool, attempt string) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: "SMTP settings", Url: base}}, info)
+	<main id="smtp-settings" class="min-w-0 flex-1 p-4 sm:px-6" hx-history="false">
+		<section id="smtp-actions" class="mx-auto flex w-full max-w-4xl flex-col gap-6" hx-sync="this:drop">
+			<header class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<h1 id="smtp-heading" class="text-2xl font-semibold" tabindex="-1">SMTP settings</h1>
+					if base=="/admin/smtp" {
+						<p class="mt-2 text-sm">Global configuration for account notifications.</p>
+					} else {
+						<p class="mt-2 text-sm">Organization configuration. Account notifications use the global SMTP settings.</p>
+					}
 				</div>
-			</div>
-		</div>
+				<a href={ templ.SafeURL(base[:len(base)-4] + "settings") } class="uk-button uk-button-default">General settings</a>
+			</header>
+			if saved {
+				<p role="status" class="rounded border p-3">SMTP settings saved. The notification worker reads current settings before each message.</p>
+			}
+			<section class="rounded-lg border p-4 sm:p-6" aria-labelledby="smtp-connection-heading">
+				<h2 id="smtp-connection-heading" class="text-lg font-semibold">Connection and authentication</h2>
+				<p class="mt-2 text-sm">Stored passwords are never shown. Choose explicitly whether to keep, replace or clear the password.</p>
+				<form id="smtp-save-form" method="post" action={ templ.SafeURL(base) } hx-post={ base } hx-disabled-elt="#smtp-save, #smtp-test" class="mt-5 flex flex-col gap-5">
+					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+					<input type="hidden" name="settingsId" value={ strconv.FormatInt(review.ID, 10) }/>
+					<input type="hidden" name="revision" value={ review.Revision }/>
+					<div class="grid min-w-0 gap-5 sm:grid-cols-2">
+						<div class="min-w-0">
+							<label for="smtp-server" class="uk-form-label">SMTP server</label>
+							<input id="smtp-server" name="server" type="text" value={ review.Config.Server } maxlength="253" spellcheck="false" autocomplete="off" required class="uk-input mt-1 w-full"/>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-port" class="uk-form-label">Port</label>
+							<input id="smtp-port" name="port" type="number" min="1" max="65535" value={ strconv.Itoa(review.Config.Port) } required class="uk-input mt-1 w-full"/>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-user" class="uk-form-label">Username</label>
+							<input id="smtp-user" name="user" type="text" value={ review.Config.User } maxlength="1024" spellcheck="false" autocomplete="off" class="uk-input mt-1 w-full"/>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-auth" class="uk-form-label">Authentication</label>
+							<select id="smtp-auth" name="auth" class="uk-select mt-1 w-full">
+								for _,authType:=range AuthTypes {
+									<option value={ authType } selected?={ review.Config.Auth==authType }>{ authType }</option>
+								}
+							</select>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-encryption" class="uk-form-label">Connection encryption</label>
+							<select id="smtp-encryption" name="encryption" class="uk-select mt-1 w-full">
+								<option value="starttls" selected?={ review.Config.Encryption=="starttls" || review.Config.Encryption=="none" }>Require STARTTLS</option>
+								<option value="smtps" selected?={ review.Config.Encryption=="smtps" }>TLS from connection start</option>
+							</select>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-from" class="uk-form-label">Sender address</label>
+							<input id="smtp-from" name="mail-from" type="email" value={ review.Config.From } maxlength="320" required class="uk-input mt-1 w-full"/>
+							<p class="mt-1 text-sm">A test message is sent to this address.</p>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-password-action" class="uk-form-label">Password action</label>
+							<select id="smtp-password-action" name="password-action" class="uk-select mt-1 w-full" aria-describedby="smtp-password-state smtp-password-help">
+								<option value="keep" selected>Keep stored password</option>
+								<option value="replace">Replace password</option>
+								<option value="clear">Clear password</option>
+							</select>
+							<p id="smtp-password-state" class="mt-1 text-sm">
+								if review.PasswordSet {
+									Password is stored.
+								} else {
+									No password is stored.
+								}
+							</p>
+						</div>
+						<div class="min-w-0">
+							<label for="smtp-password" class="uk-form-label">New password</label>
+							<input id="smtp-password" name="password" type="password" autocomplete="new-password" maxlength="16384" class="uk-input mt-1 w-full" aria-describedby="smtp-password-help"/>
+							<p id="smtp-password-help" class="mt-1 text-sm">Fill this only when replacing the password. Keep and clear require an empty field.</p>
+						</div>
+					</div>
+					<button id="smtp-save" type="submit" class="uk-button uk-button-primary self-start">Save SMTP settings</button>
+				</form>
+			</section>
+			<section class="rounded-lg border p-4 sm:p-6" aria-labelledby="smtp-test-heading">
+				<h2 id="smtp-test-heading" class="text-lg font-semibold">Test saved settings</h2>
+				<p class="mt-2 text-sm">Save changes before testing. One test message will be submitted to the saved sender address. Test messages are not retried automatically.</p>
+				<form id="smtp-test-form" method="post" action={ templ.SafeURL(base + "/test") } hx-post={ base + "/test" } hx-disabled-elt="#smtp-save, #smtp-test, #smtp-test-confirm" class="mt-4 flex flex-col items-start gap-4">
+					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+					<input type="hidden" name="settingsId" value={ strconv.FormatInt(review.ID, 10) }/>
+					<input type="hidden" name="revision" value={ review.Revision }/>
+					<input type="hidden" name="attempt" value={ attempt }/>
+					<label class="flex items-start gap-3"><input id="smtp-test-confirm" type="checkbox" name="confirm" value="send" required class="uk-checkbox mt-1"/><span>Send one test message using the saved settings.</span></label>
+					<button id="smtp-test" type="submit" class="uk-button uk-button-default">Send test message</button>
+				</form>
+				if review.LastTest!=nil {
+					<div id="smtp-last-test" class="mt-5 min-w-0 rounded border p-3 text-sm" role="status">
+						if review.LastTest.Status=="sent" {
+							<p>The SMTP server accepted your last test message. Inbox delivery is not confirmed.</p>
+						} else {
+							<p>Your last test attempt could not be confirmed. Check the inbox and server before starting another test.</p>
+						}
+						if review.LastTest.Revision!=review.Revision {
+							<p class="mt-2">The settings have changed since this test.</p>
+						}
+						<p class="mt-2">Attempted at <time datetime={ review.LastTest.CreatedAt.UTC().Format(time.RFC3339) }>{ review.LastTest.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC") }</time></p>
+						<p class="mt-1 break-all">Reference: { review.LastTest.ID }</p>
+					</div>
+				}
+			</section>
+		</section>
 	</main>
 }
 
@@ -164,5 +128,3 @@ templ SMTPSettingsIndex(title string, cmp templ.Component, commonInfo *partials.
 		@cmp
 	}
 }
-
-var AuthTypes = []string{"LOGIN", "PLAIN", "XOAUTH2", "SCRAM-SHA-256"}

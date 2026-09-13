@@ -27,10 +27,12 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
 	"github.com/open-uem/openuem-console/internal/software/winget"
 )
 
 type Handler struct {
+	smtpTestSender         consolesettings.SMTPTestSender
 	winGetSource           func(context.Context, winget.Coordinate) (*winget.Snapshot, error)
 	IndividualAgentService *openuem_nats.ServiceConnection
 	IndividualBroker       *consolebroker.Broker

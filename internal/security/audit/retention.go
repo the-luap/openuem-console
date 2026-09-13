@@ -121,7 +121,7 @@ func retentionSources(ctx context.Context, tx *sql.Tx, tenant int, windowsEnable
 			continue
 		}
 		global := source.name == "access" || source.name == "release"
-		if (global && tenant != 0) || (!global && source.name != "activity" && tenant == 0) {
+		if (global && tenant != 0) || (!global && source.name != "activity" && source.name != "settings" && tenant == 0) {
 			continue
 		}
 		predicate := `tenant_id=$1 AND created_at<$2`

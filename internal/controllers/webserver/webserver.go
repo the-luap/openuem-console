@@ -22,6 +22,7 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/audit"
 	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
 )
 
 type WebServer struct {
@@ -126,6 +127,16 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 		return err
 	}
 	if err = w.Handler.Audit.Migrate(ctx); err != nil {
+		return err
+	}
+	smtpStore, err := consolesettings.NewSMTPStore(w.Handler.Model.DB, permissions, w.Handler.EncryptionMasterKey)
+	if err != nil {
+		return err
+	}
+	if err = smtpStore.Migrate(ctx); err != nil {
+		return err
+	}
+	if err = smtpStore.MigrateSecrets(ctx); err != nil {
 		return err
 	}
 	if err = w.startInventoryRefresh(ctx); err != nil {

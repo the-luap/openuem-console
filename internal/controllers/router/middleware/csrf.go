@@ -88,6 +88,12 @@ func CSRF() echo.MiddlewareFunc {
 // Header tokens retain the same bound on these explicitly enumerated forms.
 func scopedFormLimit(path string) int64 {
 	route := strings.TrimPrefix(strings.TrimPrefix(path, "/tenant/:tenant/site/:site"), "/tenant/:tenant")
+	if route == "/admin/smtp" {
+		return 64 << 10
+	}
+	if route == "/admin/smtp/test" {
+		return 8192
+	}
 	if route == "/tasks/:profile/new" || route == "/tasks/:id" {
 		return 256 << 10
 	}

@@ -40,6 +40,7 @@ import taskEditing from "./task-editing.mjs";
 import profileEditor from "./profile-editor.mjs";
 import profileHistory from "./profile-history.mjs";
 import manualExecution from "./manual-execution.mjs";
+import smtpSettings from "./smtp-settings.mjs";
 import desktopTaskHistory from "./desktop-task-history.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
@@ -66,7 +67,7 @@ import oidcAccounts from "./oidc-accounts.mjs";
 
 assert(
   process.env.APPLE_MDM_UI_ARTIFACTS,
-  "Set APPLE_MDM_UI_ARTIFACTS to the directory rendered by the mdm_views and desktop_views tests",
+  "Set APPLE_MDM_UI_ARTIFACTS to the directory rendered by the view fixture tests",
 );
 const artifactRoot = process.env.BROWSER_TEST_ARTIFACTS
   ? resolve(process.env.BROWSER_TEST_ARTIFACTS)
@@ -124,6 +125,7 @@ try {
         [profileEditor,117],
         [profileHistory,72],
         [manualExecution,45],
+        [smtpSettings,48],
         [desktopTaskHistory,18],
         [profileAudience,18],
         [profileMetadata,36],

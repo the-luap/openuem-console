@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-uem/nats/legacysecret"
 	"github.com/wneessen/go-mail/smtp"
 )
 
@@ -321,6 +322,11 @@ func TestSMTPPasswordCompatibilityAndCorruption(t *testing.T) {
 	for _, plain := range []string{"", "legacy-password", "abc", "abcd"} {
 		if got, err := smtpPassword(plain, key); err != nil || got != plain {
 			t.Fatal("legacy password compatibility", err)
+		}
+	}
+	for _, invalid := range []string{strings.Repeat("x", legacysecret.MaxPlainSize+1), "with\x00null", string([]byte{0xff})} {
+		if _, err := smtpPassword(invalid, key); !errors.Is(err, ErrConfiguration) {
+			t.Fatal("invalid legacy SMTP secret was accepted")
 		}
 	}
 	if _, err := smtpPassword(value, "wrong-key"); !errors.Is(err, ErrConfiguration) {

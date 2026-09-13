@@ -472,7 +472,7 @@ OIDC and 2FA.
 | P1 | Audit exists only in database | Actor/action/target/result/time viewer, protected export and defined retention |
 | P1 | Rotation/restore not demonstrated | Encrypted backups, separately stored keys, restore tests and rotation without device loss |
 | P1 | Endpoint package/script execution is privileged | Signature/hash checks, approved sources, safe URLs/downloads, roles/audit, bounded execution and verified results |
-| P1 | Known upstream SMTP/user test failures | Resolve/evaluate before production; passing partial CI is not full security acceptance |
+| P1 | Remaining upstream user test failures and production SMTP acceptance | Resolve/evaluate before production; passing owned SMTP checks is not production delivery acceptance |
 
 Evidence: [Apple TLS](../internal/mdm/apple/http.go),
 [identities](../internal/mdm/apple/enrollment.go),
@@ -568,6 +568,16 @@ Owned PostgreSQL and codec tests cover rollback/restart, concurrency, hidden
 reviews, migration audit visibility and manual payloads. The documented upgrade
 requires compatible workers first; automated version negotiation, wider provider
 secret migration, key rotation/recovery and physical acceptance remain open.
+
+[SMTP settings](smtp-settings.md) now has an exact-scope, server-admin editor with
+hidden secrets, explicit keep/replace/clear, atomic revision/audit checks and
+bounded startup migration. Saved-only test delivery retains a durable attempt
+before sending, preventing duplicate submission after restart, response loss or
+audit failure. SMTP audits participate in scoped retention without deleting
+attempt evidence. Account workers read current global settings per message;
+console reminders share the bounded secret reader. Owned PostgreSQL, route,
+browser and TLS transport checks cover these paths. Provider/user secrets,
+key rotation/recovery and production mailbox acceptance remain open.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

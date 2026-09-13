@@ -4,12 +4,9 @@ package notifications
 import (
 	"bytes"
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"net"
 	"net/mail"
@@ -17,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/open-uem/nats/legacysecret"
 	gomail "github.com/wneessen/go-mail"
 	"github.com/wneessen/go-mail/smtp"
 )
@@ -59,8 +57,18 @@ func Send(ctx context.Context, q Queryer, tenant int, masterKey string, m Messag
 
 func readSettings(ctx context.Context, q Queryer, tenant int) (smtpSettings, error) {
 	var cfg smtpSettings
-	rows, err := q.QueryContext(ctx, `SELECT COALESCE(smtp_server,''),COALESCE(smtp_port,0),COALESCE(smtp_user,''),COALESCE(smtp_password,''),COALESCE(smtp_auth,'LOGIN'),COALESCE(message_from,''),COALESCE(smtp_encryption_type,'none'),tenant_settings IS NOT NULL
- FROM settings WHERE tenant_settings=$1 OR tenant_settings IS NULL ORDER BY tenant_settings NULLS LAST LIMIT 2`, tenant)
+	if tenant < 0 {
+		return cfg, ErrConfiguration
+	}
+	rows, err := q.QueryContext(ctx, `SELECT
+ CASE WHEN octet_length(smtp_server)<=253 THEN smtp_server ELSE '' END,COALESCE(smtp_port,0),
+ CASE WHEN octet_length(smtp_user)<=1024 THEN smtp_user ELSE '' END,
+ CASE WHEN octet_length(smtp_password)<=$2 THEN smtp_password ELSE '' END,
+ CASE WHEN octet_length(smtp_auth)<=32 THEN smtp_auth ELSE 'LOGIN' END,
+ CASE WHEN octet_length(message_from)<=320 THEN message_from ELSE '' END,
+ CASE WHEN octet_length(smtp_encryption_type)<=32 THEN smtp_encryption_type ELSE 'none' END,tenant_settings IS NOT NULL,
+ coalesce(octet_length(smtp_server),0)<=253 AND coalesce(octet_length(smtp_user),0)<=1024 AND coalesce(octet_length(smtp_password),0)<=$2 AND coalesce(octet_length(smtp_auth),0)<=32 AND coalesce(octet_length(message_from),0)<=320 AND coalesce(octet_length(smtp_encryption_type),0)<=32
+ FROM settings WHERE tenant_settings=$1 OR tenant_settings IS NULL ORDER BY tenant_settings NULLS LAST LIMIT 2`, tenant, legacysecret.MaxStoredSize)
 	if err != nil {
 		return cfg, err
 	}
@@ -68,9 +76,12 @@ func readSettings(ctx context.Context, q Queryer, tenant int) (smtpSettings, err
 	if !rows.Next() {
 		return cfg, ErrConfiguration
 	}
-	var specific bool
-	if err = rows.Scan(&cfg.host, &cfg.port, &cfg.username, &cfg.password, &cfg.auth, &cfg.from, &cfg.encryption, &specific); err != nil {
+	var specific, bounded bool
+	if err = rows.Scan(&cfg.host, &cfg.port, &cfg.username, &cfg.password, &cfg.auth, &cfg.from, &cfg.encryption, &specific, &bounded); err != nil {
 		return cfg, err
+	}
+	if !bounded {
+		return smtpSettings{}, ErrConfiguration
 	}
 	if !specific && rows.Next() {
 		return cfg, ErrConfiguration
@@ -82,23 +93,11 @@ func readSettings(ctx context.Context, q Queryer, tenant int) (smtpSettings, err
 // Authenticate plausible encrypted values instead of silently using a corrupt
 // ciphertext as a password. Short/plain legacy values remain compatible.
 func smtpPassword(value, key string) (string, error) {
-	data, err := hex.DecodeString(value)
-	if err != nil || len(data) < 12+16 {
-		return value, nil
-	}
-	block, err := aes.NewCipher([]byte(key))
+	plain, err := legacysecret.Open(value, key)
 	if err != nil {
 		return "", ErrConfiguration
 	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", ErrConfiguration
-	}
-	plain, err := gcm.Open(nil, data[:gcm.NonceSize()], data[gcm.NonceSize():], nil)
-	if err != nil {
-		return "", ErrConfiguration
-	}
-	return string(plain), nil
+	return plain, nil
 }
 
 func sendSMTP(parent context.Context, cfg smtpSettings, m Message, roots *x509.CertPool) error {

@@ -277,10 +277,8 @@ func (w *Worker) EncryptSensitiveFields() error {
 		return nil
 	}
 
-	// 2. Encrypt SMTP password if needed
-	if err := w.EncryptSMTPCredentials(); err != nil {
-		return err
-	}
+	// SMTP secrets migrate in bounded audited transactions before console HTTP
+	// serving. Notification workers read current stored settings for each message.
 
 	// 3. Encrypt NetBird access tokens if needed
 	if err := w.EncryptNetBirdCredentials(); err != nil {
@@ -302,37 +300,6 @@ func (w *Worker) EncryptSensitiveFields() error {
 
 	// Session tokens migrate with their durable lookup/revocation schema before
 	// either HTTP server starts. That migration also verifies the configured key.
-
-	return nil
-}
-
-func (w *Worker) EncryptSMTPCredentials() error {
-	credentials, err := w.Model.GetSMTPPasswords()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range credentials {
-		if c.SMTPPassword != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(c.SMTPPassword, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedPassword, err := utils.EncryptSensitiveField(c.SMTPPassword, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt SMTP password, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateSMTPPassword(c.ID, encryptedPassword); err != nil {
-					log.Printf("[ERROR]: could not save encrypted SMTP password, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
 
 	return nil
 }
