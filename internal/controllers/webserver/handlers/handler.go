@@ -89,6 +89,8 @@ type Handler struct {
 	oidcHTTPTransport    http.RoundTripper
 	CommonAppsJob        gocron.Job
 	EncryptionMasterKey  string
+
+	taskWizardHTTPTransport http.RoundTripper
 }
 
 func NewHandler(model *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth bool, authLogger *log.Logger) *Handler {

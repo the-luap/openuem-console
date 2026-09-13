@@ -432,9 +432,9 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
-	e.GET("/profiles/task-types", h.ProfileTaskTypes, h.IsAuthenticated)
-	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes, h.IsAuthenticated)
-	e.GET("/profiles/task-definition", h.ProfileTaskDefinition, h.IsAuthenticated)
+	e.GET("/profiles/task-types", h.RetiredTaskWizard, h.IsAuthenticated)
+	e.GET("/profiles/task-subtypes", h.RetiredTaskWizard, h.IsAuthenticated)
+	e.GET("/profiles/task-definition", h.RetiredTaskWizard, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
@@ -552,6 +552,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/site/:site/software", h.Software, h.IsAuthenticated)
 
 	e.GET("/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tasks/:id", h.EditTask, h.IsAuthenticated)
@@ -567,6 +568,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tasks/:id/movefrom/:from/to/:to", h.MoveTaskFromTo, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:id", h.EditTask, h.IsAuthenticated)
@@ -582,6 +584,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/tasks/:id/movefrom/:from/to/:to", h.MoveTaskFromTo, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/site/:site/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:id", h.EditTask, h.IsAuthenticated)

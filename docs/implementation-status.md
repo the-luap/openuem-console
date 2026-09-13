@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Task form lookups](task-wizard.md) now retain the exact destination profile
+  and scope through every selector stage, current server authorization and audit
+  commit. Old global lookups return a reload instruction. NetBird reads use the
+  organization's locked settings without creating rows, with HTTPS, timeout,
+  response-size and redirect restrictions. Provider tokens and error bodies stay
+  out of responses. Two-phase concurrency tests cover lookup and audit waits.
+  Full inventory PostgreSQL/race and audit suites pass in 85.060/14.887 seconds;
+  registered Apple/OIDC routes use an owned HTTPS provider. Affected macOS/Linux
+  race checks and the full Linux build pass. All 45 form browser cases pass with
+  scoped URLs; the complete 1,647-case Chrome matrix passes in 92.814 seconds.
+  Task editing, package search and other legacy provider/settings routes, wider
+  secret lifecycle and physical/provider acceptance remain open.
 - [Legacy task creation](task-creation.md) now holds current server authority,
   exact destination scope, the parent and existing tasks through one transaction.
   Normalization, the new task and its scoped audit receipt commit together.
@@ -72,7 +84,7 @@ the table's package summaries do not remove any detail from the roadmap.
   registered Apple/OIDC routes, affected macOS/Linux race checks and the full
   Linux build pass. All 45 focused browser cases pass, with the complete 1,647-case
   Chrome matrix passing in 94.426 seconds. Mobile states were visually inspected.
-  Task editing, source-bound wizard/provider reads, broader secret lifecycle,
+  Task editing, other provider reads, broader secret lifecycle,
   immutable revisions, delegated access and physical/provider acceptance remain
   open.
 - The [worker task-order follow-up](https://github.com/the-luap/openuem-worker/blob/d61712f/docs/profile-task-order.md)

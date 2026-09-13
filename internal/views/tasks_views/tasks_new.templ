@@ -47,7 +47,7 @@ templ TaskCreationForm(review *inventory.TaskCreationReview, commonInfo *partial
 			>
 				<fieldset id="task-create-controls" class="min-w-0">
 					<div class="flex flex-col gap-4 w-full">
-						@partials.SelectTaskAgentType(nil)
+						@partials.SelectTaskAgentType(nil,partials.GetNavigationUrl(commonInfo,fmt.Sprintf("/tasks/%d/new",review.ProfileID)))
 						<div id="select-task-type"></div>
 						<div id="select-task-subtype"></div>
 					</div>

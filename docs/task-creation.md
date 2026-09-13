@@ -50,8 +50,8 @@ a submit button and a scoped cancellation link. Pending requests disable the
 form controls. Changing a platform or category removes the previous dependent
 fields, including scripts and hidden required subtype selectors, while preserving
 the edited task name. Lookup and cancellation requests omit unrelated form values.
-The old metadata/provider lookup URLs still require their own source-bound read
-authorization; this change does not close that separate legacy read boundary.
+The later [task wizard change](task-wizard.md) binds these metadata and NetBird
+group lookups to the destination profile and current scope.
 
 Audit migration 027 enables review and create receipts in all three scopes. Audit
 resources contain IDs and positions, without names, scripts or passwords. Both
@@ -82,6 +82,6 @@ audit suite in 9.658 seconds. Registered Apple/OIDC routes, affected macOS/Linux
 race checks and the full Linux build pass. The final complete 1,647-case Chrome
 matrix passes in 94.426 seconds.
 
-Task editing, broader legacy editor and provider lookup authorization, immutable
+Task editing, broader legacy editor and other provider lookup authorization, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.

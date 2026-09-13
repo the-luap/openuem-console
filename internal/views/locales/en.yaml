@@ -2675,3 +2675,12 @@ en:
   task_groups:
     invalid: "Select up to 100 distinct NetBird group IDs."
     stale: "The NetBird group selection is outdated. Reload the task form."
+
+  task_wizard:
+    invalid: "The task form lookup is invalid. Reload the form."
+    not_found: "The destination profile is no longer available in this scope. Reload the profile."
+    denied: "Server administrator access is required to configure tasks."
+    provider_scope: "Choose a profile in an organization before configuring NetBird registration."
+    provider: "NetBird groups could not be loaded. Check this organization's HTTPS management URL and access token, then retry."
+    unavailable: "The task form could not be loaded. Reload the profile and retry."
+    retired: "This task form is outdated. Reload the destination profile and open a new task form."
