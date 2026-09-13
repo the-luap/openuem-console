@@ -117,8 +117,6 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 		method = c.Request().Method
 	}
 
-	confirmDelete := false
-
 	allProfiles, err := h.Model.GetAllProfiles()
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.all_profiles_error", err), true))
@@ -129,84 +127,10 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 		if err != nil {
 			return RenderError(c, partials.ErrorMessage(err.Error(), true))
 		}
-		return RenderViewWithReplaceUrl(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, "", successMessage, confirmDelete, false, itemsPerPage, commonInfo), commonInfo), u)
+		return RenderViewWithReplaceUrl(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, successMessage, false, itemsPerPage, commonInfo), commonInfo), u)
 	}
 
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, "", successMessage, confirmDelete, false, itemsPerPage, commonInfo), commonInfo))
-}
-
-func (h *Handler) ConfirmDeleteTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	itemsPerPage, err := h.Model.GetDefaultItemsPerPage()
-	if err != nil {
-		log.Println("[ERROR]: could not get items per page from database")
-		itemsPerPage = 5
-	}
-
-	p := partials.NewPaginationAndSort(itemsPerPage)
-	p.GetPaginationAndSortParams(c.FormValue("page"), c.FormValue("pageSize"), c.FormValue("sortBy"), c.FormValue("sortOrder"), c.FormValue("currentSortBy"), itemsPerPage)
-
-	id := c.Param("profile")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.empty_id"), true))
-	}
-
-	profileId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.invalid_task"), true))
-	}
-
-	profile, err := h.Model.GetProfileById(profileId, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.retrieve_err"), true))
-	}
-
-	p.NItems, err = h.Model.CountAllTasksForProfile(profileId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.retrieve_tasks_err"), true))
-	}
-
-	tasks, err := h.Model.GetTasksForProfileByPage(p, profileId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.retrieve_tasks_err"), true))
-	}
-
-	tags, err := h.Model.GetAllTags(commonInfo, filters.AgentFilter{})
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.no_tags"), true))
-	}
-
-	taskId := c.Param("task")
-	if taskId == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskIdAsInt, err := strconv.Atoi(taskId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), true))
-	}
-
-	_, err = h.Model.GetTasksById(taskIdAsInt)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.could_not_get"), true))
-	}
-
-	successMessage := ""
-	confirmDelete := true
-	confirmClone := false
-
-	allProfiles, err := h.Model.GetAllProfiles()
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.all_profiles_error", err), true))
-	}
-
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, taskId, successMessage, confirmDelete, confirmClone, itemsPerPage, commonInfo), commonInfo))
+	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, successMessage, false, itemsPerPage, commonInfo), commonInfo))
 }
 
 func (h *Handler) ProfileIssues(c echo.Context) error {

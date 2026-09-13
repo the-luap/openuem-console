@@ -115,13 +115,6 @@ func (h *Handler) EditTask(c echo.Context) error {
 		return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
 	}
 
-	if c.Request().Method == "DELETE" {
-		if err := h.Model.DeleteTask(task.Edges.Profile.ID, taskId); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_delete"), err), true))
-		}
-		return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.deleted"))
-	}
-
 	// decrypt local user password
 	if h.EncryptionMasterKey != "" && task.LocalUserPassword != "" {
 		isSecretEncrypted, err := utils.IsSensitiveFieldEncrypted(task.LocalUserPassword, h.EncryptionMasterKey)

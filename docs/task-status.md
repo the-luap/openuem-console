@@ -65,6 +65,7 @@ order initialization and refreshes its task region separately.
   The final complete 1,500-case Chrome matrix passes in 85.856 seconds, including
   accessible state labels and preservation of a 50-item page size.
 
-Task deletion, cloning, editing and creation still need their own
+Task deletion is covered by the later [deletion change](task-deletion.md).
+Task cloning, editing and creation still need their own
 atomic scoped mutations. This change does not complete legacy delegation,
 immutable revisions, device acceptance or the expanded roadmap.

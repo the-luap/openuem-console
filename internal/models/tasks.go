@@ -438,22 +438,6 @@ func (m *Model) GetTasksById(taskID int) (*ent.Task, error) {
 	return m.Client.Task.Query().WithProfile().Where(task.ID(taskID)).First(context.Background())
 }
 
-func (m *Model) DeleteTask(profileID int, taskID int) error {
-	// get the curren task
-	currentTask, err := m.Client.Task.Get(context.Background(), taskID)
-	if err != nil {
-		return err
-	}
-
-	// we must delete the task
-	if err := m.Client.Task.DeleteOneID(taskID).Exec(context.Background()); err != nil {
-		return err
-	}
-
-	//...but we must then update the order column from that column onwards
-	return m.Client.Task.Update().Where(task.OrderGT(currentTask.Order)).AddOrder(-1).Exec(context.Background())
-}
-
 func (m *Model) CloneTask(taskID int, taskName string, profileID int, order int) error {
 	t, err := m.Client.Task.Get(context.Background(), taskID)
 	if err != nil {

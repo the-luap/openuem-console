@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task deletion](task-deletion.md) now binds confirmation and deletion
+  to the current task and reviewed parent under current server authority and
+  exact profile scope. Task/report removal, normalization of that profile's
+  remaining tasks and the scoped audit receipt commit together. Other profiles'
+  order and surviving task definitions remain unchanged. Failed normalization,
+  failed audit and cancellation restore both the task and cascading reports.
+  Bounded, audited confirmation reads omit scripts and credentials; a native
+  English confirmation identifies the task/profile and explains device effects.
+  The full inventory PostgreSQL/race suite passes in 77.384 seconds and the full
+  audit suite in 10.473 seconds. Registered Apple/OIDC routes, affected
+  macOS/Linux race checks and the full Linux build pass. All 24 focused browser
+  cases pass; the final complete 1,560-case Chrome matrix passes in 89.120
+  seconds. The mobile confirmation was visually inspected. Task cloning,
+  creation/editing, broader editor read authorization, delegated access and
+  physical/provider acceptance remain open.
 - [Legacy task ordering](task-order.md) now holds current server authority,
   exact profile audience and task ownership through an atomic scoped reorder and
   audit. Stale starting positions conflict; zero, tied, gapped and NULL stored

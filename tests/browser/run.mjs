@@ -33,6 +33,7 @@ import desktopTags from "./desktop-tags.mjs";
 import profileStatus from "./profile-status.mjs";
 import taskStatus from "./task-status.mjs";
 import taskOrder from "./task-order.mjs";
+import taskDeletion from "./task-deletion.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
 import profileDeletion from "./profile-deletion.mjs";
@@ -109,6 +110,7 @@ try {
         [profileStatus,18],
         [taskStatus,18],
         [taskOrder,36],
+        [taskDeletion,24],
         [profileAudience,18],
         [profileMetadata,36],
         [profileDeletion,24],

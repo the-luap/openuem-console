@@ -2629,3 +2629,15 @@ en:
     large: This group exceeds the supported limit of 100 members. Choose a smaller rollout group.
     invalid: Review the pilot promotion form and confirm the complete destination selection.
     unavailable: Apple update promotion evidence is temporarily unavailable. No result can be confirmed.
+
+  task_deletion:
+    title: "Delete task"
+    delete: "Delete task"
+    id: "Task ID: "
+    truncated: "The task name is shortened for display. Use the task and profile IDs to identify it."
+    consequences: "This permanently deletes this task and its stored results, and renumbers the remaining tasks in this profile. The profile and its issue records remain."
+    device_effects: "This does not undo changes on devices, uninstall software, or cancel tasks already sent to devices."
+    invalid: "The task deletion request is invalid."
+    not_found: "The task is not available in this profile and scope. Refresh the profile before retrying."
+    denied: "Server administrator access is required to delete tasks."
+    unavailable: "The task deletion result could not be confirmed. Refresh the profile before retrying."

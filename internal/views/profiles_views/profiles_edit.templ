@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-templ EditProfile(c echo.Context, p partials.PaginationAndSort, profile *ent.Profile, tasks []*ent.Task, availableTags []*ent.Tag, allProfiles []*ent.Profile, taskId string, successMessage string, confirmDelete bool, confirmClone bool, itemsPerPage int, commonInfo *partials.CommonInfo) {
+templ EditProfile(c echo.Context, p partials.PaginationAndSort, profile *ent.Profile, tasks []*ent.Task, availableTags []*ent.Tag, allProfiles []*ent.Profile, successMessage string, confirmClone bool, itemsPerPage int, commonInfo *partials.CommonInfo) {
 	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Profile Management"), Url: string(templ.URL(partials.GetNavigationUrl(commonInfo, "/profiles")))}, {Title: profile.Name}}, commonInfo)
 	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" hx-history="false">
 		<div class="uk-width-1-2@m uk-card uk-card-default">
@@ -66,9 +66,6 @@ templ EditProfile(c echo.Context, p partials.PaginationAndSort, profile *ent.Pro
 							</button>
 						</div>
 					</div>
-					if confirmDelete {
-						@partials.ConfirmDelete(c, i18n.T(ctx, "tasks.confirm_delete"), string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d", profile.ID)))), string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%s", taskId)))))
-					}
 					if confirmClone {
 						@ConfirmClone(c, commonInfo, allProfiles)
 					}

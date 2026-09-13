@@ -159,6 +159,8 @@ templ ProfileTaskList(c echo.Context, p partials.PaginationAndSort, profileID in
 											<li>
 												<a
 													hx-get={ string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/confirm-delete/%d", profileID, t.ID)))) }
+													href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/confirm-delete/%d", profileID, t.ID))) }
+													hx-params="none"
 													hx-target="#main"
 													hx-swap="outerHTML"
 													hx-push-url="false"

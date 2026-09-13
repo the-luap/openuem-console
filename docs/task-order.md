@@ -15,8 +15,8 @@ displayed deterministically. An accepted ordering action persists consecutive
 positions from one, including when the requested position is unchanged. Older
 editor and confirmation reads now calculate display positions in memory and no
 longer initialize order values in the database. Existing stored values remain
-untouched until an authorized mutation normalizes them. The separate legacy
-task-deletion path still requires its own repair and audit coverage.
+untouched until an authorized mutation normalizes them. The later
+[task-deletion change](task-deletion.md) also normalizes only the affected profile.
 
 The registered POST routes retain their URLs in all three scopes. They share
 the 8 KiB action form bound before CSRF token extraction, reject alternate
@@ -80,7 +80,7 @@ keep the page-size value readable on mobile without changing other pages.
 - The final complete 1,536-case Chrome matrix passes in 89.560 seconds; the
   corrected mobile page-size control was visually inspected after that run.
 
-Legacy task deletion, cloning, creation and editing, broader editor read
+Legacy task cloning, creation and editing, broader editor read
 authorization, immutable revisions, delegated access and physical/provider
 acceptance remain open in the expanded roadmap. Production-scale contention
 from the existing shared audience locks also remains to be measured.
