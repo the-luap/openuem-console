@@ -22,7 +22,8 @@ var (
 
 // NetbirdOperationCommand is a single, expiring command. Revision binds the
 // reviewed device generation, organization configuration and selected profile.
-// It contains no provider token or setup key.
+// Connection requests contain no provider token or setup key. The separate
+// registration store owns version-two commands and their credential lifecycle.
 type NetbirdOperationCommand = netbirdcommand.Command
 
 // A successful result must correlate with the complete command identity. An
@@ -149,6 +150,9 @@ func (s *NetbirdOperationStore) Request(parent context.Context, actor string, sc
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684629916,hashtext($1))`, id); err != nil {
+		return nil, err
+	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(684629914,hashtext($1))`, device); err != nil {
 		return nil, err
 	}
@@ -166,7 +170,7 @@ func (s *NetbirdOperationStore) Request(parent context.Context, actor string, sc
 		return nil, err
 	}
 	var pending bool
-	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))`, device).Scan(&pending); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND status IN ('queued','unconfirmed')))`, device, id).Scan(&pending); err != nil {
 		return nil, err
 	}
 	if pending {

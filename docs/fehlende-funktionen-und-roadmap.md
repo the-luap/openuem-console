@@ -618,10 +618,18 @@ matching agent evidence before reopening admission. Lost replies use read-only
 receipt queries with the same resolution UUID; original unconfirmed outcomes
 remain unchanged. Current authority, certificate/scope changes, durable evidence,
 audit rollback/retention and 24 new/2,169 total browser cases are covered.
-Missing evidence and undelivered releases remain blocked. Durable provider admission, trusted
-Unix installers, authoritative peer ownership,
-remaining user/provider secrets and physical/provider acceptance are still
-required.
+Missing evidence and undelivered releases remain blocked.
+[Managed registration storage](netbird-registrations.md) now implements reviewed
+provider-group policy, explicit version-two agent capability, encrypted provider
+and setup-key snapshots, permanent creation/delivery/cleanup attempts, correlated
+command evidence, and exact-key absence reconciliation. Restart never repeats
+key creation or device registration. Connection and registration admission share
+one barrier; provider cleanup retains the original credential origin. Owned TLS,
+PostgreSQL, filesystem and broker tests cover uncertainty and rollback. This is a
+backend component: registration UI/startup wiring and combined provider/agent
+resolution remain incomplete. Trusted Unix installers, authoritative peer
+ownership, remaining user/provider secrets and physical/provider acceptance are
+still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

@@ -51,7 +51,16 @@ func (s *NetbirdOperationStore) recordTx(ctx context.Context, actor string, scop
 }
 
 func (s *NetbirdOperationStore) source(ctx context.Context, tx *sql.Tx, scope access.Scope, device, operation, profile string) (*NetbirdOperationReview, error) {
-	if !netbirdOperationInput(operation, profile) || scope.SiteID <= 0 {
+	if !netbirdOperationInput(operation, profile) {
+		return nil, ErrNetbirdOperationInvalid
+	}
+	return s.operationSource(ctx, tx, scope, device, operation, profile)
+}
+
+// Registration supplies its own explicit registration-state inspector. Public
+// connection methods continue to reject registration and never read a token.
+func (s *NetbirdOperationStore) operationSource(ctx context.Context, tx *sql.Tx, scope access.Scope, device, operation, profile string) (*NetbirdOperationReview, error) {
+	if (!netbirdOperationInput(operation, profile) && (operation != "register" || profile != "")) || scope.SiteID <= 0 {
 		return nil, ErrNetbirdOperationInvalid
 	}
 	manual := &ManualExecutionStore{db: s.db, permissions: s.permissions, individual: s.individual}
