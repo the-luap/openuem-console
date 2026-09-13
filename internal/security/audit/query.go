@@ -19,6 +19,7 @@ var sourceQueries = append([]auditSource{
 	{"inventory", "uem_inventory_audit", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,'recorded'::text AS result,created_at FROM uem_inventory_audit`},
 	{"inventory-refresh", "uem_inventory_refresh_audit", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,result,created_at FROM uem_inventory_refresh_audit`},
 	{"manual-execution", "uem_manual_execution_audit", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,result,created_at FROM uem_manual_execution_audit`},
+	{"netbird-operations", "uem_netbird_operations_audit", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,result,created_at FROM uem_netbird_operations_audit`},
 	{"access", "uem_access_audit", `SELECT id,0::bigint AS tenant_id,0::bigint AS site_id,actor,action,subject AS resource,'recorded'::text AS result,created_at FROM uem_access_audit`},
 	{"release", "uem_desktop_release_audit", `SELECT id,0::bigint AS tenant_id,0::bigint AS site_id,actor,action,digest AS resource,'recorded'::text AS result,created_at FROM uem_desktop_release_audit`},
 	{"activity", "uem_audit_activity", `SELECT id,tenant_id,site_id,actor,action,resource_id AS resource,result,created_at FROM uem_audit_activity`},

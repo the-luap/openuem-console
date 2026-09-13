@@ -89,6 +89,25 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	if !tagGuard {
 		return errors.New("tag revision protection is incomplete")
 	}
+	for _, guard := range []struct {
+		table, name string
+		kind        int
+	}{
+		{"agents", "uem_netbird_agent_binding", 21},
+		{"site_agents", "uem_netbird_scope_binding", 29},
+		{"sites", "uem_netbird_site_binding", 17},
+		{"netbirds", "uem_netbird_installation_binding", 29},
+		{"uem_netbird_operation_attempts", "uem_netbird_attempt_immutable", 27},
+		{"uem_netbird_operations", "uem_netbird_operation_immutable", 27},
+	} {
+		var valid bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid=pg_catalog.to_regclass($1) AND tgname=$2 AND tgtype=$3 AND tgenabled IN ('O','A') AND tgfoid=pg_catalog.to_regprocedure($2||'()'))`, guard.table, guard.name, guard.kind).Scan(&valid); err != nil {
+			return err
+		}
+		if !valid {
+			return errors.New("NetBird operation protection is incomplete")
+		}
+	}
 	return tx.Commit()
 }
 

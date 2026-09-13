@@ -592,6 +592,12 @@ one local identity, stop after failure and have shared subprocess deadlines.
 The [observation pipeline](netbird-observations.md) now bounds status subprocesses,
 preserves the action identity/deadline and keeps confirmed data after failed
 reports. Structured profile IDs and labels survive storage and native selection.
+[Durable NetBird operation storage](netbird-operations.md) now provides exact-site
+admission, immutable request/attempt receipts, source and identity revisions,
+uncertainty barriers, explicit release and scoped history. Owned PostgreSQL tests
+cover rollback/restart, cancellation races, identity changes and audit retention.
+The backend is not yet wired to legacy device routes: an expiring correlated
+agent protocol, durable agent journal and reviewed console flow are required.
 Durable provider command admission, legacy device-operation authority, trusted
 Unix installers, authoritative peer ownership,
 remaining user/provider secrets and physical/provider acceptance are still

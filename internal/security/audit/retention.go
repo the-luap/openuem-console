@@ -139,6 +139,8 @@ func retentionSources(ctx context.Context, tx *sql.Tx, tenant int, windowsEnable
 			predicate += " AND " + eligible
 			query += " WHERE " + eligible
 		}
+		// NetBird has permanent request and attempt receipts outside this event
+		// catalog. Its audit events can expire without enabling a repeat send.
 		if global {
 			predicate = `$1::bigint=0 AND created_at<$2`
 		}
