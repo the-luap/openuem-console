@@ -1,0 +1,76 @@
+package desktop_views
+
+import (
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ NetbirdResolution(c echo.Context,info *partials.CommonInfo,v *inventory.NetbirdResolutionReview,resolutionID string) {
+ @netbirdPage(c,info,v.Operation.DeviceID,"Review NetBird resolution") {
+  @netbirdTarget(v.Target)
+  <dl class="netbird-details">
+   <dt>Original request</dt><dd>{ v.Operation.ID }</dd>
+   <dt>Command</dt><dd>{ netbirdOperationLabel(v.Operation.Operation) }</dd>
+   <dt>Original outcome</dt><dd>Execution is unconfirmed</dd>
+   if v.Operation.Profile!="" {
+    <dt>Profile ID</dt><dd>{ v.Operation.Profile }</dd>
+   }
+  </dl>
+  <p>The original outcome remains unconfirmed. Resolution does not repeat the command or establish a lasting connection. Review the device state before allowing further commands.</p>
+  if v.Resolution!=nil {
+   <dl class="netbird-details">
+    <dt>Resolution ID</dt><dd>{ v.Resolution.ID }</dd>
+    <dt>Requested by</dt><dd>{ v.Resolution.Actor }</dd>
+    <dt>Requested</dt><dd>@mdm_views.Timestamp(&v.Resolution.CreatedAt)</dd>
+    if v.Resolution.ConfirmedAt!=nil {
+     <dt>Evidence confirmed</dt><dd>@mdm_views.Timestamp(v.Resolution.ConfirmedAt)</dd>
+     <dt>Confirmed by</dt><dd>{ v.Resolution.ConfirmedBy }</dd>
+    }
+   </dl>
+   if v.Resolution.ConfirmedAt!=nil {
+    <p role="status">Resolution confirmed. Further NetBird commands may be reviewed.</p>
+   } else {
+    <p role="status">Resolution is not yet confirmed. Further NetBird commands remain blocked. Checking the receipt only reads retained agent evidence and does not send another release.</p>
+    <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="resolution_id" value={ v.Resolution.ID }/>
+     <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>Check the retained receipt for this resolution.</span></label>
+     <button class="uk-button uk-button-default" id="netbird-submit" type="submit">Check agent receipt</button>
+     <span class="htmx-indicator" id="netbird-pending" role="status">Checking receipt…</span>
+    </form>
+   }
+  } else if v.CanRelease {
+   if v.Outcome=="completed" {
+    <p role="status">The agent retained a completed receipt for this command. Confirming acknowledges that later evidence while preserving the original console outcome.</p>
+   } else {
+    <p role="status">The agent retained an unconfirmed command and reports that its local execution has ended. Confirming requests an explicit release; success is recorded only after matching agent evidence.</p>
+   }
+   <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+    @mdm_views.CSRF(info)
+    <input type="hidden" name="resolution_id" value={ resolutionID }/>
+    <input type="hidden" name="revision" value={ v.Revision }/>
+    <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the outcome and allow further NetBird commands.</span></label>
+    <button class="uk-button uk-button-primary" id="netbird-submit" type="submit">Confirm resolution</button>
+    <span class="htmx-indicator" id="netbird-pending" role="status">Confirming resolution…</span>
+   </form>
+  } else {
+   <p role="status">{ netbirdResolutionBlocked(v.Outcome) }</p>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" }>Review again</a>
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID }>Original receipt</a>
+  </div>
+ }
+}
+
+func netbirdResolutionBlocked(outcome string)string {
+ switch outcome {
+ case "missing":return "No matching retained agent receipt is available. Further commands remain blocked."
+ case "waiting":return "The agent cannot yet establish that the earlier local execution has ended. A service restart alone may be insufficient. Further commands remain blocked."
+ case "conflict":return "The agent retained a different resolution. Further commands remain blocked pending recovery of matching evidence."
+ case "released":return "The original receipt records a historical release. No new release is available."
+ default:return "The agent cannot currently confirm resolution eligibility. Further commands remain blocked."
+ }
+}

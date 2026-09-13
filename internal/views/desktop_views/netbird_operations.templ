@@ -141,12 +141,23 @@ templ NetbirdReceipt(c echo.Context,info *partials.CommonInfo,r *inventory.Netbi
    <dt>Expires</dt><dd>@mdm_views.Timestamp(&r.ExpiresAt)</dd>
    <dt>Delivery attempt</dt><dd>@mdm_views.Timestamp(r.AttemptedAt)</dd>
    <dt>Finished</dt><dd>@mdm_views.Timestamp(r.FinishedAt)</dd>
+   if r.Resolution!=nil {
+    <dt>Resolution ID</dt><dd>{ r.Resolution.ID }</dd>
+    <dt>Resolution requested by</dt><dd>{ r.Resolution.Actor }</dd>
+    <dt>Resolution requested</dt><dd>@mdm_views.Timestamp(&r.Resolution.CreatedAt)</dd>
+    if r.Resolution.ConfirmedAt!=nil {
+     <dt>Evidence confirmed by</dt><dd>{ r.Resolution.ConfirmedBy }</dd>
+    }
+   }
    if r.ReleasedAt!=nil {
     <dt>Reviewed release</dt><dd>@mdm_views.Timestamp(r.ReleasedAt)</dd>
    }
   </dl>
   if r.Status=="unconfirmed" {
-   <p>The original outcome remains unconfirmed. Coordinated agent resolution is not yet available through this page.</p>
+   <p>The original outcome remains unconfirmed. Resolution allows further commands only after matching agent evidence is retained.</p>
+   if r.ReleasedAt==nil && netbirdCanManage(info,r.Scope) {
+    <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,r.DeviceID)+"/"+r.ID+"/resolution" }>Review resolution</a>
+   }
   }
   if r.Status=="queued" && r.AttemptedAt==nil && netbirdCanManage(info,r.Scope) {
    <form method="post" action={ NetbirdOperationPath(info,r.DeviceID)+"/"+r.ID+"/cancel" } class="netbird-confirm">

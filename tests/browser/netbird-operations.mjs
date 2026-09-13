@@ -1,5 +1,5 @@
 export default async function run(browser, record) {
-  const kinds = ['overview','overview-empty','overview-long','overview-viewer','review-up','review-down','review-switch','review-long','queued','sending','completed','stopped','unconfirmed','released','history','history-empty'];
+  const kinds = ['overview','overview-empty','overview-long','overview-viewer','review-up','review-down','review-switch','review-long','queued','sending','completed','stopped','unconfirmed','released','history','history-empty','resolution-completed','resolution-release','resolution-pending','resolution-confirmed','resolution-waiting','resolution-missing','resolution-conflict','resolution-long'];
   const base = '/tenant/1/site/2/computers/owned-device/netbird/operations';
   for (const width of [390,768,1440]) for (const kind of kinds) {
     await browser.visit('netbird-operations-'+kind,width);
@@ -25,6 +25,20 @@ export default async function run(browser, record) {
         const fields=await browser.evaluate('netbirdProfile');
         browser.check(fields?.some(([k,v])=>k==='profile'&&v===(kind==='overview-long'?'p'.repeat(256):'owned-profile')),'Profile review used a display label instead of exact handle');
       }
+    } else if (kind.startsWith('resolution-')) {
+      browser.check(text.includes('The original outcome remains unconfirmed')&&text.includes('does not repeat the command'),'Resolution changed the original outcome or hid its effect');
+      const enabled=['resolution-completed','resolution-release','resolution-pending','resolution-long'].includes(kind);
+      browser.check(await browser.evaluate(`!!document.querySelector('.netbird-confirm')`)===enabled,'Resolution offered an ineligible action');
+      if (enabled) {
+        await browser.evaluate(`window.netbirdRequests=[];document.body.addEventListener('htmx:configRequest',e=>{netbirdRequests.push({path:e.detail.path,fields:[...e.detail.formData.entries()]});e.preventDefault()});document.querySelector('#netbird-submit').focus()`);await browser.enter();
+        browser.check(await browser.evaluate('netbirdRequests.length===0'),'Resolution submitted without confirmation');
+        await browser.evaluate(`document.querySelector('#netbird-confirm').checked=true;document.querySelector('#netbird-submit').focus()`);await browser.enter();
+        const req=await browser.evaluate('netbirdRequests.at(-1)');
+        const pending=kind==='resolution-pending';
+        browser.check(req?.path===base+'/10000000-0000-4000-8000-000000000001/resolution'+(pending?'/reconcile':'')&&req.fields.length===(pending?3:4)&&req.fields.some(([k,v])=>k==='resolution_id'&&v==='10000000-0000-4000-8000-000000000004')&&req.fields.some(([k,v])=>k==='csrf'&&v==='owned-netbird-csrf'),'Resolution lost exact request, retained resolution ID or CSRF');
+        if (pending) browser.check(text.includes('does not send another release')&&!req.fields.some(([k])=>k==='revision'),'Receipt check was presented as another release');
+      }
+      if (kind==='resolution-confirmed') browser.check(text.includes('Resolution confirmed'),'Confirmed resolution lacks its evidence state');
     } else if (kind==='unconfirmed'||kind==='released') {
       browser.check(text.includes('Execution is unconfirmed')&&!text.includes('Command execution confirmed')&&!await browser.evaluate(`!!document.querySelector('form[method="post"]')`),'Uncertainty was upgraded or offered an automatic repeat');
     } else if (kind==='queued') {
@@ -33,7 +47,7 @@ export default async function run(browser, record) {
       browser.check(!await browser.evaluate(`!!document.querySelector('#netbird-cancel')`),'In-flight receipt offered pre-delivery cancellation');
     }
     browser.check(await browser.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'NetBird page overflows the viewport');
-    if (width===390&&['overview-long','review-switch','unconfirmed'].includes(kind)) await browser.capture('netbird-operations-'+kind+'-390');
+    if (width===390&&['overview-long','review-switch','unconfirmed','resolution-long','resolution-pending'].includes(kind)) await browser.capture('netbird-operations-'+kind+'-390');
     record({name:'NetBird operations '+kind,width,passed:true});
   }
   for (const width of [390,768,1440]) {

@@ -612,7 +612,13 @@ subjects and profile steps are rejected. Installation, registration, removal and
 peer deletion are temporarily unavailable; workers withhold profiles containing
 active legacy NetBird steps without creating provider keys. These restrictions
 are an intermediate migration state, not completed lifecycle support.
-Coordinated console/agent uncertainty resolution, durable provider admission, trusted
+[Reviewed resolution](netbird-resolutions.md) now persists immutable console
+intent before one release RPC, checks current target identity, and retains
+matching agent evidence before reopening admission. Lost replies use read-only
+receipt queries with the same resolution UUID; original unconfirmed outcomes
+remain unchanged. Current authority, certificate/scope changes, durable evidence,
+audit rollback/retention and 24 new/2,169 total browser cases are covered.
+Missing evidence and undelivered releases remain blocked. Durable provider admission, trusted
 Unix installers, authoritative peer ownership,
 remaining user/provider secrets and physical/provider acceptance are still
 required.

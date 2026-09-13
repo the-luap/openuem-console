@@ -24,7 +24,7 @@ const fixtures = new Set([
  ...["global","organization"].flatMap(scope=>["normal","empty","saved","sent","unconfirmed","changed","long"].map(kind=>"smtp-settings-"+scope+"-"+kind)),
  ...["new","configured","empty","shared","saved","long"].map(kind=>"netbird-settings-"+kind),
  ...["ordinary","duplicate","legacy","injected","empty","malformed"].map(kind=>"netbird-profiles-"+kind),
- ...['overview','overview-empty','overview-long','overview-viewer','review-up','review-down','review-switch','review-long','queued','sending','completed','stopped','unconfirmed','released','history','history-empty'].map(kind=>'netbird-operations-'+kind),
+ ...['overview','overview-empty','overview-long','overview-viewer','review-up','review-down','review-switch','review-long','queued','sending','completed','stopped','unconfirmed','released','history','history-empty','resolution-completed','resolution-release','resolution-pending','resolution-confirmed','resolution-waiting','resolution-missing','resolution-conflict','resolution-long'].map(kind=>'netbird-operations-'+kind),
   ...["normal","empty","missing","disabled","long"].map(kind=>"desktop-task-history-"+kind),
   ...["choices-task","choices-profile","choices-empty","choices-pending","choices-long","review-task","review-profile","review-long","queued","sending","accepted","rejected","stopped","unconfirmed"].map(kind=>"manual-execution-"+kind),
   ...["global","organization","site"].map(scope=>`task-order-${scope}`),

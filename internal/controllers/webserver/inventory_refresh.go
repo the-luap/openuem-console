@@ -34,6 +34,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		return err
 	}
 	w.Handler.NetbirdOperations = netbird
+	resolution, err := inventory.NewNetbirdResolutionStore(netbird, w.Handler.RequestNetbirdControl)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdResolutions = resolution
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
 	w.inventoryDone = make(chan struct{})

@@ -33,9 +33,9 @@ the CLI. Read-only users can inspect state, receipts and 50-row history without
 command controls. History remains readable in its recorded scope after removal.
 
 Receipts distinguish queued, sending, completed, stopped and unconfirmed work.
-Only an unattempted queued request offers cancellation. An unconfirmed outcome
-does not offer retry or release: coordinated console/agent resolution is still
-required before exposing that action. Profile names are escaped display values;
+Only an unattempted queued request offers cancellation. Unconfirmed outcomes
+offer [reviewed resolution](netbird-resolutions.md), with permanent intent before
+a release and read-only reconciliation after response loss. Profile names are escaped display values;
 selection and submission use the original structured handle.
 
 ## Authorization and review
@@ -111,11 +111,11 @@ does not prove a lasting connection or authoritative provider association.
 Cancellation only withdraws an unattempted queued request. The attempt is read
 again after the request lock is acquired, so cancellation cannot overlook an
 attempt committed while its original query was waiting. Explicit release
-requires device-security permission in the recorded scope and retains the
-original uncertain outcome, release actor and timestamp. It neither interrupts
-an old process nor resubmits the command. The future console workflow must
-present the uncertain outcome for operator review before calling release; the
-agent journal must prevent overlapping or repeated local execution.
+requires current device-security permission and actual target scope/identity,
+retaining the original uncertain outcome, release actor and timestamp. It neither
+interrupts an old process nor resubmits the command. Matching retained agent
+evidence is required before opening the console barrier. The agent journal
+prevents overlapping or repeated local execution.
 
 ## History and retention
 
@@ -149,7 +149,8 @@ contacted.
 
 Production integration includes native initialization, joined shutdown and the
 review/request/receipt/history/cancel routes. Coordinated resolution with durable
-console intent and matching agent evidence remains open.
+console intent and matching agent evidence is now wired through the reviewed
+resolution/reconciliation routes; see the separate resolution contract.
 Installation/uninstallation, registration with
 staged setup-key creation/cleanup and authoritative peer deletion are separate
 operations and are not admitted by this initial store. Trusted Unix installers,
@@ -166,9 +167,9 @@ The console publisher
 uses the new direct subjects and checks complete receipt correlation; neither
 commands nor controls enter the retrying agent stream. Owned codec, filesystem,
 subprocess and NATS tests cover expiry, correlation, durable replay, response loss
-and explicit uncertainty recovery. The reviewed console release must still
-coordinate its durable resolution evidence with the agent before opening the
-server barrier; the current database-only release API is not a user workflow.
+and explicit uncertainty recovery. Reviewed resolution now coordinates durable
+console intent with matching agent evidence. Migration014 prevents a new bare
+database-only release from opening the server barrier.
 
 Owned route tests cover current roles and scopes, strict forms, CSRF, idempotent
 submission, completed receipts, cancellation and history after removal. The 51

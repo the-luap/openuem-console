@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reviewed NetBird resolution](netbird-resolutions.md) now persists immutable
+  intent before one release control and retains matching agent evidence before
+  reopening console admission. Lost replies use read-only reconciliation with
+  the same resolution UUID and current target identity. Original unconfirmed
+  outcomes remain unchanged. Database guards, current authority/scope locks,
+  certificate renewal/revocation, audit rollback/retention, real routes and 24
+  new/2,169 total browser cases cover the flow. Missing evidence and undelivered
+  release requests remain blocked; staged lifecycle and physical acceptance
+  are still required.
+
 - [Managed NetBird operations](netbird-operations.md) now connect native agent
   startup, stable protected journals, current certificate deadlines and joined
   service shutdown to the console dispatcher. Exact-site review, submission,

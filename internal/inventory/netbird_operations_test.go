@@ -210,7 +210,7 @@ func TestNetbirdOperationsUncertaintyBarrierAndExplicitRelease(t *testing.T) {
 			_, err = s.Request(ctx, r.Actor, r.Scope, r.DeviceID, uuid.NewString(), r.Operation, r.Profile, r.Revision)
 			require.ErrorIs(t, err, inventory.ErrNetbirdOperationConflict)
 			require.ErrorIs(t, s.Release(ctx, "viewer", r.Scope, r.DeviceID, r.ID), access.ErrDenied)
-			require.NoError(t, s.Release(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID))
+			require.NoError(t, netbirdReleaseCompleted(t, f, s, "tag-admin", r))
 			require.NoError(t, s.Release(ctx, "admin", r.Scope, r.DeviceID, r.ID))
 			receipt = netbirdRead(t, f, s, r.ID)
 			require.Equal(t, "unconfirmed", receipt.Status)

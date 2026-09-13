@@ -131,7 +131,7 @@ try {
         [smtpSettings,48],
         [netbirdSettings,21],
         [netbirdProfiles,18],
-        [netbirdOperations,51],
+        [netbirdOperations,75],
         [desktopTaskHistory,18],
         [profileAudience,18],
         [profileMetadata,36],

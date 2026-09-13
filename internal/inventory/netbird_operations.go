@@ -72,6 +72,7 @@ type NetbirdOperation struct {
 	Result                                                            *NetbirdOperationResult
 	CommandHash                                                       string
 	CommandExpiresAt                                                  *time.Time
+	Resolution                                                        *NetbirdResolution
 }
 
 const netbirdOperationColumns = `r.id,r.device_id,r.tenant_id,r.site_id,r.actor,r.individual,r.operation,r.profile,r.revision,r.status,r.reason,r.requested_at,r.expires_at,r.finished_at,r.released_at,r.released_by,r.result,(SELECT created_at FROM uem_netbird_operation_attempts WHERE request_id=r.id),coalesce((SELECT command_hash FROM uem_netbird_operation_attempts WHERE request_id=r.id),''),(SELECT command_expires_at FROM uem_netbird_operation_attempts WHERE request_id=r.id)`
@@ -245,6 +246,10 @@ func (s *NetbirdOperationStore) Read(parent context.Context, actor string, scope
 	if err != nil {
 		return nil, err
 	}
+	r.Resolution, err = readNetbirdResolution(ctx, tx, r.ID)
+	if err != nil {
+		return nil, err
+	}
 	if err = netbirdOperationAudit(ctx, tx, r, actor, "read", "recorded"); err != nil {
 		return nil, err
 	}
@@ -348,9 +353,9 @@ func (s *NetbirdOperationStore) Cancel(parent context.Context, actor string, sco
 	return finishNetbirdOperation(ctx, tx, r, actor, "stopped", "cancelled", nil)
 }
 
-// Release explicitly acknowledges an uncertain outcome and opens the device
-// barrier. Callers must present that uncertainty for operator review; release
-// does not stop an old process, establish its result or resubmit its command.
+// Release is retained for callers reading a previously completed resolution.
+// New releases require NetbirdResolutionStore review and retained agent evidence;
+// this method cannot create that evidence or bypass its database guard.
 func (s *NetbirdOperationStore) Release(parent context.Context, actor string, scope access.Scope, device, id string) error {
 	if !canonicalRequestID(id) || !ValidReportDeviceID(device) {
 		return ErrNetbirdOperationInvalid
@@ -371,6 +376,13 @@ func (s *NetbirdOperationStore) Release(parent context.Context, actor string, sc
 	}
 	if r.ReleasedAt != nil {
 		return tx.Commit()
+	}
+	var evidence bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_resolution_evidence WHERE request_id=$1 AND actor=$2)`, id, actor).Scan(&evidence); err != nil {
+		return err
+	}
+	if !evidence {
+		return ErrNetbirdOperationNotReady
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_operations SET released_at=clock_timestamp(),released_by=$2 WHERE id=$1`, id, actor); err != nil {
 		return err
