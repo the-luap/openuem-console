@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+  ...["global","organization","site"].map(scope=>`task-order-${scope}`),
   ...["global","organization","site"].map(scope=>`profile-creation-${scope}`),
   ...["global","organization","site"].map(scope=>`profile-cloning-${scope}`),
   ...["global","organization","site","long"].map(state=>`profile-deletion-${state}`),

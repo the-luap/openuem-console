@@ -1,0 +1,25 @@
+[data-profile-tasks] nav[aria-label="Pagination"] {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+[data-profile-tasks] nav[aria-label="Pagination"] > * {
+  width: auto;
+}
+
+[data-profile-tasks] nav[aria-label="Pagination"] > div {
+  flex-wrap: wrap;
+}
+
+[data-profile-tasks] nav[aria-label="Pagination"] > div > span {
+  white-space: nowrap;
+}
+
+[data-profile-tasks] nav[aria-label="Pagination"] > div > form {
+  min-width: 5rem;
+}
+
+[data-profile-tasks] nav[aria-label="Pagination"] .uk-pagination {
+  flex-wrap: wrap;
+  margin: 0;
+}

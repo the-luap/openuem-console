@@ -15,7 +15,7 @@ templ TaskStatusAction(t *ent.Task, p partials.PaginationAndSort, info *partials
 		<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
 		<input type="hidden" name="sortBy" value={ p.SortBy }/>
 		<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
-		<button id={ fmt.Sprintf("task-status-button-%d", t.ID) } type="button" class="flex w-full items-center gap-2 px-4 py-2 text-left" hx-post={ taskStatusPath(t, info) } hx-target="closest form" hx-swap="outerHTML" hx-push-url="false" hx-disabled-elt="this">
+		<button id={ fmt.Sprintf("task-status-button-%d", t.ID) } type="button" class="flex w-full items-center gap-2 px-4 py-2 text-left" hx-post={ taskStatusPath(t, info) } hx-include="this" hx-target="closest form" hx-swap="outerHTML" hx-push-url="false" hx-disabled-elt="this">
 			if t.Disabled {
 				<uk-icon hx-history="false" icon="check" custom-class="h-5 w-5" uk-cloak></uk-icon>
 				{ i18n.T(ctx,"tasks.enable") }

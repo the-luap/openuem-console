@@ -35,8 +35,8 @@ the bundled HTMX out-of-band mechanism. It then offers the inverse action.
 Stable button IDs preserve keyboard focus; the indicator has an accessible
 status label and the form announces the confirmed result. Pending requests
 disable the button. The existing editor and its unsaved profile fields stay in
-place. This avoids the legacy editor GET path, which still initializes missing
-task order values and requires separate work alongside task reordering.
+place. [Scoped task ordering](task-order.md) also removes the former editor GET
+order initialization and refreshes its task region separately.
 
 ## Verification
 
@@ -65,6 +65,6 @@ task order values and requires separate work alongside task reordering.
   The final complete 1,500-case Chrome matrix passes in 85.856 seconds, including
   accessible state labels and preservation of a 50-item page size.
 
-Task reordering, deletion, cloning, editing and creation still need their own
+Task deletion, cloning, editing and creation still need their own
 atomic scoped mutations. This change does not complete legacy delegation,
 immutable revisions, device acceptance or the expanded roadmap.

@@ -419,32 +419,19 @@ func (m *Model) UpdateProfileTask(c echo.Context, taskID int, cfg TaskConfig) er
 }
 
 func (m *Model) GetTasksForProfileByPage(p partials.PaginationAndSort, profileID int) ([]*ent.Task, error) {
-	// Check if we've values in the order column
-	countWithOrder, err := m.Client.Task.Query().Where(task.OrderGT(0), task.HasProfileWith(profile.ID(profileID))).Count(context.Background())
+	if p.CurrentPage <= 0 || p.CurrentPage > 1000000 || p.PageSize <= 0 || p.PageSize > 1000 {
+		return nil, errors.New("invalid task pagination")
+	}
+	offset := (p.CurrentPage - 1) * p.PageSize
+	tasks, err := m.Client.Task.Query().Where(task.HasProfileWith(profile.ID(profileID))).Order(task.ByOrder(), task.ByID()).Limit(p.PageSize).Offset(offset).All(context.Background())
 	if err != nil {
 		return nil, err
 	}
-
-	// If we don't have the order column filled with values let's add them
-	if countWithOrder == 0 {
-		// let's get all tasks we have
-		tasks, err := m.Client.Task.Query().Where(task.HasProfileWith(profile.ID(profileID))).Order(task.ByID()).All(context.Background())
-		if err != nil {
-			return nil, err
-		}
-
-		// We must fill the order column as we're using it to order the results
-		for i, t := range tasks {
-			if err := m.Client.Task.UpdateOneID(t.ID).SetOrder(i + 1).Exec(context.Background()); err != nil {
-				return nil, err
-			}
-		}
+	// Display dense positions without writing legacy zero, duplicate or gapped orders on GET.
+	for i, t := range tasks {
+		t.Order = offset + i + 1
 	}
-
-	// Now, we have the ordered values, and we can use the order colum
-	query := m.Client.Task.Query().Where(task.HasProfileWith(profile.ID(profileID)))
-
-	return query.Limit(p.PageSize).Offset((p.CurrentPage - 1) * p.PageSize).Order(task.ByOrder()).All(context.Background())
+	return tasks, nil
 }
 
 func (m *Model) GetTasksById(taskID int) (*ent.Task, error) {
@@ -465,35 +452,6 @@ func (m *Model) DeleteTask(profileID int, taskID int) error {
 
 	//...but we must then update the order column from that column onwards
 	return m.Client.Task.Update().Where(task.OrderGT(currentTask.Order)).AddOrder(-1).Exec(context.Background())
-}
-
-func (m *Model) MoveTask(taskID int, currentOrder int, newOrder int) error {
-	t, err := m.Client.Task.Query().WithProfile().Where(task.ID(taskID)).Only(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if currentOrder < newOrder {
-		if err := m.Client.Task.Update().Where(
-			task.HasProfileWith(profile.ID(t.Edges.Profile.ID)),
-			task.OrderGTE(currentOrder),
-			task.OrderLTE(newOrder),
-		).AddOrder(-1).Exec(context.Background()); err != nil {
-			return err
-		}
-	}
-
-	if currentOrder > newOrder {
-		if err := m.Client.Task.Update().Where(
-			task.HasProfileWith(profile.ID(t.Edges.Profile.ID)),
-			task.OrderGTE(newOrder),
-			task.OrderLTE(currentOrder),
-		).AddOrder(+1).Exec(context.Background()); err != nil {
-			return err
-		}
-	}
-
-	return m.Client.Task.Update().Where(task.ID(taskID)).SetOrder(newOrder).Exec(context.Background())
 }
 
 func (m *Model) CloneTask(taskID int, taskName string, profileID int, order int) error {

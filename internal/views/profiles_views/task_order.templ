@@ -1,0 +1,48 @@
+package profiles_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ TaskOrderActions(t *ent.Task, p partials.PaginationAndSort, info *partials.CommonInfo) {
+	if t.Order>1 {
+		<li>
+			@TaskOrderAction(t, p, info, true)
+		</li>
+	}
+	if t.Order<p.NItems {
+		<li>
+			@TaskOrderAction(t, p, info, false)
+		</li>
+	}
+}
+
+templ TaskOrderAction(t *ent.Task, p partials.PaginationAndSort, info *partials.CommonInfo, up bool) {
+	<form>
+		<input type="hidden" name="page" value={ strconv.Itoa(p.CurrentPage) }/>
+		<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
+		<input type="hidden" name="sortBy" value={ p.SortBy }/>
+		<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
+		<button type="button" data-task-order-action data-task-id={ strconv.Itoa(t.ID) } class="flex w-full items-center gap-2 py-2 px-4 text-left" hx-post={ taskOrderPath(t, info, up) } hx-include="this" hx-target="closest form" hx-swap="none" hx-push-url="false" hx-disabled-elt="this">
+			if up {
+				<uk-icon icon="chevron-up" custom-class="h-6 w-6" uk-cloak></uk-icon>
+				{ i18n.T(ctx,"tasks.move_up") }
+			} else {
+				<uk-icon icon="chevron-down" custom-class="h-6 w-6" uk-cloak></uk-icon>
+				{ i18n.T(ctx,"tasks.move_down") }
+			}
+		</button>
+	</form>
+}
+
+func taskOrderPath(t *ent.Task, info *partials.CommonInfo, up bool) string {
+	action := "movedown"
+	if up {
+		action = "moveup"
+	}
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/%s/%d", t.ID, action, t.Order))
+}

@@ -440,6 +440,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
@@ -457,6 +458,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/site/:site/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
@@ -474,6 +476,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/register", h.SignIn)

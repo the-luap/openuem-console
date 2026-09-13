@@ -1,0 +1,179 @@
+package profiles_views
+
+import (
+	"fmt"
+	"github.com/dimmerz92/go-lucide-icons/templicons/icons"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/ent/task"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ ProfileTaskList(c echo.Context, p partials.PaginationAndSort, profileID int, tasks []*ent.Task, itemsPerPage int, info *partials.CommonInfo) {
+	<section id="profile-task-list" data-profile-tasks data-profile-id={ strconv.Itoa(profileID) } tabindex="-1" class="min-w-0" hx-get={ partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/tasks", profileID)) } hx-trigger="profileTaskOrderSaved from:body, profileTaskListRefresh from:body" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace" hx-include="#task-list-context" hx-disinherit="hx-include">
+		<link rel="stylesheet" href="/assets/css/profile-tasks.css"/>
+		<script src="/assets/js/profile-tasks.js" defer></script>
+		<form id="task-list-context">
+			<input type="hidden" name="page" value={ strconv.Itoa(p.CurrentPage) }/>
+			<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
+			<input type="hidden" name="sortBy" value={ p.SortBy }/>
+			<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
+		</form>
+		if p.NItems == 0 {
+			<p class="uk-text-small uk-text-muted">{ i18n.T(ctx,"profiles.edit.no_tasks") }</p>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="uk-table uk-table-divider uk-table-small uk-table-hover uk-table-striped" hx-history="false">
+					<thead>
+						<tr>
+							<th class="w-1/12"></th>
+							<th class="w-1/12">{ i18n.T(ctx, "Version") }</th>
+							<th class="w-1/12"><span>{ i18n.T(ctx, "profiles.is_enabled") }</span></th>
+							<th class="w-4/12">
+								<div class="flex gap-1 items-center">
+									<span>{ i18n.T(ctx, "profiles.edit.task_description") }</span>
+								</div>
+							</th>
+							<th class="w-4/12">{ i18n.T(ctx, "More info") }</th>
+							<th class="w-1/12"></th>
+						</tr>
+					</thead>
+					<tbody
+						id="tasks-sortable"
+						uk-sortable="handle: .task-drag-handle"
+						hx-trigger="taskMoved"
+						hx-post=""
+						hx-push-url="false"
+						hx-target="this"
+						hx-swap="none"
+						hx-history="false"
+						data-task-order-action
+						hx-include="#task-list-context"
+						_={ fmt.Sprintf(`
+									init
+										htmx.process(me)
+										set :taskOrders to [] as Array
+									end
+									on start
+										repeat for el in <tr[data-sortable]/>
+											append el@data-order to :taskOrders
+										end
+									end
+									on moved
+										set taskID to event.detail[1]@data-task-id
+										set currentOrder to event.detail[1]@data-order
+										for x in <tr[data-sortable]/> index i
+											if x@data-task-id is taskID
+												set newOrder to :taskOrders[i]
+												break
+											end
+										end
+										set url to '%s' + '/tasks/' + taskID + '/movefrom/' + currentOrder + '/to/' + newOrder
+										set @data-task-id to taskID
+											set @hx-post to url
+										htmx.process(me)
+										send taskMoved to me
+								    end
+									on stop
+										set :taskOrders to [] as Array
+									end
+								`,string(templ.URL(partials.GetNavigationUrl(info,"")))) }
+					>
+						for index, t := range tasks {
+							<tr class="profile-task-row" data-sortable data-task-id={ t.ID } data-order={ t.Order } hx-history="false">
+								<td class="items-center !align-middle my-10">
+									<div class="flex gap-4 items-center !align-middle">
+										@icons.Move(templ.Attributes{"class": "task-drag-handle uk-sortable-handle h-5 w-5"})
+										@TaskTypeIcon(t.Type.String())
+										@TaskAgentIcon(t.AgentType.String())
+									</div>
+								</td>
+								<td class="items-center !align-middle">{ t.Version }</td>
+								<td class="items-center !align-middle">
+									@TaskStatusIndicator(t.ID, t.Disabled, false)
+								</td>
+								<td
+									class="items-center !align-middle"
+								>
+									<a
+										id={ fmt.Sprintf("task-name-%d", t.ID) }
+										href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", t.ID))) }
+										hx-get={ string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", t.ID)))) }
+										hx-push-url="true"
+										hx-target="#main"
+										hx-swap="outerHTML"
+										class="underline hover:cursor-pointer"
+									>{ t.Name }</a>
+								</td>
+								<td class="items-center !align-middle">
+									switch t.Type {
+										case task.TypeWingetInstall, task.TypeWingetDelete, task.TypeFlatpakInstall, task.TypeFlatpakUninstall, task.TypeBrewFormulaInstall, task.TypeBrewFormulaUninstall, task.TypeBrewFormulaUpgrade, task.TypeBrewCaskInstall, task.TypeBrewCaskUninstall, task.TypeBrewCaskUpgrade:
+											<span>{ t.PackageName + " " + t.PackageVersion }</span>
+										case task.TypeAddRegistryKey, task.TypeRemoveRegistryKey, task.TypeUpdateRegistryKeyDefaultValue:
+											<span>{ t.RegistryKey }</span>
+										case task.TypeAddRegistryKeyValue, task.TypeRemoveRegistryKeyValue:
+											<span>{ t.RegistryKey + " <- " + t.RegistryKeyValueName }</span>
+										case task.TypeAddLocalUser, task.TypeRemoveLocalUser, task.TypeAddUnixLocalUser, task.TypeRemoveUnixLocalUser:
+											<span>{ t.LocalUserUsername }</span>
+										case task.TypeAddLocalGroup, task.TypeAddUnixLocalGroup:
+											if t.LocalGroupMembers != "" {
+												<span>{ t.LocalGroupName + " <- " + t.LocalGroupMembers }</span>
+											} else {
+												<span>{ t.LocalGroupName }</span>
+											}
+										case task.TypeRemoveLocalGroup, task.TypeRemoveUnixLocalGroup:
+											<span>{ t.LocalGroupName }</span>
+										case task.TypeAddUsersToLocalGroup:
+											<span>{ t.LocalGroupName + " <- " + t.LocalGroupMembersToInclude }</span>
+										case task.TypeRemoveUsersFromLocalGroup:
+											<span>{ t.LocalGroupName + " - x - " + t.LocalGroupMembersToExclude }</span>
+										case task.TypeMsiInstall, task.TypeMsiUninstall:
+											<span>{ t.MsiProductid }</span>
+										case task.TypePowershellScript:
+											<span>{ i18n.T(ctx, "tasks.powershell_subtype") }</span>
+										case task.TypeUnixScript:
+											<span>{ i18n.T(ctx, "tasks.unix_script_subtype") }</span>
+										default:
+											<span>-</span>
+									}
+								</td>
+								<td class="items-center !align-middle">
+									@partials.MoreButton(index)
+									<div class="uk-drop uk-dropdown" uk-dropdown="mode: click">
+										<ul class="uk-dropdown-nav uk-nav">
+											@TaskOrderActions(t, p, info)
+											<li>
+												@TaskStatusAction(t, p, info, "")
+											</li>
+											<li>
+												<a
+													hx-get={ string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/clone", t.ID)))) }
+													hx-target="#main"
+													hx-swap="outerHTML"
+													hx-push-url="true"
+													class="flex items-center gap-2 py-2 px-4"
+												><uk-icon hx-history="false" icon="copy" custom-class="h-5 w-5 mx-auto" uk-cloack></uk-icon>{ i18n.T(ctx, "tasks.clone.title") }</a>
+											</li>
+											<li>
+												<a
+													hx-get={ string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/confirm-delete/%d", profileID, t.ID)))) }
+													hx-target="#main"
+													hx-swap="outerHTML"
+													hx-push-url="false"
+													class="flex items-center gap-2 py-2 px-4"
+												><uk-icon hx-history="false" icon="trash-2" custom-class="h-5 w-5 mx-auto text-red-600" uk-cloack></uk-icon>{ i18n.T(ctx, "Delete") }</a>
+											</li>
+										</ul>
+									</div>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			@partials.Pagination(c, p, "get", "#profile-task-list", "outerHTML", string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/tasks", profileID)))), itemsPerPage)
+		}
+	</section>
+}

@@ -198,6 +198,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		exerciseProfileCreationScope(t, h, e, ctx, tenantID, siteID)
 		exerciseProfileCloningScope(t, h, e, ctx, tenantID, siteID)
 		exerciseTaskStatusScope(t, h, e, ctx, tenantID, siteID)
+		exerciseTaskOrderScope(t, h, e, ctx, tenantID, siteID)
 	})
 	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
 		var before, after int

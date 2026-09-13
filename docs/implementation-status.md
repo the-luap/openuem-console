@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task ordering](task-order.md) now holds current server authority,
+  exact profile audience and task ownership through an atomic scoped reorder and
+  audit. Stale starting positions conflict; zero, tied, gapped and NULL stored
+  orders have deterministic display positions. Editor GETs no longer write
+  order values. Scoped, audited task-list reads select bounded display columns
+  without scripts or credentials. Native up/down buttons and the dedicated drag
+  handle refresh only the task region, follow moves across pages and preserve
+  unsaved metadata and focus. Failed drags restore the server order. The full
+  inventory PostgreSQL/race suite passes in 71.781 seconds and the full audit
+  suite in 13.009 seconds. Registered Apple/OIDC routes, affected macOS/Linux
+  race checks and full Linux builds pass. All 36 focused browser cases pass;
+  the final complete 1,536-case Chrome matrix passes in 89.560 seconds. The
+  corrected mobile page-size control was visually inspected. Other task
+  mutations, broader editor read authorization, delegated access and physical
+  or provider acceptance remain open.
 - [Legacy task status](task-status.md) now changes only the disabled flag with
   current server authority, exact profile audience, locked/rechecked task
   ownership and an atomic scoped audit receipt. The registered-route baseline
@@ -72,8 +87,9 @@ the table's package summaries do not remove any detail from the roadmap.
   passes in 72.363 seconds and the full audit suite in 13.666 seconds. Registered
   Apple/OIDC routes, affected macOS/Linux race checks and full Linux builds pass.
   All 18 focused browser cases pass; the final complete 1,500-case Chrome matrix
-  passes in 85.856 seconds. Task reordering and legacy GET order initialization,
-  other task mutations, delegated access and device acceptance remain open.
+  passes in 85.856 seconds. Ordering and read-only list pagination are covered
+  by the later task-order change above. Other task mutations, delegated access
+  and device acceptance remain open.
 - [Legacy profile cloning](profile-cloning.md) now holds current server
   authority, the complete source audience and tasks, and the destination parent
   through one profile/task/association/audit transaction. The actual route

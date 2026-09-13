@@ -1,4 +1,10 @@
 en:
+  task_order:
+    invalid: "Choose a valid task position or page."
+    changed: "The task order changed. Refresh the list and try again."
+    not_found: "The task or profile is no longer available in this scope."
+    denied: "Only a server administrator can manage legacy task order."
+    unavailable: "The task order result is unavailable. Refresh the list before trying again."
   task_status:
     invalid: "Reopen the profile and choose the task status action again."
     not_found: "The task is no longer in a profile in this scope."
