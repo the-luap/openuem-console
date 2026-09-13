@@ -19,12 +19,16 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/computers/:uuid/tasks", "/computers/:uuid/execution", "/computers/:uuid/execution/review", "/computers/:uuid/execution/:request":
+			return access.ManageProfiles, true
 		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os", "/computers/:uuid/inventory/peripherals", "/computers/:uuid/monitors", "/computers/:uuid/printers", "/computers/:uuid/inventory/memory", "/computers/:uuid/inventory/shares", "/computers/:uuid/shares", "/computers/:uuid/inventory/security", "/security/:uuid/updates":
 			return access.ReadDevices, true
 		}
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
+			return access.ManageProfiles, true
 		case "/computers/:uuid/refresh", "/agents/:uuid/forcereport":
 			return access.RefreshDevices, true
 		case "/desktop/setup":
@@ -58,6 +62,11 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 		g.POST("/desktop/invitations/:id/revoke", h.DesktopRevokeInvitation)
 		g.POST("/desktop/identities/:id/revoke", h.DesktopRevokeIdentity)
 	}
+	manual := e.Group("/tenant/:tenant/site/:site/computers/:uuid/execution", h.IsAuthenticated, h.AppleCSRF)
+	manual.GET("", h.DesktopExecutionChoices)
+	manual.GET("/review", h.DesktopExecutionReview)
+	manual.POST("", h.DesktopExecutionRequest)
+	manual.GET("/:request", h.DesktopExecutionReceipt)
 }
 
 func (h *Handler) desktopInfo(c echo.Context) (*partials.CommonInfo, registry.Scope, error) {

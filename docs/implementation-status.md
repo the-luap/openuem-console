@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reviewed manual desktop execution](manual-desktop-execution.md) now provides
+  current server/site/source authorization, bounded choices, native confirmation,
+  durable UUID-bound intent and one independently recorded delivery attempt.
+  Recovery does not repeat attempted changing commands. Individual identities,
+  restart, retention and held source/authority have PostgreSQL/race coverage.
+  Former direct execution URLs require the reviewed envelope. Computer task
+  history uses bounded audited snapshots without task definitions, provider reads
+  or broker probes. Full inventory/audit suites pass in 125.326/11.377 seconds;
+  registered Apple/OIDC routes, affected macOS/Linux race suites and the full
+  Linux build pass. All 63 focused and 2,007 total browser cases pass; the full
+  matrix takes 109.155 seconds. Mobile views were inspected. Agent acceptance is distinct from execution; profiles still
+  retrieve current configuration later. Immutable execution and physical/provider
+  acceptance remain open.
 - [Scoped profile report history](profile-issues.md) now reads exact authorized
   profiles and issue parents without deleting unrelated orphan records on GET.
   Summaries exclude task definitions and output; independent 25-report detail
@@ -70,8 +83,8 @@ the table's package summaries do not remove any detail from the roadmap.
   restore heading focus. Full inventory/audit PostgreSQL race suites pass in
   85.605/9.399 seconds; registered Apple/OIDC routes, affected macOS/Linux race
   checks, the full Linux build and 72 focused Chrome cases pass. The complete
-  1,944-case Chrome matrix passes in 95.094 seconds. Dispatch,
-  package/provider/settings routes, broader secret lifecycle, immutable revisions
+  1,944-case Chrome matrix passes in 95.094 seconds. Manual dispatch is covered
+  by the later change above. Package/provider/settings routes, broader secret lifecycle, immutable revisions
   and physical/provider acceptance remain open.
 - [Scoped legacy profile editor](profile-editor.md) now reads current authorized
   metadata, bounded task summaries and independent tag pages in one audited
@@ -85,8 +98,8 @@ the table's package summaries do not remove any detail from the roadmap.
   PostgreSQL race suites pass in 81.881/9.430 seconds; registered Apple/OIDC
   routes, affected macOS/Linux race checks and the full Linux build pass. All
   117 focused browser cases pass; the complete 1,872-case Chrome matrix passes
-  in 93.704 seconds. Profile issue reads, dispatch,
-  package/provider/settings routes, broader secret lifecycle, immutable revisions
+  in 93.704 seconds. Profile issue reads and manual dispatch are covered by
+  later changes above. Package/provider/settings routes, broader secret lifecycle, immutable revisions
   and physical/provider acceptance remain open.
 - [Legacy task editing](task-editing.md) now holds current authority, exact
   profile scope, reviewed ownership and the submitted version through an atomic
@@ -100,9 +113,9 @@ the table's package summaries do not remove any detail from the roadmap.
   registered Apple/OIDC routes, affected macOS/Linux race checks and the full
   Linux build pass. All 108 focused browser cases pass; the complete 1,755-case
   Chrome matrix passes in 92.125 seconds. Mobile views were visually inspected.
-  Profile issue reads, one-off dispatch, package/provider routes, wider
-  secret lifecycle, immutable revisions and physical/provider acceptance remain
-  open.
+  Profile issue reads and manual dispatch are covered by later changes above.
+  Package/provider routes, wider secret lifecycle, immutable revisions and
+  physical/provider acceptance remain open.
 - [Task form lookups](task-wizard.md) now retain the exact destination profile
   and scope through every selector stage, current server authorization and audit
   commit. Old global lookups return a reload instruction. NetBird reads use the

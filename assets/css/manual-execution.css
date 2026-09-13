@@ -1,0 +1,28 @@
+.manual-execution { min-width: 0; margin: 1rem; }
+.manual-execution .uk-card-body { display: grid; gap: 1.25rem; min-width: 0; }
+.manual-execution p, .manual-execution dd, .manual-execution h1, .manual-execution a { overflow-wrap: anywhere; }
+.manual-details { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: .5rem 1rem; margin: 0; }
+.manual-details dt { font-weight: 600; }
+.manual-details dd { margin: 0; min-width: 0; }
+.manual-search, .manual-select, .manual-confirm { display: grid; gap: .75rem; min-width: 0; }
+.manual-search label, .manual-select label { font-weight: 600; }
+.manual-execution select, .manual-execution input[type=search] { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 2.75rem; }
+.manual-execution button, .manual-execution .uk-button { min-height: 2.75rem; height: auto; white-space: normal; }
+.manual-checkbox { display: flex; align-items: flex-start; gap: .75rem; cursor: pointer; }
+.manual-checkbox input { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; margin-top: .125rem; }
+.manual-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.manual-impact { border: 1px solid currentColor; border-radius: .5rem; padding: 1rem; display: grid; gap: .75rem; }
+.manual-state { font-weight: 600; }
+.manual-execution [disabled] { cursor: wait; opacity: .65; }
+.manual-execution :focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (min-width: 768px) {
+  .manual-search { grid-template-columns: minmax(8rem,1fr) minmax(0,3fr); align-items: center; }
+  .manual-search button { grid-column: 2; justify-self: start; }
+  .manual-select button { justify-self: start; }
+}
+@media (max-width: 500px) {
+  .manual-details { grid-template-columns: minmax(0,1fr); gap: .25rem; }
+  .manual-details dd { margin-bottom: .75rem; }
+  .manual-execution { margin: .75rem; }
+}
+.manual-output { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; min-width: 0; padding: .75rem; border: 1px solid currentColor; border-radius: .25rem; }

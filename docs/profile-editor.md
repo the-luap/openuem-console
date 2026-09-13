@@ -109,6 +109,7 @@ full Linux build pass. The complete 1,872-case Chrome matrix passes in 93.704
 seconds.
 
 [Profile report history](profile-issues.md) now has scoped, bounded read paths
-that retain orphan records. One-off dispatch, package/provider/settings routes, broader
+that retain orphan records. [Manual execution](manual-desktop-execution.md) now
+requires review and a durable single-attempt request. Package/provider/settings routes, broader
 secret lifecycle, immutable revisions, delegated legacy permissions and
 physical/provider acceptance remain open in the expanded roadmap.

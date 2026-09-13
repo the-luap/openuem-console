@@ -21,6 +21,8 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+  ...["normal","empty","missing","disabled","long"].map(kind=>"desktop-task-history-"+kind),
+  ...["choices-task","choices-profile","choices-empty","choices-pending","choices-long","review-task","review-profile","review-long","queued","sending","accepted","rejected","stopped","unconfirmed"].map(kind=>"manual-execution-"+kind),
   ...["global","organization","site"].map(scope=>`task-order-${scope}`),
   ...["global","organization","site"].map(scope=>`profile-creation-${scope}`),
   ...["global","organization","site"].map(scope=>`profile-cloning-${scope}`),

@@ -174,6 +174,12 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
+				limit = 8192
+				if c.Request().ContentLength > limit {
+					return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form is too large")
+				}
+
 			case "/ios/update-plans/:plan/group-assignments/:assignment/promotions", "/ios/update-plans/:plan/group-assignments", "/ios/update-plans/:plan/schedules":
 				limit = 16 << 10
 			case "/ios/configurations/:id/assign":
@@ -197,6 +203,16 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 				limit = 8192
 			}
 			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
+			if route := appleRoute(c.Path()); route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" {
+				if err := c.Request().ParseForm(); err != nil {
+					var oversized *http.MaxBytesError
+					if errors.As(err, &oversized) {
+						return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form is too large")
+					}
+					return echo.NewHTTPError(http.StatusBadRequest, "Invalid form")
+				}
+			}
+
 			expected, _ := c.Get("csrf").(string)
 			if expected == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(c.FormValue("csrf"))) != 1 {
 				return echo.NewHTTPError(http.StatusForbidden, "Invalid CSRF token")

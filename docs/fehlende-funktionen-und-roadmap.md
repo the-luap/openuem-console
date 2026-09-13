@@ -549,6 +549,15 @@ formats and physical installation, removal, offline, restart and hibernate
 acceptance remain open. Synthetic boot fixtures do not
 satisfy those physical acceptance gates.
 
+[Manual desktop execution](manual-desktop-execution.md) now uses current
+server/site/source checks, native confirmation, durable UUID-bound admission and
+one independently recorded delivery attempt. Recovery does not repeat an
+attempted changing command. Bounded task history replaces the old configuration
+graph and cross-organization selectors. Owned PostgreSQL, broker, registered
+route and responsive browser fixtures cover these paths. Agent acceptance is
+not execution proof; profiles retrieve current configuration later. Immutable
+profile execution and physical/provider acceptance remain open.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.

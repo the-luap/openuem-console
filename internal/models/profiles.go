@@ -81,8 +81,3 @@ func (m *Model) GetProfilesByPage(p partials.PaginationAndSort, c *partials.Comm
 	}
 	return profiles, nil
 }
-
-func (m *Model) GetProfileById(profileId int, c *partials.CommonInfo) (*ent.Profile, error) {
-
-	return m.Client.Profile.Query().WithTags().WithTasks().WithIssues().Where(profile.ID(profileId)).First(context.Background())
-}

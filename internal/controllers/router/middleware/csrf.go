@@ -91,7 +91,7 @@ func scopedFormLimit(path string) int64 {
 	if route == "/tasks/:profile/new" || route == "/tasks/:id" {
 		return 256 << 10
 	}
-	if route == "/tasks/:id/clone" || route == "/tasks/:id/moveup/:order" || route == "/tasks/:id/movedown/:order" || route == "/tasks/:id/movefrom/:from/to/:to" || route == "/tasks/:id/enable" || route == "/tasks/:id/disable" || route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/:uuid/tags" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
+	if route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" || route == "/tasks/:id/clone" || route == "/tasks/:id/moveup/:order" || route == "/tasks/:id/movedown/:order" || route == "/tasks/:id/movefrom/:from/to/:to" || route == "/tasks/:id/enable" || route == "/tasks/:id/disable" || route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/:uuid/tags" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
 		return 8192
 	}
 	if route == "/ios/update-plans/:plan/group-assignments/:assignment/promotions" || route == "/ios/update-plans/:plan/group-assignments/:assignment/removals" || route == "/ios/update-plans/:plan/group-assignments" || route == "/ios/update-plans/:plan/schedules" {

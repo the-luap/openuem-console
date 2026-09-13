@@ -104,7 +104,8 @@ matrix passes in 92.125 seconds.
 
 [Scoped profile editor reads](profile-editor.md) now cover metadata and bounded
 task/tag projections, and [profile history](profile-issues.md) now retains orphan
-records through scoped, bounded reads. One-off task dispatch, package search and
+records through scoped, bounded reads. [Manual task/profile dispatch](manual-desktop-execution.md)
+now requires confirmation and durable single-attempt evidence. Package search and
 other provider/settings routes, SSH-passphrase encryption/migration, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.

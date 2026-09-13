@@ -95,6 +95,7 @@ matrix passes in 95.094 seconds.
 
 These reads preserve the records that currently exist. They do not introduce
 immutable execution history or alter worker report updates and task-deletion
-semantics. One-off dispatch, package/provider/settings routes, wider secret
+semantics. [Reviewed manual dispatch and computer task history](manual-desktop-execution.md)
+now have separate guarded paths. Package/provider/settings routes, wider secret
 lifecycle, immutable revisions, delegated legacy access and physical/provider
 acceptance remain open in the expanded roadmap.

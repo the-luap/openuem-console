@@ -18,5 +18,8 @@ templ InventoryNavigation(info *partials.CommonInfo, id, active string) {
 		<a class={ inventoryLinkClass(active,"memory") } href={ memoryURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"memory") }>{ i18n.T(ctx,"memory_inventory.reported") }</a>
 		<a class={ inventoryLinkClass(active,"shares") } href={ sharesURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"shares") }>{ i18n.T(ctx,"shares_inventory.reported") }</a>
 		<a class={ inventoryLinkClass(active,"security") } href={ securityURL(info,id,"",0) } aria-current={ inventoryCurrent(active,"security") }>{ i18n.T(ctx,"security_inventory.reported") }</a>
+        if info.Principal.IsAdministrator() {
+            <a class={ inventoryLinkClass(active,"tasks") } href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(id)+"/tasks") } aria-current={ inventoryCurrent(active,"tasks") }>{ i18n.T(ctx,"manual_execution.history_title") }</a>
+        }
 	</nav>
 }

@@ -20,14 +20,22 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 	if err = store.Migrate(ctx); err != nil {
 		return err
 	}
+	manual, err := inventory.NewManualExecutionStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.EncryptionMasterKey, w.Handler.PublishManualExecution)
+	if err != nil {
+		return err
+	}
 	w.Handler.InventoryRefresh = store
+	w.Handler.ManualExecution = manual
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
 	w.inventoryDone = make(chan struct{})
 	done := w.inventoryDone
 	go func() {
 		defer close(done)
-		store.Run(run, slog.Default())
+		refreshDone := make(chan struct{})
+		go func() { defer close(refreshDone); store.Run(run, slog.Default()) }()
+		manual.Run(run, slog.Default())
+		<-refreshDone
 	}()
 	return nil
 }

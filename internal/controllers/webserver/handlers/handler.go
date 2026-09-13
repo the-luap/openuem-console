@@ -39,6 +39,7 @@ type Handler struct {
 	Preferences            *preferences.Store
 	Audit                  *audit.Store
 	InventoryRefresh       *inventory.RefreshStore
+	ManualExecution        *inventory.ManualExecutionStore
 	inventoryPublisher     inventoryPublisher
 	PublicOrigin           string
 	Model                  *models.Model

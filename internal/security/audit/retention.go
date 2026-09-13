@@ -133,6 +133,12 @@ func retentionSources(ctx context.Context, tx *sql.Tx, tenant int, windowsEnable
 			predicate += ` AND ` + eligible
 			query += ` WHERE ` + eligible
 		}
+		if source.name == "manual-execution" {
+			// Attempts prevent repeat execution after rollback or restart.
+			eligible := "NOT EXISTS(SELECT 1 FROM uem_manual_execution r WHERE r.id=uem_manual_execution_audit.request_id AND r.status='queued')"
+			predicate += " AND " + eligible
+			query += " WHERE " + eligible
+		}
 		if global {
 			predicate = `$1::bigint=0 AND created_at<$2`
 		}

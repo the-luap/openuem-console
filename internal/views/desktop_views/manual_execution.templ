@@ -1,0 +1,188 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+)
+
+func ManualPath(info *partials.CommonInfo, id string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/execution")
+}
+
+func ManualChoicePath(info *partials.CommonInfo, id, kind, search string) string {
+	return ManualPath(info, id) + "?" + url.Values{"kind": {kind}, "q": {search}}.Encode()
+}
+
+templ manualPage(c echo.Context, info *partials.CommonInfo, id, title string) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "manual_execution.inventory"), Url: partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/inventory")}, {Title: title}}, info)
+	<section class="manual-execution uk-card uk-card-default" hx-history="false" hx-sync="#main:replace">
+		<link rel="stylesheet" href="/assets/css/manual-execution.css"/>
+		<script src="/assets/js/manual-execution.js" defer></script>
+		<div class="uk-card-header">
+			<h1 class="uk-card-title" id="manual-execution-heading" tabindex="-1">{ title }</h1>
+		</div>
+		<div class="uk-card-body">
+			<div id="error" class="hidden"></div>
+			{ children... }
+		</div>
+	</section>
+}
+
+templ manualTarget(target inventory.ManualTarget) {
+	<dl class="manual-details">
+		<dt>{ i18n.T(ctx,"manual_execution.target") }</dt>
+		<dd>{ target.Name }</dd>
+		<dt>{ i18n.T(ctx,"manual_execution.device_id") }</dt>
+		<dd>{ target.ID }</dd>
+		<dt>{ i18n.T(ctx,"manual_execution.platform") }</dt>
+		<dd>{ target.Platform }</dd>
+		<dt>{ i18n.T(ctx,"manual_execution.destination") }</dt>
+		<dd>{ fmt.Sprintf("%d / %d",target.Scope.TenantID,target.Scope.SiteID) }</dd>
+	</dl>
+}
+
+templ ManualChoices(c echo.Context, info *partials.CommonInfo, page *inventory.ManualChoices) {
+	@manualPage(c, info, page.Target.ID, i18n.T(ctx, "manual_execution.title")) {
+		@manualTarget(page.Target)
+		if page.Latest != nil {
+			<aside class="manual-impact">
+				<p>{ i18n.T(ctx,"manual_execution.latest") }</p>
+				<p>
+					if page.Latest.Status=="queued" && page.Latest.AttemptedAt!=nil {
+						{ i18n.T(ctx,"manual_execution.state_sending") }
+					} else {
+						{ i18n.T(ctx,"manual_execution.state_"+page.Latest.Status) }
+					}
+				</p>
+				<a class="uk-link" href={ ManualPath(info, page.Target.ID) + "/" + page.Latest.ID }>{ i18n.T(ctx,"manual_execution.receipt") }</a>
+			</aside>
+		}
+		<p>{ i18n.T(ctx,"manual_execution.choose_help") }</p>
+		<form class="manual-search" method="get" action={ ManualPath(info, page.Target.ID) } hx-get={ ManualPath(info, page.Target.ID) } hx-select="#main" hx-target="#main" hx-swap="outerHTML" hx-push-url="true" hx-disabled-elt="find button">
+			<label for="manual-kind">{ i18n.T(ctx,"manual_execution.kind") }</label>
+			<select class="uk-select" id="manual-kind" name="kind">
+				<option value="task" selected?={ page.Kind=="task" }>{ i18n.T(ctx,"manual_execution.task") }</option>
+				<option value="profile" selected?={ page.Kind=="profile" }>{ i18n.T(ctx,"manual_execution.profile") }</option>
+			</select>
+			<label for="manual-search">{ i18n.T(ctx,"manual_execution.search") }</label>
+			<input class="uk-input" type="search" id="manual-search" name="q" value={ page.Search } maxlength="256"/>
+			<button class="uk-button uk-button-primary" type="submit">{ i18n.T(ctx,"manual_execution.search_button") }</button>
+		</form>
+		if page.Latest!=nil && page.Latest.Status=="queued" {
+			<p role="status">{ i18n.T(ctx,"manual_execution.pending_existing") }</p>
+		} else if len(page.Sources)==0 {
+			<p role="status">{ i18n.T(ctx,"manual_execution.empty") }</p>
+		} else {
+			<form class="manual-select" method="get" action={ ManualPath(info, page.Target.ID) + "/review" } hx-get={ ManualPath(info, page.Target.ID) + "/review" } hx-select="#main" hx-target="#main" hx-swap="outerHTML" hx-push-url="true" hx-disabled-elt="find button">
+				<input type="hidden" name="kind" value={ page.Kind }/>
+				<input type="hidden" name="q" value={ page.Search }/>
+				<label for="manual-source">{ i18n.T(ctx,"manual_execution.source") }</label>
+				<select class="uk-select" id="manual-source" name="source_id" required>
+					<option value="">{ i18n.T(ctx,"manual_execution.select") }</option>
+					for _,source:=range page.Sources {
+						<option value={ strconv.FormatInt(source.ID, 10) }>{ fmt.Sprintf("%s · ID %d · %s",source.Name,source.ID,source.ProfileName) }</option>
+					}
+				</select>
+				<button class="uk-button uk-button-primary" type="submit">{ i18n.T(ctx,"manual_execution.review") }</button>
+			</form>
+		}
+		if page.More && (page.Latest==nil || page.Latest.Status!="queued") {
+			<p role="status">{ i18n.T(ctx,"manual_execution.more") }</p>
+		}
+		<a class="uk-link" href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(page.Target.ID)+"/tasks") }>{ i18n.T(ctx,"manual_execution.reports") }</a>
+	}
+}
+
+templ ManualReview(c echo.Context, info *partials.CommonInfo, review *inventory.ManualReview, requestID, search string) {
+	@manualPage(c, info, review.Target.ID, i18n.T(ctx, "manual_execution.review_title")) {
+		@manualTarget(review.Target)
+		<dl class="manual-details">
+			<dt>{ i18n.T(ctx,"manual_execution.kind") }</dt>
+			<dd>{ i18n.T(ctx,"manual_execution."+review.Source.Kind) }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.source") }</dt>
+			<dd>{ review.Source.Name }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.source_id") }</dt>
+			<dd>{ strconv.FormatInt(review.Source.ID,10) }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.profile") }</dt>
+			<dd>{ fmt.Sprintf("%s · ID %d",review.Source.ProfileName,review.Source.ProfileID) }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.source_scope") }</dt>
+			<dd>{ fmt.Sprintf("%d / %d",review.Source.Scope.TenantID,review.Source.Scope.SiteID) }</dd>
+			if review.Source.Kind=="task" {
+				<dt>{ i18n.T(ctx,"manual_execution.version") }</dt>
+				<dd>{ strconv.Itoa(review.Source.Version) }</dd>
+			} else {
+				<dt>{ i18n.T(ctx,"manual_execution.task_count") }</dt>
+				<dd>{ strconv.Itoa(review.Source.TaskCount) }</dd>
+			}
+		</dl>
+		<div class="manual-impact">
+			<p>{ i18n.T(ctx,"manual_execution.impact") }</p>
+			if review.Source.Kind=="profile" {
+				<p>{ i18n.T(ctx,"manual_execution.profile_current") }</p>
+			}
+			<p>{ i18n.T(ctx,"manual_execution.no_retry") }</p>
+		</div>
+		<form class="manual-confirm" method="post" action={ ManualPath(info, review.Target.ID) } hx-post={ ManualPath(info, review.Target.ID) } hx-target="#main" hx-swap="outerHTML" hx-sync="#main:drop" hx-disabled-elt="#manual-submit, #manual-confirm" hx-indicator="#manual-pending">
+			@mdm_views.CSRF(info)
+			<input type="hidden" name="request_id" value={ requestID }/>
+			<input type="hidden" name="kind" value={ review.Source.Kind }/>
+			<input type="hidden" name="source_id" value={ strconv.FormatInt(review.Source.ID, 10) }/>
+			<input type="hidden" name="revision" value={ review.Source.Revision }/>
+			<label class="manual-checkbox" for="manual-confirm">
+				<input type="checkbox" id="manual-confirm" name="confirmed" value="yes" required/>
+				<span>{ i18n.T(ctx,"manual_execution.confirm") }</span>
+			</label>
+			<div class="manual-actions">
+				<button id="manual-submit" class="uk-button uk-button-primary" type="submit">{ i18n.T(ctx,"manual_execution.submit") }</button>
+				<a class="uk-button uk-button-default" href={ ManualChoicePath(info, review.Target.ID, review.Source.Kind, search) }>{ i18n.T(ctx,"manual_execution.cancel") }</a>
+				<span class="htmx-indicator" id="manual-pending" role="status">{ i18n.T(ctx,"manual_execution.pending") }</span>
+			</div>
+		</form>
+	}
+}
+
+templ ManualReceipt(c echo.Context, info *partials.CommonInfo, request *inventory.ManualRequest) {
+	@manualPage(c, info, request.DeviceID, i18n.T(ctx, "manual_execution.receipt")) {
+		<p role="status" class="manual-state">
+			if request.Status=="queued" && request.AttemptedAt!=nil {
+				{ i18n.T(ctx,"manual_execution.state_sending") }
+			} else {
+				{ i18n.T(ctx,"manual_execution.state_"+request.Status) }
+			}
+		</p>
+		<p>{ i18n.T(ctx,"manual_execution.acceptance") }</p>
+		if request.Reason!="" {
+			<p>{ i18n.T(ctx,"manual_execution.reason_"+request.Reason) }</p>
+		}
+		<dl class="manual-details">
+			<dt>{ i18n.T(ctx,"manual_execution.request_id") }</dt>
+			<dd>{ request.ID }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.device_id") }</dt>
+			<dd>{ request.DeviceID }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.destination") }</dt>
+			<dd>{ fmt.Sprintf("%d / %d",request.Scope.TenantID,request.Scope.SiteID) }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.source") }</dt>
+			<dd>{ fmt.Sprintf("%s · ID %d",i18n.T(ctx,"manual_execution."+request.Kind),request.SourceID) }</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.requested") }</dt>
+			<dd>
+				@mdm_views.Timestamp(&request.RequestedAt)
+			</dd>
+			<dt>{ i18n.T(ctx,"manual_execution.finished") }</dt>
+			<dd>
+				@mdm_views.Timestamp(request.FinishedAt)
+			</dd>
+		</dl>
+		<div class="manual-actions">
+			<a class="uk-button uk-button-default" href={ ManualPath(info, request.DeviceID) + "/" + request.ID } hx-get={ ManualPath(info, request.DeviceID) + "/" + request.ID } hx-select="#main" hx-target="#main" hx-swap="outerHTML" hx-push-url="false">{ i18n.T(ctx,"manual_execution.refresh") }</a>
+			<a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(request.DeviceID)+"/tasks") }>{ i18n.T(ctx,"manual_execution.reports") }</a>
+			<a class="uk-link" href={ ManualChoicePath(info, request.DeviceID, request.Kind, "") }>{ i18n.T(ctx,"manual_execution.choose_again") }</a>
+		</div>
+		<p>{ i18n.T(ctx,"manual_execution.no_retry") }</p>
+	}
+}
