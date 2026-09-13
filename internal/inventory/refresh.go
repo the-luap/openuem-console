@@ -99,6 +99,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		{"netbirds", "uem_netbird_installation_binding", 29},
 		{"uem_netbird_operation_attempts", "uem_netbird_attempt_immutable", 27},
 		{"uem_netbird_operations", "uem_netbird_operation_immutable", 27},
+		{"uem_netbird_operations", "uem_netbird_wire_receipt", 23},
 	} {
 		var valid bool
 		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid=pg_catalog.to_regclass($1) AND tgname=$2 AND tgtype=$3 AND tgenabled IN ('O','A') AND tgfoid=pg_catalog.to_regprocedure($2||'()'))`, guard.table, guard.name, guard.kind).Scan(&valid); err != nil {

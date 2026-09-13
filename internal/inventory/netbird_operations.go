@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/open-uem/nats/netbirdcommand"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
@@ -16,25 +17,24 @@ var (
 	ErrNetbirdOperationInvalid  = errors.New("invalid NetBird operation")
 	ErrNetbirdOperationChanged  = errors.New("NetBird operation source changed")
 	ErrNetbirdOperationConflict = errors.New("NetBird operation conflicts with a recorded request")
+	ErrNetbirdOperationNotReady = errors.New("NetBird execution journal is not ready")
 )
 
 // NetbirdOperationCommand is a single, expiring command. Revision binds the
 // reviewed device generation, organization configuration and selected profile.
 // It contains no provider token or setup key.
-type NetbirdOperationCommand struct {
-	RequestID, DeviceID, Revision, Operation, Profile string
-	RequestedAt, ExpiresAt                            time.Time
-}
+type NetbirdOperationCommand = netbirdcommand.Command
 
 // A successful result must correlate with the complete command identity. An
 // empty broker acknowledgement is not execution evidence. Success describes
 // this command, not the lasting connection state or provider peer ownership.
 type NetbirdOperationResult struct {
-	RequestID string `json:"request_id"`
-	DeviceID  string `json:"device_id"`
-	Revision  string `json:"revision"`
-	Operation string `json:"operation"`
-	Success   bool   `json:"success"`
+	RequestID   string `json:"request_id"`
+	DeviceID    string `json:"device_id"`
+	Revision    string `json:"revision"`
+	Operation   string `json:"operation"`
+	Success     bool   `json:"success"`
+	CommandHash string `json:"command_hash,omitempty"`
 }
 
 // NetbirdOperationExecutor must honor cancellation, refuse expired commands,
@@ -42,19 +42,24 @@ type NetbirdOperationResult struct {
 // Legacy NetBird subjects and empty replies do not satisfy this contract.
 type NetbirdOperationExecutor func(context.Context, NetbirdOperationCommand) (*NetbirdOperationResult, error)
 
+// NetbirdOperationInspector performs a fresh, correlated read-only agent query.
+// Inventory reports and legacy acknowledgements cannot establish readiness.
+type NetbirdOperationInspector func(context.Context, netbirdcommand.Identity) (netbirdcommand.State, error)
+
 type NetbirdOperationStore struct {
 	db          *sql.DB
 	permissions *access.Store
 	individual  bool
 	execute     NetbirdOperationExecutor
+	inspect     NetbirdOperationInspector
 	wake        chan struct{}
 }
 
-func NewNetbirdOperationStore(db *sql.DB, permissions *access.Store, individual bool, execute NetbirdOperationExecutor) (*NetbirdOperationStore, error) {
-	if db == nil || permissions == nil || execute == nil || db.Stats().MaxOpenConnections == 1 {
+func NewNetbirdOperationStore(db *sql.DB, permissions *access.Store, individual bool, inspect NetbirdOperationInspector, execute NetbirdOperationExecutor) (*NetbirdOperationStore, error) {
+	if db == nil || permissions == nil || inspect == nil || execute == nil || db.Stats().MaxOpenConnections == 1 {
 		return nil, ErrNetbirdOperationInvalid
 	}
-	return &NetbirdOperationStore{db: db, permissions: permissions, individual: individual, execute: execute, wake: make(chan struct{}, 1)}, nil
+	return &NetbirdOperationStore{db: db, permissions: permissions, individual: individual, inspect: inspect, execute: execute, wake: make(chan struct{}, 1)}, nil
 }
 
 type NetbirdOperation struct {
@@ -65,16 +70,18 @@ type NetbirdOperation struct {
 	FinishedAt, AttemptedAt, ReleasedAt                               *time.Time
 	ReleasedBy                                                        string
 	Result                                                            *NetbirdOperationResult
+	CommandHash                                                       string
+	CommandExpiresAt                                                  *time.Time
 }
 
-const netbirdOperationColumns = `r.id,r.device_id,r.tenant_id,r.site_id,r.actor,r.individual,r.operation,r.profile,r.revision,r.status,r.reason,r.requested_at,r.expires_at,r.finished_at,r.released_at,r.released_by,r.result,(SELECT created_at FROM uem_netbird_operation_attempts WHERE request_id=r.id)`
+const netbirdOperationColumns = `r.id,r.device_id,r.tenant_id,r.site_id,r.actor,r.individual,r.operation,r.profile,r.revision,r.status,r.reason,r.requested_at,r.expires_at,r.finished_at,r.released_at,r.released_by,r.result,(SELECT created_at FROM uem_netbird_operation_attempts WHERE request_id=r.id),coalesce((SELECT command_hash FROM uem_netbird_operation_attempts WHERE request_id=r.id),''),(SELECT command_expires_at FROM uem_netbird_operation_attempts WHERE request_id=r.id)`
 
 func scanNetbirdOperation(row interface{ Scan(...any) error }) (*NetbirdOperation, error) {
 	r := &NetbirdOperation{}
-	var finished, attempted, released sql.NullTime
+	var finished, attempted, released, commandExpires sql.NullTime
 	var releasedBy sql.NullString
 	var result []byte
-	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Individual, &r.Operation, &r.Profile, &r.Revision, &r.Status, &r.Reason, &r.RequestedAt, &r.ExpiresAt, &finished, &released, &releasedBy, &result, &attempted)
+	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Individual, &r.Operation, &r.Profile, &r.Revision, &r.Status, &r.Reason, &r.RequestedAt, &r.ExpiresAt, &finished, &released, &releasedBy, &result, &attempted, &r.CommandHash, &commandExpires)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +95,9 @@ func scanNetbirdOperation(row interface{ Scan(...any) error }) (*NetbirdOperatio
 		r.ReleasedAt = &released.Time
 	}
 	r.ReleasedBy = releasedBy.String
+	if commandExpires.Valid {
+		r.CommandExpiresAt = &commandExpires.Time
+	}
 	if len(result) > 0 {
 		if err = json.Unmarshal(result, &r.Result); err != nil {
 			return nil, err
@@ -202,13 +212,19 @@ func netbirdAttempt(ctx context.Context, tx *sql.Tx, r *NetbirdOperation) error 
 	// Read after acquiring the request lock. A receipt committed while that lock
 	// was being acquired may be newer than the locking SELECT's MVCC snapshot.
 	var at time.Time
-	err := tx.QueryRowContext(ctx, `SELECT created_at FROM uem_netbird_operation_attempts WHERE request_id=$1`, r.ID).Scan(&at)
+	var expires sql.NullTime
+	err := tx.QueryRowContext(ctx, `SELECT created_at,coalesce(command_hash,''),command_expires_at FROM uem_netbird_operation_attempts WHERE request_id=$1`, r.ID).Scan(&at, &r.CommandHash, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		r.AttemptedAt = nil
+		r.CommandHash, r.CommandExpiresAt = "", nil
 		return nil
 	}
 	if err == nil {
 		r.AttemptedAt = &at
+		r.CommandExpiresAt = nil
+		if expires.Valid {
+			r.CommandExpiresAt = &expires.Time
+		}
 	}
 	return err
 }
@@ -365,7 +381,11 @@ func (s *NetbirdOperationStore) Release(parent context.Context, actor string, sc
 	return tx.Commit()
 }
 
-func (s *NetbirdOperationStore) recordAttempt(ctx context.Context, r *NetbirdOperation) error {
+func (s *NetbirdOperationStore) recordAttempt(ctx context.Context, r *NetbirdOperation, c NetbirdOperationCommand) error {
+	digest, err := c.Digest()
+	if err != nil {
+		return ErrNetbirdOperationInvalid
+	}
 	// No foreign key to the locked request: this transaction must commit before
 	// any external side effect, even when the outer transaction later rolls back.
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -373,7 +393,7 @@ func (s *NetbirdOperationStore) recordAttempt(ctx context.Context, r *NetbirdOpe
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_netbird_operation_attempts(request_id,device_id,tenant_id,site_id,actor,operation,revision) VALUES($1,$2,$3,$4,$5,$6,$7)`, r.ID, r.DeviceID, r.Scope.TenantID, r.Scope.SiteID, r.Actor, r.Operation, r.Revision); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO uem_netbird_operation_attempts(request_id,device_id,tenant_id,site_id,actor,operation,revision,command_hash,command_expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, r.ID, r.DeviceID, r.Scope.TenantID, r.Scope.SiteID, r.Actor, r.Operation, r.Revision, digest, c.ExpiresAt); err != nil {
 		return err
 	}
 	if err = netbirdOperationAudit(ctx, tx, r, r.Actor, "attempt", "recorded"); err != nil {
@@ -420,7 +440,7 @@ func (s *NetbirdOperationStore) DispatchOne(parent context.Context) (bool, error
 		return true, err
 	}
 	source, err := s.source(ctx, tx, r.Scope, r.DeviceID, r.Operation, r.Profile)
-	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrRefreshNotReady) || errors.Is(err, ErrManualUnsupported) || errors.Is(err, ErrNetbirdOperationChanged) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrRefreshNotReady) || errors.Is(err, ErrManualUnsupported) || errors.Is(err, ErrNetbirdOperationChanged) || errors.Is(err, ErrNetbirdOperationNotReady) {
 		return stop("source_changed")
 	}
 	if err != nil {
@@ -435,15 +455,19 @@ func (s *NetbirdOperationStore) DispatchOne(parent context.Context) (bool, error
 	if !time.Now().Before(r.ExpiresAt) {
 		return stop("expired")
 	}
-	if err = s.recordAttempt(ctx, r); err != nil {
-		return true, err
-	}
 	expiresAt := r.ExpiresAt
 	if !source.identityExpiresAt.IsZero() && source.identityExpiresAt.Before(expiresAt) {
 		expiresAt = source.identityExpiresAt
 	}
+	command := NetbirdOperationCommand{Version: netbirdcommand.Version, Identity: source.identity, RequestID: r.ID, Revision: r.Revision, Operation: r.Operation, Profile: r.Profile, ManagementURL: source.ManagementURL, IssuedAt: r.RequestedAt, ExpiresAt: expiresAt}
+	digest, err := command.Digest()
+	if err != nil {
+		return stop("source_changed")
+	}
+	if err = s.recordAttempt(ctx, r, command); err != nil {
+		return true, err
+	}
 	commandCtx, cancelCommand := context.WithDeadline(ctx, expiresAt)
-	command := NetbirdOperationCommand{RequestID: r.ID, DeviceID: r.DeviceID, Revision: r.Revision, Operation: r.Operation, Profile: r.Profile, RequestedAt: r.RequestedAt, ExpiresAt: expiresAt}
 	var result *NetbirdOperationResult
 	// Do not enter the executor after a slow receipt commit consumes its lifetime.
 	if commandCtx.Err() == nil {
@@ -456,7 +480,7 @@ func (s *NetbirdOperationStore) DispatchOne(parent context.Context) (bool, error
 	if ctx.Err() != nil {
 		return true, ctx.Err()
 	}
-	if err == nil && commandErr == nil && result != nil && result.Success && result.RequestID == r.ID && result.DeviceID == r.DeviceID && result.Revision == r.Revision && result.Operation == r.Operation {
+	if err == nil && commandErr == nil && result != nil && result.Success && result.RequestID == r.ID && result.DeviceID == r.DeviceID && result.Revision == r.Revision && result.Operation == r.Operation && result.CommandHash == digest {
 		return true, finishNetbirdOperation(ctx, tx, r, r.Actor, "completed", "", result)
 	}
 	return true, finishNetbirdOperation(ctx, tx, r, r.Actor, "unconfirmed", "delivery_unconfirmed", nil)

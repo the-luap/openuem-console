@@ -42,6 +42,7 @@ type Handler struct {
 	Audit                  *audit.Store
 	InventoryRefresh       *inventory.RefreshStore
 	ManualExecution        *inventory.ManualExecutionStore
+	NetbirdOperations      *inventory.NetbirdOperationStore
 	inventoryPublisher     inventoryPublisher
 	PublicOrigin           string
 	Model                  *models.Model

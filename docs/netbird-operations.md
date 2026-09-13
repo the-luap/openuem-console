@@ -1,11 +1,12 @@
 # Durable NetBird operation storage
 
 The inventory package provides an admission and recovery store for `up`, `down`
-and `switchprofile`. This is a backend foundation: the legacy HTTP handlers and
-agent subscriptions do not use it yet. A compatible agent command protocol,
-durable agent journal and reviewed console flow are required before enabling
-production dispatch. An empty reply from a legacy NetBird subject cannot be
-adapted into a successful execution receipt.
+and `switchprofile`. The webserver now initializes and joins its dispatcher,
+with a versioned direct publisher and mandatory live journal inspection. Legacy
+HTTP handlers and production agent subscriptions do not use this flow yet.
+Native identity initialization, coordinated legacy mutation handling and reviewed
+console routes are required before enabling it for users. An empty reply from
+a legacy NetBird subject cannot be adapted into a successful execution receipt.
 
 ## Authorization and review
 
@@ -21,6 +22,13 @@ selected profile identity. Individual mode also binds the current certificate,
 broker key and command-consumer revision. The certificate and desired command
 consumer must be active and provisioned. Command lifetime is capped by the
 certificate expiry as well as the request expiry.
+
+Review, new admission and dispatch each perform a fresh read-only journal query
+while holding the target and authority locks. The probe is bounded to two seconds
+and certificate expiry. Only a valid `ready` state is accepted; older agents,
+missing responders, unavailable/full journals and pending work cannot create an
+execution attempt. The journal revision joins the source fingerprint. A changed
+revision invalidates the review or stops an admitted request before sending it.
 
 Database generations invalidate old reviews after device recreation, scope or
 organization ownership changes, eligibility/platform changes and reported
@@ -48,6 +56,13 @@ attempt receipt and an audit event. It has no foreign key that could wait on the
 locked request. Failure to commit either record prevents execution. The store
 requires a connection pool with at least two connections; production workloads
 need additional connections for normal reads and writes.
+
+The receipt captures the canonical digest of the complete prepared message and
+its actual expiry, including a shorter certificate deadline. A new completed
+result must match this digest in both application checks and the database guard.
+Migration `013_netbird_wire_receipts.sql` keeps older evidence unchanged instead
+of manufacturing hashes for messages that were never captured. Historical
+completed receipts remain readable; new completions require wire evidence.
 
 | State | Meaning | Further device actions |
 | --- | --- | --- |
@@ -102,16 +117,21 @@ audit failure, process cancellation, recovery, immutable records and retention.
 The executor in these tests is an owned callback; no real device or provider is
 contacted.
 
-Production integration still needs an expiring correlated agent protocol on a
-separate subject, agent journal/recovery, console review/history/release routes
-and background-worker wiring. Installation/uninstallation, registration with
+Production integration still needs native agent identity initialization,
+coordinated legacy mutations and console review/history/release routes.
+Installation/uninstallation, registration with
 staged setup-key creation/cleanup and authoritative peer deletion are separate
 operations and are not admitted by this initial store. Trusted Unix installers,
 provider acceptance and physical-device validation remain open.
 
 The shared `netbirdcommand` codec and agent `netbirdjournal`/`DurableExecutor`
-components are now implemented. Owned codec, filesystem, subprocess and NATS
-tests cover expiry, correlation, durable replay, response loss and explicit
-uncertainty recovery. They are not yet attached to production subscriptions or
-console dispatch. The console must persist the actual wire digest before sending
-and coordinate the reviewed release with the agent's journal.
+components are implemented, together with expiring state/receipt/release control
+messages. The agent service adapter bounds certificate lifetime, owns exact
+subscriptions and joins callbacks before closing the journal. It still needs
+native initialization and attachment to the agent service. The console publisher
+uses the new direct subjects and checks complete receipt correlation; neither
+commands nor controls enter the retrying agent stream. Owned codec, filesystem,
+subprocess and NATS tests cover expiry, correlation, durable replay, response loss
+and explicit uncertainty recovery. The reviewed console release must still
+coordinate its durable resolution evidence with the agent before opening the
+server barrier; the current database-only release API is not a user workflow.

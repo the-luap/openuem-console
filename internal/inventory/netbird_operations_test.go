@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/open-uem/ent/agent"
 	nats "github.com/open-uem/nats"
+	"github.com/open-uem/nats/netbirdcommand"
 	"github.com/open-uem/nats/netbirdstate"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/security/access"
@@ -36,7 +37,11 @@ func netbirdFixture(t *testing.T) (*refreshFixture, int) {
 }
 
 func netbirdSuccess(_ context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
-	return &inventory.NetbirdOperationResult{RequestID: c.RequestID, DeviceID: c.DeviceID, Revision: c.Revision, Operation: c.Operation, Success: true}, nil
+	digest, err := c.Digest()
+	if err != nil {
+		return nil, err
+	}
+	return &inventory.NetbirdOperationResult{RequestID: c.RequestID, DeviceID: c.DeviceID, Revision: c.Revision, Operation: c.Operation, Success: true, CommandHash: digest}, nil
 }
 
 func netbirdStore(t *testing.T, f *refreshFixture, execute inventory.NetbirdOperationExecutor) *inventory.NetbirdOperationStore {
@@ -44,9 +49,13 @@ func netbirdStore(t *testing.T, f *refreshFixture, execute inventory.NetbirdOper
 	if execute == nil {
 		execute = netbirdSuccess
 	}
-	s, err := inventory.NewNetbirdOperationStore(f.db, f.permissions, false, execute)
+	s, err := inventory.NewNetbirdOperationStore(f.db, f.permissions, false, netbirdReady, execute)
 	require.NoError(t, err)
 	return s
+}
+
+func netbirdReady(_ context.Context, identity netbirdcommand.Identity) (netbirdcommand.State, error) {
+	return netbirdcommand.State{Status: "ready", Revision: strings.Repeat("d", 64), Remaining: netbirdcommand.MaxJournalAttempts}, nil
 }
 
 func netbirdRequest(t *testing.T, f *refreshFixture, s *inventory.NetbirdOperationStore, operation, profile string) *inventory.NetbirdOperation {
@@ -72,13 +81,20 @@ func TestNetbirdOperationsScopeReviewDispatchAndHistory(t *testing.T) {
 	s := netbirdStore(t, f, func(ctx context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
 		sent++
 		require.Equal(t, f.id, c.DeviceID)
-		require.Equal(t, 2*time.Minute, c.ExpiresAt.Sub(c.RequestedAt))
+		require.Equal(t, 2*time.Minute, c.ExpiresAt.Sub(c.IssuedAt))
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		require.Equal(t, c.ExpiresAt, deadline)
 		var attempts int
 		require.NoError(t, f.db.QueryRowContext(ctx, `SELECT count(*) FROM uem_netbird_operation_attempts WHERE request_id=$1`, c.RequestID).Scan(&attempts))
 		require.Equal(t, 1, attempts)
+		var hash string
+		var expiry time.Time
+		require.NoError(t, f.db.QueryRowContext(ctx, `SELECT command_hash,command_expires_at FROM uem_netbird_operation_attempts WHERE request_id=$1`, c.RequestID).Scan(&hash, &expiry))
+		expected, err := c.Digest()
+		require.NoError(t, err)
+		require.Equal(t, expected, hash)
+		require.True(t, c.ExpiresAt.Equal(expiry))
 		return netbirdSuccess(ctx, c)
 	})
 	for _, actor := range []string{"viewer", "operator", "tag-viewer", "tag-operator", "missing"} {
@@ -114,6 +130,8 @@ func TestNetbirdOperationsScopeReviewDispatchAndHistory(t *testing.T) {
 		require.Equal(t, "completed", receipt.Status)
 		require.NotNil(t, receipt.Result)
 		require.NotNil(t, receipt.AttemptedAt)
+		require.Equal(t, receipt.Result.CommandHash, receipt.CommandHash)
+		require.NotNil(t, receipt.CommandExpiresAt)
 		again, err = s.Request(ctx, r.Actor, r.Scope, r.DeviceID, r.ID, r.Operation, r.Profile, r.Revision)
 		require.NoError(t, err)
 		require.Equal(t, "completed", again.Status)
@@ -155,7 +173,7 @@ func TestNetbirdOperationsScopeReviewDispatchAndHistory(t *testing.T) {
 func TestNetbirdOperationsUncertaintyBarrierAndExplicitRelease(t *testing.T) {
 	f, _ := netbirdFixture(t)
 	ctx := t.Context()
-	for _, outcome := range []string{"error", "empty", "wrong-request", "wrong-device", "wrong-revision", "wrong-operation", "unsuccessful"} {
+	for _, outcome := range []string{"error", "empty", "wrong-request", "wrong-device", "wrong-revision", "wrong-operation", "unsuccessful", "missing-hash", "wrong-hash"} {
 		t.Run(outcome, func(t *testing.T) {
 			sent := 0
 			s := netbirdStore(t, f, func(ctx context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
@@ -176,6 +194,10 @@ func TestNetbirdOperationsUncertaintyBarrierAndExplicitRelease(t *testing.T) {
 					r.Operation = "down"
 				case "unsuccessful":
 					r.Success = false
+				case "missing-hash":
+					r.CommandHash = ""
+				case "wrong-hash":
+					r.CommandHash = strings.Repeat("f", 64)
 				}
 				return r, nil
 			})

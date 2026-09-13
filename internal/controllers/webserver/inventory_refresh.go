@@ -29,6 +29,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 	}
 	w.Handler.InventoryRefresh = store
 	w.Handler.ManualExecution = manual
+	netbird, err := inventory.NewNetbirdOperationStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.InspectNetbirdJournal, w.Handler.PublishNetbirdOperation)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdOperations = netbird
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
 	w.inventoryDone = make(chan struct{})
@@ -37,8 +42,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		defer close(done)
 		refreshDone := make(chan struct{})
 		go func() { defer close(refreshDone); store.Run(run, slog.Default()) }()
+		netbirdDone := make(chan struct{})
+		go func() { defer close(netbirdDone); netbird.Run(run, slog.Default()) }()
 		manual.Run(run, slog.Default())
 		<-refreshDone
+		<-netbirdDone
 	}()
 	return nil
 }

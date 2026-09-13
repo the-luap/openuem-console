@@ -268,7 +268,7 @@ func TestNetbirdOperationsPreDispatchStopsAndSchemaGuards(t *testing.T) {
 				require.NoError(t, f.client.NetbirdSettings.UpdateOneID(providerID).SetManagementURL("https://changed.example.test").Exec(ctx))
 			case "mode":
 				var err error
-				s, err = inventory.NewNetbirdOperationStore(f.db, f.permissions, true, netbirdSuccess)
+				s, err = inventory.NewNetbirdOperationStore(f.db, f.permissions, true, netbirdReady, netbirdSuccess)
 				require.NoError(t, err)
 				reason = "mode_changed"
 			case "expired":
@@ -289,7 +289,7 @@ func TestNetbirdOperationsPreDispatchStopsAndSchemaGuards(t *testing.T) {
 		})
 	}
 	f, _ := netbirdFixture(t)
-	for _, guard := range [][2]string{{"agents", "uem_netbird_agent_binding"}, {"site_agents", "uem_netbird_scope_binding"}, {"sites", "uem_netbird_site_binding"}, {"netbirds", "uem_netbird_installation_binding"}, {"uem_netbird_operation_attempts", "uem_netbird_attempt_immutable"}, {"uem_netbird_operations", "uem_netbird_operation_immutable"}} {
+	for _, guard := range [][2]string{{"agents", "uem_netbird_agent_binding"}, {"site_agents", "uem_netbird_scope_binding"}, {"sites", "uem_netbird_site_binding"}, {"netbirds", "uem_netbird_installation_binding"}, {"uem_netbird_operation_attempts", "uem_netbird_attempt_immutable"}, {"uem_netbird_operations", "uem_netbird_operation_immutable"}, {"uem_netbird_operations", "uem_netbird_wire_receipt"}} {
 		_, err := f.db.ExecContext(t.Context(), `ALTER TABLE `+guard[0]+` DISABLE TRIGGER `+guard[1])
 		require.NoError(t, err)
 		require.ErrorContains(t, inventory.Migrate(t.Context(), f.db), "NetBird operation protection")

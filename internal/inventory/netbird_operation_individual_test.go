@@ -36,7 +36,7 @@ func TestNetbirdOperationsIndividualIdentityAndConsumer(t *testing.T) {
 			require.NoError(t, f.client.Agent.Create().SetID(f.id).SetHostname("Owned individual endpoint").SetOs("windows").SetAgentStatus(agent.AgentStatusEnabled).AddSiteIDs(f.scope.SiteID).Exec(ctx))
 			require.NoError(t, f.client.Netbird.Create().SetOwnerID(f.id).SetInstalled(true).Exec(ctx))
 			calls := 0
-			s, err := inventory.NewNetbirdOperationStore(f.db, f.permissions, true, func(ctx context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
+			s, err := inventory.NewNetbirdOperationStore(f.db, f.permissions, true, netbirdReady, func(ctx context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
 				calls++
 				if change == "short-certificate" {
 					require.Less(t, time.Until(c.ExpiresAt), time.Minute)

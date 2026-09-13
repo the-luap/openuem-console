@@ -11,6 +11,7 @@ import (
 
 	nats "github.com/open-uem/nats"
 	"github.com/open-uem/nats/netbirdapi"
+	"github.com/open-uem/nats/netbirdcommand"
 	"github.com/open-uem/nats/netbirdstate"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
@@ -19,6 +20,8 @@ type NetbirdOperationReview struct {
 	Target                                                   ManualTarget
 	Operation, Profile, ProfileName, ManagementURL, Revision string
 	identityExpiresAt                                        time.Time
+	identity                                                 netbirdcommand.Identity
+	Journal                                                  netbirdcommand.State
 }
 
 func netbirdOperationInput(operation, profile string) bool {
@@ -89,6 +92,10 @@ func (s *NetbirdOperationStore) source(ctx context.Context, tx *sql.Tx, scope ac
 			return nil, ErrNetbirdOperationChanged
 		}
 	}
+	r.identity = netbirdcommand.Identity{DeviceID: device, TenantID: int64(scope.TenantID), SiteID: int64(scope.SiteID), Individual: s.individual, CertificateHash: certificate}
+	if !r.identity.Valid() {
+		return nil, ErrNetbirdOperationChanged
+	}
 	var selected nats.NetbirdProfile
 	if operation == "switchprofile" {
 		profiles, err := netbirdstate.Decode(raw)
@@ -108,13 +115,27 @@ func (s *NetbirdOperationStore) source(ctx context.Context, tx *sql.Tx, scope ac
 			return nil, ErrNetbirdOperationChanged
 		}
 	}
+	if s.inspect == nil {
+		return nil, ErrNetbirdOperationNotReady
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	if !r.identityExpiresAt.IsZero() && r.identityExpiresAt.Before(deadline) {
+		deadline = r.identityExpiresAt
+	}
+	probe, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	r.Journal, err = s.inspect(probe, r.identity)
+	if err != nil || probe.Err() != nil || !r.Journal.Valid() || r.Journal.Status != "ready" {
+		return nil, ErrNetbirdOperationNotReady
+	}
 	data, err := json.Marshal(struct {
 		Device, Generation, Link, Provider, Certificate, Broker, Operation string
 		Scope                                                              access.Scope
 		SettingsID                                                         int64
 		ConsumerRevision                                                   int64
 		Profile                                                            nats.NetbirdProfile
-	}{device, generation, link, provider, certificate, broker, operation, scope, settingsID, consumerRevision, selected})
+		JournalRevision                                                    string
+	}{device, generation, link, provider, certificate, broker, operation, scope, settingsID, consumerRevision, selected, r.Journal.Revision})
 	if err != nil {
 		return nil, err
 	}
