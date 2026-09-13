@@ -67,6 +67,6 @@ order initialization and refreshes its task region separately.
 
 Task deletion is covered by the later [deletion change](task-deletion.md).
 Task cloning is covered by the later [cloning change](task-cloning.md).
-Task editing and creation still need their own
-atomic scoped mutations. This change does not complete legacy delegation,
+Task creation is covered by the later [creation change](task-creation.md).
+Task editing still needs its own atomic scoped mutation. This change does not complete legacy delegation,
 immutable revisions, device acceptance or the expanded roadmap.

@@ -88,6 +88,7 @@ audit suite in 11.815 seconds. Registered Apple/OIDC routes, affected macOS/Linu
 race checks and the full Linux build pass. The final complete 1,602-case Chrome
 matrix passes in 91.762 seconds.
 
-Task creation/editing, broader legacy editor read authorization, immutable
+Task creation is covered by the later [creation change](task-creation.md).
+Task editing, broader legacy editor read authorization, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
@@ -17,48 +19,6 @@ import (
 	"github.com/open-uem/utils"
 	"github.com/open-uem/wingetcfg/wingetcfg"
 )
-
-func (h *Handler) NewTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	profile := c.Param("profile")
-	if profile == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.empty_profile"), true))
-	}
-
-	profileID, err := strconv.Atoi(profile)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.invalid_profile"), true))
-	}
-
-	if c.Request().Method == "POST" {
-		t, err := validateTaskForm(c)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%v", err), true))
-		}
-
-		// encrypt local user password if not empty
-		if h.EncryptionMasterKey != "" && t.LocalUserPassword != "" {
-			t.LocalUserPassword, err = utils.EncryptSensitiveField(t.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_could_not_encrypt"), true))
-			}
-		}
-
-		if err := h.Model.AddTaskToProfile(c, profileID, *t); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.new.could_not_save"), err), true))
-		}
-
-		return h.EditProfile(c, "GET", profile, i18n.T(c.Request().Context(), "tasks.new.saved"))
-	}
-
-	return RenderView(c, tasks_views.TasksIndex("| Tasks", tasks_views.NewTask(c, profileID, commonInfo), commonInfo))
-}
 
 func (h *Handler) EditTask(c echo.Context) error {
 	var err error
@@ -922,18 +882,24 @@ func validateNetbird(c echo.Context) (*models.TaskConfig, error) {
 			return nil, errors.New(i18n.T(c.Request().Context(), "netbird.could_not_parse_groups"))
 		}
 
-		groups := ""
 		if len(p["netbird-groups[]"]) > 0 {
-			groupIDs := []string{}
-			for _, g := range p["netbird-groups[]"] {
-				tmp := strings.Split(g, "-")
-				if len(tmp) > 1 {
-					groupIDs = append(groupIDs, fmt.Sprintf(`"%s"`, tmp[1]))
-				}
-			}
-			groups = strings.Join(groupIDs, ",")
-			taskConfig.NetbirdGroups = groups
+			return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.stale"))
 		}
+		groupIDs := p["netbird-group-id"]
+		if len(groupIDs) > 100 {
+			return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.invalid"))
+		}
+		encoded := []string{}
+		seen := map[string]bool{}
+		for _, id := range groupIDs {
+			if id == "" || len(id) > 128 || !utf8.ValidString(id) || strings.ContainsRune(id, 0) || seen[id] {
+				return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.invalid"))
+			}
+			seen[id] = true
+			value, _ := json.Marshal(id)
+			encoded = append(encoded, string(value))
+		}
+		taskConfig.NetbirdGroups = strings.Join(encoded, ",")
 
 		greed := c.FormValue("netbird-allow-extra-dns-labels")
 		if greed == "on" {

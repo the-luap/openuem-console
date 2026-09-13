@@ -2660,3 +2660,18 @@ en:
     denied: "Server administrator access is required to clone tasks."
     provider_scope: "NetBird registration tasks must stay in their configured organization."
     unavailable: "The task cloning result could not be confirmed. Refresh the destination profile before retrying."
+
+  task_creation:
+    profile: "Destination profile ID: %d"
+    description: "Create a task at the end of this profile. Tasks in an assigned profile may run on its devices."
+    truncated: "The profile name is shortened for display. Use its ID to identify the destination."
+    invalid: "The task creation request is invalid. Check the task type, platform and configuration."
+    not_found: "The destination profile is not available in this scope. Refresh before retrying."
+    denied: "Server administrator access is required to create tasks."
+    provider_scope: "NetBird registration requires a profile in its configured organization."
+    secret_storage: "A task password cannot be stored without configured server encryption."
+    unavailable: "The task creation result could not be confirmed. Refresh the profile before retrying."
+
+  task_groups:
+    invalid: "Select up to 100 distinct NetBird group IDs."
+    stale: "The NetBird group selection is outdated. Reload the task form."

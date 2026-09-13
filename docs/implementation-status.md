@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task creation](task-creation.md) now holds current server authority,
+  exact destination scope, the parent and existing tasks through one transaction.
+  Normalization, the new task and its scoped audit receipt commit together.
+  The extracted mapper retains task defaults and fixes registry value types and
+  NetBird registration positions. Local-user passwords require server encryption.
+  Strict bounded forms and native controls preserve edited names while clearing
+  incompatible fields. NetBird groups use separate IDs without delimiter parsing.
+  Full inventory PostgreSQL/race and audit suites pass in 86.259/9.658 seconds;
+  registered Apple/OIDC routes, affected macOS/Linux race checks and the full
+  Linux build pass. All 45 focused browser cases pass, with the complete 1,647-case
+  Chrome matrix passing in 94.426 seconds. Mobile states were visually inspected.
+  Task editing, source-bound wizard/provider reads, broader secret lifecycle,
+  immutable revisions, delegated access and physical/provider acceptance remain
+  open.
 - The [worker task-order follow-up](https://github.com/the-luap/openuem-worker/blob/d61712f/docs/profile-task-order.md)
   makes all four assigned-profile reads match the console's stored-order/ID/NULL
   ordering. Consecutive positions are projected only in memory, preserving NULL
@@ -83,7 +97,7 @@ the table's package summaries do not remove any detail from the roadmap.
   Registered Apple/OIDC routes, affected macOS/Linux race checks and the full
   Linux build pass. All 42 focused browser cases pass; the final complete
   1,602-case Chrome matrix passes in 91.762 seconds. Mobile normal and empty
-  states were visually inspected. Task creation/editing, broader editor read
+  states were visually inspected. Task editing, broader editor read
   authorization, immutable revisions, delegated access and physical/provider
   acceptance remain open.
 - [Legacy task deletion](task-deletion.md) now binds confirmation and deletion
@@ -98,8 +112,8 @@ the table's package summaries do not remove any detail from the roadmap.
   audit suite in 10.473 seconds. Registered Apple/OIDC routes, affected
   macOS/Linux race checks and the full Linux build pass. All 24 focused browser
   cases pass; the final complete 1,560-case Chrome matrix passes in 89.120
-  seconds. The mobile confirmation was visually inspected. Task cloning,
-  creation/editing, broader editor read authorization, delegated access and
+  seconds. The mobile confirmation was visually inspected. Later changes cover
+  task cloning and creation. Task editing, broader editor read authorization, delegated access and
   physical/provider acceptance remain open.
 - [Legacy task ordering](task-order.md) now holds current server authority,
   exact profile audience and task ownership through an atomic scoped reorder and

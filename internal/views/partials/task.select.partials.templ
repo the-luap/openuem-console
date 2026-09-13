@@ -17,11 +17,15 @@ templ SelectTaskAgentType(t *ent.Task) {
 			name="task-agent-type"
 			class="uk-select"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			hx-trigger="change"
 			hx-get="/profiles/task-types"
 			hx-target="#select-task-type"
 			hx-swap="innerHTML"
-			_="on change      
+			_="on change
+                set #select-task-type.innerHTML to ''
+                set #select-task-subtype.innerHTML to ''
+                set #task-definition.innerHTML to ''
                 add .hidden to #select-task-subtype
                 add .hidden to #task-definition
             end"
@@ -45,11 +49,14 @@ templ SelectTaskType(t *ent.Task, agentType string) {
 			name="task-type"
 			class="uk-select"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			hx-trigger="change"
 			hx-get="/profiles/task-subtypes"
 			hx-target="#select-task-subtype"
 			hx-swap="innerHTML"
-			_="on change      
+			_="on change
+                set #select-task-subtype.innerHTML to ''
+                set #task-definition.innerHTML to ''
                 if my.value == 'powershell_type' or my.value == 'unix_script_type' then
                     remove .hidden from #task-definition
 					add .hidden to #select-task-subtype
@@ -149,6 +156,7 @@ templ SelectWinGetPackageTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -174,6 +182,7 @@ templ SelectRegistryTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -202,6 +211,7 @@ templ SelectLocalUserTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -227,6 +237,7 @@ templ SelectWindowsLocalGroupTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -254,6 +265,7 @@ templ SelectUnixLocalGroupTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -279,6 +291,7 @@ templ SelectUnixLocalUserTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -304,6 +317,7 @@ templ SelectMSITaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -329,6 +343,7 @@ templ SelectFlatpakPackageTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -354,6 +369,7 @@ templ SelectHomeBrewFormulaTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -380,6 +396,7 @@ templ SelectHomeBrewCaskTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -406,6 +423,7 @@ templ SelectAPTTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -434,6 +452,7 @@ templ SelectNetbirdTaskSubtype(t *ent.Task) {
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"

@@ -35,6 +35,7 @@ import taskStatus from "./task-status.mjs";
 import taskOrder from "./task-order.mjs";
 import taskDeletion from "./task-deletion.mjs";
 import taskCloning from "./task-cloning.mjs";
+import taskCreation from "./task-creation.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
 import profileDeletion from "./profile-deletion.mjs";
@@ -113,6 +114,7 @@ try {
         [taskOrder,36],
         [taskDeletion,24],
         [taskCloning,42],
+        [taskCreation,45],
         [profileAudience,18],
         [profileMetadata,36],
         [profileDeletion,24],
