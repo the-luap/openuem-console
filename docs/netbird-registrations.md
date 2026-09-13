@@ -5,8 +5,9 @@ and staged dispatch. The console now provides exact-site group selection,
 review, submission, receipts, history, queued cancellation and read-only cleanup
 checks. Startup owns and joins the registration dispatcher. The old registration
 alias accepts only the same complete reviewed request; raw legacy settings cannot
-bypass it. Installation, authoritative provider-peer binding, combined
-registration resolution, and real-provider acceptance remain open.
+bypass it. [Combined provider/agent resolution](netbird-registration-resolutions.md)
+now supports retained-key requests with matching evidence. Installation,
+authoritative provider-peer binding and real-provider acceptance remain open.
 
 ## Admission and authority
 
@@ -38,8 +39,10 @@ both the new routes and the old registration alias.
 Receipts show key creation, device execution and key removal separately. A reader
 can inspect recorded results without management controls. History uses a stable
 50-record cursor in the original scope, including after a move or removal.
-Unconfirmed receipts only offer an eligible read-only key-removal check; they
-cannot repeat registration or release an unknown device outcome.
+Unconfirmed receipts offer an eligible read-only key-removal check and a managed
+resolution review. Resolution metadata is shown separately from the unchanged
+original outcome, including in history. Key absence alone cannot release an
+unknown device outcome.
 
 
 ## Credentials and retained evidence
@@ -110,14 +113,14 @@ and coordinated-resolution tests remain part of regression validation.
 
 Rendered view, real route and browser tests cover scoped permissions, CSRF,
 confirmation, precise group policy, key-removal reconciliation, retained history,
-keyboard submission, pending input locks and long provider labels. All 57 new
-registration browser cases and the complete 2,226-case browser suite pass at
-390, 768 and 1,440 pixels. Owned database
+keyboard submission, pending input locks and long provider labels. Registration
+and combined-resolution pages have 105 browser cases at 390, 768 and 1,440 pixels. Owned database
 tests cover empty group policy, 50-row pagination and joined dispatcher shutdown.
 
-Combined provider/agent uncertainty resolution and authoritative peer association
-remain incomplete. Missing creation responses and undelivered release requests
-still need explicit recovery policy; do not clear
-journals, retry POST, or infer ownership from mutable reports. Trusted installers,
+Combined resolution is implemented for retained keys and matching agent evidence;
+its [failure ordering and remaining cases](netbird-registration-resolutions.md)
+are documented separately. Authoritative peer association, missing creation
+responses and undelivered release requests still need explicit recovery policy;
+do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

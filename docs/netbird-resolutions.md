@@ -96,5 +96,7 @@ Missing journal evidence remains blocked. If the release request itself was
 never received, read-only reconciliation cannot manufacture a release; there
 is no automatic resend or journal reset. Explicit recovery of incomplete local
 storage and physical-device acceptance remain separate work. Installation,
-registration/setup-key lifecycle and authoritative peer deletion are still
-temporarily unavailable as described in [managed operations](netbird-operations.md).
+authoritative peer deletion and additional recovery protocols remain open.
+[Managed registration](netbird-registrations.md) and its separate
+[combined resolution](netbird-registration-resolutions.md) now cover reviewed
+setup-key creation, cleanup and retained-key uncertainty.

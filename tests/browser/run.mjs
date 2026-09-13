@@ -133,7 +133,7 @@ try {
         [netbirdSettings,21],
         [netbirdProfiles,18],
         [netbirdOperations,75],
-        [netbirdRegistrations,57],
+        [netbirdRegistrations,105],
         [desktopTaskHistory,18],
         [profileAudience,18],
         [profileMetadata,36],

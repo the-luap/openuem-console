@@ -44,6 +44,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		return err
 	}
 	w.Handler.NetbirdRegistrations = registration
+	registrationResolution, err := inventory.NewNetbirdRegistrationResolutionStore(registration, w.Handler.RequestNetbirdControl)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdRegistrationResolutions = registrationResolution
 
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel

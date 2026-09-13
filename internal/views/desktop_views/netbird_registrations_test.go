@@ -33,7 +33,7 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/2/computers/owned-device/netbird/registrations", nil).WithContext(ctx), httptest.NewRecorder())
 	scope := access.Scope{TenantID: 1, SiteID: 2}
 	instant := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	for _, kind := range []string{"choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full"} {
+	for _, kind := range []string{"choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full", "unconfirmed-resolved", "history-resolved", "resolution-completed", "resolution-release", "resolution-cleanup", "resolution-no-delivery", "resolution-continue", "resolution-pending", "resolution-confirmed", "resolution-unknown-key", "resolution-missing-receipt", "resolution-active", "resolution-changed-key", "resolution-unavailable", "resolution-long"} {
 		t.Run(kind, func(t *testing.T) {
 			info.Principal = access.Principal{UserID: "owned-admin", Grants: []access.Grant{{Role: access.Administrator}}}
 			if kind == "unconfirmed-viewer" {
@@ -72,7 +72,68 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 				for index := 0; index < count; index++ {
 					rows = append(rows, inventory.NetbirdRegistration{ID: fmt.Sprintf("10000000-0000-4000-8000-%012d", index+1), DeviceID: target.ID, Status: "completed", RequestedAt: instant})
 				}
+				if kind == "history-resolved" {
+					rows[0].Status = "unconfirmed"
+					rows[0].ReleasedAt = &instant
+				}
 				component = NetbirdRegistrationHistory(c, info, target.ID, rows)
+			case strings.HasPrefix(kind, "resolution-"):
+				r := &inventory.NetbirdRegistration{ID: "10000000-0000-4000-8000-000000000001", DeviceID: target.ID, Scope: scope, Status: "unconfirmed", KeyAbsent: true}
+				v := &inventory.NetbirdRegistrationResolutionReview{Registration: r, Target: target, Revision: strings.Repeat("a", 64), KeyState: "absent", AgentState: "completed", CanResolve: true}
+				d := &inventory.NetbirdRegistrationResolution{ID: "20000000-0000-4000-8000-000000000002", RequestID: r.ID, Actor: "Owned <operator>", CreatedAt: instant, Kind: "release"}
+				switch kind {
+				case "resolution-release":
+					v.AgentState = "unconfirmed"
+				case "resolution-cleanup":
+					v.AgentState = "unconfirmed"
+					v.KeyState = "present"
+					v.CanCleanup = true
+					r.KeyAbsent = false
+				case "resolution-no-delivery":
+					v.AgentState = "not-attempted"
+				case "resolution-continue":
+					v.Resolution = d
+					v.CanResolve = false
+					v.CanContinue = true
+					v.AgentState = "unconfirmed"
+				case "resolution-pending":
+					v.Resolution = d
+					d.AgentAttemptedAt = &instant
+					v.CanResolve = false
+					v.AgentState = "unconfirmed"
+				case "resolution-confirmed":
+					v.Resolution = d
+					d.ConfirmedAt = &instant
+					d.ConfirmedBy = "Owned <manager>"
+					r.ReleasedAt = &instant
+					v.CanResolve = false
+					v.AgentState = "resolved"
+				case "resolution-unknown-key":
+					v.KeyState = "unknown"
+					r.KeyAbsent = false
+					v.CanResolve = false
+				case "resolution-missing-receipt":
+					v.AgentState = "missing"
+					v.CanResolve = false
+				case "resolution-active":
+					v.AgentState = "waiting"
+					v.CanResolve = false
+				case "resolution-changed-key":
+					v.KeyState = "changed"
+					r.KeyAbsent = false
+					v.CanResolve = false
+				case "resolution-unavailable":
+					v.KeyState = "unavailable"
+					v.AgentState = "unavailable"
+					r.KeyAbsent = false
+					v.CanResolve = false
+				case "resolution-long":
+					v.Resolution = d
+					v.CanResolve = false
+					v.CanContinue = true
+					d.Actor = strings.Repeat("W", 255)
+				}
+				component = NetbirdRegistrationResolution(c, info, v, "30000000-0000-4000-8000-000000000003")
 			default:
 				r := &inventory.NetbirdRegistration{ID: "10000000-0000-4000-8000-000000000001", DeviceID: target.ID, Scope: scope, Actor: "Owned <operator>", Status: kind, RequestedAt: instant, ExpiresAt: instant.Add(2 * time.Minute), Groups: review.Groups, ExtraDNS: true}
 				if kind == "started" {
@@ -96,13 +157,18 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 						r.Attempts = append(r.Attempts, "delete")
 						r.Delivered = &inventory.NetbirdOperationResult{Success: true}
 					}
-					if kind == "unconfirmed-cleaned" || kind == "completed" {
+					if kind == "unconfirmed-cleaned" || kind == "unconfirmed-resolved" || kind == "completed" {
 						r.KeyAbsent = true
 					}
 					if kind == "completed" {
 						r.Status = "completed"
 						r.Reason = ""
 					}
+				}
+				if kind == "unconfirmed-resolved" {
+					r.ReleasedAt = &instant
+					r.ReleasedBy = "Owned <manager>"
+					r.Resolution = &inventory.NetbirdRegistrationResolution{ID: "20000000-0000-4000-8000-000000000002"}
 				}
 				component = NetbirdRegistrationReceipt(c, info, r)
 			}

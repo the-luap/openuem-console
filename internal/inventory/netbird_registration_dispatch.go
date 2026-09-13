@@ -21,17 +21,21 @@ import (
 func registrationEvidence(ctx context.Context, tx *sql.Tx, r *NetbirdRegistration) (string, error) {
 	r.Attempts = []string{}
 	r.Key, r.Delivered, r.KeyAbsent = nil, nil, false
-	rows, err := tx.QueryContext(ctx, `SELECT stage FROM uem_netbird_registration_attempts WHERE request_id=$1 AND revision=$2 ORDER BY created_at,stage`, r.ID, r.Revision)
+	r.CommandHash = ""
+	rows, err := tx.QueryContext(ctx, `SELECT stage,digest FROM uem_netbird_registration_attempts WHERE request_id=$1 AND revision=$2 ORDER BY created_at,stage`, r.ID, r.Revision)
 	if err != nil {
 		return "", err
 	}
 	for rows.Next() {
-		var stage string
-		if err = rows.Scan(&stage); err != nil {
+		var stage, digest string
+		if err = rows.Scan(&stage, &digest); err != nil {
 			rows.Close()
 			return "", err
 		}
 		r.Attempts = append(r.Attempts, stage)
+		if stage == "deliver" {
+			r.CommandHash = digest
+		}
 	}
 	err = rows.Err()
 	rows.Close()
@@ -70,6 +74,10 @@ func registrationEvidence(ctx context.Context, tx *sql.Tx, r *NetbirdRegistratio
 }
 
 func (s *NetbirdRegistrationStore) attempt(ctx context.Context, r *NetbirdRegistration, stage, digest string) error {
+	return s.attemptAs(ctx, r, r.Actor, stage, digest)
+}
+
+func (s *NetbirdRegistrationStore) attemptAs(ctx context.Context, r *NetbirdRegistration, actor, stage, digest string) error {
 	tx, err := s.operations.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -79,7 +87,7 @@ func (s *NetbirdRegistrationStore) attempt(ctx context.Context, r *NetbirdRegist
 	if err != nil {
 		return err
 	}
-	if err = registrationAudit(ctx, tx, r, r.Actor, "attempt", stage); err != nil {
+	if err = registrationAudit(ctx, tx, r, actor, "attempt", stage); err != nil {
 		return err
 	}
 	if err = tx.Commit(); err != nil {
@@ -90,6 +98,10 @@ func (s *NetbirdRegistrationStore) attempt(ctx context.Context, r *NetbirdRegist
 }
 
 func (s *NetbirdRegistrationStore) evidence(ctx context.Context, r *NetbirdRegistration, kind string, value any, secret string) error {
+	return s.evidenceAs(ctx, r, r.Actor, kind, value, secret)
+}
+
+func (s *NetbirdRegistrationStore) evidenceAs(ctx context.Context, r *NetbirdRegistration, actor, kind string, value any, secret string) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return ErrNetbirdOperationInvalid
@@ -103,7 +115,7 @@ func (s *NetbirdRegistrationStore) evidence(ctx context.Context, r *NetbirdRegis
 	if err != nil {
 		return err
 	}
-	if err = registrationAudit(ctx, tx, r, r.Actor, "attempt", "evidence-"+kind); err != nil {
+	if err = registrationAudit(ctx, tx, r, actor, "attempt", "evidence-"+kind); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -136,6 +148,10 @@ func (s *NetbirdRegistrationStore) observe(ctx context.Context, snapshot registr
 // provider credential. A recorded DELETE attempt is never sent again. A later
 // read may prove absence after a lost reply; other errors never mean absence.
 func (s *NetbirdRegistrationStore) cleanup(ctx context.Context, r *NetbirdRegistration, snapshot registrationSnapshot) error {
+	return s.cleanupAs(ctx, r, snapshot, r.Actor)
+}
+
+func (s *NetbirdRegistrationStore) cleanupAs(ctx context.Context, r *NetbirdRegistration, snapshot registrationSnapshot, actor string) error {
 	if r.Key == nil || r.KeyAbsent {
 		return nil
 	}
@@ -150,7 +166,7 @@ func (s *NetbirdRegistrationStore) cleanup(ctx context.Context, r *NetbirdRegist
 	if !attempted {
 		data, _ := json.Marshal([]any{r.ID, r.Revision, r.Key.ID, r.Key})
 		digest := sha256.Sum256(data)
-		if err = s.attempt(ctx, r, "delete", hex.EncodeToString(digest[:])); err != nil {
+		if err = s.attemptAs(ctx, r, actor, "delete", hex.EncodeToString(digest[:])); err != nil {
 			return err
 		}
 		if !absent {
@@ -168,7 +184,7 @@ func (s *NetbirdRegistrationStore) cleanup(ctx context.Context, r *NetbirdRegist
 	if !absent {
 		return ErrNetbirdOperationNotReady
 	}
-	if err = s.evidence(ctx, r, "absent", struct {
+	if err = s.evidenceAs(ctx, r, actor, "absent", struct {
 		KeyID  string `json:"key_id"`
 		Absent bool   `json:"absent"`
 	}{r.Key.ID, true}, ""); err != nil {

@@ -21,7 +21,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request", "/computers/:uuid/netbird", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request":
 			return access.ReadDevices, true
-		case "/computers/:uuid/netbird/registrations/new", "/computers/:uuid/netbird/registrations/review", "/computers/:uuid/netbird/operations/review", "/computers/:uuid/netbird/operations/:request/resolution":
+		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/new", "/computers/:uuid/netbird/registrations/review", "/computers/:uuid/netbird/operations/review", "/computers/:uuid/netbird/operations/:request/resolution":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/tasks", "/computers/:uuid/execution", "/computers/:uuid/execution/review", "/computers/:uuid/execution/:request":
 			return access.ManageProfiles, true
@@ -35,7 +35,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/refresh":
 			return access.RefreshDevices, true
-		case "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
+		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/:request/resolution/continue", "/computers/:uuid/netbird/registrations/:request/resolution/reconcile", "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
 			return access.ManageProfiles, true
@@ -94,6 +94,10 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	registration.GET("/:request", h.NetbirdRegistrationReceipt)
 	registration.POST("/:request/cancel", h.NetbirdRegistrationCancel)
 	registration.POST("/:request/cleanup", h.NetbirdRegistrationCleanup)
+	registration.GET("/:request/resolution", h.NetbirdRegistrationResolutionReview)
+	registration.POST("/:request/resolution", h.NetbirdRegistrationResolutionRequest)
+	registration.POST("/:request/resolution/continue", h.NetbirdRegistrationResolutionContinue)
+	registration.POST("/:request/resolution/reconcile", h.NetbirdRegistrationResolutionReconcile)
 
 }
 

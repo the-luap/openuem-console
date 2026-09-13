@@ -631,9 +631,19 @@ and read-only key-removal checks are now wired into the console. Its dispatcher
 joins shutdown; old registration aliases require the same complete reviewed
 contract. Route and browser tests cover permissions, CSRF, precise group IDs,
 keyboard confirmation, pending input and long content: 57 new registration cases
-and all 2,226 browser cases pass. Combined provider/agent
-resolution, trusted Unix installers, authoritative peer ownership, remaining
-user/provider secrets and physical/provider acceptance are still required.
+and all 2,226 browser cases passed at that checkpoint.
+[Combined registration resolution](netbird-registration-resolutions.md) now
+coordinates retained key absence with original agent evidence. Permanent intent
+precedes first cleanup, a separate agent attempt precedes one release, and final
+proof/release audit commits atomically. Fresh explicit continuation can start an
+unattempted remaining step; reconciliation only reads external evidence. Original
+uncertain outcomes and request identities remain immutable after admission opens.
+Real routes and 48 additional browser cases cover the distinction and retained
+history; all 2,274 browser cases, the full inventory/audit race suites and the
+Linux console build pass. Unknown creation responses, missing agent receipts and undelivered
+release/removal attempts still need explicit recovery protocols. Trusted Unix
+installers, authoritative peer ownership, remaining user/provider secrets and
+physical/provider acceptance are still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

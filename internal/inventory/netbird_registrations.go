@@ -61,6 +61,9 @@ func NewNetbirdRegistrationStore(db *sql.DB, permissions *access.Store, individu
 // Completed means a matching command receipt plus confirmed key removal; it
 // does not claim a lasting connection, group membership, or owned provider peer.
 type NetbirdRegistration struct {
+	CommandHash, ReleasedBy                       string
+	ReleasedAt                                    *time.Time
+	Resolution                                    *NetbirdRegistrationResolution
 	ID, DeviceID, Actor, Revision, Status, Reason string
 	Scope                                         access.Scope
 	Individual, ExtraDNS                          bool
@@ -181,13 +184,14 @@ func (s *NetbirdRegistrationStore) Review(parent context.Context, actor string, 
 	return review, tx.Commit()
 }
 
-const registrationColumns = `r.id,r.device_id,r.tenant_id,r.site_id,r.actor,r.individual,r.revision,r.groups,r.extra_dns,r.snapshot,r.status,r.reason,r.requested_at,r.expires_at,r.finished_at`
+const registrationColumns = `r.id,r.device_id,r.tenant_id,r.site_id,r.actor,r.individual,r.revision,r.groups,r.extra_dns,r.snapshot,r.status,r.reason,r.requested_at,r.expires_at,r.finished_at,r.released_at,r.released_by`
 
 func scanRegistration(row interface{ Scan(...any) error }) (*NetbirdRegistration, error) {
 	r := &NetbirdRegistration{}
 	var groups []byte
-	var finished sql.NullTime
-	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Individual, &r.Revision, &groups, &r.ExtraDNS, &r.snapshot, &r.Status, &r.Reason, &r.RequestedAt, &r.ExpiresAt, &finished)
+	var finished, released sql.NullTime
+	var releasedBy sql.NullString
+	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Individual, &r.Revision, &groups, &r.ExtraDNS, &r.snapshot, &r.Status, &r.Reason, &r.RequestedAt, &r.ExpiresAt, &finished, &released, &releasedBy)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +201,10 @@ func scanRegistration(row interface{ Scan(...any) error }) (*NetbirdRegistration
 	if finished.Valid {
 		r.FinishedAt = &finished.Time
 	}
+	if released.Valid {
+		r.ReleasedAt = &released.Time
+	}
+	r.ReleasedBy = releasedBy.String
 	return r, nil
 }
 
@@ -232,7 +240,7 @@ func (s *NetbirdRegistrationStore) Request(parent context.Context, actor string,
 		return nil, err
 	}
 	var pending bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE device_id=$1 AND status IN ('queued','unconfirmed'))`, device, id).Scan(&pending)
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))`, device, id).Scan(&pending)
 	if err != nil {
 		return nil, err
 	}
@@ -302,6 +310,10 @@ func (s *NetbirdRegistrationStore) Read(parent context.Context, actor string, sc
 		return nil, err
 	}
 	if _, err = registrationEvidence(ctx, tx, r); err != nil {
+		return nil, err
+	}
+	r.Resolution, err = readRegistrationResolution(ctx, tx, r.ID)
+	if err != nil {
 		return nil, err
 	}
 	if err = registrationAudit(ctx, tx, r, actor, "read", ""); err != nil {

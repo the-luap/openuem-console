@@ -98,7 +98,7 @@ func netbirdRegistrationState(r *inventory.NetbirdRegistration)string {
 func netbirdRegistrationReason(reason string)string {
  switch reason {
  case "recovered_without_delivery":return "The retained setup key was removed after recovery. No device delivery was attempted."
- case "registration_unconfirmed":return "A required provider or device result was not retained. Further NetBird commands remain blocked."
+ case "registration_unconfirmed":return "A required provider or device result was not retained."
  case "expired":return "The request expired before device delivery."
  default:return netbirdReason(reason)
  }
@@ -155,7 +155,7 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
    }
   </dl>
   <p>This receipt does not establish current connectivity, provider peer identity or group membership. Removing the setup key does not disconnect a peer that already registered with it.</p>
-  if r.Status=="unconfirmed" {
+  if r.Status=="unconfirmed" && r.ReleasedAt==nil {
    <p>The original outcome remains unconfirmed. Checking key removal does not repeat registration or release the device's command block.</p>
    if r.Key!=nil && !r.KeyAbsent && slices.Contains(r.Attempts,"delete") && netbirdCanManage(info,r.Scope) {
     <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-post={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-cleanup" hx-indicator="#netbird-pending">
@@ -165,6 +165,17 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
      <span id="netbird-pending" class="htmx-indicator" role="status">Checking key removal…</span>
     </form>
    }
+  }
+  if r.ReleasedAt!=nil {
+   <p role="status">Resolution confirmed. Further NetBird commands may be reviewed; the original registration outcome remains unconfirmed.</p>
+   <dl class="netbird-details"><dt>Resolution confirmed</dt><dd>@mdm_views.Timestamp(r.ReleasedAt)</dd><dt>Confirmed by</dt><dd>{ r.ReleasedBy }</dd>
+    if r.Resolution!=nil {
+     <dt>Resolution ID</dt><dd>{ r.Resolution.ID }</dd>
+    }
+   </dl>
+  }
+  if r.Status=="unconfirmed" && netbirdCanManage(info,r.Scope) {
+   <p><a class="uk-button uk-button-default" id="netbird-resolution-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/resolution" }>Review registration resolution</a></p>
   }
   if r.Status=="queued" && len(r.Attempts)==0 && netbirdCanManage(info,r.Scope) {
    <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cancel" } class="netbird-confirm">
@@ -190,7 +201,11 @@ templ NetbirdRegistrationHistory(c echo.Context,info *partials.CommonInfo,device
 }
   <ol class="netbird-history">
    for _,r:=range rows {
-<li><a href={ NetbirdRegistrationPath(info,device)+"/"+r.ID }>Registration · { r.Status }</a><span class="netbird-id">{ r.ID }</span>@mdm_views.Timestamp(&r.RequestedAt)</li>
+<li><a href={ NetbirdRegistrationPath(info,device)+"/"+r.ID }>Registration · { r.Status }
+ if r.ReleasedAt!=nil {
+  <span> · resolution confirmed</span>
+ }
+</a><span class="netbird-id">{ r.ID }</span>@mdm_views.Timestamp(&r.RequestedAt)</li>
 }
   </ol>
   <div class="netbird-actions">

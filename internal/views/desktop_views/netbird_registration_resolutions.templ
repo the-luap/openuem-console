@@ -1,0 +1,104 @@
+package desktop_views
+
+import (
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *inventory.NetbirdRegistrationResolutionReview,resolutionID string) {
+ @netbirdPage(c,info,v.Registration.DeviceID,"Review NetBird registration resolution") {
+  @netbirdTarget(v.Target)
+  <dl class="netbird-details">
+   <dt>Original request</dt><dd>{ v.Registration.ID }</dd>
+   <dt>Original outcome</dt><dd>Registration is unconfirmed</dd>
+   <dt>Setup key</dt><dd>{ netbirdRegistrationKeyState(v.KeyState) }</dd>
+   <dt>Agent evidence</dt><dd>{ netbirdRegistrationAgentState(v.AgentState) }</dd>
+  </dl>
+  <p>The original outcome remains unconfirmed. Resolution requires proof that the retained setup key is absent and matching evidence about device execution. It does not repeat registration or establish current connectivity, provider peer identity or group membership.</p>
+  if v.Resolution!=nil {
+   <dl class="netbird-details">
+    <dt>Resolution ID</dt><dd>{ v.Resolution.ID }</dd>
+    <dt>Requested by</dt><dd>{ v.Resolution.Actor }</dd>
+    <dt>Requested</dt><dd>@mdm_views.Timestamp(&v.Resolution.CreatedAt)</dd>
+    if v.Resolution.AgentAttemptedAt!=nil {
+     <dt>Agent resolution attempted</dt><dd>@mdm_views.Timestamp(v.Resolution.AgentAttemptedAt)</dd>
+    }
+    if v.Resolution.ConfirmedAt!=nil {
+     <dt>Evidence confirmed</dt><dd>@mdm_views.Timestamp(v.Resolution.ConfirmedAt)</dd>
+     <dt>Confirmed by</dt><dd>{ v.Resolution.ConfirmedBy }</dd>
+    }
+   </dl>
+  }
+  if v.Registration.ReleasedAt!=nil {
+   <p role="status">Resolution confirmed. Further NetBird commands may be reviewed. The original registration result has not changed.</p>
+  } else {
+   <p role="status">Further NetBird commands remain blocked until resolution is confirmed.</p>
+   if v.CanResolve || v.CanContinue {
+    if v.CanCleanup && !v.Registration.KeyAbsent {
+     <p>Confirmation may start removal of the exact retained setup key. Agent release begins only after the provider confirms key absence. Removing a setup key does not disconnect a peer that already registered with it.</p>
+    }
+    if v.AgentState=="unconfirmed" {
+     <p>The agent reports that the earlier execution has ended. Confirmation may send its first explicit release, allowing further commands once matching evidence is retained.</p>
+    } else if v.AgentState=="completed" {
+     <p>The agent retained a completed receipt. Confirmation acknowledges that evidence after key removal is confirmed.</p>
+    } else if v.AgentState=="not-attempted" {
+     <p>No device delivery was attempted. Confirmation can resolve the request after key removal is confirmed, without contacting the agent.</p>
+    }
+    if v.CanContinue {
+     <p>This continuation uses a fresh review and starts only steps that have not yet been attempted. Previously attempted removal and release requests are never repeated.</p>
+     @netbirdRegistrationResolutionForm(info,v,v.Resolution.ID,"/continue","Confirm continuation")
+    } else {
+     @netbirdRegistrationResolutionForm(info,v,resolutionID,"","Confirm resolution")
+    }
+   } else if v.Resolution==nil {
+    <p>Matching provider and agent evidence is required before resolution can start. Missing key identity or a missing agent receipt cannot establish that registration did not occur.</p>
+   }
+   if v.Resolution!=nil {
+    <p>Checking evidence only reads provider and agent results. It cannot repeat key removal or send an agent release. If a later step becomes eligible, review again and explicitly confirm continuation.</p>
+    <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check" hx-indicator="#netbird-check-pending" class="netbird-confirm">
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="resolution_id" value={ v.Resolution.ID }/>
+     <input type="hidden" name="confirmed" value="yes"/>
+     <button class="uk-button uk-button-default" id="netbird-check" type="submit">Check retained evidence</button>
+     <span class="htmx-indicator" id="netbird-check-pending" role="status">Checking evidence…</span>
+    </form>
+   }
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution" }>Review again</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID }>Original receipt</a>
+  </div>
+ }
+}
+
+templ netbirdRegistrationResolutionForm(info *partials.CommonInfo,v *inventory.NetbirdRegistrationResolutionReview,resolutionID,suffix,label string) {
+ <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check" hx-indicator="#netbird-pending" class="netbird-confirm">
+  @mdm_views.CSRF(info)
+  <input type="hidden" name="resolution_id" value={ resolutionID }/>
+  <input type="hidden" name="revision" value={ v.Revision }/>
+  <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the provider and agent evidence, authorize the described remaining steps and allow further NetBird commands after confirmed resolution.</span></label>
+  <button class="uk-button uk-button-primary" id="netbird-submit" type="submit">{ label }</button>
+  <span class="htmx-indicator" id="netbird-pending" role="status">Confirming resolution…</span>
+ </form>
+}
+
+func netbirdRegistrationKeyState(state string)string {
+ switch state {
+ case "absent":return "Absence confirmed at the provider"
+ case "present":return "The exact retained key and its creation policy still match"
+ case "changed":return "The provider key no longer matches its retained creation policy; removal is blocked"
+ case "unknown":return "No retained key identity is available"
+ default:return "The provider cannot currently confirm the retained key state"
+ }
+}
+func netbirdRegistrationAgentState(state string)string {
+ switch state {
+ case "not-attempted":return "No device delivery was attempted"
+ case "completed":return "A matching completed receipt is retained"
+ case "unconfirmed":return "A matching unconfirmed receipt is retained"
+ case "resolved":return "Resolution evidence was confirmed"
+ default:return netbirdResolutionBlocked(state)
+ }
+}

@@ -58,6 +58,8 @@ type Handler struct {
 	DesktopBootstrapReady  bool
 	DesktopSetupError      string
 
+	NetbirdRegistrationResolutions *inventory.NetbirdRegistrationResolutionStore
+
 	SessionManager       *sessions.SessionManager
 	JWTKey               string
 	CertPath             string
