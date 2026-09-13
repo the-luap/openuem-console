@@ -584,10 +584,15 @@ server-admin editing without exposing stored tokens or creating data during GET.
 Explicit secret actions, independent provider/ownership revisions and audited
 copies protect shared legacy configuration. Token migration is bounded and
 resumable. Console and worker provider calls use shared HTTPS/status/response
-bounds, redirect refusal and exact peer-deletion identity. Owned database,
-route, browser and TLS tests cover these changes. Durable provider command
-admission, legacy device-operation authority, remaining user/provider secrets
-and physical/provider acceptance are still required.
+bounds, redirect refusal and unique matching peer IP results. Owned database,
+route, browser and TLS tests cover these changes. The agent now validates
+connection-command inputs, invokes fixed binaries with literal arguments and
+delivers one-off keys through a per-child environment. Command sequences retain
+one local identity, stop after failure and have shared subprocess deadlines.
+Durable provider command admission, legacy device-operation authority, bounded
+agent status collection, trusted Unix installers, authoritative peer ownership,
+remaining user/provider secrets and physical/provider acceptance are still
+required.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

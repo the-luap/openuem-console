@@ -91,6 +91,10 @@ Peer deletion requires exactly one provider result whose address matches the
 requested IP. Two matches are an error. Names are checked when testing for an
 existing peer, and returned IDs cannot inject URL paths. These requests use the
 published [peer API](https://docs.netbird.io/api/resources/peers).
+This matching check does not prove ownership: agent-reported IP addresses are
+mutable metadata, and shared provider accounts can contain another organization's
+peer. Authoritative peer association must be established before scoped deletion
+can be considered secure.
 
 Setup-key creation uses structured JSON for a one-off key, a one-day lifetime and
 usage limit one, following the published

@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Agent NetBird command execution](https://github.com/the-luap/openuem-agent/blob/daf5188/docs/netbird-command-execution.md)
+  now shares strict, bounded request validation and literal command arguments
+  across Linux, macOS and Windows. Fixed executable paths and positional profile
+  handles prevent shell/flag injection. One-off keys use only the registration
+  child's environment; inherited NetBird overrides and command output are not
+  propagated. Sequences retain one local execution identity, share subprocess
+  deadlines and stop on failure or cancellation. Windows uses the selected
+  token's native environment. Owned process and actual NATS subscription tests
+  pass; complete agent race suites pass on macOS/Linux in 26.860/26.752 seconds,
+  and all three platform builds pass. CI includes both new command packages.
+  Legacy status collection/profile parsing, Unix installer trust, durable command
+  admission/recovery, provider-peer ownership and native/physical acceptance
+  remain unfinished.
+
 - [NetBird settings](netbird-settings.md) now uses exact organization scope,
   current server administration, hidden tokens and explicit keep/replace/clear.
   Independent provider/link revisions reject stale edits and ownership ABA;
@@ -68,7 +82,8 @@ the table's package summaries do not remove any detail from the roadmap.
   token migration is bounded, audited, resumable and preserves shared/orphan scope
   and NULLs. Inventory navigation uses a presence-only projection. Console and
   worker provider requests share bounded HTTPS, redirect refusal, encoded queries,
-  status/response checks and exact peer-deletion identity. Owned PostgreSQL,
+  status/response checks and unique matching peer IP results. This does not
+  establish ownership of an agent-reported IP. Owned PostgreSQL,
   registered routes, browser and TLS provider checks cover these paths. Durable
   provider command admission, authority held throughout legacy device operations,
   other provider/user secrets, key rotation and production acceptance remain open.
