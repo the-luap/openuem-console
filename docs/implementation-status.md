@@ -61,6 +61,13 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Worker NetBird registration now uses the bounded shared legacy token reader.
+  Successful decryption continues registration and preserves following tasks;
+  unreadable tokens fail before that task contacts the provider. Owned
+  PostgreSQL/local-provider and profile-order tests pass (1.310 seconds), and
+  worker Linux/Windows builds pass. NetBird console editing, audited token
+  migration and bounded/durable provider HTTP operations remain open.
+
 - [SMTP settings and delivery](smtp-settings.md) now provides exact global or
   organization scope, held server administration, secret-free reviews, explicit
   password actions and atomic revision/audit checks. Startup migration is
