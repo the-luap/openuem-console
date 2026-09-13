@@ -38,6 +38,7 @@ import taskCloning from "./task-cloning.mjs";
 import taskCreation from "./task-creation.mjs";
 import taskEditing from "./task-editing.mjs";
 import profileEditor from "./profile-editor.mjs";
+import profileHistory from "./profile-history.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
 import profileDeletion from "./profile-deletion.mjs";
@@ -119,6 +120,7 @@ try {
         [taskCreation,45],
         [taskEditing,108],
         [profileEditor,117],
+        [profileHistory,72],
         [profileAudience,18],
         [profileMetadata,36],
         [profileDeletion,24],

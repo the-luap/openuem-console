@@ -1,7 +1,7 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 1872 cases. The table highlights
+headless Chrome session. The runner covers 1944 cases. The table highlights
 coverage; [run.mjs](run.mjs) defines the complete suite matrix:
 
 | Form | Case matrix | Cases |
@@ -9,6 +9,7 @@ coverage; [run.mjs](run.mjs) defines the complete suite matrix:
 | Enterprise Wi-Fi | System/User × existing/copied trust × three TLS ranges × three widths; reader at each width | 39 |
 | Active Directory certificates | System/User × omitted/explicit options × three widths; reader at each width | 15 |
 | IKEv2 certificate VPN | System/User × machine/EAP-TLS × existing/copied trust × three widths; reader at each width | 27 |
+| Profile report history | Global/organization/site × seven summary/detail states × three widths; real page response, URL and heading focus at each scope/width | 72 |
 | Scoped profile editor | Global/organization/site × normal/long names × six native workflows × three widths; pending request synchronization and focus at each scope/width | 117 |
 | Desktop inventory | Complete/incomplete and missing/zero-number reports × three widths; viewer/operator × six refresh states × three widths | 48 |
 | Desktop software | Viewer/operator × first/next/empty/long reports × three widths | 24 |

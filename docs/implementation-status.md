@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Scoped profile report history](profile-issues.md) now reads exact authorized
+  profiles and issue parents without deleting unrelated orphan records on GET.
+  Summaries exclude task definitions and output; independent 25-report detail
+  pages bound output and retain disabled/unavailable task results. Endpoint links
+  use current unique sites and suppress foreign current identity through scoped
+  profiles. Native pages replace embedded modals, preserve list navigation and
+  restore heading focus. Full inventory/audit PostgreSQL race suites pass in
+  85.605/9.399 seconds; registered Apple/OIDC routes, affected macOS/Linux race
+  checks, the full Linux build and 72 focused Chrome cases pass. The complete
+  1,944-case Chrome matrix passes in 95.094 seconds. Dispatch,
+  package/provider/settings routes, broader secret lifecycle, immutable revisions
+  and physical/provider acceptance remain open.
 - [Scoped legacy profile editor](profile-editor.md) now reads current authorized
   metadata, bounded task summaries and independent tag pages in one audited
   transaction. Task definitions and secrets are excluded. Global tag choices

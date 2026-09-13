@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"log"
-	"strconv"
 
-	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"github.com/open-uem/openuem-console/internal/views/profiles_views"
@@ -55,49 +53,4 @@ func (h *Handler) NewProfile(c echo.Context) error {
 	}
 
 	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.NewProfile(c, commonInfo), commonInfo))
-}
-
-func (h *Handler) ProfileIssues(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	profileID := c.Param("uuid")
-	if profileID == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.issues.empty_id"), true))
-	}
-
-	itemsPerPage, err := h.Model.GetDefaultItemsPerPage()
-	if err != nil {
-		log.Println("[ERROR]: could not get items per page from database")
-		itemsPerPage = 5
-	}
-
-	p := partials.NewPaginationAndSort(itemsPerPage)
-	p.GetPaginationAndSortParams(c.FormValue("page"), c.FormValue("pageSize"), c.FormValue("sortBy"), c.FormValue("sortOrder"), c.FormValue("currentSortBy"), itemsPerPage)
-
-	pID, err := strconv.Atoi(profileID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), true))
-	}
-
-	p.NItems, err = h.Model.CountAllProfileIssues(pID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	profile, err := h.Model.GetProfileById(pID, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.retrieve_err"), true))
-	}
-
-	issues, err := h.Model.GetProfileIssuesByPage(p, pID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), true))
-	}
-
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.ProfilesIssues(c, p, issues, profile, itemsPerPage, commonInfo), commonInfo))
 }

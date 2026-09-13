@@ -108,6 +108,7 @@ Mobile views were visually inspected. Affected macOS/Linux race checks and the
 full Linux build pass. The complete 1,872-case Chrome matrix passes in 93.704
 seconds.
 
-Profile issue reads, one-off dispatch, package/provider/settings routes, broader
+[Profile report history](profile-issues.md) now has scoped, bounded read paths
+that retain orphan records. One-off dispatch, package/provider/settings routes, broader
 secret lifecycle, immutable revisions, delegated legacy permissions and
 physical/provider acceptance remain open in the expanded roadmap.

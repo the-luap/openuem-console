@@ -28,6 +28,7 @@ const fixtures = new Set([
   ...["global","organization","site","long"].map(state=>`task-deletion-${state}`),
   ...["global","organization","site","long","empty"].map(state=>`task-cloning-${state}`),
   ...["global","organization","site","long"].map(state=>`task-creation-${state}`),
+  ...["global","organization","site"].flatMap(scope=>["list","list-orphan","list-empty","reports","reports-orphan","reports-empty","reports-long"].map(kind=>`profile-history-${scope}-${kind}`)),
   ...["global","organization","site"].flatMap(scope=>["normal","long"].map(kind=>`profile-editor-${scope}-${kind}`)),
   ...["global","organization","site"].flatMap(scope=>["script","user","unix-user","netbird","long"].map(kind=>`task-editing-${scope}-${kind}`)),
   ...["global","organization","site"].flatMap(scope=>["none","all","tags","all-with-tags"].map(state=>`profile-metadata-${scope}-${state}`)),

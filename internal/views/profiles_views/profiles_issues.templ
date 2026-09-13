@@ -2,173 +2,188 @@ package profiles_views
 
 import (
 	"fmt"
-	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
-	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
-	"strings"
+	"net/url"
+	"strconv"
 	"time"
 )
 
-templ ProfilesIssues(c echo.Context, p partials.PaginationAndSort, issues []*ent.ProfileIssue, profile *ent.Profile, itemsPerPage int, commonInfo *partials.CommonInfo) {
-	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Profile Management"), Url: string(templ.URL(partials.GetNavigationUrl(commonInfo, "/profiles")))}, {Title: profile.Name, Url: string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d", profile.ID))))}, {Title: i18n.T(ctx, "profiles.issues.title")}}, commonInfo)
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+func profileHistoryPath(info *partials.CommonInfo, id int64, page, size int) string {
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/issues", id)) + "?" + url.Values{"page": {strconv.Itoa(page)}, "pageSize": {strconv.Itoa(size)}}.Encode()
+}
+
+func profileReportPath(info *partials.CommonInfo, profile, issue int64, page, sourcePage, sourceSize int) string {
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/issues/%d", profile, issue)) + "?" + url.Values{"page": {strconv.Itoa(page)}, "issuePage": {strconv.Itoa(sourcePage)}, "issuePageSize": {strconv.Itoa(sourceSize)}}.Encode()
+}
+
+templ ProfilesIssues(c echo.Context, page *inventory.ProfileIssuesPage, info *partials.CommonInfo) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: "Profile Management", Url: partials.GetNavigationUrl(info, "/profiles")}, {Title: "Profile", Url: partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d", page.ProfileID))}, {Title: "Profile reports"}}, info)
+	<main class="grid flex-1 min-w-0 gap-4 p-4 sm:px-6 sm:py-0" hx-history="false">
 		<div id="error" class="hidden"></div>
-		<div class="uk-width-1-2@m uk-card uk-card-default">
-			<div class="uk-card-header">
-				<div class="flex justify-between items-center">
-					<div class="flex flex-col my-4 mx-1">
-						<h3 class="uk-card-title">{ i18n.T(ctx, "profiles.issues.title") }</h3>
-						<p class="uk-margin-small-top uk-text-small">
-							{ i18n.T(ctx, "profiles.issues.description") }
-						</p>
-					</div>
-				</div>
-			</div>
-			<div class="uk-card-body flex flex-col gap-4">
-				if len(issues) > 0 {
-					<table class="uk-table uk-table-divider uk-table-small uk-table-hover uk-table-striped mt-6">
-						<thead>
-							<tr>
-								<th class="w-1/6"><span>{ i18n.T(ctx, "profiles.issues.endpoint") }</span></th>
-								<th class="w-1/6"><span>{ i18n.T(ctx, "profiles.issues.last_report") }</span></th>
-								<th class="w-2/3"><span>{ i18n.T(ctx, "profiles.issues.tasks_report") }</span></th>
-							</tr>
-						</thead>
-						for index, issue := range issues {
-							if issue.Edges.Agents != nil {
-								<tr>
-									<td class="!align-middle">
-										<a
-											href={ templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s", issue.Edges.Agents.ID))) }
-											hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s", issue.Edges.Agents.ID)))) }
-											hx-push-url="true"
-											hx-target="#main"
-											hx-swap="outerHTML"
-											class="underline cursor-pointer"
-										>
-											{ issue.Edges.Agents.Nickname }
-										</a>
-									</td>
-									<td class="!align-middle">
-										{ issue.When.Local().String() }
-									</td>
-									<td class="flex flex-col gap-4 !align-middle">
-										if issue.Error != "" {
-											for line := range strings.SplitSeq(issue.Error, ", ") {
-												<p>{ line }</p>
-											}
-										} else {
-											if len(issue.Edges.Tasksreports) > 0 {
-												<div class="flex gap-2">
-													if getSuccessfulTasks(issue.Edges.Tasksreports) > 0 {
-														<span>{ i18n.T(ctx, "profiles.issues.tasks_report_successful_summary", getSuccessfulTasks(issue.Edges.Tasksreports)) }</span>
-													}
-													if getFailedTasks(issue.Edges.Tasksreports) > 0 {
-														<span class="text-red-600">{ i18n.T(ctx, "profiles.issues.tasks_report_failed_summary", getFailedTasks(issue.Edges.Tasksreports)) }</span>
-													}
-													<a class="underline cursor-pointer" href={ fmt.Sprintf("#modal-overflow-%d", index) } uk-toggle>{ i18n.T(ctx, "profiles.issues.tasks_report_more_info") }</a>
-												</div>
-												<div id={ fmt.Sprintf("modal-overflow-%d", index) } uk-modal>
-													<div id="profile-report-modal" class="uk-margin-auto-vertical uk-modal-dialog  w-2/3">
-														<button id={ fmt.Sprintf("profile-report-modal-close-%d", index) } class="uk-modal-close-default dark:text-white" type="button" uk-close></button>
-														<div class="flex flex-col gap-4 uk-modal-body" uk-overflow-auto>
-															<h2 class="uk-modal-title dark:text-white">{ i18n.T(ctx, "profiles.issues.tasks_report_for", issue.Edges.Agents.Nickname) }</h2>
-															@ReportDetail(issue, commonInfo, index)
-														</div>
-													</div>
-												</div>
-											} else {
-												{ "-" }
-											}
-										}
-									</td>
-								</tr>
-							}
-						}
-					</table>
-					@partials.Pagination(c, p, "get", "#main", "outerHTML", string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d/issues", profile.ID)))), itemsPerPage)
-				} else {
-					<p class="uk-text-small uk-text-muted mt-6">
-						{ i18n.T(ctx, "profiles.issues.no_issues") }
-					</p>
-				}
-			</div>
-		</div>
+		@ProfileIssuesContent(page, info)
 	</main>
 }
 
-templ ReportDetail(issue *ent.ProfileIssue, commonInfo *partials.CommonInfo, index int) {
-	<table class="uk-table uk-table-divider uk-table-small uk-table-hover uk-table-striped uk-overflow-auto">
-		for _, t := range issue.Edges.Tasksreports {
-			if t.Edges.Task != nil && !t.Edges.Task.Disabled {
-				<tr>
-					<th class="align-middle" rowspan="4">
-						<div class="flex gap-2">
-							if t.Failed {
-								@partials.Crossmark()
-							} else {
-								@partials.Checkmark()
-							}
-							<a
-								href={ templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d", t.Edges.Task.ID))) }
-								hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d", t.Edges.Task.ID)))) }
-								hx-params="none"
-								hx-push-url="true"
-								hx-target="#main"
-								hx-swap="outerHTML"
-								class="underline hover:cursor-pointer"
-								_={ fmt.Sprintf("on click call #profile-report-modal-close-%d.click()", index) }
-							>{ t.Edges.Task.Name }</a>
-						</div>
-					</th>
-				</tr>
-				<tr>
-					<th><span class="text-nowrap">{ i18n.T(ctx, "profiles.standard_error") }</span></th>
-					<td class="dark:text-white">{ t.StdError }</td>
-				</tr>
-				<tr>
-					<th><span class="text-nowrap">{ i18n.T(ctx, "profiles.standard_output") }</span></th>
-					<td class="dark:text-white">{ t.StdOutput }</td>
-				</tr>
-				<tr>
-					<th>{ i18n.T(ctx, "profiles.execution_time") }</th>
-					if when, err := parseTime(t.End); err == nil {
-						<td class="dark:text-white">{ commonInfo.Translator.FmtDateMedium(when.Local()) + " " + commonInfo.Translator.FmtTimeMedium(when.Local()) }</td>
-					}
-					if _, err := parseTime(t.End); err != nil {
-						<td class="dark:text-white">{ t.End }</td>
-					}
-				</tr>
+templ ProfileIssuesContent(page *inventory.ProfileIssuesPage, info *partials.CommonInfo) {
+	<section id="profile-issues-page" class="uk-card uk-card-default profile-history" hx-history="false" hx-sync="#main:replace">
+		<link rel="stylesheet" href="/assets/css/profile-history.css"/>
+		<script src="/assets/js/profile-history.js" defer></script>
+		<div class="uk-card-header">
+			<h3 id="profile-history-heading" tabindex="-1" class="uk-card-title">Profile reports</h3>
+			<p>{ page.ProfileName }</p>
+			<p>{ fmt.Sprintf("Profile ID: %d · %d reports",page.ProfileID,page.Total) }</p>
+		</div>
+		<div class="uk-card-body flex flex-col gap-4 min-w-0">
+			<p>Stored history includes reports whose endpoint or task is no longer available.</p>
+			if page.Total==0 {
+				<p>No profile reports are available.</p>
 			}
-		}
-	</table>
+			for _,issue:=range page.Issues {
+				<article class="profile-history-entry" data-profile-issue={ strconv.FormatInt(issue.ID, 10) }>
+					@ProfileIssueHeading(issue)
+					if issue.Error!="" {
+						<pre class="profile-history-output" tabindex="0" aria-label={ fmt.Sprintf("Profile report %d error", issue.ID) }>{ issue.Error }</pre>
+						if issue.ErrorTruncated {
+							<p class="uk-text-small">The error preview is limited to 1,024 characters.</p>
+						}
+					}
+					<p>{ fmt.Sprintf("%d successful · %d failed task reports",issue.Reports-issue.Failed,issue.Failed) }</p>
+					<div>
+						@ProfileHistoryLink(profileReportPath(info, page.ProfileID, issue.ID, 1, page.Page, page.PageSize), "View task reports")
+					</div>
+				</article>
+			}
+			<nav class="profile-history-navigation" aria-label="Profile report pages">
+				if page.Page>1 {
+					@ProfileHistoryLink(profileHistoryPath(info, page.ProfileID, page.Page-1, page.PageSize), "Previous reports")
+				}
+				<span>{ fmt.Sprintf("Page %d of %d · %d per page",page.Page,max(1,(page.Total+page.PageSize-1)/page.PageSize),page.PageSize) }</span>
+				if page.Page*page.PageSize<page.Total {
+					@ProfileHistoryLink(profileHistoryPath(info, page.ProfileID, page.Page+1, page.PageSize), "Next reports")
+				}
+			</nav>
+		</div>
+	</section>
 }
 
-func getFailedTasks(taskReports []*ent.TaskReport) int {
-	failed := 0
-
-	for _, t := range taskReports {
-		if t.Failed && !t.Edges.Task.Disabled {
-			failed++
+templ ProfileIssueHeading(issue inventory.ProfileIssueSummary) {
+	<h4>{ fmt.Sprintf("Report %d",issue.ID) }</h4>
+	<div>
+		if issue.EndpointState=="available" {
+			<a class="underline" href={ templ.URL(fmt.Sprintf("/tenant/%d/site/%d/computers/%s", issue.EndpointScope.TenantID, issue.EndpointScope.SiteID, url.PathEscape(issue.EndpointID))) } hx-get={ fmt.Sprintf("/tenant/%d/site/%d/computers/%s", issue.EndpointScope.TenantID, issue.EndpointScope.SiteID, url.PathEscape(issue.EndpointID)) } hx-params="none" hx-target="#main" hx-swap="outerHTML" hx-push-url="true">{ issue.EndpointName }</a>
+			<p class="uk-text-small">{ fmt.Sprintf("Endpoint %s · Organization %d · Site %d",issue.EndpointID,issue.EndpointScope.TenantID,issue.EndpointScope.SiteID) }</p>
+		} else if issue.EndpointState=="missing" {
+			<p>Endpoint no longer available</p>
+		} else {
+			<p>Endpoint identity is unavailable in this profile's current scope.</p>
 		}
+	</div>
+	<p>
+		{ "Reported: " }
+		@ProfileHistoryTime(issue.When)
+	</p>
+}
+
+templ ProfileIssueReports(c echo.Context, page *inventory.ProfileIssueReportsPage, sourcePage, sourceSize int, info *partials.CommonInfo) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: "Profile Management", Url: partials.GetNavigationUrl(info, "/profiles")}, {Title: "Profile reports", Url: profileHistoryPath(info, page.ProfileID, sourcePage, sourceSize)}, {Title: "Task reports"}}, info)
+	<main class="grid flex-1 min-w-0 gap-4 p-4 sm:px-6 sm:py-0" hx-history="false">
+		<div id="error" class="hidden"></div>
+		@ProfileIssueReportsContent(page, sourcePage, sourceSize, info)
+	</main>
+}
+
+templ ProfileIssueReportsContent(page *inventory.ProfileIssueReportsPage, sourcePage, sourceSize int, info *partials.CommonInfo) {
+	<section id="profile-issue-reports-page" class="uk-card uk-card-default profile-history" hx-history="false" hx-sync="#main:replace">
+		<link rel="stylesheet" href="/assets/css/profile-history.css"/>
+		<script src="/assets/js/profile-history.js" defer></script>
+		<div class="uk-card-header">
+			<h3 id="profile-history-heading" tabindex="-1" class="uk-card-title">Task reports</h3>
+			<p>{ page.ProfileName }</p>
+			<p>{ fmt.Sprintf("Profile ID: %d · Report ID: %d",page.ProfileID,page.Issue.ID) }</p>
+		</div>
+		<div class="uk-card-body flex flex-col gap-4 min-w-0">
+			<div>
+				@ProfileHistoryLink(profileHistoryPath(info, page.ProfileID, sourcePage, sourceSize), "Back to profile reports")
+			</div>
+			@ProfileIssueHeading(page.Issue)
+			if page.Issue.Error!="" {
+				<pre class="profile-history-output" tabindex="0" aria-label="Profile report error">{ page.Issue.Error }</pre>
+				if page.Issue.ErrorTruncated {
+					<p class="uk-text-small">The error preview is limited to 1,024 characters.</p>
+				}
+			}
+			<p>{ fmt.Sprintf("%d stored task reports. Current task status does not change historical outcomes.",page.Total) }</p>
+			if page.Total==0 {
+				<p>No task reports are available for this profile report.</p>
+			}
+			for _,report:=range page.Reports {
+				<article class="profile-history-entry" data-task-report={ strconv.FormatInt(report.ID, 10) }>
+					<h4>{ fmt.Sprintf("Task report %d",report.ID) }</h4>
+					if report.TaskID>0 {
+						<div><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", report.TaskID))) } hx-get={ partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", report.TaskID)) } hx-params="none" hx-target="#main" hx-swap="outerHTML" hx-push-url="true">{ report.TaskName }</a></div>
+						if report.TaskDisabled {
+							<p>Task is currently disabled.</p>
+						}
+					} else {
+						<p>Current task is unavailable in this profile.</p>
+					}
+					if report.Failed {
+						<p class="font-semibold">Result: Failed</p>
+					} else {
+						<p class="font-semibold">Result: Succeeded</p>
+					}
+					if report.End!=nil || report.RawEnd=="" {
+						<p>
+							{ "Completed: " }
+							@ProfileHistoryTime(report.End)
+						</p>
+					} else {
+						<p>Unrecognized completion time: { report.RawEnd }</p>
+					}
+					<h5>Standard output</h5>
+					if report.Output!="" {
+						<pre class="profile-history-output" tabindex="0" aria-label={ fmt.Sprintf("Task report %d standard output", report.ID) }>{ report.Output }</pre>
+					} else {
+						<p>No standard output was reported.</p>
+					}
+					if report.OutputTruncated {
+						<p class="uk-text-small">Standard output is limited to the first 4,096 characters.</p>
+					}
+					<h5>Standard error</h5>
+					if report.Error!="" {
+						<pre class="profile-history-output" tabindex="0" aria-label={ fmt.Sprintf("Task report %d standard error", report.ID) }>{ report.Error }</pre>
+					} else {
+						<p>No standard error was reported.</p>
+					}
+					if report.ErrorTruncated {
+						<p class="uk-text-small">Standard error is limited to the first 4,096 characters.</p>
+					}
+				</article>
+			}
+			<nav class="profile-history-navigation" aria-label="Task report pages">
+				if page.Page>1 {
+					@ProfileHistoryLink(profileReportPath(info, page.ProfileID, page.Issue.ID, page.Page-1, sourcePage, sourceSize), "Previous task reports")
+				}
+				<span>{ fmt.Sprintf("Page %d of %d · 25 per page",page.Page,max(1,(page.Total+inventory.ProfileIssueReportPageSize-1)/inventory.ProfileIssueReportPageSize)) }</span>
+				if page.Page*inventory.ProfileIssueReportPageSize<page.Total {
+					@ProfileHistoryLink(profileReportPath(info, page.ProfileID, page.Issue.ID, page.Page+1, sourcePage, sourceSize), "Next task reports")
+				}
+			</nav>
+		</div>
+	</section>
+}
+
+templ ProfileHistoryLink(path, label string) {
+	<a class="uk-button uk-button-default" href={ templ.URL(path) } hx-get={ path } hx-params="none" hx-target="#main" hx-swap="outerHTML" hx-push-url="true">{ label }</a>
+}
+
+templ ProfileHistoryTime(value *time.Time) {
+	if value==nil {
+		<span>Not reported</span>
+	} else {
+		<time datetime={ value.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision="second" title={ value.UTC().Format(time.RFC3339Nano) }>{ value.UTC().Format("2006-01-02 15:04:05 UTC") }</time>
 	}
-
-	return failed
-}
-
-func getSuccessfulTasks(taskReports []*ent.TaskReport) int {
-	successful := 0
-
-	for _, t := range taskReports {
-		if !t.Failed && !t.Edges.Task.Disabled {
-			successful++
-		}
-	}
-
-	return successful
-}
-
-func parseTime(when string) (time.Time, error) {
-	return time.ParseInLocation(time.RFC3339Nano, when, time.Local)
 }

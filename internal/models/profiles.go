@@ -6,7 +6,6 @@ import (
 
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/profile"
-	"github.com/open-uem/ent/profileissue"
 	"github.com/open-uem/ent/site"
 	"github.com/open-uem/ent/tenant"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -86,30 +85,4 @@ func (m *Model) GetProfilesByPage(p partials.PaginationAndSort, c *partials.Comm
 func (m *Model) GetProfileById(profileId int, c *partials.CommonInfo) (*ent.Profile, error) {
 
 	return m.Client.Profile.Query().WithTags().WithTasks().WithIssues().Where(profile.ID(profileId)).First(context.Background())
-}
-
-func (m *Model) CountAllProfileIssues(profileID int) (int, error) {
-	// Remove issues that has no agents associated
-	nDeleted, err := m.Client.ProfileIssue.Delete().Where(profileissue.Not(profileissue.HasAgents())).Exec(context.Background())
-	if err != nil {
-		return nDeleted, err
-	}
-
-	return m.Client.ProfileIssue.Query().Where(profileissue.HasProfileWith(profile.ID(profileID))).Count(context.Background())
-}
-
-func (m *Model) GetProfileIssuesByPage(p partials.PaginationAndSort, profileID int) ([]*ent.ProfileIssue, error) {
-	// Remove issues that has no agents associated
-	_, err := m.Client.ProfileIssue.Delete().Where(profileissue.Not(profileissue.HasAgents())).Exec(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	return m.Client.ProfileIssue.Query().
-		WithAgents().
-		WithTasksreports(func(q *ent.TaskReportQuery) { q.WithTask().All(context.Background()) }).
-		Where(profileissue.HasProfileWith(profile.ID(profileID))).
-		Order(ent.Desc(profileissue.FieldWhen)).
-		Limit(p.PageSize).
-		Offset((p.CurrentPage - 1) * p.PageSize).All(context.Background())
 }
