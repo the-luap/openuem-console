@@ -39,6 +39,12 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		return err
 	}
 	w.Handler.NetbirdResolutions = resolution
+	registration, err := inventory.NewNetbirdRegistrationStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.EncryptionMasterKey, nil, w.Handler.RequestNetbirdControl, w.Handler.PublishNetbirdOperation)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdRegistrations = registration
+
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
 	w.inventoryDone = make(chan struct{})
@@ -49,7 +55,10 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		go func() { defer close(refreshDone); store.Run(run, slog.Default()) }()
 		netbirdDone := make(chan struct{})
 		go func() { defer close(netbirdDone); netbird.Run(run, slog.Default()) }()
+		registrationDone := make(chan struct{})
+		go func() { defer close(registrationDone); registration.Run(run, slog.Default()) }()
 		manual.Run(run, slog.Default())
+		<-registrationDone
 		<-refreshDone
 		<-netbirdDone
 	}()

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -337,4 +338,34 @@ func (s *NetbirdRegistrationStore) DispatchOne(parent context.Context) (bool, er
 		}
 	}
 	return uncertain()
+}
+
+// Run joins every dispatch before returning on cancellation. A failed dispatch
+// retains its permanent stage evidence for the next bounded recovery pass.
+func (s *NetbirdRegistrationStore) Run(ctx context.Context, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.operations.wake:
+		case <-ticker.C:
+		}
+		for i := 0; i < 10; i++ {
+			worked, err := s.DispatchOne(ctx)
+			if err != nil {
+				if ctx.Err() == nil {
+					logger.Error("NetBird registration dispatch is unavailable")
+				}
+				break
+			}
+			if !worked {
+				break
+			}
+		}
+	}
 }

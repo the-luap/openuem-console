@@ -44,6 +44,7 @@ type Handler struct {
 	ManualExecution        *inventory.ManualExecutionStore
 	NetbirdOperations      *inventory.NetbirdOperationStore
 	NetbirdResolutions     *inventory.NetbirdResolutionStore
+	NetbirdRegistrations   *inventory.NetbirdRegistrationStore
 	inventoryPublisher     inventoryPublisher
 	PublicOrigin           string
 	Model                  *models.Model

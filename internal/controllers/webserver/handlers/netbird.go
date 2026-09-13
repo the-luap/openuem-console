@@ -54,11 +54,11 @@ func (h *Handler) netbirdLifecycleUnavailable(c echo.Context) error {
 	if _, _, err := h.netbirdInfo(c); err != nil {
 		return err
 	}
-	return echo.NewHTTPError(503, "NetBird installation, registration and peer removal are not yet available through managed commands.")
+	return echo.NewHTTPError(503, "NetBird installation and peer removal are not yet available through managed commands.")
 }
 func (h *Handler) NetbirdInstall(c echo.Context) error   { return h.netbirdLifecycleUnavailable(c) }
 func (h *Handler) NetbirdUninstall(c echo.Context) error { return h.netbirdLifecycleUnavailable(c) }
-func (h *Handler) NetbirdRegister(c echo.Context) error  { return h.netbirdLifecycleUnavailable(c) }
+func (h *Handler) NetbirdRegister(c echo.Context) error  { return h.NetbirdRegistrationRequest(c) }
 func (h *Handler) NetbirdDeletePeer(c echo.Context, uninstalling bool) error {
 	return h.netbirdLifecycleUnavailable(c)
 }

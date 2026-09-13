@@ -1,10 +1,12 @@
 # Managed NetBird registration storage
 
 `NetbirdRegistrationStore` implements reviewed, durable registration admission
-and staged dispatch. It is available as a backend component; console routes,
-forms and startup dispatch are not enabled yet. Existing registration aliases
-continue to reject mutations. Installation, authoritative provider-peer binding,
-combined registration resolution, and real-provider acceptance remain open.
+and staged dispatch. The console now provides exact-site group selection,
+review, submission, receipts, history, queued cancellation and read-only cleanup
+checks. Startup owns and joins the registration dispatcher. The old registration
+alias accepts only the same complete reviewed request; raw legacy settings cannot
+bypass it. Installation, authoritative provider-peer binding, combined
+registration resolution, and real-provider acceptance remain open.
 
 ## Admission and authority
 
@@ -23,6 +25,22 @@ request UUID with a fixed two-minute lifetime. Connection and registration
 requests share a device admission lock and reject request-ID reuse across both
 families. A queued or unresolved registration blocks new connection operations.
 Only an unattempted queued registration can be cancelled.
+
+The device overview and history pages do not contact the provider or agent.
+Opening group selection performs a live capability and provider-group read;
+reviewing a selection does not create a key. Forms submit exact group IDs rather
+than display labels. Explicit confirmation binds the request UUID, review digest,
+groups and extra-DNS choice. Inputs reject repeated scalar fields, duplicate or
+unknown group IDs, unsupported encodings, and oversized requests. Current route
+capabilities, body/header CSRF checks, no-store responses and HTMX redirects cover
+both the new routes and the old registration alias.
+
+Receipts show key creation, device execution and key removal separately. A reader
+can inspect recorded results without management controls. History uses a stable
+50-record cursor in the original scope, including after a move or removal.
+Unconfirmed receipts only offer an eligible read-only key-removal check; they
+cannot repeat registration or release an unknown device outcome.
+
 
 ## Credentials and retained evidence
 
@@ -90,10 +108,16 @@ permanent evidence, stage/audit rollback, lost responses, cleanup under captured
 credentials, and restart without repeated effects. Existing NetBird connection
 and coordinated-resolution tests remain part of regression validation.
 
-Before enabling registration in the console, complete review/receipt/history
-routes and accessible forms, startup wiring, combined provider/agent uncertainty
-resolution and authoritative peer association. Missing creation responses and
-undelivered release requests still need explicit recovery policy; do not clear
+Rendered view, real route and browser tests cover scoped permissions, CSRF,
+confirmation, precise group policy, key-removal reconciliation, retained history,
+keyboard submission, pending input locks and long provider labels. All 57 new
+registration browser cases and the complete 2,226-case browser suite pass at
+390, 768 and 1,440 pixels. Owned database
+tests cover empty group policy, 50-row pagination and joined dispatcher shutdown.
+
+Combined provider/agent uncertainty resolution and authoritative peer association
+remain incomplete. Missing creation responses and undelivered release requests
+still need explicit recovery policy; do not clear
 journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

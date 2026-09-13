@@ -135,6 +135,7 @@ func exerciseNetbirdOperationRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx 
 	}
 	require.Equal(t, 1, calls)
 	exerciseNetbirdResolutionRoutes(t, h, e, ctx, scope, id, path)
+	exerciseNetbirdRegistrationRoutes(t, h, e, ctx, tenant, site)
 	require.NoError(t, h.Model.Client.Agent.DeleteOneID(id).Exec(ctx))
 	require.Equal(t, 200, request("scoped-viewer", "GET", receiptPath, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("scoped-viewer", "GET", path, nil, "console-test-token").Code)

@@ -124,6 +124,7 @@ func TestNetbirdOperationViews(t *testing.T) {
 			if kind == "overview-viewer" {
 				require.NotContains(t, html, "Review connect")
 				require.NotContains(t, html, "Review profile switch")
+				require.NotContains(t, html, "Register with provider")
 			}
 			if kind == "unconfirmed" || kind == "released" {
 				require.Contains(t, html, "Execution is unconfirmed.")

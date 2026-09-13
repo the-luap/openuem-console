@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	nats "github.com/open-uem/nats"
 	"github.com/open-uem/nats/legacysecret"
 	"github.com/open-uem/nats/netbirdapi"
 	"github.com/open-uem/nats/netbirdcommand"
@@ -77,6 +78,7 @@ func (r NetbirdRegistration) String() string   { return "NetBird registration (c
 func (r NetbirdRegistration) GoString() string { return r.String() }
 
 type NetbirdRegistrationReview struct {
+	GroupChoices            []nats.NetBirdGroups
 	Target                  ManualTarget
 	Revision, ManagementURL string
 	Groups                  []string
@@ -148,6 +150,7 @@ func (s *NetbirdRegistrationStore) source(ctx context.Context, tx *sql.Tx, scope
 	data, _ := json.Marshal([]any{source.Revision, groups, extra})
 	digest := sha256.Sum256(data)
 	review := &NetbirdRegistrationReview{Target: source.Target, Revision: hex.EncodeToString(digest[:]), ManagementURL: source.ManagementURL, Groups: groups, ExtraDNS: extra, Journal: source.Journal}
+	review.GroupChoices = available
 	snapshot = registrationSnapshot{source.ManagementURL, token, source.identity, source.identityExpiresAt}
 	return review, snapshot, nil
 }
@@ -265,7 +268,14 @@ func (s *NetbirdRegistrationStore) Request(parent context.Context, actor string,
 	if err = registrationAudit(ctx, tx, r, actor, "request", ""); err != nil {
 		return nil, err
 	}
-	return r, tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	select {
+	case s.operations.wake <- struct{}{}:
+	default:
+	}
+	return r, nil
 }
 
 func recordedRegistration(ctx context.Context, tx *sql.Tx, scope access.Scope, device, id, lock string) (*NetbirdRegistration, error) {
@@ -399,4 +409,51 @@ func (s *NetbirdRegistrationStore) ReconcileCleanup(parent context.Context, acto
 		return nil, err
 	}
 	return r, tx.Commit()
+}
+
+// History returns stable, bounded pages in the recorded scope after a move or
+// removal. It does not decrypt credentials, contact providers, or query agents.
+func (s *NetbirdRegistrationStore) History(parent context.Context, actor string, scope access.Scope, device, before string) ([]NetbirdRegistration, error) {
+	if !ValidReportDeviceID(device) || before != "" && !canonicalRequestID(before) {
+		return nil, ErrNetbirdOperationInvalid
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+	tx, err := s.operations.recordTx(ctx, actor, scope, access.ReadDevices)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	at := time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	id := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	if before != "" {
+		r, err := recordedRegistration(ctx, tx, scope, device, before, "")
+		if err != nil {
+			return nil, err
+		}
+		at, id = r.RequestedAt, r.ID
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT `+registrationColumns+` FROM uem_netbird_registrations r WHERE device_id=$1 AND tenant_id=$2 AND site_id=$3 AND (requested_at,id)<($4,$5::uuid) ORDER BY requested_at DESC,id DESC LIMIT 50`, device, scope.TenantID, scope.SiteID, at, id)
+	if err != nil {
+		return nil, err
+	}
+	result := []NetbirdRegistration{}
+	for rows.Next() {
+		r, err := scanRegistration(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		r.snapshot = ""
+		result = append(result, *r)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if err = registrationAudit(ctx, tx, &NetbirdRegistration{DeviceID: device, Scope: scope}, actor, "read", "history"); err != nil {
+		return nil, err
+	}
+	return result, tx.Commit()
 }

@@ -608,8 +608,8 @@ Native initialization now binds the protected journal to the installation and
 joins managed subscriptions before releasing native identity ownership. Exact-site
 console review, submission, receipt, history and queued cancellation are wired and
 covered by real routes and 51 new/2,145 total browser cases. Old mutating agent
-subjects and profile steps are rejected. Installation, registration, removal and
-peer deletion are temporarily unavailable; workers withhold profiles containing
+subjects and profile steps are rejected. Installation, removal and peer deletion
+are temporarily unavailable; workers withhold profiles containing
 active legacy NetBird steps without creating provider keys. These restrictions
 are an intermediate migration state, not completed lifecycle support.
 [Reviewed resolution](netbird-resolutions.md) now persists immutable console
@@ -625,11 +625,15 @@ and setup-key snapshots, permanent creation/delivery/cleanup attempts, correlate
 command evidence, and exact-key absence reconciliation. Restart never repeats
 key creation or device registration. Connection and registration admission share
 one barrier; provider cleanup retains the original credential origin. Owned TLS,
-PostgreSQL, filesystem and broker tests cover uncertainty and rollback. This is a
-backend component: registration UI/startup wiring and combined provider/agent
-resolution remain incomplete. Trusted Unix installers, authoritative peer
-ownership, remaining user/provider secrets and physical/provider acceptance are
-still required.
+PostgreSQL, filesystem and broker tests cover uncertainty and rollback. Exact-site
+group selection, reviewed submission, receipts, paged history, queued cancellation
+and read-only key-removal checks are now wired into the console. Its dispatcher
+joins shutdown; old registration aliases require the same complete reviewed
+contract. Route and browser tests cover permissions, CSRF, precise group IDs,
+keyboard confirmation, pending input and long content: 57 new registration cases
+and all 2,226 browser cases pass. Combined provider/agent
+resolution, trusted Unix installers, authoritative peer ownership, remaining
+user/provider secrets and physical/provider acceptance are still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

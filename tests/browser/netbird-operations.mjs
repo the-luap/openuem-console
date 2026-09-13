@@ -18,7 +18,7 @@ export default async function run(browser, record) {
       browser.check(request?.method==='post'&&request.path===base&&request.fields.length===6&&request.fields.some(([k,v])=>k==='operation'&&v===operation)&&request.fields.some(([k,v])=>k==='revision'&&v==='a'.repeat(64))&&request.fields.some(([k,v])=>k==='csrf'&&v==='owned-netbird-csrf'),'NetBird confirmation lost exact command or CSRF fields');
     } else if (kind.startsWith('overview')) {
       browser.check(text.includes('Reported device state'),'Overview presented reports as live execution evidence');
-      if (kind==='overview-viewer') browser.check(!text.includes('Review connect')&&!text.includes('Review profile switch'),'Reader was offered management controls');
+      if (kind==='overview-viewer') browser.check(!text.includes('Review connect')&&!text.includes('Review profile switch')&&!text.includes('Register with provider'),'Reader was offered management controls');
       else if (kind==='overview-empty') browser.check(await browser.evaluate('document.querySelector("#netbird-profile").disabled'),'Empty profile list remains selectable');
       else {
         await browser.evaluate(`window.netbirdProfile=null;document.querySelector('.netbird-profile').addEventListener('submit',e=>{e.preventDefault();netbirdProfile=[...new FormData(e.target)]});document.querySelector('#netbird-profile').selectedIndex=1;document.querySelector('.netbird-profile button').focus()`);await browser.enter();

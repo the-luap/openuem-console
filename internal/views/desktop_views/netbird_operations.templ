@@ -58,6 +58,7 @@ templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.N
   </dl>
   <div class="netbird-actions">
    <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,page.Target.ID) }>Command history</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,page.Target.ID) }>Registration history</a>
    if info.Principal.Can(access.RefreshDevices,page.Target.Scope) {
     <form method="post" action={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(page.Target.ID)+"/netbird/refresh") }>
      @mdm_views.CSRF(info)
@@ -67,6 +68,7 @@ templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.N
    }
   </div>
   if page.Installed && netbirdCanManage(info,page.Target.Scope) {
+   <div class="netbird-actions"><a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,page.Target.ID)+"/new" }>Register with provider</a></div>
    <h2>Connection commands</h2>
    <p>Review the target and impact before submitting. The agent must have a ready execution journal.</p>
    <div class="netbird-actions">
@@ -88,7 +90,7 @@ templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.N
     <p role="status">No selectable profiles were reported.</p>
    }
   }
-  <p>Managed installation, registration and peer removal are not yet available.</p>
+  <p>Managed installation and peer removal are not yet available.</p>
  }
 }
 

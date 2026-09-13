@@ -21,6 +21,7 @@ const assetRoot = realpathSync(
   fileURLToPath(new URL("../../assets", import.meta.url)),
 );
 const fixtures = new Set([
+ ...['choices','choices-empty','choices-long','review','review-empty','review-long','queued','started','completed','stopped','unconfirmed-create','unconfirmed-delivery','unconfirmed-cleanup','unconfirmed-cleaned','unconfirmed-viewer','history','history-empty','history-full'].map(kind=>'netbird-registrations-'+kind),
  ...["global","organization"].flatMap(scope=>["normal","empty","saved","sent","unconfirmed","changed","long"].map(kind=>"smtp-settings-"+scope+"-"+kind)),
  ...["new","configured","empty","shared","saved","long"].map(kind=>"netbird-settings-"+kind),
  ...["ordinary","duplicate","legacy","injected","empty","malformed"].map(kind=>"netbird-profiles-"+kind),
