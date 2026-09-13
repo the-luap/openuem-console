@@ -145,11 +145,10 @@ func (h *Handler) Overview(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -189,11 +188,10 @@ func (h *Handler) Computer(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 	return RenderView(c, computers_views.InventoryIndex(" | Inventory", computers_views.Computer(c, p, agent, confirmDelete, commonInfo, netbird, offline), commonInfo))
@@ -232,11 +230,10 @@ func (h *Handler) OperatingSystem(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -300,11 +297,10 @@ func (h *Handler) NetworkAdapters(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -349,11 +345,10 @@ func (h *Handler) Printers(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -392,11 +387,10 @@ func (h *Handler) LogicalDisks(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -435,11 +429,10 @@ func (h *Handler) PhysicalDisks(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -479,11 +472,10 @@ func (h *Handler) Shares(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -522,11 +514,10 @@ func (h *Handler) Monitors(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -597,11 +588,10 @@ func (h *Handler) Apps(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -648,11 +638,10 @@ func (h *Handler) RemoteAssistance(c echo.Context) error {
 	_, err = net.LookupIP(agent.Hostname + "." + domain)
 	isHostResolvedByDNS := err == nil
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -985,11 +974,10 @@ func (h *Handler) ComputerDeploy(c echo.Context, successMessage string) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -1338,11 +1326,10 @@ func (h *Handler) PowerManagement(c echo.Context) error {
 		if err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 		}
-		settings, err := h.Model.GetNetbirdSettings(tenantID)
+		netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 		if err != nil {
 			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 		}
-		netbird := settings.AccessToken != ""
 
 		offline := h.IsAgentOffline(c)
 
@@ -1528,11 +1515,10 @@ func (h *Handler) ComputerMetadata(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -1576,11 +1562,10 @@ func (h *Handler) Notes(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -1846,11 +1831,10 @@ func (h *Handler) SetDefaultPrinter(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -1911,12 +1895,10 @@ func (h *Handler) RemovePrinter(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 

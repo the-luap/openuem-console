@@ -22,6 +22,7 @@ const assetRoot = realpathSync(
 );
 const fixtures = new Set([
  ...["global","organization"].flatMap(scope=>["normal","empty","saved","sent","unconfirmed","changed","long"].map(kind=>"smtp-settings-"+scope+"-"+kind)),
+ ...["new","configured","empty","shared","saved","long"].map(kind=>"netbird-settings-"+kind),
   ...["normal","empty","missing","disabled","long"].map(kind=>"desktop-task-history-"+kind),
   ...["choices-task","choices-profile","choices-empty","choices-pending","choices-long","review-task","review-profile","review-long","queued","sending","accepted","rejected","stopped","unconfirmed"].map(kind=>"manual-execution-"+kind),
   ...["global","organization","site"].map(scope=>`task-order-${scope}`),

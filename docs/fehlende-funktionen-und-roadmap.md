@@ -579,6 +579,16 @@ console reminders share the bounded secret reader. Owned PostgreSQL, route,
 browser and TLS transport checks cover these paths. Provider/user secrets,
 key rotation/recovery and production mailbox acceptance remain open.
 
+[NetBird settings](netbird-settings.md) now provides organization-scoped,
+server-admin editing without exposing stored tokens or creating data during GET.
+Explicit secret actions, independent provider/ownership revisions and audited
+copies protect shared legacy configuration. Token migration is bounded and
+resumable. Console and worker provider calls use shared HTTPS/status/response
+bounds, redirect refusal and exact peer-deletion identity. Owned database,
+route, browser and TLS tests cover these changes. Durable provider command
+admission, legacy device-operation authority, remaining user/provider secrets
+and physical/provider acceptance are still required.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.

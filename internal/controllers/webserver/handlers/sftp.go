@@ -114,12 +114,10 @@ func (h *Handler) BrowseLogicalDisk(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -251,11 +249,10 @@ func (h *Handler) DeleteItem(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -340,11 +337,10 @@ func (h *Handler) RenameItem(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -422,11 +418,10 @@ func (h *Handler) DeleteMany(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
@@ -532,11 +527,10 @@ func (h *Handler) UploadFile(c echo.Context) error {
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 

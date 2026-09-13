@@ -61,12 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
-- Worker NetBird registration now uses the bounded shared legacy token reader.
-  Successful decryption continues registration and preserves following tasks;
-  unreadable tokens fail before that task contacts the provider. Owned
-  PostgreSQL/local-provider and profile-order tests pass (1.310 seconds), and
-  worker Linux/Windows builds pass. NetBird console editing, audited token
-  migration and bounded/durable provider HTTP operations remain open.
+- [NetBird settings](netbird-settings.md) now uses exact organization scope,
+  current server administration, hidden tokens and explicit keep/replace/clear.
+  Independent provider/link revisions reject stale edits and ownership ABA;
+  shared legacy rows are copied only for the organization being edited. Startup
+  token migration is bounded, audited, resumable and preserves shared/orphan scope
+  and NULLs. Inventory navigation uses a presence-only projection. Console and
+  worker provider requests share bounded HTTPS, redirect refusal, encoded queries,
+  status/response checks and exact peer-deletion identity. Owned PostgreSQL,
+  registered routes, browser and TLS provider checks cover these paths. Durable
+  provider command admission, authority held throughout legacy device operations,
+  other provider/user secrets, key rotation and production acceptance remain open.
 
 - [SMTP settings and delivery](smtp-settings.md) now provides exact global or
   organization scope, held server administration, secret-free reviews, explicit

@@ -3,15 +3,14 @@ package inventory
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/open-uem/nats"
+	"github.com/open-uem/nats/legacysecret"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/taskconfig"
-	"github.com/open-uem/utils"
 )
 
 var ErrTaskWizardProvider = errors.New("task provider groups are unavailable")
@@ -43,21 +42,13 @@ func ReadTaskWizard(parent context.Context, db *sql.DB, permissions *access.Stor
 		var base, token string
 		// The scope transaction already holds the tenant row, including its settings
 		// FK. Lock the referenced settings row against rotation until the read ends.
-		err = tx.QueryRowContext(ctx, `SELECT coalesce(n.management_url,''),coalesce(n.access_token,'') FROM netbird_settings n JOIN tenants t ON t.tenant_netbird=n.id WHERE t.id=$1 AND coalesce(octet_length(n.management_url),0)<=2048 AND coalesce(octet_length(n.access_token),0)<=32768 FOR SHARE OF n`, scope.TenantID).Scan(&base, &token)
+		err = tx.QueryRowContext(ctx, `SELECT coalesce(n.management_url,''),coalesce(n.access_token,'') FROM netbird_settings n JOIN tenants t ON t.tenant_netbird=n.id WHERE t.id=$1 AND coalesce(octet_length(n.management_url),0)<=2048 AND coalesce(octet_length(n.access_token),0)<=$2 FOR SHARE OF n`, scope.TenantID, legacysecret.MaxStoredSize).Scan(&base, &token)
 		if err != nil || token == "" {
 			return nil, ErrTaskWizardProvider
 		}
-		// Legacy ciphertext has no marker. Long hex values may be ciphertext;
-		// fail closed if they cannot be decrypted, rather than send them as tokens.
-		decoded, hexErr := hex.DecodeString(token)
-		if hexErr == nil && len(decoded) >= 28 {
-			if masterKey == "" {
-				return nil, ErrTaskWizardProvider
-			}
-			token, err = utils.DecryptSensitiveField(token, masterKey)
-			if err != nil {
-				return nil, ErrTaskWizardProvider
-			}
+		token, err = legacysecret.Open(token, masterKey)
+		if err != nil || token == "" {
+			return nil, ErrTaskWizardProvider
 		}
 
 		lookupCtx, stop := context.WithTimeout(ctx, 5*time.Second)

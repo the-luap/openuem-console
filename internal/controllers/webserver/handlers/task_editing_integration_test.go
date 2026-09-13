@@ -101,9 +101,9 @@ func exerciseTaskEditingScope(t *testing.T, h *Handler, e *echo.Echo, ctx contex
 		_, _ = io.WriteString(w, `[{"id":"new-ID","name":"Owned new group"}]`)
 	}))
 	defer provider.Close()
-	previous := h.taskWizardHTTPTransport
-	h.taskWizardHTTPTransport = provider.Client().Transport
-	defer func() { h.taskWizardHTTPTransport = previous }()
+	previous := h.netbirdHTTPTransport
+	h.netbirdHTTPTransport = provider.Client().Transport
+	defer func() { h.netbirdHTTPTransport = previous }()
 	settings, err := h.Model.Client.NetbirdSettings.Create().SetManagementURL(provider.URL).SetAccessToken("owned-provider-token").AddTenantIDs(tenant).Save(ctx)
 	require.NoError(t, err)
 	defer func() {

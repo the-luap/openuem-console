@@ -1,95 +1,73 @@
 package admin_views
 
 import (
-	"fmt"
-	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
-	"github.com/open-uem/ent"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
 	"github.com/open-uem/openuem-console/internal/views/layout"
 	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
 )
 
-templ NetbirdSettings(c echo.Context, settings *ent.NetbirdSettings, agentsExists, serversExists bool, commonInfo *partials.CommonInfo, tenantName string, successMessage string) {
-	@partials.Header(c, []partials.Breadcrumb{{Title: tenantName, Url: string(templ.URL(fmt.Sprintf("/tenant/%s/admin/tags", commonInfo.TenantID)))}, {Title: i18n.T(ctx, "netbird.settings"), Url: string(templ.URL(fmt.Sprintf("/tenant/%s/admin/netbird", commonInfo.TenantID)))}}, commonInfo)
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-		<div class="uk-width-1-2@m uk-card uk-card-default">
-			<div class="uk-card-body uk-flex uk-flex-column gap-4">
-				@ConfigNavbar("netbird", agentsExists, serversExists, commonInfo)
-				if successMessage != "" {
-					@partials.SuccessMessage(successMessage)
-				} else {
-					<div id="success" class="hidden"></div>
+templ NetbirdSettings(c echo.Context, review *consolesettings.NetbirdReview, info *partials.CommonInfo, base string, saved bool) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: "NetBird settings", Url: base}}, info)
+	<main id="netbird-settings" class="min-w-0 flex-1 p-4 sm:px-6" hx-history="false">
+		<section class="mx-auto flex w-full max-w-3xl flex-col gap-6" hx-sync="this:drop">
+			<header class="flex flex-wrap items-start justify-between gap-3">
+				<div><h1 class="text-2xl font-semibold" tabindex="-1">NetBird settings</h1><p class="mt-2 text-sm">Organization configuration for NetBird management.</p></div>
+				<a href={ templ.SafeURL("/tenant/" + info.TenantID + "/admin/settings") } class="uk-button uk-button-default">General settings</a>
+			</header>
+			if saved {
+				<p role="status" class="rounded border p-3">NetBird settings saved. This save does not contact the provider or change any device.</p>
+			}
+			<section class="rounded-lg border p-4 sm:p-6" aria-labelledby="netbird-connection-heading">
+				<h2 id="netbird-connection-heading" class="text-lg font-semibold">Management connection</h2>
+				if review.ID==0 {
+					<p id="netbird-new" class="mt-2 text-sm">No configuration is stored for this organization. Saving creates it.</p>
 				}
-				<div id="error" class="hidden"></div>
-				<div class="uk-width-1-2@m uk-card uk-card-default">
-					<div class="uk-card-header">
-						<div class="uk-card-title flex gap-2 items-center">
-							<img src="/assets/img/svg/netbird.svg" class="w-5"/>
-							{ i18n.T(ctx, "netbird.settings_title") }
+				if review.Shared {
+					<p id="netbird-shared" class="mt-2 rounded border p-3 text-sm">This configuration is shared with another organization. Saving creates a separate copy for this organization.</p>
+				}
+				<form id="netbird-save-form" method="post" action={ templ.SafeURL(base) } hx-post={ base } hx-disabled-elt="#netbird-save" class="mt-5 flex flex-col gap-5">
+					<input type="hidden" name="csrf" value={ info.CSRFToken }/>
+					<input type="hidden" name="settingsId" value={ strconv.FormatInt(review.ID, 10) }/>
+					<input type="hidden" name="revision" value={ review.Revision }/>
+					<div class="min-w-0">
+						<label for="netbird-url" class="uk-form-label">Management API URL</label>
+						<input id="netbird-url" type="url" name="management-url" value={ review.ManagementURL } maxlength="2048" required autocomplete="off" spellcheck="false" class="uk-input mt-1 w-full" aria-describedby="netbird-url-help"/>
+						<p id="netbird-url-help" class="mt-1 text-sm">Use an HTTPS URL, optionally with a path prefix. Keep credentials, query parameters and fragments out of the URL.</p>
+					</div>
+					<div class="grid min-w-0 gap-5 sm:grid-cols-2">
+						<div class="min-w-0">
+							<label for="netbird-token-action" class="uk-form-label">Access token action</label>
+							<select id="netbird-token-action" name="token-action" class="uk-select mt-1 w-full" aria-describedby="netbird-token-state netbird-token-help">
+								<option value="keep" selected>Keep stored token</option>
+								<option value="replace">Replace token</option>
+								<option value="clear">Clear token</option>
+							</select>
+							<p id="netbird-token-state" class="mt-1 text-sm">
+								if review.TokenSet {
+									An access token is stored.
+								} else {
+									No access token is stored.
+								}
+							</p>
 						</div>
-						<p class="uk-margin-small-top uk-text-small">
-							{ i18n.T(ctx, "netbird.description") }
-						</p>
+						<div class="min-w-0">
+							<label for="netbird-token" class="uk-form-label">New access token</label>
+							<input id="netbird-token" type="password" name="token" maxlength="16384" autocomplete="new-password" spellcheck="false" class="uk-input mt-1 w-full" aria-describedby="netbird-token-help"/>
+						</div>
 					</div>
-					<div class="uk-card-body">
-						<form class="flex flex-col mt-6 gap-4">
-							<table class="uk-table uk-table-divider uk-table-small uk-table-hover uk-table-striped mt-6">
-								<tr>
-									<td class="!align-middle">{ i18n.T(ctx, "netbird.settings_management_title") }</td>
-									<td class="!align-middle">{ i18n.T(ctx, "netbird.settings_management_description") }</td>
-									<td class="!align-middle">
-										<input class="uk-input" type="text" name="netbird-management-url" value={ settings.ManagementURL } spellcheck="false" autocomplete="off" autofocus/>
-									</td>
-								</tr>
-								<tr>
-									<td class="!align-middle">{ i18n.T(ctx, "netbird.settings_token_title") }</td>
-									<td class="!align-middle">{ i18n.T(ctx, "netbird.settings_token_description") }</td>
-									<td class="!align-middle">
-										<div class="flex uk-inline">
-											<input id="password" class="uk-input pr-10" type="password" name="netbird-access-token" value={ settings.AccessToken } spellcheck="false" autocomplete="off" autofocus/>
-											<button
-												class="uk-form-icon uk-form-icon-flip"
-												type="button"
-												_="
-													on click 
-														if #reveal-password@icon is 'eye' then
-															set #reveal-password@icon to 'eye-off'
-															set #password@type to 'text'
-														else
-															set #reveal-password@icon to 'eye'
-															set #password@type to 'password'
-														end
-													end
-												"
-											>
-												<uk-icon id="reveal-password" icon="eye" class="uk-text-muted mt-1"></uk-icon>
-											</button>
-										</div>
-									</td>
-								</tr>
-							</table>
-							<div class="flex flex-row-reverse">
-								<button
-									hx-post={ string(templ.URL(fmt.Sprintf("/tenant/%s/admin/netbird", commonInfo.TenantID))) }
-									hx-target="#main"
-									hx-swap="outerHTML"
-									hx-push-url="false"
-									type="submit"
-									class="uk-button uk-button-primary"
-								>
-									{ i18n.T(ctx, "netbird.settings_save") }
-								</button>
-							</div>
-						</form>
-					</div>
-				</div>
-			</div>
-		</div>
+					<p id="netbird-token-help" class="text-sm">Stored tokens are never shown. Fill the new token only when replacing it; keep and clear require an empty field. A kept token will be used with the management URL you save.</p>
+					<p class="text-sm">Clearing the token disables new provider requests. Existing NetBird peers and device connections remain in place.</p>
+					<button id="netbird-save" type="submit" class="uk-button uk-button-primary self-start">Save NetBird settings</button>
+				</form>
+			</section>
+		</section>
 	</main>
 }
 
-templ NetbirdSettingsIndex(title string, cmp templ.Component, commonInfo *partials.CommonInfo) {
-	@layout.Base("admin", commonInfo) {
+templ NetbirdSettingsIndex(title string, cmp templ.Component, info *partials.CommonInfo) {
+	@layout.Base("admin", info) {
 		@cmp
 	}
 }

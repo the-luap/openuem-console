@@ -69,7 +69,7 @@ func (h *Handler) TaskWizard(c echo.Context) error {
 		return taskWizardFailure(c, err)
 	}
 	groups, err := inventory.ReadTaskWizard(r.Context(), h.Model.DB, h.Access, info.Principal.UserID, scope, profileID, stage, value, h.EncryptionMasterKey, func(ctx context.Context, base, token string) ([]nats.NetBirdGroups, error) {
-		return netbirdapi.Groups(ctx, h.taskWizardHTTPTransport, base, token)
+		return netbirdapi.Groups(ctx, h.netbirdHTTPTransport, base, token)
 	})
 	if err != nil {
 		return taskWizardFailure(c, err)

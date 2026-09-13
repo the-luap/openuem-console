@@ -30,10 +30,10 @@ func exerciseTaskWizardScope(t *testing.T, h *Handler, e *echo.Echo, ctx context
 		_, _ = io.WriteString(w, `[{"id":"group-ID-1","name":"Owned <provider-group>","peers_count":2}]`)
 	}))
 	defer provider.Close()
-	previousTransport, previousKey := h.taskWizardHTTPTransport, h.EncryptionMasterKey
-	h.taskWizardHTTPTransport = provider.Client().Transport
+	previousTransport, previousKey := h.netbirdHTTPTransport, h.EncryptionMasterKey
+	h.netbirdHTTPTransport = provider.Client().Transport
 	h.EncryptionMasterKey = strings.Repeat("k", 32)
-	defer func() { h.taskWizardHTTPTransport = previousTransport; h.EncryptionMasterKey = previousKey }()
+	defer func() { h.netbirdHTTPTransport = previousTransport; h.EncryptionMasterKey = previousKey }()
 	encrypted, err := utils.EncryptSensitiveField("owned-wizard-token", h.EncryptionMasterKey)
 	require.NoError(t, err)
 	settings, err := h.Model.Client.NetbirdSettings.Create().SetManagementURL(provider.URL).SetAccessToken(encrypted).AddTenantIDs(tenant).Save(ctx)

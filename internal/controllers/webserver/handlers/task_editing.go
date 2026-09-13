@@ -102,7 +102,7 @@ func (h *Handler) EditTask(c echo.Context) error {
 	groups := []nats.NetBirdGroups{}
 	if review.Task.Type == task.TypeNetbirdRegister {
 		groups, err = inventory.ReadTaskWizard(r.Context(), h.Model.DB, h.Access, info.Principal.UserID, scope, review.ProfileID, "definition", "netbird_register", h.EncryptionMasterKey, func(ctx context.Context, base, token string) ([]nats.NetBirdGroups, error) {
-			return netbirdapi.Groups(ctx, h.taskWizardHTTPTransport, base, token)
+			return netbirdapi.Groups(ctx, h.netbirdHTTPTransport, base, token)
 		})
 		if err != nil {
 			return taskWizardFailure(c, err)

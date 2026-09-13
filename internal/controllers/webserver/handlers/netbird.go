@@ -1,11 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -14,100 +13,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
-	"github.com/open-uem/openuem-console/internal/views/admin_views"
+	"github.com/open-uem/nats/legacysecret"
+	"github.com/open-uem/nats/netbirdapi"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
 	"github.com/open-uem/openuem-console/internal/views/computers_views"
 	"github.com/open-uem/openuem-console/internal/views/partials"
-	"github.com/open-uem/utils"
 )
-
-func (h *Handler) NetbirdSettings(c echo.Context) error {
-	var err error
-	var successMessage string
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	tenantID := -1
-	tID := c.Param("tenant")
-	if tID != "" {
-		tenantID, err = strconv.Atoi(tID)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-		}
-		commonInfo.TenantID = tID
-	} else {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.settings_empty_tenant"), true))
-	}
-
-	if c.Request().Method == "POST" {
-		managementURL := c.FormValue("netbird-management-url")
-		accessToken := c.FormValue("netbird-access-token")
-
-		if accessToken == "" {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_must_be_set"), true))
-		}
-
-		// if empty URL let's use the NetBird Cloud API
-		if managementURL == "" {
-			managementURL = "https://api.netbird.io"
-		}
-
-		// encrypt the access token if we have the encryption master key and the token is not already encrypted
-		if h.EncryptionMasterKey != "" && accessToken != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(accessToken, h.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				accessToken, err = utils.EncryptSensitiveField(accessToken, h.EncryptionMasterKey)
-				if err != nil {
-					return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_encrypted"), true))
-				}
-			}
-		}
-
-		if err := h.Model.SaveNetbirdSettings(tenantID, managementURL, accessToken); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.settings_not_saved", err.Error()), true))
-		}
-
-		successMessage = i18n.T(c.Request().Context(), "netbird.settings_saved")
-	}
-
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
-	}
-
-	// decrypt access token
-	if h.EncryptionMasterKey != "" && settings.AccessToken != "" {
-		isSecretEncrypted, err := utils.IsSensitiveFieldEncrypted(settings.AccessToken, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err.Error()), true))
-		}
-
-		if isSecretEncrypted {
-			settings.AccessToken, err = utils.DecryptSensitiveField(settings.AccessToken, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err.Error()), true))
-			}
-		}
-	}
-
-	agentsExists, err := h.Model.AgentsExists(commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	serversExists, err := h.Model.ServersExists()
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	return RenderView(c, admin_views.NetbirdSettingsIndex(" | NetBird Settings", admin_views.NetbirdSettings(c, settings, agentsExists, serversExists, commonInfo, h.GetAdminTenantName(commonInfo), successMessage), commonInfo))
-}
 
 func (h *Handler) Netbird(c echo.Context, successMessage string) error {
 	var err error
@@ -190,7 +101,7 @@ func (h *Handler) Netbird(c echo.Context, successMessage string) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -203,21 +114,12 @@ func (h *Handler) Netbird(c echo.Context, successMessage string) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_empty"), true))
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(settings.AccessToken, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			settings.AccessToken, err = utils.DecryptSensitiveField(settings.AccessToken, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-			}
-		}
+	accessToken, err := legacysecret.Open(settings.AccessToken, h.EncryptionMasterKey)
+	if err != nil || accessToken == "" {
+		return netbirdSettingsFailure(consolesettings.ErrNetbirdSecret)
 	}
 
-	ng, err := getGroupsFromNetbirdAPI(settings.ManagementURL, settings.AccessToken)
+	ng, err := netbirdapi.Groups(c.Request().Context(), h.netbirdHTTPTransport, settings.ManagementURL, accessToken)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_groups", err.Error()), true))
 	}
@@ -304,7 +206,7 @@ func (h *Handler) NetbirdRegister(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -317,34 +219,31 @@ func (h *Handler) NetbirdRegister(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_empty"), true))
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(settings.AccessToken, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			settings.AccessToken, err = utils.DecryptSensitiveField(settings.AccessToken, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-			}
-		}
+	accessToken, err := legacysecret.Open(settings.AccessToken, h.EncryptionMasterKey)
+	if err != nil || accessToken == "" {
+		return netbirdSettingsFailure(consolesettings.ErrNetbirdSecret)
 	}
 
-	setupKeyID, setupKey, err := utils.CreateNetBirdOneOffSetupKeyAPI(settings.ManagementURL, agentID, groups, allowExtraDNSLabels, settings.AccessToken)
+	groupIDs, err := netbirdapi.ParseGroups(groups)
+	if err != nil {
+		return netbirdSettingsFailure(consolesettings.ErrNetbirdInvalid)
+	}
+	setupKey, err := netbirdapi.CreateOneOffKey(c.Request().Context(), h.netbirdHTTPTransport, settings.ManagementURL, accessToken, agentID, groupIDs, allowExtraDNSLabels)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
 
 	defer func() {
-		if err := utils.DeleteNetBirdOneOffSetupKeyAPI(settings.ManagementURL, setupKeyID, settings.AccessToken); err != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := netbirdapi.DeleteKey(cleanupCtx, h.netbirdHTTPTransport, settings.ManagementURL, accessToken, setupKey.ID); err != nil {
 			log.Printf("[ERROR]: could not delete one-off key using Netbird API, reason: %v", err)
 		}
 	}()
 
 	request := nats.NetbirdSettings{
 		ManagementURL: settings.ManagementURL,
-		OneOffKey:     setupKey,
+		OneOffKey:     setupKey.Key,
 	}
 
 	data, err := json.Marshal(request)
@@ -444,7 +343,7 @@ func (h *Handler) NetbirdSwitchProfile(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -541,7 +440,7 @@ func (h *Handler) NetbirdConnect(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -604,7 +503,7 @@ func (h *Handler) NetbirdDisconnect(c echo.Context, successMessage string) error
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -653,41 +552,6 @@ func (h *Handler) NetbirdDisconnect(c echo.Context, successMessage string) error
 	return h.Netbird(c, successMessage)
 }
 
-func getGroupsFromNetbirdAPI(managementURL string, token string) ([]nats.NetBirdGroups, error) {
-
-	url := fmt.Sprintf("%s/api/groups", managementURL)
-	method := "GET"
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
-
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	groups := []nats.NetBirdGroups{}
-	if err := json.Unmarshal(body, &groups); err != nil {
-		return nil, err
-	}
-
-	return groups, nil
-}
-
 func (h *Handler) NetbirdDeletePeer(c echo.Context, comingFromUninstall bool) error {
 	commonInfo, err := h.GetCommonInfo(c)
 	if err != nil {
@@ -706,7 +570,7 @@ func (h *Handler) NetbirdDeletePeer(c echo.Context, comingFromUninstall bool) er
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
 	}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	settings, err := h.Model.GetNetbirdSettings(c.Request().Context(), tenantID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			settings = &ent.NetbirdSettings{}
@@ -719,18 +583,9 @@ func (h *Handler) NetbirdDeletePeer(c echo.Context, comingFromUninstall bool) er
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_empty"), true))
 	}
 
-	if h.EncryptionMasterKey != "" {
-		isAccessTokenEncrypted, err := utils.IsSensitiveFieldEncrypted(settings.AccessToken, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-		}
-
-		if isAccessTokenEncrypted {
-			settings.AccessToken, err = utils.DecryptSensitiveField(settings.AccessToken, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.token_cannot_be_decrypted", err), true))
-			}
-		}
+	accessToken, err := legacysecret.Open(settings.AccessToken, h.EncryptionMasterKey)
+	if err != nil || accessToken == "" {
+		return netbirdSettingsFailure(consolesettings.ErrNetbirdSecret)
 	}
 
 	ip := agent.Edges.Netbird.IP
@@ -743,12 +598,12 @@ func (h *Handler) NetbirdDeletePeer(c echo.Context, comingFromUninstall bool) er
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.wrong_ip_format"), true))
 	}
 
-	peerID, err := utils.GetMyNetBirdPeerID(ipElements[0], settings.ManagementURL, settings.AccessToken)
+	peerID, err := netbirdapi.PeerIDByIP(c.Request().Context(), h.netbirdHTTPTransport, settings.ManagementURL, accessToken, ipElements[0])
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_peer_id", err.Error()), true))
 	}
 
-	if err := utils.DeleteNetBirdPeer(peerID, settings.ManagementURL, settings.AccessToken); err != nil {
+	if err := netbirdapi.DeletePeer(c.Request().Context(), h.netbirdHTTPTransport, settings.ManagementURL, accessToken, peerID); err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_delete_peer", err.Error()), true))
 	}
 

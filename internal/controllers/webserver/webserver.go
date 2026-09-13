@@ -139,6 +139,16 @@ func (w *WebServer) Serve(address, certFile, certKey string) error {
 	if err = smtpStore.MigrateSecrets(ctx); err != nil {
 		return err
 	}
+	netbirdStore, err := consolesettings.NewNetbirdStore(w.Handler.Model.DB, permissions, w.Handler.EncryptionMasterKey)
+	if err != nil {
+		return err
+	}
+	if err = netbirdStore.Migrate(ctx); err != nil {
+		return err
+	}
+	if err = netbirdStore.MigrateSecrets(ctx); err != nil {
+		return err
+	}
 	if err = w.startInventoryRefresh(ctx); err != nil {
 		return err
 	}

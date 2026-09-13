@@ -120,12 +120,10 @@ func (h *Handler) RustDeskStop(c echo.Context) error {
 	confirmDelete := c.QueryParam("delete") != ""
 	p := partials.PaginationAndSort{}
 
-	settings, err := h.Model.GetNetbirdSettings(tenantID)
+	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
 	}
-
-	netbird := settings.AccessToken != ""
 
 	offline := h.IsAgentOffline(c)
 
