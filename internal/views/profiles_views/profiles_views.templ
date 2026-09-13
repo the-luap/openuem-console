@@ -10,16 +10,14 @@ import (
 	"strconv"
 )
 
-templ Profiles(c echo.Context, p partials.PaginationAndSort, profiles []*ent.Profile, refresh int, profileId string, confirmDelete bool, successMessage string, itemsPerPage int, commonInfo *partials.CommonInfo) {
+templ Profiles(c echo.Context, p partials.PaginationAndSort, profiles []*ent.Profile, refresh int, successMessage string, itemsPerPage int, commonInfo *partials.CommonInfo) {
 	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Profile Management"), Url: string(templ.URL(partials.GetNavigationUrl(commonInfo, "/profiles")))}}, commonInfo)
 	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 		if successMessage != "" {
 			@partials.SuccessMessage(successMessage)
 		}
 		<div id="error" class="hidden"></div>
-		if confirmDelete {
-			@partials.ConfirmDelete(c, i18n.T(ctx, "profiles.confirm_delete"), string(templ.URL(partials.GetNavigationUrl(commonInfo, "/profiles"))), string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%s", profileId)))))
-		}
+
 		<div class="uk-width-1-2@m uk-card uk-card-default">
 			<div class="uk-card-header">
 				<div class="flex justify-between items-center">
@@ -151,6 +149,7 @@ templ Profiles(c echo.Context, p partials.PaginationAndSort, profiles []*ent.Pro
 											</li>
 											<li>
 												<a
+													href={ templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d/confirm-delete", profile.ID))) }
 													hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d/confirm-delete", profile.ID)))) }
 													hx-target="#main"
 													hx-swap="outerHTML"

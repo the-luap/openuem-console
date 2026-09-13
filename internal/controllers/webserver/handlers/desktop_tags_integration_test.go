@@ -79,7 +79,7 @@ func exerciseDesktopTagAssignments(t *testing.T, h *Handler, e *echo.Echo, ctx c
 	require.Equal(t, 6, events)
 }
 
-func ownedTagHTTPRequest(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context) func(string, string, string, url.Values, string) *httptest.ResponseRecorder {
+func ownedTagHTTPRequest(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, adjust ...func(*http.Request)) func(string, string, string, url.Values, string) *httptest.ResponseRecorder {
 	t.Helper()
 	// The shared role fixture supplies a fixed form token. Wrap these HTMX
 	// requests with the production header/cookie middleware as well.
@@ -100,6 +100,9 @@ func ownedTagHTTPRequest(t *testing.T, h *Handler, e *echo.Echo, ctx context.Con
 		r.AddCookie(&http.Cookie{Name: "__Host-openuem-csrf", Value: cookie})
 		r.Header.Set("X-CSRF-Token", token)
 		r.Header.Set("HX-Request", "true")
+		for _, configure := range adjust {
+			configure(r)
+		}
 		w := httptest.NewRecorder()
 		c := outer.NewContext(r, w)
 		if err := gate(c); err != nil {

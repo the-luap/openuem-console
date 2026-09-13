@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile deletion](profile-deletion.md) now removes a profile, its
+  tasks, reports and associations in one scoped transaction with retained audit.
+  The actual route test reproduced the former foreign-organization deletion and
+  now rejects it. Parent-deletion failure, audit failure and cancellation restore
+  already deleted task/result rows; other profiles and shared tags are retained.
+  Final audit tests hold current authority and prevent new tasks/results from
+  attaching while deletion commits. The complete inventory PostgreSQL/race suite
+  passes in 52.642 seconds and the complete audit suite in 10.695 seconds.
+  Registered Apple/OIDC routes, macOS/Linux package race checks and the full Linux
+  build pass. The current-scope review shows name and ID, explains deletion
+  consequences and bounds long names. All 24 focused confirmation/cancellation
+  browser cases pass; the complete 1,428-case Chrome matrix passes in 82.854
+  seconds. Normal and long mobile dialogs were inspected. Immutable review
+  tokens, creation, cloning, other editor reads and task lifecycle work remain
+  separate.
+
 - [Legacy profile metadata](profile-metadata.md) now saves the name, explicit
   assignment mode, tag removals and audit in one transaction with current server
   authority and the complete selected audience. The actual route test reproduced

@@ -9,7 +9,6 @@ import (
 	"github.com/open-uem/ent/profile"
 	"github.com/open-uem/ent/profileissue"
 	"github.com/open-uem/ent/site"
-	"github.com/open-uem/ent/task"
 	"github.com/open-uem/ent/tenant"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -105,20 +104,6 @@ func (m *Model) AddProfile(siteID int, tenantID int, description string) (*ent.P
 func (m *Model) GetProfileById(profileId int, c *partials.CommonInfo) (*ent.Profile, error) {
 
 	return m.Client.Profile.Query().WithTags().WithTasks().WithIssues().Where(profile.ID(profileId)).First(context.Background())
-}
-
-func (m *Model) DeleteProfile(profileID int, c *partials.CommonInfo) error {
-	_, err := m.Client.Task.Delete().Where(task.HasProfileWith(profile.ID(profileID))).Exec(context.Background())
-	if err != nil {
-		return err
-	}
-
-	_, err = m.Client.Profile.Delete().Where(profile.ID(profileID)).Exec(context.Background())
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (m *Model) CountAllProfileIssues(profileID int) (int, error) {

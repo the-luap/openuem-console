@@ -50,10 +50,7 @@ func (h *Handler) Profiles(c echo.Context, successMessage string) error {
 		refreshTime = 5
 	}
 
-	confirmDelete := false
-	profileId := ""
-
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.Profiles(c, p, profiles, refreshTime, profileId, confirmDelete, successMessage, itemsPerPage, commonInfo), commonInfo))
+	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.Profiles(c, p, profiles, refreshTime, successMessage, itemsPerPage, commonInfo), commonInfo))
 }
 
 func (h *Handler) NewProfile(c echo.Context) error {
@@ -144,13 +141,6 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 		method = c.Request().Method
 	}
 
-	if method == "DELETE" {
-		if err := h.Model.DeleteProfile(profileId, commonInfo); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.could_not_delete"), true))
-		}
-		return h.Profiles(c, i18n.T(c.Request().Context(), "profiles.edit.deleted"))
-	}
-
 	confirmDelete := false
 
 	allProfiles, err := h.Model.GetAllProfiles()
@@ -167,50 +157,6 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 	}
 
 	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, "", successMessage, confirmDelete, false, itemsPerPage, commonInfo), commonInfo))
-}
-
-func (h *Handler) ConfirmDeleteProfile(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	profileId := c.Param("uuid")
-	if profileId == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.edit.empty_id"), true))
-	}
-
-	itemsPerPage, err := h.Model.GetDefaultItemsPerPage()
-	if err != nil {
-		log.Println("[ERROR]: could not get items per page from database")
-		itemsPerPage = 5
-	}
-
-	p := partials.NewPaginationAndSort(itemsPerPage)
-	p.GetPaginationAndSortParams(c.FormValue("page"), c.FormValue("pageSize"), c.FormValue("sortBy"), c.FormValue("sortOrder"), c.FormValue("currentSortBy"), itemsPerPage)
-
-	p.NItems, err = h.Model.CountAllProfiles(commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	profiles, err := h.Model.GetProfilesByPage(p, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), true))
-	}
-
-	refreshTime, err := h.Model.GetDefaultRefreshTime()
-	if err != nil {
-		log.Println("[ERROR]: could not get refresh time from database")
-		refreshTime = 5
-	}
-
-	confirmDelete := true
-	successMessage := ""
-
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.Profiles(c, p, profiles, refreshTime, profileId, confirmDelete, successMessage, itemsPerPage, commonInfo), commonInfo))
 }
 
 func (h *Handler) ConfirmDeleteTask(c echo.Context) error {

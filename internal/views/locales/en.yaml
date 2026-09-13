@@ -1,4 +1,15 @@
 en:
+  profile_deletion:
+    title: "Delete profile"
+    id: "Profile ID: "
+    truncated: "The name is shortened for display. Check the profile ID."
+    consequences: "This deletes the profile, all of its task definitions and their stored results from the console."
+    device_effects: "It does not undo changes on devices or cancel tasks already sent."
+    delete: "Delete profile and tasks"
+    invalid: "Reopen the profile list and choose the delete action again."
+    not_found: "Profile not found in the selected scope. Refresh the list if it has moved or been deleted."
+    denied: "Only a server administrator can delete legacy profiles."
+    unavailable: "The profile could not be deleted. Refresh the list and try again."
   profile_metadata:
     invalid: "Enter a profile name, shorten it if necessary, and choose one assignment mode. Reopen the editor if the form is out of date."
     not_found: "Profile not found in the selected scope. Refresh the list if it has moved."
