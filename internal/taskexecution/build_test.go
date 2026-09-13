@@ -7,6 +7,7 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
 	openuem "github.com/open-uem/nats"
+	"github.com/open-uem/nats/tasksecrets"
 	"github.com/open-uem/openuem-console/internal/taskexecution"
 	"github.com/open-uem/utils"
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,7 @@ func TestManualPayloadSecretsBoundsAndUnsupportedSources(t *testing.T) {
 		func(t *ent.Task) { t.Edges.Profile = nil },
 		func(t *ent.Task) { t.Script = strings.Repeat("x", (128<<10)+1) },
 		func(t *ent.Task) { t.Name = strings.Repeat("界", 700) },
-		func(t *ent.Task) { t.LocalUserPassword = strings.Repeat("x", 16385) },
+		func(t *ent.Task) { t.LocalUserPassword = strings.Repeat("x", tasksecrets.MaxPasswordStoredSize+1) },
 		func(t *ent.Task) { t.Script = "invalid\x00script" },
 	} {
 		source := executableTask(task.TypePowershellScript, task.AgentTypeWindows)
@@ -98,5 +99,32 @@ func TestManualPayloadSecretsBoundsAndUnsupportedSources(t *testing.T) {
 		p, err := taskexecution.Build(source, key)
 		require.ErrorIs(t, err, taskexecution.ErrUnsupported)
 		require.Nil(t, p)
+	}
+}
+
+func TestManualSSHSecretsStorageBoundsAndFailure(t *testing.T) {
+	key := strings.Repeat("k", 32)
+	for _, platform := range []task.AgentType{task.AgentTypeLinux, task.AgentTypeMacos} {
+		for _, plain := range []string{"owned-private-ssh", strings.Repeat("x", tasksecrets.MaxPlainSize)} {
+			stored, err := tasksecrets.SealSSH(plain, key)
+			require.NoError(t, err)
+			source := executableTask(task.TypeAddUnixLocalUser, platform)
+			source.LocalUserSSHKeyPassphrase = stored
+			payload, err := taskexecution.Build(source, key)
+			require.NoError(t, err)
+			require.Contains(t, string(payload.Data), plain)
+			require.NotContains(t, string(payload.Data), stored)
+			require.Equal(t, stored, source.LocalUserSSHKeyPassphrase)
+			payload, err = taskexecution.Build(source, strings.Repeat("z", 32))
+			require.ErrorIs(t, err, taskexecution.ErrInvalid)
+			require.Nil(t, payload)
+		}
+		for _, invalid := range []string{tasksecrets.Prefix + "ssh:v1:broken", strings.Repeat("x", tasksecrets.MaxPlainSize+1)} {
+			source := executableTask(task.TypeAddUnixLocalUser, platform)
+			source.LocalUserSSHKeyPassphrase = invalid
+			payload, err := taskexecution.Build(source, key)
+			require.ErrorIs(t, err, taskexecution.ErrInvalid)
+			require.Nil(t, payload)
+		}
 	}
 }

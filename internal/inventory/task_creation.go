@@ -11,9 +11,9 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
+	"github.com/open-uem/nats/tasksecrets"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/taskconfig"
-	"github.com/open-uem/utils"
 )
 
 var ErrTaskSecretStorage = errors.New("task secret storage is unavailable")
@@ -63,7 +63,13 @@ func CreateLegacyTask(parent context.Context, db *sql.DB, permissions *access.St
 		if masterKey == "" {
 			return 0, ErrTaskSecretStorage
 		}
-		cfg.LocalUserPassword, err = utils.EncryptSensitiveField(cfg.LocalUserPassword, masterKey)
+		cfg.LocalUserPassword, err = tasksecrets.SealPassword(cfg.LocalUserPassword, masterKey)
+		if err != nil {
+			return 0, ErrTaskSecretStorage
+		}
+	}
+	if cfg.LocalUserSSHKeyPassphrase != "" {
+		cfg.LocalUserSSHKeyPassphrase, err = tasksecrets.SealSSH(cfg.LocalUserSSHKeyPassphrase, masterKey)
 		if err != nil {
 			return 0, ErrTaskSecretStorage
 		}

@@ -12,6 +12,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
+	"github.com/open-uem/nats/tasksecrets"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/taskconfig"
 	"github.com/open-uem/openuem-console/internal/taskexecution"
@@ -174,7 +175,7 @@ func lockManualSource(ctx context.Context, tx *sql.Tx, target ManualTarget, kind
 		references = []manualTaskReference{{ID: id, Version: current.Version, Type: current.Type, Platform: current.AgentType}}
 		if definition {
 			var bounded bool
-			err = tx.QueryRowContext(ctx, "SELECT NOT EXISTS(SELECT 1 FROM jsonb_each_text(to_jsonb(t)) v WHERE octet_length(v.value)>CASE WHEN v.key='name' THEN 2048 WHEN v.key='script' THEN 131072 ELSE 16384 END) FROM tasks t WHERE id=$1 AND profile_tasks=$2", id, result.source.ProfileID).Scan(&bounded)
+			err = tx.QueryRowContext(ctx, "SELECT NOT EXISTS(SELECT 1 FROM jsonb_each_text(to_jsonb(t)) v WHERE octet_length(v.value)>CASE WHEN v.key='name' THEN 2048 WHEN v.key='script' THEN 131072 WHEN v.key='local_user_ssh_key_passphrase' THEN $3 WHEN v.key='local_user_password' THEN $4 ELSE 16384 END) FROM tasks t WHERE id=$1 AND profile_tasks=$2", id, result.source.ProfileID, tasksecrets.MaxSSHStoredSize, tasksecrets.MaxPasswordStoredSize).Scan(&bounded)
 			if err != nil {
 				return nil, err
 			}

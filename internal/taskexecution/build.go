@@ -3,7 +3,6 @@
 package taskexecution
 
 import (
-	"encoding/hex"
 	"errors"
 	"reflect"
 	"strings"
@@ -12,9 +11,9 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
 	openuem "github.com/open-uem/nats"
+	"github.com/open-uem/nats/tasksecrets"
 	ansiblecfg "github.com/open-uem/openuem-ansible-config/ansible"
 	"github.com/open-uem/openuem-console/internal/taskconfig"
-	"github.com/open-uem/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -124,6 +123,10 @@ func bounded(t *ent.Task) bool {
 		text := value.String()
 		limit := 16384
 		switch fields.Type().Field(i).Name {
+		case "LocalUserSSHKeyPassphrase":
+			limit = tasksecrets.MaxSSHStoredSize
+		case "LocalUserPassword":
+			limit = tasksecrets.MaxPasswordStoredSize
 		case "Name":
 			limit = 2048
 		case "Script":
@@ -137,17 +140,8 @@ func bounded(t *ent.Task) bool {
 	return total <= 256<<10
 }
 
-// Legacy ciphertext has no format marker. Long hexadecimal values must decrypt;
-// short hexadecimal plaintext never reaches the unsafe legacy encryption probe.
 func legacyPassword(value, masterKey string) (string, error) {
-	decoded, err := hex.DecodeString(value)
-	if err != nil || len(decoded) < 28 {
-		return value, nil
-	}
-	if masterKey == "" {
-		return "", ErrInvalid
-	}
-	plain, err := utils.DecryptSensitiveField(value, masterKey)
+	plain, err := tasksecrets.OpenPassword(value, masterKey)
 	if err != nil {
 		return "", ErrInvalid
 	}

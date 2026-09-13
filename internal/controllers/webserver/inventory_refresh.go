@@ -20,6 +20,9 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 	if err = store.Migrate(ctx); err != nil {
 		return err
 	}
+	if err = inventory.MigrateTaskSecrets(ctx, w.Handler.Model.DB, w.Handler.EncryptionMasterKey); err != nil {
+		return err
+	}
 	manual, err := inventory.NewManualExecutionStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.EncryptionMasterKey, w.Handler.PublishManualExecution)
 	if err != nil {
 		return err

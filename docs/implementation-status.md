@@ -74,6 +74,20 @@ the table's package summaries do not remove any detail from the roadmap.
   matrix takes 109.155 seconds. Mobile views were inspected. Agent acceptance is distinct from execution; profiles still
   retrieve current configuration later. Immutable execution and physical/provider
   acceptance remain open.
+- [Task secret storage](task-secret-storage.md) now encrypts SSH passphrases
+  before creation/replacement and uses a shared versioned reader in the console
+  and worker. Startup migration locks at most 64 rows per batch and commits
+  global maintenance audit events with representation changes, preserving task
+  versions, order, NULLs and assignment. Corrupt or ambiguous legacy values stop
+  migration; completed batches survive restart. Kept editor values remain unread,
+  encrypted task/profile clones remain executable, and payload bounds include
+  storage overhead. Worker account generators no longer stop after successful
+  password decryption or mutate stored secrets; Unix removal is mapped correctly.
+  Full inventory/audit PostgreSQL race suites pass in 122.049/10.762 seconds;
+  registered Apple/OIDC routes, affected Linux race checks and full console/worker
+  builds pass. Worker model/common PostgreSQL and command suites also pass.
+  Coordinated worker-first deployment is required. Broader provider secret
+  migration, rotation/recovery and physical acceptance remain open.
 - [Scoped profile report history](profile-issues.md) now reads exact authorized
   profiles and issue parents without deleting unrelated orphan records on GET.
   Summaries exclude task definitions and output; independent 25-report detail
@@ -106,7 +120,7 @@ the table's package summaries do not remove any detail from the roadmap.
   configuration update and audit. Concurrent saves of one version produce one
   winner; type/platform, order/status/execution time and history are preserved.
   Review omits password/passphrase values, and explicit keep/replace/clear choices
-  prevent accidental secret loss. Password replacements require encryption.
+  prevent accidental secret loss. Password and SSH-passphrase replacements require encryption.
   NetBird edits retain missing saved group IDs and DNS settings; Flatpak branch
   edits and MSI hash clearing are corrected. Mobile Unix fields use full width.
   Full inventory PostgreSQL/race and audit suites pass in 89.484/15.400 seconds;

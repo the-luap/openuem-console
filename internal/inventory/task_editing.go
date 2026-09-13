@@ -11,9 +11,9 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
+	"github.com/open-uem/nats/tasksecrets"
 	"github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/open-uem/openuem-console/internal/taskconfig"
-	"github.com/open-uem/utils"
 )
 
 var ErrTaskEditConflict = errors.New("task configuration changed or cannot be edited")
@@ -147,14 +147,19 @@ func UpdateLegacyTask(parent context.Context, db *sql.DB, permissions *access.St
 		if masterKey == "" {
 			return 0, ErrTaskSecretStorage
 		}
-		encrypted, err := utils.EncryptSensitiveField(*password, masterKey)
+		encrypted, err := tasksecrets.SealPassword(*password, masterKey)
 		if err != nil {
 			return 0, ErrTaskSecretStorage
 		}
 		password = &encrypted
 	}
-	// SSH passphrases retain the legacy worker representation; encryption and
-	// migration of that separate field require coordinated worker changes.
+	if passphrase != nil && *passphrase != "" {
+		encrypted, err := tasksecrets.SealSSH(*passphrase, masterKey)
+		if err != nil {
+			return 0, ErrTaskSecretStorage
+		}
+		passphrase = &encrypted
+	}
 	client := ent.NewClient(ent.Driver(entsql.NewDriver(dialect.Postgres, entsql.Conn{ExecQuerier: tx})))
 	next := version + 1
 	count, err := taskconfig.Update(ctx, client, int(taskID), int(profileID), next, cfg, taskconfig.SecretUpdate{Password: password, SSHKeyPassphrase: passphrase})

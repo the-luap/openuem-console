@@ -558,6 +558,17 @@ route and responsive browser fixtures cover these paths. Agent acceptance is
 not execution proof; profiles retrieve current configuration later. Immutable
 profile execution and physical/provider acceptance remain open.
 
+[Task secret storage](task-secret-storage.md) now encrypts SSH passphrases on
+creation/replacement and migrates legacy task secrets in bounded, audited
+transactions before console task dispatch and HTTP serving. The shared reader
+supports coordinated worker upgrades, keeps encrypted clones usable, and rejects
+corrupt secrets without partial configuration. Worker password decryption no
+longer drops subsequent tasks; Unix account removal uses the correct task type.
+Owned PostgreSQL and codec tests cover rollback/restart, concurrency, hidden
+reviews, migration audit visibility and manual payloads. The documented upgrade
+requires compatible workers first; automated version negotiation, wider provider
+secret migration, key rotation/recovery and physical acceptance remain open.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.

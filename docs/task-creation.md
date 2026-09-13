@@ -22,10 +22,11 @@ default values now retain the selected value type. NetBird registration uses the
 same common creation defaults, including its position and ignore-errors setting,
 and requires a destination organization recorded as its provider tenant.
 
-A nonempty local-user password requires configured server encryption and is
-encrypted after authorization, before insertion. A missing or unusable key
-prevents creation. This covers that password field; the wider legacy secret
-lifecycle, including SSH key passphrases, remains open.
+Nonempty local-user passwords and SSH key passphrases require configured server
+encryption and are encrypted after authorization, before insertion. A missing or
+unusable key prevents creation. The [task secret upgrade](task-secret-storage.md)
+covers coordinated worker compatibility and legacy migration; broader secret
+rotation and recovery remain open.
 
 ## Form and request boundaries
 

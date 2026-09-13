@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/open-uem/ent"
 	"github.com/open-uem/ent/task"
+	"github.com/open-uem/nats/tasksecrets"
 	ansiblecfg "github.com/open-uem/openuem-ansible-config/ansible"
 	"github.com/open-uem/wingetcfg/wingetcfg"
 	"strconv"
@@ -112,11 +113,16 @@ func ansiblePlaybook(t *ent.Task, masterKey string) (*ansiblecfg.AnsiblePlaybook
 		}
 		t.LocalUserPassword = password
 
+		passphrase, err := tasksecrets.OpenSSH(t.LocalUserSSHKeyPassphrase, masterKey)
+		if err != nil {
+			return nil, err
+		}
+
 		addLinuxUser, err := ansiblecfg.AddLocalUser(fmt.Sprintf("task_%d", t.ID), t.LocalUserAppend, t.LocalUserDescription,
 			t.LocalUserCreateHome, expires, t.LocalUserForce, t.LocalUserGenerateSSHKey, t.LocalUserGroup, t.LocalUserGroups,
 			t.LocalUserHome, t.LocalUserUsername, t.LocalUserNonunique, t.LocalUserPassword, password_expire_account_disable, password_expire_max,
 			password_expire_min, password_expire_warn, t.LocalUserPasswordLock, t.LocalUserShell, t.LocalUserSkeleton, ssh_key_bits,
-			t.LocalUserSSHKeyComment, t.LocalUserSSHKeyFile, t.LocalUserSSHKeyPassphrase, t.LocalUserSSHKeyType,
+			t.LocalUserSSHKeyComment, t.LocalUserSSHKeyFile, passphrase, t.LocalUserSSHKeyType,
 			t.LocalUserSystem, t.LocalUserUmask, uid, uid_max, uid_min, t.AgentType.String(), t.IgnoreErrors)
 
 		if err != nil {

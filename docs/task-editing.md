@@ -38,9 +38,9 @@ untouched, without reading it into the application. A replacement password
 requires a usable server encryption key and is always encrypted as newly entered
 plaintext. Clearing requires an empty input. Conflicting action/value combinations
 are rejected instead of silently ignoring a newly typed secret. SSH-passphrase
-inputs are masked. Their stored representation remains compatible with the legacy
-worker; encrypting and migrating that separate field requires coordinated worker
-changes and remains open.
+inputs are masked and replacements use authenticated encrypted storage. The
+[coordinated secret upgrade](task-secret-storage.md) covers worker compatibility,
+legacy migration and recovery limits.
 
 NetBird registration stays in its configured organization. Its edit form now
 loads group choices through the bounded, audited [task wizard](task-wizard.md)
@@ -106,6 +106,6 @@ matrix passes in 92.125 seconds.
 task/tag projections, and [profile history](profile-issues.md) now retains orphan
 records through scoped, bounded reads. [Manual task/profile dispatch](manual-desktop-execution.md)
 now requires confirmation and durable single-attempt evidence. Package search and
-other provider/settings routes, SSH-passphrase encryption/migration, immutable
+other provider/settings routes, broader secret rotation/recovery, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.
