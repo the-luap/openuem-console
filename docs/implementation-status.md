@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile cloning](profile-cloning.md) now holds current server
+  authority, the complete source audience and tasks, and the destination parent
+  through one profile/task/association/audit transaction. The actual route
+  baseline reproduced an out-of-scope source GET returning 200 instead of 404.
+  Copies retain configuration and nullable values, correct APT package names,
+  deterministic task order and same-organization NetBird settings, with fresh
+  IDs/version and no assignment or history. Source and destination retain scoped
+  receipts; task or destination audit failure rolls everything back. The full
+  inventory PostgreSQL/race suite passes in 67.035 seconds and the full audit
+  suite in 10.884 seconds. Registered Apple/OIDC routes, affected macOS/Linux
+  race checks and the full Linux build pass. The native responsive form covers
+  exact scope, required names, CSRF, isolated site lookups and clearing stale
+  destinations in 36 browser cases. A visually detected locale nesting error is
+  corrected and guarded by rendered English-label assertions. The complete
+  1,482-case Chrome matrix passes in 89.348 seconds. Task mutations,
+  delegated legacy access and physical/provider acceptance remain open.
 - [Legacy profile creation](profile-creation.md) now holds current server
   authority and the selected organization/site through profile, association and
   audit commit. The actual route test reproduced creation without an audit event

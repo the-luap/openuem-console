@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/open-uem/ent"
@@ -118,50 +117,4 @@ func (m *Model) GetProfileIssuesByPage(p partials.PaginationAndSort, profileID i
 // TODO-Steve we should check which profiles can be listed based on user's role
 func (m *Model) GetAllProfiles() ([]*ent.Profile, error) {
 	return m.Client.Profile.Query().All(context.Background())
-}
-
-func (m *Model) CloneProfile(profileID int, description string, tenantID int, siteID int) error {
-	// 1. Get the profile and its tasks
-	profile, err := m.Client.Profile.Query().WithTasks().Where(profile.ID(profileID)).Only(context.Background())
-	if err != nil {
-		return err
-	}
-
-	// 2. Initiate transaction
-	tx, err := m.Client.Tx(context.Background())
-	if err != nil {
-		return err
-	}
-
-	// 3. Create the new profile
-	query := tx.Profile.Create().SetName(description)
-	if tenantID != -1 {
-		query.AddTenantIDs(tenantID)
-
-		if siteID != -1 {
-			query.AddSiteIDs(siteID)
-		}
-	}
-
-	newProfile, err := query.Save(context.Background())
-	if err != nil {
-		return rollback(tx, err)
-	}
-
-	// 4. Clone the tasks to the profile
-	for index, t := range profile.Edges.Tasks {
-		if err := m.CloneTaskInProfileTransaction(tx, t.ID, t.Name, newProfile.ID, index+1); err != nil {
-			return rollback(tx, err)
-		}
-	}
-
-	// 5. Commit the transaction.
-	return tx.Commit()
-}
-
-func rollback(tx *ent.Tx, err error) error {
-	if rerr := tx.Rollback(); rerr != nil {
-		err = fmt.Errorf("%w: %v", err, rerr)
-	}
-	return err
 }

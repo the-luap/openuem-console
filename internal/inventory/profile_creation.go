@@ -20,7 +20,22 @@ func CreateLegacyProfile(parent context.Context, db *sql.DB, permissions *access
 		return 0, err
 	}
 	defer tx.Rollback()
+	id, err := insertUnassignedProfile(ctx, tx, scope, name)
+	if err != nil {
+		return 0, err
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,'inventory.profiles.create',$4)", scope.TenantID, scope.SiteID, actor, strconv.FormatInt(id, 10)); err != nil {
+		return 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func insertUnassignedProfile(ctx context.Context, tx *sql.Tx, scope access.Scope, name string) (int64, error) {
 	var id int64
+	var err error
 	if err = tx.QueryRowContext(ctx, "INSERT INTO profiles(name,apply_to_all,type,disabled) VALUES($1,false,'winget',false) RETURNING id", name).Scan(&id); err != nil {
 		return 0, err
 	}
@@ -33,12 +48,6 @@ func CreateLegacyProfile(parent context.Context, db *sql.DB, permissions *access
 		if _, err = tx.ExecContext(ctx, "INSERT INTO site_profiles(site_id,profile_id) VALUES($1,$2)", scope.SiteID, id); err != nil {
 			return 0, err
 		}
-	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,'inventory.profiles.create',$4)", scope.TenantID, scope.SiteID, actor, strconv.FormatInt(id, 10)); err != nil {
-		return 0, err
-	}
-	if err = tx.Commit(); err != nil {
-		return 0, err
 	}
 	return id, nil
 }

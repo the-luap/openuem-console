@@ -1,4 +1,15 @@
 en:
+  profile_cloning:
+    invalid: "Enter a valid profile name and destination."
+    not_found: "The source profile or destination is no longer available in this scope."
+    denied: "You do not have permission to clone profiles."
+    unavailable: "The cloning result is unavailable. Check the destination profile list before trying again."
+    provider_scope: "Profiles with NetBird registration tasks can only be cloned into their configured organization. Review those tasks before choosing another destination."
+    description: "Copy the tasks into a new, unassigned profile. Tags, schedules and stored results are excluded. Review the copied configuration before assigning devices. NetBird registration tasks require the same configured organization."
+    source: "Source profile ID: %d"
+    organization: "Destination organization"
+    global: "Global profiles"
+    site: "Destination site"
   profile_creation:
     invalid: "Enter a profile name and shorten it if necessary. Reopen the form if it is out of date."
     not_found: "The selected organization or site is no longer available."

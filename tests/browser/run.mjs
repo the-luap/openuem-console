@@ -35,6 +35,7 @@ import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
 import profileDeletion from "./profile-deletion.mjs";
 import profileCreation from "./profile-creation.mjs";
+import profileCloning from "./profile-cloning.mjs";
 import windowsUpdateGroups from "./windows-update-groups.mjs";
 import appleProfileAssignments from "./apple-profile-assignments.mjs";
 import appleProfileOrganizationGroups from "./apple-profile-organization-groups.mjs";
@@ -108,6 +109,7 @@ try {
         [profileMetadata,36],
         [profileDeletion,24],
         [profileCreation,18],
+        [profileCloning,36],
         [windowsUpdateGroups,36],
         [appleProfileAssignments,9],
         [appleProfileGroups,30],

@@ -511,17 +511,6 @@ func (m *Model) CloneTask(taskID int, taskName string, profileID int, order int)
 	return CloneTask(query, t, taskName, profileID, order)
 }
 
-func (m *Model) CloneTaskInProfileTransaction(tx *ent.Tx, taskID int, taskName string, profileID int, order int) error {
-	t, err := tx.Task.Get(context.Background(), taskID)
-	if err != nil {
-		return err
-	}
-
-	query := tx.Task.Create()
-
-	return CloneTask(query, t, taskName, profileID, order)
-}
-
 func CloneTask(query *ent.TaskCreate, t *ent.Task, taskName string, profileID int, order int) error {
 	query.SetAgentType(t.AgentType)
 	query.SetAptAllowDowngrade(t.AptAllowDowngrade)
