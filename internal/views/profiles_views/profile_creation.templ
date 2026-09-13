@@ -1,0 +1,26 @@
+package profiles_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ProfileCreationForm(info *partials.CommonInfo) {
+	<form
+		id="profile-create-form"
+		class="uk-form-stacked my-6"
+		hx-post={ partials.GetNavigationUrl(info, "/profiles/new") }
+		hx-target="#main"
+		hx-swap="outerHTML"
+		hx-push-url="false"
+		hx-disabled-elt="find button"
+	>
+		@ProfileNameField(&ent.Profile{})
+		<div class="uk-form-controls my-4">
+			<button type="submit" class="uk-button uk-button-primary">
+				{ i18n.T(ctx,"profiles.new.create") }
+			</button>
+		</div>
+	</form>
+}

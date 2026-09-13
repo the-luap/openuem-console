@@ -84,23 +84,6 @@ func (m *Model) GetProfilesByPage(p partials.PaginationAndSort, c *partials.Comm
 	return profiles, nil
 }
 
-func (m *Model) AddProfile(siteID int, tenantID int, description string) (*ent.Profile, error) {
-	query := m.Client.Profile.Create().SetName(description)
-
-	if tenantID != -1 {
-		query.AddTenantIDs(tenantID)
-		if siteID != -1 {
-			query.AddSiteIDs(siteID)
-		}
-	}
-
-	profile, err := query.Save(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	return profile, nil
-}
-
 func (m *Model) GetProfileById(profileId int, c *partials.CommonInfo) (*ent.Profile, error) {
 
 	return m.Client.Profile.Query().WithTags().WithTasks().WithIssues().Where(profile.ID(profileId)).First(context.Background())

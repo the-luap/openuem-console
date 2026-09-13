@@ -424,7 +424,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 
 	e.GET("/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/profiles/new", h.NewProfile, h.IsAuthenticated)
+	e.POST("/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
 	e.DELETE("/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)
@@ -444,7 +444,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 
 	e.GET("/tenant/:tenant/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/profiles/new", h.NewProfile, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
 	e.DELETE("/tenant/:tenant/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)
@@ -461,7 +461,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 
 	e.GET("/tenant/:tenant/site/:site/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/profiles/new", h.NewProfile, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/site/:site/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
 	e.DELETE("/tenant/:tenant/site/:site/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)

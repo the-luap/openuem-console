@@ -1,4 +1,9 @@
 en:
+  profile_creation:
+    invalid: "Enter a profile name and shorten it if necessary. Reopen the form if it is out of date."
+    not_found: "The selected organization or site is no longer available."
+    denied: "Only a server administrator can create legacy profiles."
+    unavailable: "The creation result is unavailable. Check the profile list before trying again."
   profile_deletion:
     title: "Delete profile"
     id: "Profile ID: "

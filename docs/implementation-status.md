@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy profile creation](profile-creation.md) now holds current server
+  authority and the selected organization/site through profile, association and
+  audit commit. The actual route test reproduced creation without an audit event
+  and now verifies one scoped event. New profiles preserve empty task/tag and
+  unassigned defaults. Association failure, audit failure, cancellation and
+  concurrent permission/site changes cannot leave a partial profile. The complete
+  inventory PostgreSQL/race suite passes in 55.473 seconds and the complete audit
+  suite in 10.112 seconds. Registered Apple/OIDC routes, macOS/Linux package race
+  checks and the full Linux build pass. The native form shares validated,
+  full-width name fields and strict scoped POST/CSRF behavior; all 54 focused
+  creation/editor browser cases pass. The complete 1,446-case Chrome matrix
+  passes in 84.661 seconds, and the mobile creation form was inspected. Request
+  idempotency, cloning, other editor reads, task lifecycle and immutable definition
+  history remain separate.
+
 - [Legacy profile deletion](profile-deletion.md) now removes a profile, its
   tasks, reports and associations in one scoped transaction with retained audit.
   The actual route test reproduced the former foreign-organization deletion and

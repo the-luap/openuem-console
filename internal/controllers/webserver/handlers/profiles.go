@@ -61,30 +61,6 @@ func (h *Handler) NewProfile(c echo.Context) error {
 		return err
 	}
 
-	siteID, err := strconv.Atoi(commonInfo.SiteID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "sites.could_not_convert_site_to_int", commonInfo.SiteID), true))
-	}
-
-	tenantID, err := strconv.Atoi(commonInfo.TenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-	}
-
-	if c.Request().Method == "POST" {
-		description := c.FormValue("profile-description")
-		if description == "" {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.new.empty"), true))
-		}
-
-		profile, err := h.Model.AddProfile(siteID, tenantID, description)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "profiles.new.could_not_save"), true))
-		}
-
-		return h.EditProfile(c, "GET", strconv.Itoa(profile.ID), i18n.T(c.Request().Context(), "profiles.new.saved"))
-	}
-
 	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.NewProfile(c, commonInfo), commonInfo))
 }
 

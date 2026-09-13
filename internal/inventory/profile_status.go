@@ -18,10 +18,7 @@ func beginLegacyProfileTransaction(ctx context.Context, db *sql.DB, permissions 
 	return beginLegacyProfileAudienceTransaction(ctx, db, permissions, actor, scope, profileID, false)
 }
 
-func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, profileID int64, writeAudience bool) (*sql.Tx, error) {
-	if profileID <= 0 {
-		return nil, ErrProfileInvalid
-	}
+func beginLegacyProfileScopeTransaction(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope) (*sql.Tx, error) {
 	if db == nil || permissions == nil || scope.TenantID < 0 || scope.SiteID < 0 || scope.TenantID == 0 && scope.SiteID != 0 {
 		return nil, access.ErrDenied
 	}
@@ -39,6 +36,18 @@ func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, perm
 	if err = permissions.AuthorizeTransaction(ctx, tx, actor, access.ManageProfiles, access.Scope{}); err != nil {
 		return fail(err)
 	}
+	return tx, nil
+}
+
+func beginLegacyProfileAudienceTransaction(ctx context.Context, db *sql.DB, permissions *access.Store, actor string, scope access.Scope, profileID int64, writeAudience bool) (*sql.Tx, error) {
+	if profileID <= 0 {
+		return nil, ErrProfileInvalid
+	}
+	tx, err := beginLegacyProfileScopeTransaction(ctx, db, permissions, actor, scope)
+	if err != nil {
+		return nil, err
+	}
+	fail := func(err error) (*sql.Tx, error) { tx.Rollback(); return nil, err }
 	// Count all audience edges, including associations hidden by the route.
 	lock := `LOCK TABLE tenant_profiles,site_profiles IN SHARE MODE`
 	if writeAudience {

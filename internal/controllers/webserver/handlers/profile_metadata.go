@@ -25,9 +25,17 @@ func profileMetadataFailure(c echo.Context, err error) error {
 }
 
 func profileMetadataForm(c echo.Context) (inventory.ProfileMetadata, error) {
+	definition, err := profileDefinitionForm(c, false)
+	if err != nil {
+		return definition, profileMetadataFailure(c, err)
+	}
+	return definition, nil
+}
+
+func profileDefinitionForm(c echo.Context, creation bool) (inventory.ProfileMetadata, error) {
 	r := c.Request()
 	invalid := func() (inventory.ProfileMetadata, error) {
-		return inventory.ProfileMetadata{}, profileMetadataFailure(c, inventory.ErrProfileInvalid)
+		return inventory.ProfileMetadata{}, inventory.ErrProfileInvalid
 	}
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "application/x-www-form-urlencoded" || len(r.Header.Values("Content-Type")) != 1 || r.Header.Get("Content-Encoding") != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.ContentLength > 8192 {
@@ -42,7 +50,11 @@ func profileMetadataForm(c echo.Context) (inventory.ProfileMetadata, error) {
 			return invalid()
 		}
 		switch key {
-		case "profile-description", "profile-assignment":
+		case "profile-description":
+		case "profile-assignment":
+			if creation {
+				return invalid()
+			}
 		case "csrf", "page", "pageSize", "sortBy", "sortOrder":
 			if len(values[0]) > 128 {
 				return invalid()
@@ -52,6 +64,9 @@ func profileMetadataForm(c echo.Context) (inventory.ProfileMetadata, error) {
 		}
 	}
 	definition := inventory.ProfileMetadata{Name: r.PostForm.Get("profile-description"), Assignment: r.PostForm.Get("profile-assignment")}
+	if creation {
+		definition.Assignment = "dontApplyToAll"
+	}
 	if !definition.Valid() {
 		return invalid()
 	}
