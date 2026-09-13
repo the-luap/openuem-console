@@ -155,6 +155,9 @@ templ NetbirdReceipt(c echo.Context,info *partials.CommonInfo,r *inventory.Netbi
     <dt>Reviewed release</dt><dd>@mdm_views.Timestamp(r.ReleasedAt)</dd>
    }
   </dl>
+  if r.Resolution!=nil {
+   @netbirdResolutionRetrySummary(r.Resolution.LastRetry)
+  }
   if r.Status=="unconfirmed" {
    <p>The original outcome remains unconfirmed. Resolution allows further commands only after matching agent evidence is retained.</p>
    if r.ReleasedAt==nil && netbirdCanManage(info,r.Scope) {

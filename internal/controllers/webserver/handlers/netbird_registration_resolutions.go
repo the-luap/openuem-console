@@ -32,6 +32,9 @@ func (h *Handler) NetbirdRegistrationResolutionRequest(c echo.Context) error {
 func (h *Handler) NetbirdRegistrationResolutionContinue(c echo.Context) error {
 	return h.netbirdRegistrationResolutionAction(c, "continue")
 }
+func (h *Handler) NetbirdRegistrationResolutionRetry(c echo.Context) error {
+	return h.netbirdRegistrationResolutionAction(c, "retry")
+}
 func (h *Handler) NetbirdRegistrationResolutionReconcile(c echo.Context) error {
 	return h.netbirdRegistrationResolutionAction(c, "reconcile")
 }
@@ -40,6 +43,9 @@ func (h *Handler) netbirdRegistrationResolutionAction(c echo.Context, action str
 	keys := []string{"resolution_id"}
 	if action != "reconcile" {
 		keys = append(keys, "revision")
+	}
+	if action == "retry" {
+		keys = append(keys, "retry_id")
 	}
 	values, err := netbirdRegistrationValues(c, keys...)
 	if err != nil {
@@ -59,6 +65,8 @@ func (h *Handler) netbirdRegistrationResolutionAction(c echo.Context, action str
 		_, err = s.Resolve(ctx, actor, scope, device, id, values.Get("resolution_id"), values.Get("revision"))
 	case "continue":
 		_, err = s.Continue(ctx, actor, scope, device, id, values.Get("resolution_id"), values.Get("revision"))
+	case "retry":
+		_, err = s.Retry(ctx, actor, scope, device, id, values.Get("resolution_id"), values.Get("retry_id"), values.Get("revision"))
 	case "reconcile":
 		_, err = s.Reconcile(ctx, actor, scope, device, id, values.Get("resolution_id"))
 	default:

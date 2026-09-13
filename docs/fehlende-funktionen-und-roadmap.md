@@ -648,9 +648,16 @@ UUID is refused after restart; existing execution cannot be rewritten. Owned
 filesystem, broker, database, real route and 12 additional browser cases cover
 this path; all 2,286 browser cases, the full inventory race suite, native
 Linux/macOS agent suites, Linux worker database suites and platform builds pass. Unknown creation responses, unsupported
-agents and undelivered release/removal/withdrawal requests still need explicit
-recovery protocols. Uncertain execution that wins a withdrawal race remains
-blocked, while a matching later completed receipt can confirm resolution.
+agents and undelivered removal requests still need explicit recovery protocols.
+[Reviewed recovery attempts](netbird-resolution-retries.md) now cover undelivered
+release/withdrawal controls and release after execution wins a withdrawal race.
+Each attempt retains its own immutable record and audit before transmission,
+uses the unchanged resolution UUID and requires fresh current evidence. Replayed
+forms never resend controls; read-only checks can recover lost proof. Current
+certificate renewal, concurrent confirmations, audit rollback, guarded storage
+and 27 additional browser cases cover this path. All 2,313 browser cases, the full
+inventory and audit race suites, registered routes and the Linux console build
+pass. Connection-command withdrawal still needs console support.
 Trusted Unix installers, authoritative peer ownership, remaining user/provider secrets and
 physical/provider acceptance are still required.
 

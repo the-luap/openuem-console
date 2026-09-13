@@ -100,6 +100,8 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		{"uem_netbird_operation_attempts", "uem_netbird_attempt_immutable", 27},
 		{"uem_netbird_operations", "uem_netbird_operation_immutable", 27},
 		{"uem_netbird_operations", "uem_netbird_wire_receipt", 23},
+		{"uem_netbird_resolution_retries", "uem_netbird_resolution_retry_immutable", 27},
+		{"uem_netbird_resolution_retries", "uem_netbird_resolution_retry_valid", 7},
 		{"uem_netbird_resolutions", "uem_netbird_resolution_immutable", 27},
 		{"uem_netbird_resolution_evidence", "uem_netbird_resolution_evidence_immutable", 27},
 		{"uem_netbird_resolution_evidence", "uem_netbird_resolution_evidence_valid", 7},

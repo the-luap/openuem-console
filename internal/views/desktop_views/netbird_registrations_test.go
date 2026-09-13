@@ -33,7 +33,7 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/2/computers/owned-device/netbird/registrations", nil).WithContext(ctx), httptest.NewRecorder())
 	scope := access.Scope{TenantID: 1, SiteID: 2}
 	instant := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	for _, kind := range []string{"choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full", "unconfirmed-resolved", "history-resolved", "resolution-completed", "resolution-release", "resolution-cleanup", "resolution-no-delivery", "resolution-continue", "resolution-pending", "resolution-confirmed", "resolution-unknown-key", "resolution-missing-receipt", "resolution-active", "resolution-changed-key", "resolution-unavailable", "resolution-long", "resolution-withdraw", "resolution-withdraw-cleanup", "resolution-withdrawn", "resolution-recovery-unavailable"} {
+	for _, kind := range []string{"choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full", "unconfirmed-resolved", "history-resolved", "resolution-completed", "resolution-release", "resolution-cleanup", "resolution-no-delivery", "resolution-continue", "resolution-pending", "resolution-confirmed", "resolution-unknown-key", "resolution-missing-receipt", "resolution-active", "resolution-changed-key", "resolution-unavailable", "resolution-long", "resolution-withdraw", "resolution-withdraw-cleanup", "resolution-withdrawn", "resolution-recovery-unavailable", "resolution-retry-release", "resolution-retry-withdraw", "resolution-retry-long"} {
 		t.Run(kind, func(t *testing.T) {
 			info.Principal = access.Principal{UserID: "owned-admin", Grants: []access.Grant{{Role: access.Administrator}}}
 			if kind == "unconfirmed-viewer" {
@@ -143,6 +143,22 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 				case "resolution-recovery-unavailable":
 					v.AgentState = "recovery-unavailable"
 					v.CanResolve = false
+				case "resolution-retry-release", "resolution-retry-withdraw", "resolution-retry-long":
+					v.Resolution = d
+					v.CanResolve = false
+					v.CanRetry = true
+					v.RetryKind = "release"
+					v.AgentState = "unconfirmed"
+					d.AgentAttemptedAt = &instant
+					if kind == "resolution-retry-withdraw" {
+						v.RetryKind = "withdraw"
+						v.AgentState = "not-received"
+						d.Kind = "withdraw"
+					}
+					d.LastRetry = &inventory.NetbirdResolutionRetry{ID: "50000000-0000-4000-8000-000000000005", Actor: "Owned <reviewer>", Kind: v.RetryKind, Sequence: 2, CreatedAt: instant}
+					if strings.HasSuffix(kind, "long") {
+						d.LastRetry.Actor = strings.Repeat("W", 255)
+					}
 				case "resolution-long":
 					v.Resolution = d
 					v.CanResolve = false

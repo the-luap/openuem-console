@@ -30,6 +30,7 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
      <dt>Confirmed by</dt><dd>{ v.Resolution.ConfirmedBy }</dd>
     }
    </dl>
+   @netbirdResolutionRetrySummary(v.Resolution.LastRetry)
   }
   if v.Registration.ReleasedAt!=nil {
    <p role="status">Resolution confirmed. Further NetBird commands may be reviewed. The original registration result has not changed.</p>
@@ -57,9 +58,12 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
    } else if v.Resolution==nil {
     <p>Matching provider and agent evidence is required before resolution can start. Missing key identity or a missing agent receipt cannot establish that registration did not occur.</p>
    }
+   if v.CanRetry {
+    @netbirdResolutionRetryForm(info,NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/retry",v.Resolution.ID,resolutionID,v.Revision,v.RetryKind)
+   }
    if v.Resolution!=nil {
     <p>Checking evidence only reads provider and agent results. It cannot repeat key removal or send an agent release. If a later step becomes eligible, review again and explicitly confirm continuation.</p>
-    <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check" hx-indicator="#netbird-check-pending" class="netbird-confirm">
+    <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check,#netbird-retry-submit,#netbird-retry-confirm" hx-indicator="#netbird-check-pending" class="netbird-confirm">
      @mdm_views.CSRF(info)
      <input type="hidden" name="resolution_id" value={ v.Resolution.ID }/>
      <input type="hidden" name="confirmed" value="yes"/>
@@ -76,7 +80,7 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
 }
 
 templ netbirdRegistrationResolutionForm(info *partials.CommonInfo,v *inventory.NetbirdRegistrationResolutionReview,resolutionID,suffix,label string) {
- <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check" hx-indicator="#netbird-pending" class="netbird-confirm">
+ <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution"+suffix } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check,#netbird-retry-submit,#netbird-retry-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
   @mdm_views.CSRF(info)
   <input type="hidden" name="resolution_id" value={ resolutionID }/>
   <input type="hidden" name="revision" value={ v.Revision }/>

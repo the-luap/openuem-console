@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -43,7 +44,9 @@ func exerciseNetbirdResolutionRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx
 		controls++
 		if c.Kind == "release" {
 			releases++
-			releaseID = c.RequestID
+			if releases > 1 {
+				releaseID = c.RequestID
+			}
 			return nil, errors.New("owned lost release reply")
 		}
 		p, err := netbirdcommand.ControlResponseFor(c, "ok")
@@ -96,6 +99,18 @@ func exerciseNetbirdResolutionRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx
 	retained, err := store.Read(ctx, "apple-console-admin", scope, device, op.ID)
 	require.NoError(t, err)
 	require.Nil(t, retained.ReleasedAt)
+	v, err = resolution.Review(ctx, "apple-console-admin", scope, device, op.ID)
+	require.NoError(t, err)
+	require.True(t, v.CanRetry)
+	retry := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {confirm.Get("resolution_id")}, "retry_id": {uuid.NewString()}, "revision": {v.Revision}}
+	exerciseNetbirdRetryFormRejections(t, request, location+"/retry", retry)
+	response = request("apple-console-admin", "POST", location+"/retry", retry, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, location, response.Header().Get("HX-Redirect"))
+	before := controls
+	require.Equal(t, 204, request("apple-console-admin", "POST", location+"/retry", retry, "console-test-token").Code)
+	require.Equal(t, before, controls)
+	require.Equal(t, 2, releases)
 	check := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {releaseID}}
 	require.Equal(t, 403, request("scoped-viewer", "POST", location+"/reconcile", check, "console-test-token").Code)
 	require.Equal(t, 204, request("apple-console-admin", "POST", location+"/reconcile", check, "console-test-token").Code)
@@ -108,5 +123,21 @@ func exerciseNetbirdResolutionRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx
 	require.NotNil(t, retained.ReleasedAt)
 	require.Equal(t, "unconfirmed", retained.Status)
 	require.Nil(t, retained.Result)
-	require.Equal(t, 1, releases)
+	require.Equal(t, 2, releases)
+}
+
+func exerciseNetbirdRetryFormRejections(t *testing.T, request func(string, string, string, url.Values, string) *httptest.ResponseRecorder, path string, form url.Values) {
+	t.Helper()
+	for _, actor := range []string{"scoped-viewer", "scoped-operator"} {
+		require.Equal(t, 403, request(actor, "POST", path, form, "console-test-token").Code)
+	}
+	require.Equal(t, 403, request("apple-console-admin", "POST", path, form, "").Code)
+	for _, alter := range []func(url.Values){func(v url.Values) { v.Del("confirmed") }, func(v url.Values) { v.Del("retry_id") }, func(v url.Values) { v.Add("retry_id", uuid.NewString()) }, func(v url.Values) { v.Set("retry_id", "invalid") }, func(v url.Values) { v.Set("setup_key", "injected") }} {
+		bad := url.Values{}
+		for k, list := range form {
+			bad[k] = append([]string{}, list...)
+		}
+		alter(bad)
+		require.Equal(t, 400, request("apple-console-admin", "POST", path, bad, "console-test-token").Code)
+	}
 }

@@ -143,7 +143,9 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 			mu.Lock()
 			require.True(t, absent)
 			mu.Unlock()
-			releaseID = c.RequestID
+			if !lostRelease || releases > 1 {
+				releaseID = c.RequestID
+			}
 			if lostRelease {
 				return nil, errors.New("owned release reply lost")
 			}
@@ -347,12 +349,24 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	retained, err := store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
 	require.NoError(t, err)
 	require.Nil(t, retained.ReleasedAt)
+	v, err = resolver.Review(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.True(t, v.CanRetry)
+	retry := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {confirm.Get("resolution_id")}, "retry_id": {uuid.NewString()}, "revision": {v.Revision}}
+	exerciseNetbirdRetryFormRejections(t, request, resolutionPath+"/retry", retry)
+	response = request("apple-console-admin", "POST", resolutionPath+"/retry", retry, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, resolutionPath, response.Header().Get("HX-Redirect"))
+	beforeRetryReplay := controls
+	require.Equal(t, 204, request("apple-console-admin", "POST", resolutionPath+"/retry", retry, "console-test-token").Code)
+	require.Equal(t, beforeRetryReplay, controls)
+	require.Equal(t, 2, releases)
 	require.Equal(t, 204, request("apple-console-admin", "POST", resolutionPath+"/reconcile", check, "console-test-token").Code)
 	retained, err = store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
 	require.NoError(t, err)
 	require.NotNil(t, retained.ReleasedAt)
 	require.Equal(t, "unconfirmed", retained.Status)
-	require.Equal(t, 1, releases)
+	require.Equal(t, 2, releases)
 	mu.Lock()
 	require.Equal(t, 3, creates)
 	require.Equal(t, 3, deletes)

@@ -35,7 +35,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/refresh":
 			return access.RefreshDevices, true
-		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/:request/resolution/continue", "/computers/:uuid/netbird/registrations/:request/resolution/reconcile", "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
+		case "/computers/:uuid/netbird/registrations/:request/resolution/retry", "/computers/:uuid/netbird/operations/:request/resolution/retry", "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/:request/resolution/continue", "/computers/:uuid/netbird/registrations/:request/resolution/reconcile", "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
 			return access.ManageProfiles, true
@@ -86,6 +86,7 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	netbird.GET("/:request/resolution", h.NetbirdResolutionReview)
 	netbird.POST("/:request/resolution", h.NetbirdResolutionRequest)
 	netbird.POST("/:request/resolution/reconcile", h.NetbirdResolutionReconcile)
+	netbird.POST("/:request/resolution/retry", h.NetbirdResolutionRetry)
 	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
 	registration.GET("", h.NetbirdRegistrationHistory)
 	registration.GET("/new", h.NetbirdRegistrationChoices)
@@ -98,6 +99,7 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	registration.POST("/:request/resolution", h.NetbirdRegistrationResolutionRequest)
 	registration.POST("/:request/resolution/continue", h.NetbirdRegistrationResolutionContinue)
 	registration.POST("/:request/resolution/reconcile", h.NetbirdRegistrationResolutionReconcile)
+	registration.POST("/:request/resolution/retry", h.NetbirdRegistrationResolutionRetry)
 
 }
 

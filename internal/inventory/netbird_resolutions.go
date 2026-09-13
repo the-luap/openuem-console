@@ -35,6 +35,7 @@ type NetbirdResolution struct {
 	CreatedAt                            time.Time
 	ConfirmedAt                          *time.Time
 	ConfirmedBy                          string
+	LastRetry                            *NetbirdResolutionRetry
 }
 
 type NetbirdResolutionReview struct {
@@ -42,6 +43,7 @@ type NetbirdResolutionReview struct {
 	Target            ManualTarget
 	Revision, Outcome string
 	CanRelease        bool
+	CanRetry          bool
 	Resolution        *NetbirdResolution
 	identity          netbirdcommand.Identity
 	identityExpiry    time.Time
@@ -64,7 +66,8 @@ func readNetbirdResolution(ctx context.Context, tx *sql.Tx, id string) (*Netbird
 		d.ConfirmedAt = &confirmed.Time
 		d.ConfirmedBy = actor.String
 	}
-	return d, nil
+	d.LastRetry, err = readNetbirdResolutionRetry(ctx, tx, "operation", id)
+	return d, err
 }
 
 func (s *NetbirdResolutionStore) begin(ctx context.Context, actor string, scope access.Scope, device, id string) (*sql.Tx, *NetbirdOperation, error) {
@@ -180,35 +183,32 @@ func (s *NetbirdResolutionStore) review(ctx context.Context, tx *sql.Tx, r *Netb
 			return nil, ErrNetbirdOperationConflict
 		}
 		v.Outcome = v.response.Receipt.Status
-		if v.Resolution == nil {
-			if v.Outcome == "completed" {
-				v.CanRelease = true
-			} else if v.response.ReleaseID != "" {
+		if v.Outcome == "completed" {
+			v.CanRelease = v.Resolution == nil
+		} else if v.response.ReleaseID != "" {
+			if v.Resolution == nil || v.response.ReleaseID != v.Resolution.ID {
 				v.Outcome = "conflict"
-			} else {
-				deadline := netbirdControlRequest(ctx, v, "receipt", uuid.NewString()).ExpiresAt
-				probe, cancel := context.WithDeadline(ctx, deadline)
-				journal, err = s.operations.inspect(probe, v.identity)
-				valid := err == nil && probe.Err() == nil && journal.Valid()
-				cancel()
-				if !valid {
-					return nil, ErrNetbirdOperationNotReady
-				}
-				v.CanRelease = journal.Status == "unconfirmed" && journal.CanRelease && journal.PendingID == r.ID && journal.PendingHash == r.CommandHash
-				if !v.CanRelease {
-					v.Outcome = "waiting"
-				}
+			}
+		} else if v.Outcome == "unconfirmed" {
+			deadline := netbirdControlRequest(ctx, v, "receipt", uuid.NewString()).ExpiresAt
+			probe, cancel := context.WithDeadline(ctx, deadline)
+			journal, err = s.operations.inspect(probe, v.identity)
+			valid := err == nil && probe.Err() == nil && journal.Valid()
+			cancel()
+			if !valid {
+				return nil, ErrNetbirdOperationNotReady
+			}
+			eligible := journal.Status == "unconfirmed" && journal.CanRelease && journal.PendingID == r.ID && journal.PendingHash == r.CommandHash
+			v.CanRelease = eligible && v.Resolution == nil
+			v.CanRetry = eligible && v.Resolution != nil && v.Resolution.Kind == "release"
+			if !eligible {
+				v.Outcome = "waiting"
 			}
 		}
 	}
 	// Time, query UUID and response request hash are deliberately excluded: a
 	// fresh read of the same evidence must preserve the reviewed revision.
-	data, _ := json.Marshal(struct {
-		Generation, ID, Hash, Outcome, Release string
-		Receipt                                netbirdcommand.Receipt
-		Journal                                netbirdcommand.State
-		Allowed                                bool
-	}{generation, r.ID, r.CommandHash, v.Outcome, v.response.ReleaseID, v.response.Receipt, journal, v.CanRelease})
+	data, _ := json.Marshal([]any{generation, r.ID, r.CommandHash, v.Outcome, v.response.ReleaseID, v.response.Receipt, journal, v.CanRelease, v.CanRetry, v.Resolution})
 	digest := sha256.Sum256(data)
 	v.Revision = hex.EncodeToString(digest[:])
 	return v, nil

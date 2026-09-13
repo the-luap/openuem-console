@@ -27,7 +27,7 @@ reversed still invalidates a previous confirmation.
 | Retained completed receipt | Explicitly acknowledge the later completion evidence. No agent release is sent. |
 | Retained unconfirmed receipt, matching pending journal entry, local execution ended | Explicitly request one durable agent release. |
 | Missing receipt, unavailable journal, active/unjoined execution or another release identity | Keep further commands blocked. |
-| Existing console resolution intent without confirmed evidence | Query its retained receipt; do not send another release. |
+| Existing console resolution intent without confirmed evidence | Query its retained receipt. If a release was not retained and local execution has ended, a fresh review can explicitly authorize another recovery attempt. |
 
 The form shows the original request, target, profile and remaining uncertainty.
 It requires an unchecked confirmation, CSRF and exact resolution UUID/revision.
@@ -84,17 +84,19 @@ receipts, explicit reconciliation and the unchanged original outcome.
 Twenty-four additional browser cases cover release, later completion, pending
 and confirmed resolution, blocked evidence and long text at 390, 768 and 1,440
 pixels. Together with the command pages, there are 75 NetBird operation cases
-and 2,169 cases in the full browser matrix. Fixtures use owned callbacks and
+before the additional [recovery-attempt cases](netbird-resolution-retries.md).
+The full browser matrix now passes 2,313 cases. Fixtures use owned callbacks and
 brokers; no installed NetBird executable, real provider or physical endpoint is
 invoked by these tests.
 
-The full inventory PostgreSQL race suite passes in 153.020 seconds; the full
-audit suite passes in 10.740 seconds and the affected view race test in 1.832
+The full inventory PostgreSQL race suite passes in 200.398 seconds; the full
+audit suite passes in 9.233 seconds and the affected view race test in 1.942
 seconds. Final registered-route fixtures and the full Linux console build pass.
 
 Missing journal evidence remains blocked. If the release request itself was
 never received, read-only reconciliation cannot manufacture a release; there
-is no automatic resend or journal reset. Explicit recovery of incomplete local
+is no automatic resend or journal reset. [Explicit recovery attempts](netbird-resolution-retries.md)
+now allow a freshly reviewed release under the same resolution ID. Recovery of incomplete local
 storage and physical-device acceptance remain separate work. Installation,
 authoritative peer deletion and additional recovery protocols remain open.
 [Managed registration](netbird-registrations.md) and its separate

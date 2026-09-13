@@ -2,6 +2,7 @@ package desktop_views
 
 import (
  "github.com/labstack/echo/v4"
+ "strconv"
  "github.com/open-uem/openuem-console/internal/inventory"
  "github.com/open-uem/openuem-console/internal/views/mdm_views"
  "github.com/open-uem/openuem-console/internal/views/partials"
@@ -29,11 +30,15 @@ templ NetbirdResolution(c echo.Context,info *partials.CommonInfo,v *inventory.Ne
      <dt>Confirmed by</dt><dd>{ v.Resolution.ConfirmedBy }</dd>
     }
    </dl>
+   @netbirdResolutionRetrySummary(v.Resolution.LastRetry)
    if v.Resolution.ConfirmedAt!=nil {
     <p role="status">Resolution confirmed. Further NetBird commands may be reviewed.</p>
    } else {
+    if v.CanRetry {
+     @netbirdResolutionRetryForm(info,NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/retry",v.Resolution.ID,resolutionID,v.Revision,"release")
+    }
     <p role="status">Resolution is not yet confirmed. Further NetBird commands remain blocked. Checking the receipt only reads retained agent evidence and does not send another release.</p>
-    <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+    <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution/reconcile" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-retry-submit,#netbird-retry-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
      @mdm_views.CSRF(info)
      <input type="hidden" name="resolution_id" value={ v.Resolution.ID }/>
      <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>Check the retained receipt for this resolution.</span></label>
@@ -47,7 +52,7 @@ templ NetbirdResolution(c echo.Context,info *partials.CommonInfo,v *inventory.Ne
    } else {
     <p role="status">The agent retained an unconfirmed command and reports that its local execution has ended. Confirming requests an explicit release; success is recorded only after matching agent evidence.</p>
    }
-   <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+   <form method="post" action={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-post={ NetbirdOperationPath(info,v.Operation.DeviceID)+"/"+v.Operation.ID+"/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-retry-submit,#netbird-retry-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
     @mdm_views.CSRF(info)
     <input type="hidden" name="resolution_id" value={ resolutionID }/>
     <input type="hidden" name="revision" value={ v.Revision }/>
@@ -73,4 +78,35 @@ func netbirdResolutionBlocked(outcome string)string {
  case "released":return "The original receipt records a historical release. No new release is available."
  default:return "The agent cannot currently confirm resolution eligibility. Further commands remain blocked."
  }
+}
+
+
+templ netbirdResolutionRetrySummary(r *inventory.NetbirdResolutionRetry) {
+ if r!=nil {
+  <dl class="netbird-details">
+   <dt>Recovery attempts</dt><dd>{ strconv.FormatInt(r.Sequence,10) }</dd>
+   <dt>Latest attempt ID</dt><dd>{ r.ID }</dd>
+   <dt>Latest recovery action</dt><dd>{ r.Kind }</dd>
+   <dt>Latest attempt by</dt><dd>{ r.Actor }</dd>
+   <dt>Latest attempt</dt><dd>@mdm_views.Timestamp(&r.CreatedAt)</dd>
+  </dl>
+ }
+}
+
+templ netbirdResolutionRetryForm(info *partials.CommonInfo,path,resolutionID,retryID,revision,kind string) {
+ if kind=="withdraw" {
+  <p>No execution attempt is retained. A new recovery attempt can permanently withdraw the original request under the existing resolution ID.</p>
+ } else {
+  <p>The agent retains an unconfirmed execution that has ended. A new recovery attempt can release it under the existing resolution ID.</p>
+ }
+ <p>Each attempt requires a fresh review and confirmation. The original command is not repeated. Further commands remain blocked until matching evidence confirms resolution.</p>
+ <form method="post" action={ path } hx-post={ path } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm,#netbird-check,#netbird-retry-submit,#netbird-retry-confirm" hx-indicator="#netbird-retry-pending" class="netbird-confirm">
+  @mdm_views.CSRF(info)
+  <input type="hidden" name="resolution_id" value={ resolutionID }/>
+  <input type="hidden" name="retry_id" value={ retryID }/>
+  <input type="hidden" name="revision" value={ revision }/>
+  <label class="netbird-checkbox" for="netbird-retry-confirm"><input id="netbird-retry-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the current evidence and authorize this recovery attempt.</span></label>
+  <button class="uk-button uk-button-primary" id="netbird-retry-submit" type="submit">Confirm recovery attempt</button>
+  <span class="htmx-indicator" id="netbird-retry-pending" role="status">Attempting recovery…</span>
+ </form>
 }

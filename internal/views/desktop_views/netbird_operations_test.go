@@ -31,7 +31,7 @@ func TestNetbirdOperationViews(t *testing.T) {
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/2/computers/owned-device/netbird", nil).WithContext(ctx), httptest.NewRecorder())
 	scope := access.Scope{TenantID: 1, SiteID: 2}
 	instant := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	for _, kind := range []string{"overview", "overview-empty", "overview-long", "overview-viewer", "review-up", "review-down", "review-switch", "review-long", "queued", "sending", "completed", "stopped", "unconfirmed", "released", "history", "history-empty", "resolution-completed", "resolution-release", "resolution-pending", "resolution-confirmed", "resolution-waiting", "resolution-missing", "resolution-conflict", "resolution-long"} {
+	for _, kind := range []string{"overview", "overview-empty", "overview-long", "overview-viewer", "review-up", "review-down", "review-switch", "review-long", "queued", "sending", "completed", "stopped", "unconfirmed", "released", "history", "history-empty", "resolution-completed", "resolution-release", "resolution-pending", "resolution-confirmed", "resolution-waiting", "resolution-missing", "resolution-conflict", "resolution-long", "resolution-retry", "resolution-retry-long"} {
 		t.Run(kind, func(t *testing.T) {
 			info.Principal = access.Principal{UserID: "owned-admin", Grants: []access.Grant{{Role: access.Administrator}}}
 			if kind == "overview-viewer" {
@@ -56,14 +56,23 @@ func TestNetbirdOperationViews(t *testing.T) {
 					outcome = "unconfirmed"
 				}
 				v := &inventory.NetbirdResolutionReview{Operation: op, Target: target, Outcome: outcome, Revision: strings.Repeat("a", 64), CanRelease: kind == "resolution-completed" || kind == "resolution-release" || kind == "resolution-long"}
-				if kind == "resolution-pending" || kind == "resolution-confirmed" {
+				if kind == "resolution-pending" || kind == "resolution-confirmed" || strings.HasPrefix(kind, "resolution-retry") {
 					v.Resolution = &inventory.NetbirdResolution{ID: "10000000-0000-4000-8000-000000000004", RequestID: op.ID, Actor: "Owned <operator>", Kind: "release", CreatedAt: instant}
 					if kind == "resolution-confirmed" {
 						v.Resolution.ConfirmedAt = &instant
 						v.Resolution.ConfirmedBy = "Owned <reviewer>"
 					}
 				}
-				component = NetbirdResolution(c, info, v, "10000000-0000-4000-8000-000000000004")
+				if strings.HasPrefix(kind, "resolution-retry") {
+					v.CanRetry = true
+					v.Resolution.LastRetry = &inventory.NetbirdResolutionRetry{ID: "50000000-0000-4000-8000-000000000005", Actor: "Owned <reviewer>", Kind: "release", Sequence: 2, CreatedAt: instant}
+					if strings.HasSuffix(kind, "long") {
+						v.Resolution.LastRetry.Actor = strings.Repeat("W", 255)
+					}
+					component = NetbirdResolution(c, info, v, "30000000-0000-4000-8000-000000000003")
+				} else {
+					component = NetbirdResolution(c, info, v, "10000000-0000-4000-8000-000000000004")
+				}
 			case strings.HasPrefix(kind, "overview"):
 				page := &inventory.NetbirdOverview{Target: target, Installed: true, ManagementConnected: true, Profile: name, Profiles: []nats.NetbirdProfile{{ID: profile, Name: name, Active: true}}, ManagementURL: management, Version: "owned-version", LastContact: &instant}
 				if kind == "overview-empty" {

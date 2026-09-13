@@ -155,6 +155,9 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
    }
   </dl>
   <p>This receipt does not establish current connectivity, provider peer identity or group membership. Removing the setup key does not disconnect a peer that already registered with it.</p>
+  if r.Resolution!=nil {
+   @netbirdResolutionRetrySummary(r.Resolution.LastRetry)
+  }
   if r.Status=="unconfirmed" && r.ReleasedAt==nil {
    <p>The original outcome remains unconfirmed. Checking key removal does not repeat registration or release the device's command block.</p>
    if r.Key!=nil && !r.KeyAbsent && slices.Contains(r.Attempts,"delete") && netbirdCanManage(info,r.Scope) {

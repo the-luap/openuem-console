@@ -53,8 +53,8 @@ func registrationResolutionFixture(t *testing.T, status string, cleanup bool) (*
 		if c.Kind == "withdraw" {
 			a.withdrawals++
 			var attempts, absent int
-			require.NoError(t, f.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM uem_netbird_registration_resolution_attempts WHERE request_id=$1 AND resolution_id=$2),(SELECT count(*) FROM uem_netbird_registration_evidence WHERE request_id=$1 AND kind='absent')`, c.ReferenceID, c.RequestID).Scan(&attempts, &absent))
-			require.Equal(t, 1, attempts)
+			require.NoError(t, f.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM (SELECT 1 FROM uem_netbird_registration_resolution_attempts WHERE request_id=$1 AND resolution_id=$2 UNION ALL SELECT 1 FROM uem_netbird_resolution_retries WHERE family='registration' AND request_id=$1 AND resolution_id=$2) admitted),(SELECT count(*) FROM uem_netbird_registration_evidence WHERE request_id=$1 AND kind='absent')`, c.ReferenceID, c.RequestID).Scan(&attempts, &absent))
+			require.Positive(t, attempts)
 			require.Equal(t, 1, absent)
 			if a.onWithdraw != nil {
 				a.onWithdraw()
@@ -83,8 +83,8 @@ func registrationResolutionFixture(t *testing.T, status string, cleanup bool) (*
 		if c.Kind == "release" {
 			a.releases++
 			var attempts, absent int
-			require.NoError(t, f.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM uem_netbird_registration_resolution_attempts WHERE request_id=$1 AND resolution_id=$2),(SELECT count(*) FROM uem_netbird_registration_evidence WHERE request_id=$1 AND kind='absent')`, c.ReferenceID, c.RequestID).Scan(&attempts, &absent))
-			require.Equal(t, 1, attempts)
+			require.NoError(t, f.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM (SELECT 1 FROM uem_netbird_registration_resolution_attempts WHERE request_id=$1 AND resolution_id=$2 UNION ALL SELECT 1 FROM uem_netbird_resolution_retries WHERE family='registration' AND request_id=$1 AND resolution_id=$2) admitted),(SELECT count(*) FROM uem_netbird_registration_evidence WHERE request_id=$1 AND kind='absent')`, c.ReferenceID, c.RequestID).Scan(&attempts, &absent))
+			require.Positive(t, attempts)
 			require.Equal(t, 1, absent)
 			if a.dropRelease {
 				return nil, errors.New("owned request not delivered")
@@ -376,8 +376,10 @@ func TestNetbirdRegistrationResolutionMigrationGuards(t *testing.T) {
 }
 
 func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T) {
-	for _, change := range []string{"renewed", "withdraw-renewed", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
 		t.Run(change, func(t *testing.T) {
+			retry := strings.HasPrefix(change, "retry-")
+			change = strings.TrimPrefix(change, "retry-")
 			withdrawal := change == "withdraw-renewed"
 			f, id := netbirdFixture(t)
 			p := newRegistrationProvider(t, f, id)
@@ -418,7 +420,9 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 				}
 				if c.Kind == "release" || c.Kind == "withdraw" {
 					releases++
-					releaseID = c.RequestID
+					if !retry || releases > 1 {
+						releaseID = c.RequestID
+					}
 					return nil, errors.New("owned release reply lost")
 				}
 				queries++
@@ -452,6 +456,11 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			d, err := resolver.Resolve(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, uuid.NewString(), v.Revision)
 			require.NoError(t, err)
 			require.Nil(t, d.ConfirmedAt)
+			if retry {
+				v, err = resolver.Review(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID)
+				require.NoError(t, err)
+				require.True(t, v.CanRetry)
+			}
 			before := queries
 			switch change {
 			case "renewed", "withdraw-renewed":
@@ -466,6 +475,30 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 				err = f.client.Agent.UpdateOneID(f.id).RemoveSiteIDs(f.scope.SiteID).AddSiteIDs(f.otherSite).Exec(ctx)
 			}
 			require.NoError(t, err)
+			if retry {
+				_, err = resolver.Retry(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID, uuid.NewString(), v.Revision)
+				require.Error(t, err)
+				require.Equal(t, 1, releases)
+				if change == "renewed" || change == "withdraw-renewed" {
+					fresh, e := resolver.Review(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID)
+					require.NoError(t, e)
+					require.NotEqual(t, v.Revision, fresh.Revision)
+					retried, e := resolver.Retry(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID, uuid.NewString(), fresh.Revision)
+					require.NoError(t, e)
+					require.Nil(t, retried.ConfirmedAt)
+					require.Equal(t, 2, releases)
+					result, e := resolver.Reconcile(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID)
+					require.NoError(t, e)
+					require.NotNil(t, result.ConfirmedAt)
+					require.Equal(t, strings.Repeat("a", 64), certificate)
+					var hash string
+					require.NoError(t, f.db.QueryRowContext(ctx, `SELECT control->>'certificate_hash' FROM uem_netbird_resolution_retries WHERE request_id=$1`, r.ID).Scan(&hash))
+					require.Equal(t, certificate, hash)
+				} else {
+					require.Equal(t, before, queries)
+				}
+				return
+			}
 			result, err := resolver.Reconcile(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID)
 			if change == "renewed" || change == "withdraw-renewed" {
 				require.NoError(t, err)

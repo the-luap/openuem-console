@@ -120,8 +120,9 @@ tests cover empty group policy, 50-row pagination and joined dispatcher shutdown
 Combined resolution is implemented for retained keys and matching agent evidence;
 its [failure ordering and remaining cases](netbird-registration-resolutions.md)
 and [permanent withdrawal](netbird-registration-withdrawals.md)
+and [explicit recovery attempts](netbird-resolution-retries.md)
 are documented separately. Authoritative peer association, missing creation
-responses and undelivered release requests still need explicit recovery policy;
+responses and unsuccessful recorded removal still need explicit recovery policy;
 do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

@@ -39,12 +39,15 @@ type NetbirdRegistrationResolution struct {
 	AgentAttemptedAt                     *time.Time
 	ConfirmedAt                          *time.Time
 	ConfirmedBy                          string
+	LastRetry                            *NetbirdResolutionRetry
 }
 type NetbirdRegistrationResolutionReview struct {
 	Registration                        *NetbirdRegistration
 	Target                              ManualTarget
 	Revision, KeyState, AgentState      string
 	CanResolve, CanContinue, CanCleanup bool
+	CanRetry                            bool
+	RetryKind                           string
 	Resolution                          *NetbirdRegistrationResolution
 	agent                               *NetbirdResolutionReview
 	generation                          string
@@ -69,7 +72,8 @@ func readRegistrationResolution(ctx context.Context, tx *sql.Tx, id string) (*Ne
 		d.ConfirmedAt = &confirmed.Time
 		d.ConfirmedBy = actor.String
 	}
-	return d, nil
+	d.LastRetry, err = readNetbirdResolutionRetry(ctx, tx, "registration", id)
+	return d, err
 }
 func (s *NetbirdRegistrationResolutionStore) begin(ctx context.Context, actor string, scope access.Scope, device, id string) (*sql.Tx, *NetbirdRegistration, error) {
 	if !canonicalRequestID(id) || !ValidReportDeviceID(device) {
@@ -265,7 +269,14 @@ func (s *NetbirdRegistrationResolutionStore) review(ctx context.Context, tx *sql
 		v.CanResolve = eligible && keyReady
 	} else {
 		compatible := d.Kind == registrationResolutionKind(v.AgentState) || d.Kind == "withdraw" && v.AgentState == "completed"
-		v.CanContinue = compatible && eligible && keyReady && d.AgentAttemptedAt == nil
+		v.CanContinue = compatible && eligible && keyReady && d.AgentAttemptedAt == nil && d.LastRetry == nil
+		attempted := d.AgentAttemptedAt != nil || d.LastRetry != nil
+		if r.KeyAbsent && v.AgentState == "unconfirmed" && v.agent.CanRelease && (d.Kind == "withdraw" || d.Kind == "release" && attempted) {
+			v.CanRetry, v.RetryKind = true, "release"
+		}
+		if r.KeyAbsent && v.AgentState == "not-received" && v.canWithdraw && d.Kind == "withdraw" && attempted && (d.LastRetry == nil || d.LastRetry.Kind != "release") {
+			v.CanRetry, v.RetryKind = true, "withdraw"
+		}
 	}
 	var receipt netbirdcommand.Receipt
 	var release string
@@ -273,7 +284,7 @@ func (s *NetbirdRegistrationResolutionStore) review(ctx context.Context, tx *sql
 		receipt = v.agent.response.Receipt
 		release = v.agent.response.ReleaseID
 	}
-	data, _ := json.Marshal([]any{r.ID, r.Revision, r.CommandHash, v.generation, v.KeyState, r.KeyAbsent, r.Attempts, v.AgentState, receipt, release, v.CanResolve, v.CanContinue, v.CanCleanup, d})
+	data, _ := json.Marshal([]any{r.ID, r.Revision, r.CommandHash, v.generation, v.KeyState, r.KeyAbsent, r.Attempts, v.AgentState, receipt, release, v.CanResolve, v.CanContinue, v.CanCleanup, v.CanRetry, v.RetryKind, d})
 	digest := sha256.Sum256(data)
 	v.Revision = hex.EncodeToString(digest[:])
 	return v, nil
@@ -360,7 +371,7 @@ func (s *NetbirdRegistrationResolutionStore) finish(ctx context.Context, tx *sql
 			matched = p.Receipt.Status == "completed" && p.ReleaseID == ""
 		}
 		if matched && d.Kind == "withdraw" {
-			matched = (p.Receipt.Status == "withdrawn" && p.ReleaseID == d.ID) || (c.Kind == "receipt" && p.Receipt.Status == "completed" && p.ReleaseID == "")
+			matched = (p.Receipt.Status == "withdrawn" && p.ReleaseID == d.ID) || (c.Kind == "receipt" && p.Receipt.Status == "completed" && p.ReleaseID == "") || (d.LastRetry != nil && d.LastRetry.Kind == "release" && p.Receipt.Status == "unconfirmed" && p.ReleaseID == d.ID)
 		}
 		if matched {
 			var err error
@@ -430,7 +441,7 @@ func (s *NetbirdRegistrationResolutionStore) advance(ctx context.Context, tx *sq
 		return nil, err
 	}
 	c, p := v.agent.query, v.agent.response
-	if d.AgentAttemptedAt == nil {
+	if d.AgentAttemptedAt == nil && d.LastRetry == nil {
 		if d.Kind != registrationResolutionKind(v.AgentState) && !(d.Kind == "withdraw" && v.AgentState == "completed") {
 			return s.pending(ctx, tx, r, d, actor)
 		}

@@ -50,10 +50,12 @@ receipt remains insufficient to confirm resolution.
 If execution starts before withdrawal obtains the journal mutex, withdrawal
 conflicts and cannot rewrite that execution. A matching later completed receipt
 can be acknowledged with key absence, retaining the original uncertain outcome.
-An uncertain attempt that wins the race remains blocked and needs additional
-reviewed recovery. An undelivered withdrawal request is not retried automatically.
-Unknown provider key identity, unavailable storage, unsupported agents and lost
-release/removal requests also remain explicit recovery work.
+An uncertain attempt that wins the race can now receive an explicitly reviewed
+[release recovery attempt](netbird-resolution-retries.md) after execution ends.
+The same recovery flow covers an undelivered release or withdrawal, preserving
+the original resolution UUID. Nothing is retried automatically. Unknown provider
+key identity, unavailable storage, unsupported agents and lost removal requests
+still need separate recovery work.
 
 ## Validation and scope
 
@@ -70,9 +72,9 @@ individual identity, loss of either request or reply, immutable audit ordering,
 late completed/unconfirmed execution and read-only proof recovery. Actual console
 routes test the reviewed form and separate outcome metadata. Twelve additional
 responsive browser cases cover permanent-withdrawal wording, confirmation,
-pending proof and unsupported agents; all 117 registration cases and all 2,286
+pending proof and unsupported agents; all 117 registration cases and all 2,313
 cases in the full browser matrix pass. The complete inventory PostgreSQL race
-suite passes in 183.913 seconds. Agent race suites pass on Linux and macOS,
+suite passes in 200.398 seconds. Agent race suites pass on Linux and macOS,
 worker models/common pass with owned PostgreSQL on Linux, and agent builds for
 Linux/macOS/Windows plus console/worker Linux and worker Windows builds pass.
 
