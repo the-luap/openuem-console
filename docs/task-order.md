@@ -9,6 +9,16 @@ task count are invalid. The transaction updates only that profile's order fields
 and commits them together with an `inventory.tasks.reorder` receipt. It does not
 change task version, configuration, ownership, tags, reports or device work.
 
+The [worker follow-up](https://github.com/the-luap/openuem-worker/blob/d61712f/docs/profile-task-order.md)
+uses the same stored-order/ID/NULL ordering for all four assigned-profile queries.
+It projects consecutive positions only in memory so its WinGet, Ansible and
+NetBird generators retain NULL placement despite the nullable column's plain
+integer representation in Ent. PostgreSQL tests cover the queries and actual
+generated task sequences, with stored task JSON unchanged. Full worker model and
+common-package PostgreSQL/race suites pass in 2.680 and 3.269 seconds, and the
+complete Linux build passes. This proves generated configuration order;
+physical execution and WinGet dependency semantics require separate acceptance.
+
 Positions are defined by stored order followed by task ID, with PostgreSQL's
 ascending NULL placement. Gaps, duplicates, zero values and NULL are therefore
 displayed deterministically. An accepted ordering action persists consecutive

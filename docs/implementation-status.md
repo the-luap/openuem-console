@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [worker task-order follow-up](https://github.com/the-luap/openuem-worker/blob/d61712f/docs/profile-task-order.md)
+  makes all four assigned-profile reads match the console's stored-order/ID/NULL
+  ordering. Consecutive positions are projected only in memory, preserving NULL
+  placement through the actual WinGet, Ansible and NetBird generators without
+  changing stored tasks. A PostgreSQL baseline reproduced the previous unordered
+  result. Full worker model/common PostgreSQL/race suites pass in 2.680/3.269
+  seconds, and the full Linux build passes. Generated configuration order is
+  verified; physical execution and WinGet dependency semantics remain separate
+  acceptance work.
 - [Legacy task cloning](task-cloning.md) now validates current source ownership
   and the displayed destination scope under current server authority. Source and
   destination locks, normalization, the new task and scoped audit receipts commit
