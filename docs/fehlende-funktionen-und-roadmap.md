@@ -640,9 +640,18 @@ unattempted remaining step; reconciliation only reads external evidence. Origina
 uncertain outcomes and request identities remain immutable after admission opens.
 Real routes and 48 additional browser cases cover the distinction and retained
 history; all 2,274 browser cases, the full inventory/audit race suites and the
-Linux console build pass. Unknown creation responses, missing agent receipts and undelivered
-release/removal attempts still need explicit recovery protocols. Trusted Unix
-installers, authoritative peer ownership, remaining user/provider secrets and
+Linux console build passed at that checkpoint.
+[Permanent registration withdrawal](netbird-registration-withdrawals.md) now
+coordinates an explicit version-two control with journal non-admission, exact
+provider key absence and retained console proof. Late delivery of a withdrawn
+UUID is refused after restart; existing execution cannot be rewritten. Owned
+filesystem, broker, database, real route and 12 additional browser cases cover
+this path; all 2,286 browser cases, the full inventory race suite, native
+Linux/macOS agent suites, Linux worker database suites and platform builds pass. Unknown creation responses, unsupported
+agents and undelivered release/removal/withdrawal requests still need explicit
+recovery protocols. Uncertain execution that wins a withdrawal race remains
+blocked, while a matching later completed receipt can confirm resolution.
+Trusted Unix installers, authoritative peer ownership, remaining user/provider secrets and
 physical/provider acceptance are still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must

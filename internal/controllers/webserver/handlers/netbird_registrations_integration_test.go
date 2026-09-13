@@ -99,7 +99,9 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	defer h.Model.Client.Agent.DeleteOneID(device).Exec(ctx)
 	require.NoError(t, h.Model.Client.Netbird.Create().SetOwnerID(device).SetInstalled(true).Exec(ctx))
 	var command inventory.NetbirdOperationCommand
-	lostDelivery, lostRelease := false, false
+	lostDelivery, lostRelease, missingDelivery := false, false, false
+	withdrawalID := ""
+	withdrawals := 0
 	releaseID := ""
 	controls, releases := 0, 0
 	control := func(_ context.Context, c netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error) {
@@ -107,7 +109,7 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 		require.NoError(t, err)
 		if c.Kind == "registration-state" {
 			p.State = netbirdcommand.State{Status: "ready", Revision: strings.Repeat("e", 64), Remaining: 4096}
-			if lostDelivery && command.RequestID != "" && releaseID == "" {
+			if lostDelivery && !missingDelivery && command.RequestID != "" && releaseID == "" && withdrawalID == "" {
 				hash, err := command.Digest()
 				require.NoError(t, err)
 				p.State = netbirdcommand.State{Status: "unconfirmed", Revision: strings.Repeat("d", 64), Remaining: 4095, PendingID: command.RequestID, PendingHash: hash, CanRelease: true}
@@ -115,6 +117,27 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 			return &p, nil
 		}
 		controls++
+		if c.Kind == "withdraw" {
+			withdrawals++
+			mu.Lock()
+			require.True(t, absent)
+			mu.Unlock()
+			require.True(t, missingDelivery)
+			withdrawalID = c.RequestID
+		}
+		if withdrawalID != "" {
+			if c.Version != netbirdcommand.RecoveryVersion {
+				p.Outcome = "conflict"
+				return &p, nil
+			}
+			p.Receipt, err = netbirdcommand.ReceiptFor(command, "withdrawn")
+			p.ReleaseID = withdrawalID
+			return &p, err
+		}
+		if missingDelivery {
+			p.Outcome = "missing"
+			return &p, nil
+		}
 		if c.Kind == "release" {
 			releases++
 			mu.Lock()
@@ -338,6 +361,46 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	for _, secret := range []string{"owned-private-registration-token", "owned-private-registration-key"} {
 		require.NotContains(t, page.Body.String(), secret)
 	}
+
+	// Missing receipt becomes resolvable only through explicit durable withdrawal.
+	command = inventory.NetbirdOperationCommand{}
+	releaseID = ""
+	missingDelivery = true
+	lostRelease = false
+	mu.Lock()
+	retainDelete = false
+	mu.Unlock()
+	review, err = store.Review(ctx, "apple-console-admin", scope, device, []string{"owned-group"}, true)
+	require.NoError(t, err)
+	form.Set("request_id", uuid.NewString())
+	form.Set("revision", review.Revision)
+	require.Equal(t, 204, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
+	_, err = store.DispatchOne(ctx)
+	require.NoError(t, err)
+	resolutionPath = path + "/" + form.Get("request_id") + "/resolution"
+	page = request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Contains(t, page.Body.String(), "permanently withdraws")
+	require.Contains(t, page.Body.String(), "rejects any later delivery")
+	require.Zero(t, withdrawals)
+	v, err = resolver.Review(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	confirm.Set("revision", v.Revision)
+	confirm.Set("resolution_id", uuid.NewString())
+	response = request("apple-console-admin", "POST", resolutionPath, confirm, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, 1, withdrawals)
+	retained, err = store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.NotNil(t, retained.ReleasedAt)
+	require.Equal(t, "unconfirmed", retained.Status)
+	page = request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token")
+	require.Contains(t, page.Body.String(), "Resolution confirmed.")
+	require.Equal(t, 4, deliveries)
+	mu.Lock()
+	require.Equal(t, 4, creates)
+	require.Equal(t, 4, deletes)
+	mu.Unlock()
 	require.NoError(t, h.Model.Client.Agent.DeleteOneID(device).Exec(ctx))
 	require.Equal(t, 200, request("scoped-viewer", "GET", path, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token").Code)

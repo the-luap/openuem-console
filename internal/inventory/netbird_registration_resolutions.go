@@ -48,6 +48,7 @@ type NetbirdRegistrationResolutionReview struct {
 	Resolution                          *NetbirdRegistrationResolution
 	agent                               *NetbirdResolutionReview
 	generation                          string
+	canWithdraw                         bool
 }
 
 func readRegistrationResolution(ctx context.Context, tx *sql.Tx, id string) (*NetbirdRegistrationResolution, error) {
@@ -99,6 +100,8 @@ func registrationResolutionKind(state string) string {
 		return "acknowledge"
 	case "unconfirmed":
 		return "release"
+	case "not-received", "withdrawn":
+		return "withdraw"
 	default:
 		return ""
 	}
@@ -111,6 +114,17 @@ func (s *NetbirdRegistrationResolutionStore) currentTarget(ctx context.Context, 
 	}
 	return &NetbirdRegistrationResolutionReview{Registration: r, Target: agent.Target, agent: agent, generation: generation}, nil
 }
+func registrationRecoveryControl(ctx context.Context, v *NetbirdResolutionReview, kind, id string) netbirdcommand.ControlRequest {
+	durationKind := kind
+	if kind == "withdraw" {
+		durationKind = "release"
+	}
+	c := netbirdControlRequest(ctx, v, durationKind, id)
+	c.Version, c.Kind = netbirdcommand.RecoveryVersion, kind
+	c.Revision, c.Operation = v.Operation.Revision, v.Operation.Operation
+	return c
+}
+
 func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, v *NetbirdRegistrationResolutionReview) error {
 	if !slices.Contains(v.Registration.Attempts, "deliver") {
 		v.AgentState = "not-attempted"
@@ -122,14 +136,42 @@ func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, 
 	a := v.agent
 	a.response = nil
 	a.CanRelease = false
+	v.canWithdraw = false
 	a.query = netbirdControlRequest(ctx, a, "receipt", uuid.NewString())
+	if v.Resolution != nil && v.Resolution.Kind == "withdraw" {
+		a.query = registrationRecoveryControl(ctx, a, "receipt", uuid.NewString())
+	}
 	response, err := s.agent.request(ctx, a.query)
 	if err != nil {
 		v.AgentState = "unavailable"
 		return nil
 	}
+	if response.Outcome == "missing" && a.query.Version != netbirdcommand.RecoveryVersion {
+		// A correlated version-two response, not a legacy missing receipt, proves
+		// that the owner supports durable withdrawal and extended receipt queries.
+		a.query = registrationRecoveryControl(ctx, a, "receipt", uuid.NewString())
+		response, err = s.agent.request(ctx, a.query)
+		if err != nil {
+			v.AgentState = "recovery-unavailable"
+			return nil
+		}
+	}
 	a.response = response
 	v.AgentState = response.Outcome
+	if response.Outcome == "missing" {
+		journal, valid := s.registrationAgentJournal(ctx, v)
+		if !valid {
+			v.AgentState = "unavailable"
+			return nil
+		}
+		v.canWithdraw = journal.Status == "ready" && journal.Remaining > 0
+		if v.canWithdraw {
+			v.AgentState = "not-received"
+		} else {
+			v.AgentState = "waiting"
+		}
+		return nil
+	}
 	if response.Outcome != "ok" {
 		return nil
 	}
@@ -137,6 +179,12 @@ func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, 
 		return ErrNetbirdOperationConflict
 	}
 	v.AgentState = response.Receipt.Status
+	if response.Receipt.Status == "withdrawn" {
+		if v.Resolution == nil || v.Resolution.Kind != "withdraw" || v.Resolution.ID != response.ReleaseID {
+			v.AgentState = "conflict"
+		}
+		return nil
+	}
 	if response.Receipt.Status == "completed" {
 		a.CanRelease = true
 		return nil
@@ -147,25 +195,29 @@ func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, 
 		}
 		return nil
 	}
-	deadline := netbirdControlRequest(ctx, a, "receipt", uuid.NewString()).ExpiresAt
-	call, cancel := context.WithDeadline(ctx, deadline)
-	journal, err := s.registrations.operations.inspect(call, a.identity)
-	valid := err == nil && call.Err() == nil && journal.Valid()
-	cancel()
+	journal, valid := s.registrationAgentJournal(ctx, v)
 	if !valid {
 		v.AgentState = "unavailable"
 		return nil
 	}
 	a.CanRelease = journal.Status == "unconfirmed" && journal.CanRelease && journal.PendingID == v.Registration.ID && journal.PendingHash == v.Registration.CommandHash
-	a.response.State = netbirdcommand.State{} // Receipt evidence remains canonical.
 	if !a.CanRelease {
 		v.AgentState = "waiting"
 	}
-	// The review includes the full live journal state separately through this
-	// digest, so a new boot, attempt or release invalidates stale confirmation.
-	data, _ := json.Marshal(journal)
-	v.generation += "/" + string(data)
 	return nil
+}
+
+func (s *NetbirdRegistrationResolutionStore) registrationAgentJournal(ctx context.Context, v *NetbirdRegistrationResolutionReview) (netbirdcommand.State, bool) {
+	deadline := netbirdControlRequest(ctx, v.agent, "receipt", uuid.NewString()).ExpiresAt
+	call, cancel := context.WithDeadline(ctx, deadline)
+	journal, err := s.registrations.operations.inspect(call, v.agent.identity)
+	valid := err == nil && call.Err() == nil && journal.Valid()
+	cancel()
+	if valid {
+		data, _ := json.Marshal(journal)
+		v.generation += "/" + string(data)
+	}
+	return journal, valid
 }
 func (s *NetbirdRegistrationResolutionStore) review(ctx context.Context, tx *sql.Tx, r *NetbirdRegistration) (*NetbirdRegistrationResolutionReview, error) {
 	d, err := readRegistrationResolution(ctx, tx, r.ID)
@@ -207,12 +259,12 @@ func (s *NetbirdRegistrationResolutionStore) review(ctx context.Context, tx *sql
 		return nil, err
 	}
 	v.CanCleanup = r.Key != nil && !slices.Contains(r.Attempts, "delete") && (v.KeyState == "present" || v.KeyState == "absent")
-	eligible := v.AgentState == "not-attempted" || v.AgentState == "completed" || v.AgentState == "unconfirmed" && v.agent.CanRelease
+	eligible := v.AgentState == "not-attempted" || v.AgentState == "completed" || v.AgentState == "unconfirmed" && v.agent.CanRelease || v.AgentState == "not-received" && v.canWithdraw
 	keyReady := v.KeyState == "absent" || v.CanCleanup
 	if d == nil {
 		v.CanResolve = eligible && keyReady
 	} else {
-		compatible := d.Kind == registrationResolutionKind(v.AgentState)
+		compatible := d.Kind == registrationResolutionKind(v.AgentState) || d.Kind == "withdraw" && v.AgentState == "completed"
 		v.CanContinue = compatible && eligible && keyReady && d.AgentAttemptedAt == nil
 	}
 	var receipt netbirdcommand.Receipt
@@ -307,6 +359,9 @@ func (s *NetbirdRegistrationResolutionStore) finish(ctx context.Context, tx *sql
 		if matched && d.Kind == "acknowledge" {
 			matched = p.Receipt.Status == "completed" && p.ReleaseID == ""
 		}
+		if matched && d.Kind == "withdraw" {
+			matched = (p.Receipt.Status == "withdrawn" && p.ReleaseID == d.ID) || (c.Kind == "receipt" && p.Receipt.Status == "completed" && p.ReleaseID == "")
+		}
 		if matched {
 			var err error
 			control, err = netbirdcommand.EncodeControl(c)
@@ -376,7 +431,7 @@ func (s *NetbirdRegistrationResolutionStore) advance(ctx context.Context, tx *sq
 	}
 	c, p := v.agent.query, v.agent.response
 	if d.AgentAttemptedAt == nil {
-		if d.Kind != registrationResolutionKind(v.AgentState) {
+		if d.Kind != registrationResolutionKind(v.AgentState) && !(d.Kind == "withdraw" && v.AgentState == "completed") {
 			return s.pending(ctx, tx, r, d, actor)
 		}
 		if d.Kind == "release" {
@@ -385,10 +440,16 @@ func (s *NetbirdRegistrationResolutionStore) advance(ctx context.Context, tx *sq
 			}
 			c = netbirdControlRequest(ctx, v.agent, "release", d.ID)
 		}
+		if d.Kind == "withdraw" && v.AgentState != "completed" {
+			if !allowNew || !v.canWithdraw {
+				return s.pending(ctx, tx, r, d, actor)
+			}
+			c = registrationRecoveryControl(ctx, v.agent, "withdraw", d.ID)
+		}
 		if err := s.recordControl(ctx, r, d, actor, c); err != nil {
 			return nil, err
 		}
-		if d.Kind == "release" {
+		if c.Kind == "release" || c.Kind == "withdraw" {
 			var err error
 			p, err = s.agent.request(ctx, c)
 			if err != nil {

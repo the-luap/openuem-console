@@ -43,6 +43,8 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
      <p>The agent reports that the earlier execution has ended. Confirmation may send its first explicit release, allowing further commands once matching evidence is retained.</p>
     } else if v.AgentState=="completed" {
      <p>The agent retained a completed receipt. Confirmation acknowledges that evidence after key removal is confirmed.</p>
+    } else if v.AgentState=="not-received" {
+     <p>Confirmation permanently withdraws this original request if no execution attempt exists. The agent stores that denial before returning proof and rejects any later delivery of the same request. Existing execution attempts cannot be withdrawn.</p>
     } else if v.AgentState=="not-attempted" {
      <p>No device delivery was attempted. Confirmation can resolve the request after key removal is confirmed, without contacting the agent.</p>
     }
@@ -96,6 +98,9 @@ func netbirdRegistrationKeyState(state string)string {
 func netbirdRegistrationAgentState(state string)string {
  switch state {
  case "not-attempted":return "No device delivery was attempted"
+ case "not-received":return "No execution attempt is retained; durable withdrawal is supported"
+ case "withdrawn":return "A matching permanent withdrawal is retained"
+ case "recovery-unavailable":return "This agent cannot confirm support for permanent withdrawal. Further commands remain blocked."
  case "completed":return "A matching completed receipt is retained"
  case "unconfirmed":return "A matching unconfirmed receipt is retained"
  case "resolved":return "Resolution evidence was confirmed"

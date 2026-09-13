@@ -1,5 +1,5 @@
 export default async function run(browser,record) {
- const kinds=['choices','choices-empty','choices-long','review','review-empty','review-long','queued','started','completed','stopped','unconfirmed-create','unconfirmed-delivery','unconfirmed-cleanup','unconfirmed-cleaned','unconfirmed-viewer','history','history-empty','history-full','unconfirmed-resolved','history-resolved','resolution-completed','resolution-release','resolution-cleanup','resolution-no-delivery','resolution-continue','resolution-pending','resolution-confirmed','resolution-unknown-key','resolution-missing-receipt','resolution-active','resolution-changed-key','resolution-unavailable','resolution-long'];
+ const kinds=['choices','choices-empty','choices-long','review','review-empty','review-long','queued','started','completed','stopped','unconfirmed-create','unconfirmed-delivery','unconfirmed-cleanup','unconfirmed-cleaned','unconfirmed-viewer','history','history-empty','history-full','unconfirmed-resolved','history-resolved','resolution-completed','resolution-release','resolution-cleanup','resolution-no-delivery','resolution-continue','resolution-pending','resolution-confirmed','resolution-unknown-key','resolution-missing-receipt','resolution-active','resolution-changed-key','resolution-unavailable','resolution-long','resolution-withdraw','resolution-withdraw-cleanup','resolution-withdrawn','resolution-recovery-unavailable'];
  const base='/tenant/1/site/2/computers/owned-device/netbird/registrations';
  for(const width of [390,768,1440]) for(const kind of kinds) {
   await browser.visit('netbird-registrations-'+kind,width);
@@ -8,8 +8,8 @@ export default async function run(browser,record) {
   browser.check(!text.includes('!(MISSING:')&&!text.includes('@netbird')&&!await browser.evaluate(`!!document.querySelector('Berlin')`),'Registration labels became markup or template source');
   if(kind.startsWith('resolution-')) {
    browser.check(text.includes('original outcome remains unconfirmed')&&text.includes('Setup key')&&text.includes('Agent evidence'),'Resolution hides separate evidence or changes the original outcome');
-   const actionable=['resolution-completed','resolution-release','resolution-cleanup','resolution-no-delivery','resolution-continue','resolution-long'].includes(kind);
-   const checking=['resolution-continue','resolution-pending','resolution-long'].includes(kind);
+   const actionable=['resolution-completed','resolution-release','resolution-cleanup','resolution-no-delivery','resolution-continue','resolution-long','resolution-withdraw','resolution-withdraw-cleanup'].includes(kind);
+   const checking=['resolution-continue','resolution-pending','resolution-long','resolution-withdrawn'].includes(kind);
    browser.check(await browser.evaluate(`!!document.querySelector('#netbird-confirm')`)===actionable,'Resolution offers an ineligible confirmation');
    browser.check(await browser.evaluate(`!!document.querySelector('#netbird-check')`)===checking,'Resolution offers an ineligible evidence check');
    await browser.evaluate(`window.resolutionRequests=[];document.body.addEventListener('htmx:configRequest',e=>{resolutionRequests.push({path:e.detail.path,fields:[...e.detail.formData.entries()]});e.preventDefault()})`);
@@ -29,6 +29,7 @@ export default async function run(browser,record) {
    }
    if(kind==='resolution-confirmed') browser.check(!await browser.evaluate(`!!document.querySelector('.netbird-operations form')`)&&text.includes('Further NetBird commands may be reviewed'),'Confirmed resolution offers another mutation');
    if(kind==='resolution-cleanup') browser.check(text.includes('only after the provider confirms key absence'),'Resolution permits release before key removal');
+   if(kind.startsWith('resolution-withdraw')&&actionable) browser.check(text.includes('permanently withdraws')&&text.includes('rejects any later delivery')&&text.includes('Existing execution attempts cannot be withdrawn'),'Withdrawal confirmation hides permanent effect or the execution boundary');
    if(kind==='resolution-no-delivery') browser.check(text.includes('without contacting the agent'),'Undelivered resolution invents agent evidence');
   } else if(kind.startsWith('choices')) {
    browser.check(text.includes('does not create a key'),'Group selection hides its read-only effect');

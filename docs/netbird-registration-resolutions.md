@@ -14,7 +14,8 @@ after resolution; separate confirmation metadata opens admission.
 | Known key; no device delivery attempt | Prove key absence, then resolve using the permanent delivery barrier. No agent control is needed. |
 | Known key; matching completed agent receipt | Prove key absence, then acknowledge the later completion evidence. No agent release is sent. |
 | Known key; matching unconfirmed receipt and ended local execution | Prove key absence before attempting one explicit agent release. Require its matching resolution UUID before opening admission. |
-| Unknown key identity, changed key policy, missing agent receipt, active execution or another release identity | Keep admission blocked. |
+| Known key; version-two missing receipt and a ready journal | Explicitly request permanent withdrawal after key absence. A matching retained withdrawal is required to open admission. |
+| Unknown key identity, changed key policy, unsupported withdrawal, active execution or another resolution identity | Keep admission blocked. |
 
 Review only reads the provider and agent. The fingerprint binds the original
 request and delivery digest, current scope/identity generations, key state,
@@ -84,14 +85,15 @@ Real registered-route tests exercise permissions, CSRF, strict forms, read-only
 review/reconciliation, explicit continuation and retained historical receipts.
 Browser cases cover keyboard confirmation, pending input locks across both
 forms, focus recovery, blocked states and long content at 390, 768 and 1,440 pixels.
-All 105 registration cases and the full 2,274-case browser matrix pass. The full
-inventory PostgreSQL race suite passes in 174.011 seconds; the final focused
-resolution race suite passes in 14.748 seconds, including current individual
-identity and cleanup by another authorized actor. The audit race suite, affected
+All 117 registration cases and the full 2,286-case browser matrix pass. The full
+inventory PostgreSQL race suite passes in 183.913 seconds, including current
+individual identity, permanent withdrawal and cleanup by another authorized actor. The audit race suite, affected
 view race tests, registered-route fixtures and Linux console build also pass.
 
 A missing creation response still cannot establish the provider key identity.
-A missing agent receipt cannot prove non-execution after a delivery attempt.
+A missing agent receipt alone cannot prove non-execution after a delivery attempt.
+The [permanent withdrawal protocol](netbird-registration-withdrawals.md) now
+provides an explicit recovery path when the agent supports it and has no attempt.
 An undelivered release request or a recorded DELETE whose key remains present
 is not automatically retried. These cases need additional explicit recovery
 protocols and remain blocked. No journal reset or mutable name/IP match substitutes

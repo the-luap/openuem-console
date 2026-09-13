@@ -114,11 +114,12 @@ and coordinated-resolution tests remain part of regression validation.
 Rendered view, real route and browser tests cover scoped permissions, CSRF,
 confirmation, precise group policy, key-removal reconciliation, retained history,
 keyboard submission, pending input locks and long provider labels. Registration
-and combined-resolution pages have 105 browser cases at 390, 768 and 1,440 pixels. Owned database
+and combined-resolution pages have 117 browser cases at 390, 768 and 1,440 pixels. Owned database
 tests cover empty group policy, 50-row pagination and joined dispatcher shutdown.
 
 Combined resolution is implemented for retained keys and matching agent evidence;
 its [failure ordering and remaining cases](netbird-registration-resolutions.md)
+and [permanent withdrawal](netbird-registration-withdrawals.md)
 are documented separately. Authoritative peer association, missing creation
 responses and undelivered release requests still need explicit recovery policy;
 do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,

@@ -18,6 +18,10 @@ import (
 )
 
 type ownedRegistrationAgent struct {
+	withdrawalSupport                  bool
+	withdrawalID                       string
+	withdrawals                        int
+	onWithdraw                         func()
 	command                            netbirdcommand.Command
 	status, release                    string
 	canRelease, loseReply, dropRelease bool
@@ -43,6 +47,35 @@ func registrationResolutionFixture(t *testing.T, status string, cleanup bool) (*
 			return &response, nil
 		}
 		a.queries++
+		if c.Version == netbirdcommand.RecoveryVersion && !a.withdrawalSupport {
+			return nil, errors.New("owned older agent does not support withdrawal")
+		}
+		if c.Kind == "withdraw" {
+			a.withdrawals++
+			var attempts, absent int
+			require.NoError(t, f.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM uem_netbird_registration_resolution_attempts WHERE request_id=$1 AND resolution_id=$2),(SELECT count(*) FROM uem_netbird_registration_evidence WHERE request_id=$1 AND kind='absent')`, c.ReferenceID, c.RequestID).Scan(&attempts, &absent))
+			require.Equal(t, 1, attempts)
+			require.Equal(t, 1, absent)
+			if a.onWithdraw != nil {
+				a.onWithdraw()
+			}
+			if a.status != "missing" {
+				p, err := netbirdcommand.ControlResponseFor(c, "conflict")
+				return &p, err
+			}
+			if a.dropRelease {
+				return nil, errors.New("owned withdrawal was not delivered")
+			}
+			a.status = "withdrawn"
+			a.withdrawalID = c.RequestID
+			if a.loseReply {
+				return nil, errors.New("owned withdrawal response lost")
+			}
+		}
+		if a.status == "withdrawn" && c.Version != netbirdcommand.RecoveryVersion {
+			p, err := netbirdcommand.ControlResponseFor(c, "conflict")
+			return &p, err
+		}
 		if a.status == "missing" {
 			r, err := netbirdcommand.ControlResponseFor(c, "missing")
 			return &r, err
@@ -64,6 +97,9 @@ func registrationResolutionFixture(t *testing.T, status string, cleanup bool) (*
 		response.Receipt, err = netbirdcommand.ReceiptFor(a.command, a.status)
 		require.NoError(t, err)
 		response.ReleaseID = a.release
+		if a.status == "withdrawn" {
+			response.ReleaseID = a.withdrawalID
+		}
 		return &response, nil
 	}
 	s, err := inventory.NewNetbirdRegistrationStore(f.db, f.permissions, false, strings.Repeat("k", 32), p.server.Client().Transport, control, func(_ context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
@@ -340,8 +376,9 @@ func TestNetbirdRegistrationResolutionMigrationGuards(t *testing.T) {
 }
 
 func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T) {
-	for _, change := range []string{"renewed", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"renewed", "withdraw-renewed", "revoked", "expired", "consumer", "moved"} {
 		t.Run(change, func(t *testing.T) {
+			withdrawal := change == "withdraw-renewed"
 			f, id := netbirdFixture(t)
 			p := newRegistrationProvider(t, f, id)
 			ctx := t.Context()
@@ -372,14 +409,14 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 				require.NoError(t, err)
 				if c.Kind == "registration-state" {
 					result.State = netbirdcommand.State{Status: "ready", Revision: strings.Repeat("e", 64), Remaining: 4096}
-					if command.RequestID != "" && releaseID == "" {
+					if command.RequestID != "" && releaseID == "" && !withdrawal {
 						hash, err := command.Digest()
 						require.NoError(t, err)
 						result.State = netbirdcommand.State{Status: "unconfirmed", Revision: strings.Repeat("d", 64), Remaining: 4095, PendingID: command.RequestID, PendingHash: hash, CanRelease: true}
 					}
 					return &result, nil
 				}
-				if c.Kind == "release" {
+				if c.Kind == "release" || c.Kind == "withdraw" {
 					releases++
 					releaseID = c.RequestID
 					return nil, errors.New("owned release reply lost")
@@ -387,7 +424,15 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 				queries++
 				certificate = c.CertificateHash
 				require.True(t, c.Individual)
-				result.Receipt, err = netbirdcommand.ReceiptFor(command, "unconfirmed")
+				if withdrawal && releaseID == "" {
+					result.Outcome = "missing"
+					return &result, nil
+				}
+				status := "unconfirmed"
+				if withdrawal {
+					status = "withdrawn"
+				}
+				result.Receipt, err = netbirdcommand.ReceiptFor(command, status)
 				result.ReleaseID = releaseID
 				return &result, err
 			}
@@ -409,7 +454,7 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			require.Nil(t, d.ConfirmedAt)
 			before := queries
 			switch change {
-			case "renewed":
+			case "renewed", "withdraw-renewed":
 				_, err = f.db.ExecContext(ctx, `UPDATE uem_agent_identities SET certificate_hash=repeat('a',64) WHERE id=$1`, f.id)
 			case "revoked":
 				_, err = f.db.ExecContext(ctx, `UPDATE uem_agent_identities SET revoked_at=clock_timestamp() WHERE id=$1`, f.id)
@@ -422,7 +467,7 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			}
 			require.NoError(t, err)
 			result, err := resolver.Reconcile(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID)
-			if change == "renewed" {
+			if change == "renewed" || change == "withdraw-renewed" {
 				require.NoError(t, err)
 				require.NotNil(t, result.ConfirmedAt)
 				require.Equal(t, strings.Repeat("a", 64), certificate)
