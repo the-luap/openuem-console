@@ -75,6 +75,7 @@ audit suite in 14.887 seconds. Registered Apple/OIDC routes, affected macOS/Linu
 race checks and the full Linux build pass. The final complete 1,647-case Chrome
 matrix passes in 92.814 seconds. The provider tests contact only owned fixtures.
 
-Task editing, package search and other legacy provider/settings routes, the wider
+Task editing is covered by the later [editing change](task-editing.md).
+Package search and other legacy provider/settings routes, the wider
 secret lifecycle, immutable revisions, delegated access and physical/provider
 acceptance remain open in the expanded roadmap.

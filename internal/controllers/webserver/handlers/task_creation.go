@@ -33,7 +33,9 @@ func taskCreationFailure(c echo.Context, err error) error {
 	return echo.NewHTTPError(status, i18n.T(c.Request().Context(), "task_creation."+key))
 }
 
-func taskCreationForm(c echo.Context) error {
+func taskCreationForm(c echo.Context) error { return taskDefinitionForm(c, false) }
+
+func taskDefinitionForm(c echo.Context, editing bool) error {
 	r := c.Request()
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "application/x-www-form-urlencoded" || len(r.Header.Values("Content-Type")) != 1 || r.Header.Get("Content-Encoding") != "" || r.URL.RawQuery != "" || r.URL.ForceQuery {
@@ -65,10 +67,14 @@ func taskCreationForm(c echo.Context) error {
 			}
 			continue
 		}
-		if !taskCreationFields[key] || len(values) != 1 {
+		extra := editing && (key == "profile" || key == "task-version" || key == "task-password-action" || key == "task-passphrase-action")
+		if (!taskCreationFields[key] && !extra) || len(values) != 1 {
 			return inventory.ErrTaskInvalid
 		}
 		limit := 16 << 10
+		if extra {
+			limit = 64
+		}
 		switch key {
 		case "powershell-script", "unix-script":
 			limit = 128 << 10

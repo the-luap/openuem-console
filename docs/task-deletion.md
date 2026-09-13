@@ -69,7 +69,8 @@ matrix passes in 89.120 seconds.
 
 Task cloning is covered by the later [cloning change](task-cloning.md).
 Task creation is covered by the later [creation change](task-creation.md).
-Task editing, broader legacy editor read authorization,
+Task editing is covered by the later [editing change](task-editing.md).
+Broader legacy editor read authorization,
 immutable profile revisions, delegated access and physical/provider acceptance
 remain open in the expanded roadmap. Deletion is not request-deduplicated: a
 retry after a successful removal returns 404 and creates no additional delete

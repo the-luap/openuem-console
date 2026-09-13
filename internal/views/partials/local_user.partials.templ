@@ -301,7 +301,6 @@ templ UnixLocalUserComponent(t *ent.Task) {
 					<input
 						class="uk-toggle-switch uk-toggle-switch-primary"
 						id="local-user-advanced-toggle"
-						name="local-user-advanced-toggle"
 						type="checkbox"
 						_="on change
 						if me.checked then
@@ -557,7 +556,7 @@ templ UnixLocalUserComponent(t *ent.Task) {
 								{ i18n.T(ctx, "tasks.local_user_ssh_key_passphrase_description") }
 							</label>
 							<input
-								type="text"
+								type="password"
 								class="uk-input"
 								id="local-user-ssh-key-passphrase"
 								name="local-user-ssh-key-passphrase"

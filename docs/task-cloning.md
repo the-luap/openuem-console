@@ -89,6 +89,7 @@ race checks and the full Linux build pass. The final complete 1,602-case Chrome
 matrix passes in 91.762 seconds.
 
 Task creation is covered by the later [creation change](task-creation.md).
-Task editing, broader legacy editor read authorization, immutable
+Task editing is covered by the later [editing change](task-editing.md).
+Broader legacy editor read authorization, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.

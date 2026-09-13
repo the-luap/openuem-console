@@ -113,6 +113,7 @@ templ ReportDetail(issue *ent.ProfileIssue, commonInfo *partials.CommonInfo, ind
 							<a
 								href={ templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d", t.Edges.Task.ID))) }
 								hx-get={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d", t.Edges.Task.ID)))) }
+								hx-params="none"
 								hx-push-url="true"
 								hx-target="#main"
 								hx-swap="outerHTML"

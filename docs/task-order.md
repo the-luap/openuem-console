@@ -92,7 +92,8 @@ keep the page-size value readable on mobile without changing other pages.
 
 Task cloning is covered by the later [cloning change](task-cloning.md).
 Task creation is covered by the later [creation change](task-creation.md).
-Legacy task editing, broader editor read
+Task editing is covered by the later [editing change](task-editing.md).
+Broader editor read
 authorization, immutable revisions, delegated access and physical/provider
 acceptance remain open in the expanded roadmap. Production-scale contention
 from the existing shared audience locks also remains to be measured.

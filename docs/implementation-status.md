@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task editing](task-editing.md) now holds current authority, exact
+  profile scope, reviewed ownership and the submitted version through an atomic
+  configuration update and audit. Concurrent saves of one version produce one
+  winner; type/platform, order/status/execution time and history are preserved.
+  Review omits password/passphrase values, and explicit keep/replace/clear choices
+  prevent accidental secret loss. Password replacements require encryption.
+  NetBird edits retain missing saved group IDs and DNS settings; Flatpak branch
+  edits and MSI hash clearing are corrected. Mobile Unix fields use full width.
+  Full inventory PostgreSQL/race and audit suites pass in 89.484/15.400 seconds;
+  registered Apple/OIDC routes, affected macOS/Linux race checks and the full
+  Linux build pass. All 108 focused browser cases pass; the complete 1,746-case
+  Chrome matrix passes in 92.125 seconds. Mobile views were visually inspected.
+  Broader profile/editor reads, one-off dispatch, package/provider routes, wider
+  secret lifecycle, immutable revisions and physical/provider acceptance remain
+  open.
 - [Task form lookups](task-wizard.md) now retain the exact destination profile
   and scope through every selector stage, current server authorization and audit
   commit. Old global lookups return a reload instruction. NetBird reads use the
@@ -71,7 +86,7 @@ the table's package summaries do not remove any detail from the roadmap.
   registered Apple/OIDC routes use an owned HTTPS provider. Affected macOS/Linux
   race checks and the full Linux build pass. All 45 form browser cases pass with
   scoped URLs; the complete 1,647-case Chrome matrix passes in 92.814 seconds.
-  Task editing, package search and other legacy provider/settings routes, wider
+  Package search and other legacy provider/settings routes, wider
   secret lifecycle and physical/provider acceptance remain open.
 - [Legacy task creation](task-creation.md) now holds current server authority,
   exact destination scope, the parent and existing tasks through one transaction.
@@ -84,7 +99,7 @@ the table's package summaries do not remove any detail from the roadmap.
   registered Apple/OIDC routes, affected macOS/Linux race checks and the full
   Linux build pass. All 45 focused browser cases pass, with the complete 1,647-case
   Chrome matrix passing in 94.426 seconds. Mobile states were visually inspected.
-  Task editing, other provider reads, broader secret lifecycle,
+  Other provider reads, broader secret lifecycle,
   immutable revisions, delegated access and physical/provider acceptance remain
   open.
 - The [worker task-order follow-up](https://github.com/the-luap/openuem-worker/blob/d61712f/docs/profile-task-order.md)
@@ -109,7 +124,7 @@ the table's package summaries do not remove any detail from the roadmap.
   Registered Apple/OIDC routes, affected macOS/Linux race checks and the full
   Linux build pass. All 42 focused browser cases pass; the final complete
   1,602-case Chrome matrix passes in 91.762 seconds. Mobile normal and empty
-  states were visually inspected. Task editing, broader editor read
+  states were visually inspected. Broader editor read
   authorization, immutable revisions, delegated access and physical/provider
   acceptance remain open.
 - [Legacy task deletion](task-deletion.md) now binds confirmation and deletion
@@ -125,7 +140,7 @@ the table's package summaries do not remove any detail from the roadmap.
   macOS/Linux race checks and the full Linux build pass. All 24 focused browser
   cases pass; the final complete 1,560-case Chrome matrix passes in 89.120
   seconds. The mobile confirmation was visually inspected. Later changes cover
-  task cloning and creation. Task editing, broader editor read authorization, delegated access and
+  task cloning, creation and editing. Broader editor read authorization, delegated access and
   physical/provider acceptance remain open.
 - [Legacy task ordering](task-order.md) now holds current server authority,
   exact profile audience and task ownership through an atomic scoped reorder and

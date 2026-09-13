@@ -14,84 +14,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/task"
 	"github.com/open-uem/openuem-console/internal/models"
-	"github.com/open-uem/openuem-console/internal/views/partials"
-	"github.com/open-uem/openuem-console/internal/views/tasks_views"
-	"github.com/open-uem/utils"
 	"github.com/open-uem/wingetcfg/wingetcfg"
 )
-
-func (h *Handler) EditTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	if c.Request().Method == "POST" {
-		t, err := validateTaskForm(c)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%v", err), true))
-		}
-
-		// encrypt local user password if not empty
-		if h.EncryptionMasterKey != "" && t.LocalUserPassword != "" {
-			isPasswordEncrypted, err := utils.IsSensitiveFieldEncrypted(t.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isPasswordEncrypted {
-				t.LocalUserPassword, err = utils.EncryptSensitiveField(t.LocalUserPassword, h.EncryptionMasterKey)
-				if err != nil {
-					return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_could_not_encrypt"), true))
-				}
-			}
-		}
-
-		if err := h.Model.UpdateProfileTask(c, taskId, *t); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-		}
-
-		return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
-	}
-
-	// decrypt local user password
-	if h.EncryptionMasterKey != "" && task.LocalUserPassword != "" {
-		isSecretEncrypted, err := utils.IsSensitiveFieldEncrypted(task.LocalUserPassword, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_cannot_be_decrypted", err.Error()), true))
-		}
-
-		if isSecretEncrypted {
-			task.LocalUserPassword, err = utils.DecryptSensitiveField(task.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_cannot_be_decrypted", err.Error()), true))
-			}
-		}
-	}
-
-	return RenderView(c, tasks_views.TasksIndex("| Tasks", tasks_views.EditTask(c, task.Edges.Profile.ID, task, commonInfo), commonInfo))
-}
 
 func validateTaskForm(c echo.Context) (*models.TaskConfig, error) {
 	taskType := ""

@@ -101,6 +101,7 @@ templ ProfileTaskList(c echo.Context, p partials.PaginationAndSort, profileID in
 										id={ fmt.Sprintf("task-name-%d", t.ID) }
 										href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", t.ID))) }
 										hx-get={ string(templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d", t.ID)))) }
+										hx-params="none"
 										hx-push-url="true"
 										hx-target="#main"
 										hx-swap="outerHTML"

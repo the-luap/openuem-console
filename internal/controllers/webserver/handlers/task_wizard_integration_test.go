@@ -38,7 +38,13 @@ func exerciseTaskWizardScope(t *testing.T, h *Handler, e *echo.Echo, ctx context
 	require.NoError(t, err)
 	settings, err := h.Model.Client.NetbirdSettings.Create().SetManagementURL(provider.URL).SetAccessToken(encrypted).AddTenantIDs(tenant).Save(ctx)
 	require.NoError(t, err)
-	defer h.Model.Client.NetbirdSettings.DeleteOneID(settings.ID).Exec(ctx)
+	defer func() {
+		// This legacy FK cascades tenant deletion when settings are removed. Detach
+		// the owned fixture first, preserving the shared route-test tenant.
+		_, err := h.Model.DB.ExecContext(ctx, "UPDATE tenants SET tenant_netbird=NULL WHERE id=$1 AND tenant_netbird=$2", tenant, settings.ID)
+		require.NoError(t, err)
+		require.NoError(t, h.Model.Client.NetbirdSettings.DeleteOneID(settings.ID).Exec(ctx))
+	}()
 	for _, scope := range []access.Scope{{}, {TenantID: tenant}, {TenantID: tenant, SiteID: site}} {
 		prefix := ""
 		create := h.Model.Client.Profile.Create().SetName("Owned wizard profile")
