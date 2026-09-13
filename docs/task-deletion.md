@@ -67,7 +67,8 @@ audit suite in 10.473 seconds. Registered Apple/OIDC routes, affected macOS/Linu
 race checks and the full Linux build pass. The final complete 1,560-case Chrome
 matrix passes in 89.120 seconds.
 
-Task cloning, creation/editing, broader legacy editor read authorization,
+Task cloning is covered by the later [cloning change](task-cloning.md).
+Task creation/editing, broader legacy editor read authorization,
 immutable profile revisions, delegated access and physical/provider acceptance
 remain open in the expanded roadmap. Deletion is not request-deduplicated: a
 retry after a successful removal returns 404 and creates no additional delete

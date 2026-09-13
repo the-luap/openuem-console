@@ -26,6 +26,7 @@ const fixtures = new Set([
   ...["global","organization","site"].map(scope=>`profile-cloning-${scope}`),
   ...["global","organization","site","long"].map(state=>`profile-deletion-${state}`),
   ...["global","organization","site","long"].map(state=>`task-deletion-${state}`),
+  ...["global","organization","site","long","empty"].map(state=>`task-cloning-${state}`),
   ...["global","organization","site"].flatMap(scope=>["none","all","tags","all-with-tags"].map(state=>`profile-metadata-${scope}-${state}`)),
   "profile-audience-actions",
   "profile-status-actions", "task-status-actions",

@@ -117,20 +117,15 @@ func (h *Handler) EditProfile(c echo.Context, method string, id string, successM
 		method = c.Request().Method
 	}
 
-	allProfiles, err := h.Model.GetAllProfiles()
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.all_profiles_error", err), true))
-	}
-
 	if successMessage != "" {
 		u, err := url.Parse(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%s", id)))
 		if err != nil {
 			return RenderError(c, partials.ErrorMessage(err.Error(), true))
 		}
-		return RenderViewWithReplaceUrl(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, successMessage, false, itemsPerPage, commonInfo), commonInfo), u)
+		return RenderViewWithReplaceUrl(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, successMessage, itemsPerPage, commonInfo), commonInfo), u)
 	}
 
-	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, allProfiles, successMessage, false, itemsPerPage, commonInfo), commonInfo))
+	return RenderView(c, profiles_views.ProfilesIndex("| Profiles", profiles_views.EditProfile(c, p, profile, tasks, tags, successMessage, itemsPerPage, commonInfo), commonInfo))
 }
 
 func (h *Handler) ProfileIssues(c echo.Context) error {

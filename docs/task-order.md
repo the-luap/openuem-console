@@ -80,7 +80,8 @@ keep the page-size value readable on mobile without changing other pages.
 - The final complete 1,536-case Chrome matrix passes in 89.560 seconds; the
   corrected mobile page-size control was visually inspected after that run.
 
-Legacy task cloning, creation and editing, broader editor read
+Task cloning is covered by the later [cloning change](task-cloning.md).
+Legacy task creation and editing, broader editor read
 authorization, immutable revisions, delegated access and physical/provider
 acceptance remain open in the expanded roadmap. Production-scale contention
 from the existing shared audience locks also remains to be measured.

@@ -5,11 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/open-uem/ent"
-	"github.com/open-uem/ent/task"
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
@@ -105,15 +103,7 @@ func CloneLegacyProfile(parent context.Context, db *sql.DB, permissions *access.
 	// The pinned Ent schema enumerates configuration fields. Copy nullable values
 	// directly; fresh identity, version, execution time and deterministic order are
 	// deliberate exceptions. Edges to tags and historical results are not copied.
-	columns := make([]string, 0, len(task.Columns))
-	for _, column := range task.Columns {
-		switch column {
-		case task.FieldID, task.FieldVersion, task.FieldWhen, task.FieldOrder:
-			continue
-		}
-		columns = append(columns, `"`+column+`"`)
-	}
-	fields := strings.Join(columns, ",")
+	fields := legacyTaskCopyFields(false)
 	result, err := tx.ExecContext(ctx, `INSERT INTO tasks (`+fields+`,version,"order",profile_tasks) SELECT `+fields+`,1,row_number() OVER (ORDER BY "order",id),$2 FROM tasks WHERE profile_tasks=$1`, profileID, id)
 	if err != nil {
 		return 0, err

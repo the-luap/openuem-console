@@ -66,6 +66,7 @@ order initialization and refreshes its task region separately.
   accessible state labels and preservation of a 50-item page size.
 
 Task deletion is covered by the later [deletion change](task-deletion.md).
-Task cloning, editing and creation still need their own
+Task cloning is covered by the later [cloning change](task-cloning.md).
+Task editing and creation still need their own
 atomic scoped mutations. This change does not complete legacy delegation,
 immutable revisions, device acceptance or the expanded roadmap.

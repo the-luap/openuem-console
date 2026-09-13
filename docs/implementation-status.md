@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Legacy task cloning](task-cloning.md) now validates current source ownership
+  and the displayed destination scope under current server authority. Source and
+  destination locks, normalization, the new task and scoped audit receipts commit
+  together. Configuration copying shares the pinned column helper with profile
+  cloning, preserves nullable/encrypted values and APT package names, and resets
+  identity/version/execution time without copying history. NetBird registration
+  tasks retain their configured organization. Bounded audited destination search
+  replaces the unscoped full-profile list; native forms retain edited names and
+  clear a prior destination before searching. The full inventory PostgreSQL/race
+  suite passes in 77.350 seconds and the full audit suite in 11.815 seconds.
+  Registered Apple/OIDC routes, affected macOS/Linux race checks and the full
+  Linux build pass. All 42 focused browser cases pass; the final complete
+  1,602-case Chrome matrix passes in 91.762 seconds. Mobile normal and empty
+  states were visually inspected. Task creation/editing, broader editor read
+  authorization, immutable revisions, delegated access and physical/provider
+  acceptance remain open.
 - [Legacy task deletion](task-deletion.md) now binds confirmation and deletion
   to the current task and reviewed parent under current server authority and
   exact profile scope. Task/report removal, normalization of that profile's

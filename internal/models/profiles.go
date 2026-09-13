@@ -113,8 +113,3 @@ func (m *Model) GetProfileIssuesByPage(p partials.PaginationAndSort, profileID i
 		Limit(p.PageSize).
 		Offset((p.CurrentPage - 1) * p.PageSize).All(context.Background())
 }
-
-// TODO-Steve we should check which profiles can be listed based on user's role
-func (m *Model) GetAllProfiles() ([]*ent.Profile, error) {
-	return m.Client.Profile.Query().All(context.Background())
-}
