@@ -42,6 +42,7 @@ import profileHistory from "./profile-history.mjs";
 import manualExecution from "./manual-execution.mjs";
 import smtpSettings from "./smtp-settings.mjs";
 import netbirdSettings from "./netbird-settings.mjs";
+import netbirdProfiles from "./netbird-profiles.mjs";
 import desktopTaskHistory from "./desktop-task-history.mjs";
 import profileAudience from "./profile-audience.mjs";
 import profileMetadata from "./profile-metadata.mjs";
@@ -128,6 +129,7 @@ try {
         [manualExecution,45],
         [smtpSettings,48],
         [netbirdSettings,21],
+        [netbirdProfiles,18],
         [desktopTaskHistory,18],
         [profileAudience,18],
         [profileMetadata,36],

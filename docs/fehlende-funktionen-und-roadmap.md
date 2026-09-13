@@ -589,8 +589,11 @@ route, browser and TLS tests cover these changes. The agent now validates
 connection-command inputs, invokes fixed binaries with literal arguments and
 delivers one-off keys through a per-child environment. Command sequences retain
 one local identity, stop after failure and have shared subprocess deadlines.
-Durable provider command admission, legacy device-operation authority, bounded
-agent status collection, trusted Unix installers, authoritative peer ownership,
+The [observation pipeline](netbird-observations.md) now bounds status subprocesses,
+preserves the action identity/deadline and keeps confirmed data after failed
+reports. Structured profile IDs and labels survive storage and native selection.
+Durable provider command admission, legacy device-operation authority, trusted
+Unix installers, authoritative peer ownership,
 remaining user/provider secrets and physical/provider acceptance are still
 required.
 

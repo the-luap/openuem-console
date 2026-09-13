@@ -12,6 +12,7 @@ import (
 	"github.com/open-uem/ent/netbird"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/nats/legacysecret"
+	"github.com/open-uem/nats/netbirdstate"
 )
 
 // HasNetbirdToken projects only a presence flag for inventory navigation.
@@ -53,6 +54,15 @@ func (m *Model) GetNetbirdSettings(parent context.Context, tenantID int) (*ent.N
 }
 
 func (m *Model) SaveNetbirdInfo(agentID string, data nats.Netbird) error {
+	if data.Error != "" {
+		return errors.New("NetBird observation is unavailable")
+	}
+	profiles, err := netbirdstate.Encode(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	return m.Client.Netbird.
 		Create().
 		SetVersion(data.Version).
@@ -67,12 +77,12 @@ func (m *Model) SaveNetbirdInfo(agentID string, data nats.Netbird) error {
 		SetPeersConnected(data.PeersConnected).
 		SetPeersTotal(data.PeersTotal).
 		SetServiceStatus(data.ServiceStatus).
-		SetProfilesAvailable(strings.Join(data.Profiles, ",")).
+		SetProfilesAvailable(profiles).
 		SetDNSServer(strings.Join(data.DNSServers, ",")).
 		SetOwnerID(agentID).
 		OnConflictColumns(netbird.OwnerColumn).
 		UpdateNewValues().
-		Exec(context.Background())
+		Exec(ctx)
 }
 
 func (m *Model) SetNetbirdAsUninstalled(agentID string) error {

@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [NetBird observations and profile identities](netbird-observations.md) now use
+  bounded direct CLI collection with the original action identity/deadline,
+  service cancellation, strict state parsing and explicit unconfirmed reports.
+  Both model writers retain prior confirmed data after failure and preserve
+  structured profile IDs/labels in the existing text column. The labeled native
+  selector submits handles while escaping display names, including commas and
+  duplicate labels. Owned process, NATS and PostgreSQL tests cover these paths.
+  Agent race suites pass on macOS/Linux; full agent builds pass for Linux,
+  macOS and Windows. Worker model/common PostgreSQL race suites pass in
+  2.943/3.644 seconds, and Linux/Windows builds pass. Console model/view/handler
+  race suites and its Linux build pass. All 18 new and 2,094 total browser cases
+  pass; the full matrix takes 103.498 seconds. Durable action/history workflows,
+  trusted Unix installers, authoritative peer ownership and physical/provider
+  acceptance remain required.
+
 - [Agent NetBird command execution](https://github.com/the-luap/openuem-agent/blob/daf5188/docs/netbird-command-execution.md)
   now shares strict, bounded request validation and literal command arguments
   across Linux, macOS and Windows. Fixed executable paths and positional profile
@@ -71,9 +86,9 @@ the table's package summaries do not remove any detail from the roadmap.
   token's native environment. Owned process and actual NATS subscription tests
   pass; complete agent race suites pass on macOS/Linux in 26.860/26.752 seconds,
   and all three platform builds pass. CI includes both new command packages.
-  Legacy status collection/profile parsing, Unix installer trust, durable command
-  admission/recovery, provider-peer ownership and native/physical acceptance
-  remain unfinished.
+  The subsequent observation work above replaces legacy collection/profile
+  parsing. Unix installer trust, durable command admission/recovery, provider-peer
+  ownership and native/physical acceptance remain unfinished.
 
 - [NetBird settings](netbird-settings.md) now uses exact organization scope,
   current server administration, hidden tokens and explicit keep/replace/clear.
