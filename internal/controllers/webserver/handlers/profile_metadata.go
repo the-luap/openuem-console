@@ -96,5 +96,5 @@ func (h *Handler) SaveProfileMetadata(c echo.Context) error {
 	if err = inventory.SaveProfileMetadata(c.Request().Context(), h.Model.DB, h.Access, info.Principal.UserID, scope, id, definition); err != nil {
 		return profileMetadataFailure(c, err)
 	}
-	return h.EditProfile(c, http.MethodGet, c.Param("uuid"), i18n.T(c.Request().Context(), "profiles.edit.saved"))
+	return profileEditorRedirect(c, info, id)
 }

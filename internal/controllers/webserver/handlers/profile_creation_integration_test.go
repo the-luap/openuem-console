@@ -18,7 +18,7 @@ func exerciseProfileCreationScope(t *testing.T, h *Handler, e *echo.Echo, ctx co
 	request := ownedTagHTTPRequest(t, h, e, ctx)
 	name := "Owned profile creation audit"
 	path := fmt.Sprintf("/tenant/%d/site/%d/profiles/new", tenant, site)
-	require.Equal(t, 200, request("apple-console-admin", "POST", path, url.Values{"profile-description": {name}}, "console-test-token").Code)
+	require.Equal(t, 204, request("apple-console-admin", "POST", path, url.Values{"profile-description": {name}}, "console-test-token").Code)
 	profile, err := h.Model.Client.Profile.Query().Where(entprofile.NameEQ(name)).Only(ctx)
 	require.NoError(t, err)
 	defer h.Model.Client.Profile.DeleteOneID(profile.ID).Exec(ctx)
@@ -44,7 +44,7 @@ func exerciseProfileCreationScope(t *testing.T, h *Handler, e *echo.Echo, ctx co
 		for _, invalid := range []url.Values{nil, {"profile-description": {" \t"}}, {"profile-description": {name, name}}, {"profile-description": {name}, "profile-assignment": {"applyToAll"}}, {"profile-description": {name}, "profile": {"17"}}, {"profile-description": {name}, "tenant-id": {"1"}}} {
 			require.Equal(t, 400, request("apple-console-admin", "POST", path, invalid, "console-test-token").Code)
 		}
-		require.Equal(t, 200, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
+		require.Equal(t, 204, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
 		created, err := h.Model.Client.Profile.Query().Where(entprofile.NameEQ(name)).WithTasks().WithTags().WithTenant().WithSite().Only(ctx)
 		require.NoError(t, err)
 		defer h.Model.Client.Profile.DeleteOneID(created.ID).Exec(ctx)

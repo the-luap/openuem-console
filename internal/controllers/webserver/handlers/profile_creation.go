@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
@@ -44,5 +43,5 @@ func (h *Handler) CreateLegacyProfile(c echo.Context) error {
 	if err != nil {
 		return profileCreationFailure(c, err)
 	}
-	return h.EditProfile(c, http.MethodGet, strconv.FormatInt(id, 10), i18n.T(c.Request().Context(), "profiles.new.saved"))
+	return profileEditorRedirect(c, info, id)
 }

@@ -61,6 +61,21 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Scoped legacy profile editor](profile-editor.md) now reads current authorized
+  metadata, bounded task summaries and independent tag pages in one audited
+  transaction. Task definitions and secrets are excluded. Global tag choices
+  include organization/ID labels; scoped choices remain organization-bound.
+  Native panel changes commit their response data with the assignment and audit,
+  preserving unsaved names and task paging. Search clears stale selections and
+  restores focus; pending controls share request synchronization. Oversized
+  legacy names require an explicit replacement. Creation and metadata saves
+  redirect after commit without a fallible follow-up read. Full inventory/audit
+  PostgreSQL race suites pass in 81.881/9.430 seconds; registered Apple/OIDC
+  routes, affected macOS/Linux race checks and the full Linux build pass. All
+  117 focused browser cases pass; the complete 1,872-case Chrome matrix passes
+  in 93.704 seconds. Profile issue reads, dispatch,
+  package/provider/settings routes, broader secret lifecycle, immutable revisions
+  and physical/provider acceptance remain open.
 - [Legacy task editing](task-editing.md) now holds current authority, exact
   profile scope, reviewed ownership and the submitted version through an atomic
   configuration update and audit. Concurrent saves of one version produce one
@@ -71,9 +86,9 @@ the table's package summaries do not remove any detail from the roadmap.
   edits and MSI hash clearing are corrected. Mobile Unix fields use full width.
   Full inventory PostgreSQL/race and audit suites pass in 89.484/15.400 seconds;
   registered Apple/OIDC routes, affected macOS/Linux race checks and the full
-  Linux build pass. All 108 focused browser cases pass; the complete 1,746-case
+  Linux build pass. All 108 focused browser cases pass; the complete 1,755-case
   Chrome matrix passes in 92.125 seconds. Mobile views were visually inspected.
-  Broader profile/editor reads, one-off dispatch, package/provider routes, wider
+  Profile issue reads, one-off dispatch, package/provider routes, wider
   secret lifecycle, immutable revisions and physical/provider acceptance remain
   open.
 - [Task form lookups](task-wizard.md) now retain the exact destination profile

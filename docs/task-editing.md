@@ -102,7 +102,8 @@ audit suite in 15.400 seconds. Registered Apple/OIDC routes, affected macOS/Linu
 race checks and the full Linux build pass. The final complete 1,755-case Chrome
 matrix passes in 92.125 seconds.
 
-Broader legacy profile/editor reads, one-off task dispatch, package search and
+[Scoped profile editor reads](profile-editor.md) now cover metadata and bounded
+task/tag projections. Profile issue reads, one-off task dispatch, package search and
 other provider/settings routes, SSH-passphrase encryption/migration, immutable
 profile revisions, delegated access and physical/provider acceptance remain open
 in the expanded roadmap.

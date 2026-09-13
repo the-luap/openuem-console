@@ -91,13 +91,13 @@ func scopedFormLimit(path string) int64 {
 	if route == "/tasks/:profile/new" || route == "/tasks/:id" {
 		return 256 << 10
 	}
-	if route == "/tasks/:id/clone" || route == "/tasks/:id/moveup/:order" || route == "/tasks/:id/movedown/:order" || route == "/tasks/:id/movefrom/:from/to/:to" || route == "/tasks/:id/enable" || route == "/tasks/:id/disable" || route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
+	if route == "/tasks/:id/clone" || route == "/tasks/:id/moveup/:order" || route == "/tasks/:id/movedown/:order" || route == "/tasks/:id/movefrom/:from/to/:to" || route == "/tasks/:id/enable" || route == "/tasks/:id/disable" || route == "/tenant/sites" || route == "/profiles/:uuid/clone" || route == "/profiles/:uuid/tags" || route == "/profiles/new" || route == "/profiles/:uuid" || route == "/profiles/:uuid/enable" || route == "/profiles/:uuid/disable" || route == "/profiles/:uuid/setglobal" || route == "/profiles/:uuid/settenant" {
 		return 8192
 	}
 	if route == "/ios/update-plans/:plan/group-assignments/:assignment/promotions" || route == "/ios/update-plans/:plan/group-assignments/:assignment/removals" || route == "/ios/update-plans/:plan/group-assignments" || route == "/ios/update-plans/:plan/schedules" {
 		return 16 << 10
 	}
-	if route == "/ios/configurations/:id/assign" || route == "/agents" || route == "/computers" || route == "/profiles/:uuid/tags" {
+	if route == "/ios/configurations/:id/assign" || route == "/agents" || route == "/computers" {
 		return 64 << 10
 	}
 	if route == "/ios/update-plans/:plan/group-assignments/:assignment/escalation" || route == "/ios/update-plans/:plan/group-assignments/:assignment/escalation/acknowledge" || route == "/ios/:id/update-exceptions" || route == "/ios/update-plans/:plan/schedules/:schedule/cancel" || route == "/auth/confirm/:token" || route == "/login/new" || route == "/myaccount/language" || route == "/admin/oidc-accounts" || route == "/devices/export" || route == "/device-groups" || route == "/device-groups/:group" || route == "/ios/configurations/:id/group-assignments" || route == "/ios/:id/update" || route == "/ios/update-plans" || route == "/ios/update-plans/:plan" || route == "/windows" || strings.HasPrefix(route, "/windows/") {

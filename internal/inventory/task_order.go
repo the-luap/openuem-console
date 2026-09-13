@@ -104,11 +104,27 @@ func ReadLegacyTaskPage(parent context.Context, db *sql.DB, permissions *access.
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err = lockProfileTasks(ctx, tx, profileID, false); err != nil {
+	result, err := readLegacyTaskPage(ctx, tx, profileID, page, size)
+	if err != nil {
+		return nil, err
+	}
+	resource := fmt.Sprintf("%d/page/%d/size/%d", profileID, result.Page, size)
+	if _, err = tx.ExecContext(ctx, "INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,'inventory.tasks.list',$4)", scope.TenantID, scope.SiteID, actor, resource); err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// The caller holds current authority and the parent, and owns its read receipt.
+func readLegacyTaskPage(ctx context.Context, tx *sql.Tx, profileID int64, page, size int) (*LegacyTaskPage, error) {
+	if err := lockProfileTasks(ctx, tx, profileID, false); err != nil {
 		return nil, err
 	}
 	result := &LegacyTaskPage{ProfileID: profileID, Page: page, PageSize: size, Tasks: []*ent.Task{}}
-	err = tx.QueryRowContext(ctx, "SELECT count(*) FROM tasks WHERE profile_tasks=$1", profileID).Scan(&result.Total)
+	err := tx.QueryRowContext(ctx, "SELECT count(*) FROM tasks WHERE profile_tasks=$1", profileID).Scan(&result.Total)
 	if err != nil {
 		return nil, err
 	}
@@ -134,13 +150,6 @@ func ReadLegacyTaskPage(parent context.Context, db *sql.DB, permissions *access.
 		return nil, err
 	}
 	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-	resource := fmt.Sprintf("%d/page/%d/size/%d", profileID, result.Page, size)
-	if _, err = tx.ExecContext(ctx, "INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id) VALUES($1,$2,$3,'inventory.tasks.list',$4)", scope.TenantID, scope.SiteID, actor, resource); err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
 	return result, nil

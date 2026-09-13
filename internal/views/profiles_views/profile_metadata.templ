@@ -31,7 +31,7 @@ templ ProfileNameField(profile *ent.Profile) {
 	</div>
 }
 
-templ ProfileAssignmentField(profile *ent.Profile) {
+templ ProfileAssignmentField(profile *ent.Profile, keepTagsVisible ...bool) {
 	<label class="uk-form-label" for="profile-assignment">
 		{ i18n.T(ctx, "profiles.select_assignment") }
 	</label>
@@ -40,13 +40,15 @@ templ ProfileAssignmentField(profile *ent.Profile) {
 			class="uk-select"
 			id="profile-assignment"
 			name="profile-assignment"
-			_="
+			if len(keepTagsVisible)==0 || !keepTagsVisible[0] {
+				_="
 			on change
 				if my.value is 'dontApplyToAll' then hide #profile-tags with visibility end
 				if my.value is 'applyToAll' then hide #profile-tags with visibility end
 				if my.value is 'useTags' then show #profile-tags with visibility end
 			end
 		"
+			}
 		>
 			<option value={ "dontApplyToAll" } selected?={ !profile.ApplyToAll && len(profile.Edges.Tags) == 0 }>{ i18n.T(ctx, "profiles.dont_assign") }</option>
 			<option value={ "applyToAll" } selected?={ profile.ApplyToAll }>{ i18n.T(ctx, "profiles.assign_all") }</option>

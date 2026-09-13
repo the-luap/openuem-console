@@ -58,11 +58,11 @@ func exerciseProfileTagAssignments(t *testing.T, h *Handler, e *echo.Echo, ctx c
 		} else {
 			require.Equal(t, 404, request("apple-console-admin", "POST", fmt.Sprintf("/tenant/%d/profiles/%d/tags", tenant, profile.ID), form, "console-test-token").Code)
 		}
-		require.Equal(t, 200, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
+		require.Equal(t, 204, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
 		current, err := h.Model.Client.Profile.Get(ctx, profile.ID)
 		require.NoError(t, err)
 		require.False(t, current.ApplyToAll)
-		require.Equal(t, 200, request("apple-console-admin", "DELETE", path+"?"+form.Encode(), nil, "console-test-token").Code)
+		require.Equal(t, 204, request("apple-console-admin", "DELETE", path+"?"+form.Encode(), nil, "console-test-token").Code)
 		var count int
 		require.NoError(t, h.Model.DB.QueryRowContext(ctx, `SELECT count(*) FROM profile_tags WHERE profile_id=$1`, profile.ID).Scan(&count))
 		require.Zero(t, count)

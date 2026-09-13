@@ -41,8 +41,11 @@ Conflicts with older writers fail without applying a partial assignment.
 The existing HTMX forms retain POST-body additions and DELETE-query removals,
 with the global CSRF header/cookie and origin checks. The hidden target must
 exactly match the canonical profile ID in the route. Duplicate, mixed-source,
-malformed and oversized identities are rejected. Pagination, sorting and filters
-remain in the form. Rendering the editor after success uses a read operation.
+malformed and oversized identities are rejected. The [scoped editor](profile-editor.md) now uses independent bounded panel forms
+with applied-tag paging and available-tag search. Native panel changes read
+their response before the same mutation/audit commit; cached whole-editor forms
+redirect after commit. Metadata and task paging are not submitted with panel
+changes.
 
 Audit migration 16 adds `inventory.profile_tags.assign` and
 `inventory.profile_tags.unassign`. Events record the exact global, organization

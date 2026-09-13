@@ -52,7 +52,7 @@ func exerciseProfileMetadataScope(t *testing.T, h *Handler, e *echo.Echo, ctx co
 			for _, invalid := range []url.Values{{"profile-description": {"Owned"}}, {"profile-description": {"Owned"}, "profile-assignment": {"unknown"}}, {"profile-description": {"Owned", "Other"}, "profile-assignment": {"useTags"}}, {"profile-description": {"Owned"}, "profile-assignment": {"useTags"}, "profile": {"1"}}} {
 				require.Equal(t, 400, request("apple-console-admin", "POST", path, invalid, "console-test-token").Code)
 			}
-			require.Equal(t, 200, request("apple-console-admin", "POST", path, body, "console-test-token").Code)
+			require.Equal(t, 204, request("apple-console-admin", "POST", path, body, "console-test-token").Code)
 			current, err := h.Model.Client.Profile.Get(ctx, owned.ID)
 			require.NoError(t, err)
 			require.Equal(t, body.Get("profile-description"), current.Name)

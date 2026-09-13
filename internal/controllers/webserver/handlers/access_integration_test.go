@@ -181,6 +181,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	})
 	t.Run("profile tag assignment scope and HTMX protocol", func(t *testing.T) {
 		exerciseProfileTagAssignments(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
+		exerciseProfileEditor(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
 	})
 	t.Run("profile status matches current audience", func(t *testing.T) {
 		exerciseProfileStatusScope(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
