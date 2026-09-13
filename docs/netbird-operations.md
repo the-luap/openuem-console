@@ -108,3 +108,10 @@ and background-worker wiring. Installation/uninstallation, registration with
 staged setup-key creation/cleanup and authoritative peer deletion are separate
 operations and are not admitted by this initial store. Trusted Unix installers,
 provider acceptance and physical-device validation remain open.
+
+The shared `netbirdcommand` codec and agent `netbirdjournal`/`DurableExecutor`
+components are now implemented. Owned codec, filesystem, subprocess and NATS
+tests cover expiry, correlation, durable replay, response loss and explicit
+uncertainty recovery. They are not yet attached to production subscriptions or
+console dispatch. The console must persist the actual wire digest before sending
+and coordinate the reviewed release with the agent's journal.

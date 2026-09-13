@@ -598,6 +598,11 @@ uncertainty barriers, explicit release and scoped history. Owned PostgreSQL test
 cover rollback/restart, cancellation races, identity changes and audit retention.
 The backend is not yet wired to legacy device routes: an expiring correlated
 agent protocol, durable agent journal and reviewed console flow are required.
+The shared expiring codec and agent journal/executor now retain correlated
+attempts and results, reject duplicate execution and preserve uncertainty after
+response loss or restart. Owned filesystem, process and broker tests cover these
+components. Production subscriptions, current-identity/service integration,
+capability reporting and coordinated console resolution remain open.
 Durable provider command admission, legacy device-operation authority, trusted
 Unix installers, authoritative peer ownership,
 remaining user/provider secrets and physical/provider acceptance are still
