@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Managed NetBird operations](netbird-operations.md) now connect native agent
+  startup, stable protected journals, current certificate deadlines and joined
+  service shutdown to the console dispatcher. Exact-site review, submission,
+  receipts, history and queued cancellation use strict forms and CSRF. Overview
+  GET reads audited inventory without provider credentials or external actions.
+  Native identity renewal/scope checks, owned broker/PostgreSQL route tests and
+  all 51 new/2,145 total browser cases pass. Legacy mutating subjects and profile
+  steps are rejected; workers withhold profiles containing active NetBird steps
+  before reading tokens or creating keys. Installation, registration, removal
+  and peer deletion are temporarily unavailable. Coordinated uncertainty
+  resolution and staged provider/installer lifecycle remain required; this is
+  an intermediate migration, not a completed NetBird feature.
+
 - [NetBird observations and profile identities](netbird-observations.md) now use
   bounded direct CLI collection with the original action identity/deadline,
   service cancellation, strict state parsing and explicit unconfirmed reports.

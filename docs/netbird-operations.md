@@ -1,12 +1,42 @@
 # Durable NetBird operation storage
 
 The inventory package provides an admission and recovery store for `up`, `down`
-and `switchprofile`. The webserver now initializes and joins its dispatcher,
-with a versioned direct publisher and mandatory live journal inspection. Legacy
-HTTP handlers and production agent subscriptions do not use this flow yet.
-Native identity initialization, coordinated legacy mutation handling and reviewed
-console routes are required before enabling it for users. An empty reply from
-a legacy NetBird subject cannot be adapted into a successful execution receipt.
+and `switchprofile`. The webserver initializes and joins its dispatcher, with a
+versioned direct publisher and mandatory live journal inspection. The native
+agent now opens the journal under its validated installation identity and binds
+the managed command/control subscriptions. Exact-site console pages provide
+review, submission, receipts, history and cancellation of unattempted requests.
+An empty legacy reply cannot be adapted into a successful execution receipt.
+
+This is a partial lifecycle migration. Install, uninstall, registration and peer
+removal are temporarily unavailable through the console. Agents reject old
+mutating subjects and old NetBird profile steps. Workers withhold entire profiles
+containing active legacy NetBird steps before reading credentials or creating
+provider keys. Disabled NetBird steps do not block other profile tasks. Upgrade
+console, agent and worker together; there is no version negotiation or unsafe
+fallback. Staged managed lifecycle operations must replace these temporary
+restrictions before the NetBird roadmap is complete.
+
+## Console workflow
+
+Open `/tenant/{tenant}/site/{site}/computers/{device}/netbird`. The overview reads
+reported inventory in an audited, authorized membership snapshot without provider
+credentials or device/provider requests. Its explicit refresh action uses the
+existing scoped inventory refresh queue. It does not refresh during GET.
+
+Connection and profile actions open a review of the exact device, organization,
+site, configured management URL and profile handle. Submission requires an
+unchecked confirmation checkbox, a retained request UUID, the reviewed source
+revision and CSRF protection. Duplicate clicks are suppressed while pending.
+The browser redirects to a durable receipt after admission; it does not wait for
+the CLI. Read-only users can inspect state, receipts and 50-row history without
+command controls. History remains readable in its recorded scope after removal.
+
+Receipts distinguish queued, sending, completed, stopped and unconfirmed work.
+Only an unattempted queued request offers cancellation. An unconfirmed outcome
+does not offer retry or release: coordinated console/agent resolution is still
+required before exposing that action. Profile names are escaped display values;
+selection and submission use the original structured handle.
 
 ## Authorization and review
 
@@ -117,8 +147,9 @@ audit failure, process cancellation, recovery, immutable records and retention.
 The executor in these tests is an owned callback; no real device or provider is
 contacted.
 
-Production integration still needs native agent identity initialization,
-coordinated legacy mutations and console review/history/release routes.
+Production integration includes native initialization, joined shutdown and the
+review/request/receipt/history/cancel routes. Coordinated resolution with durable
+console intent and matching agent evidence remains open.
 Installation/uninstallation, registration with
 staged setup-key creation/cleanup and authoritative peer deletion are separate
 operations and are not admitted by this initial store. Trusted Unix installers,
@@ -127,11 +158,24 @@ provider acceptance and physical-device validation remain open.
 The shared `netbirdcommand` codec and agent `netbirdjournal`/`DurableExecutor`
 components are implemented, together with expiring state/receipt/release control
 messages. The agent service adapter bounds certificate lifetime, owns exact
-subscriptions and joins callbacks before closing the journal. It still needs
-native initialization and attachment to the agent service. The console publisher
+subscriptions and joins callbacks before closing the journal. Native startup
+derives stable storage from the protected individual identity directory or the
+validated legacy configuration parent. Renewal retains installation identity;
+scope changes close old subscriptions rather than reset duplicate protection.
+The console publisher
 uses the new direct subjects and checks complete receipt correlation; neither
 commands nor controls enter the retrying agent stream. Owned codec, filesystem,
 subprocess and NATS tests cover expiry, correlation, durable replay, response loss
 and explicit uncertainty recovery. The reviewed console release must still
 coordinate its durable resolution evidence with the agent before opening the
 server barrier; the current database-only release API is not a user workflow.
+
+Owned route tests cover current roles and scopes, strict forms, CSRF, idempotent
+submission, completed receipts, cancellation and history after removal. The 51
+new browser cases and full 2,145-case matrix pass at 390, 768 and 1,440 pixels,
+including confirmation, pending controls, focus, long text and narrow layouts.
+The full inventory PostgreSQL race suite passes in 135.517 seconds and the audit
+suite in 10.988 seconds. Final registered-route fixtures pass. Full agent builds
+pass for Linux, macOS and Windows; worker Linux/Windows and console Linux builds
+also pass. Cross-compilation does not establish native Windows or physical
+NetBird/provider acceptance.

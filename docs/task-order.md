@@ -18,6 +18,9 @@ generated task sequences, with stored task JSON unchanged. Full worker model and
 common-package PostgreSQL/race suites pass in 2.680 and 3.269 seconds, and the
 complete Linux build passes. This proves generated configuration order;
 physical execution and WinGet dependency semantics require separate acceptance.
+The later [managed NetBird migration](netbird-operations.md) temporarily rejects
+active legacy NetBird profile steps. Current worker tests retain WinGet/Ansible
+order assertions and verify that NetBird rejection leaves stored tasks unchanged.
 
 Positions are defined by stored order followed by task ID, with PostgreSQL's
 ascending NULL placement. Gaps, duplicates, zero values and NULL are therefore

@@ -596,8 +596,6 @@ reports. Structured profile IDs and labels survive storage and native selection.
 admission, immutable request/attempt receipts, source and identity revisions,
 uncertainty barriers, explicit release and scoped history. Owned PostgreSQL tests
 cover rollback/restart, cancellation races, identity changes and audit retention.
-The backend is not yet wired to legacy device routes: an expiring correlated
-agent protocol, durable agent journal and reviewed console flow are required.
 The shared expiring codec and agent journal/executor now retain correlated
 attempts and results, reject duplicate execution and preserve uncertainty after
 response loss or restart. Owned filesystem, process and broker tests cover these
@@ -606,9 +604,15 @@ service adapter are now implemented. The console dispatcher and direct publisher
 require live journal readiness and retain the complete prepared message digest
 and effective expiry. Owned PostgreSQL and broker tests cover unavailable or
 changed readiness, strict receipt matching and loss of a release response.
-Production agent subscriptions, native identity initialization, coordination of
-legacy mutations, reviewed console routes and coordinated resolution remain open.
-Durable provider command admission, legacy device-operation authority, trusted
+Native initialization now binds the protected journal to the installation and
+joins managed subscriptions before releasing native identity ownership. Exact-site
+console review, submission, receipt, history and queued cancellation are wired and
+covered by real routes and 51 new/2,145 total browser cases. Old mutating agent
+subjects and profile steps are rejected. Installation, registration, removal and
+peer deletion are temporarily unavailable; workers withhold profiles containing
+active legacy NetBird steps without creating provider keys. These restrictions
+are an intermediate migration state, not completed lifecycle support.
+Coordinated console/agent uncertainty resolution, durable provider admission, trusted
 Unix installers, authoritative peer ownership,
 remaining user/provider secrets and physical/provider acceptance are still
 required.

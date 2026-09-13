@@ -79,6 +79,13 @@ database maintenance. Oversized legacy URLs cannot be edited until repaired.
 
 ## Shared provider requests
 
+The later [managed operation migration](netbird-operations.md) disables legacy
+registration/key creation and peer deletion routes, and workers no longer
+generate active NetBird profile steps. The mutation client contracts below
+describe retained implementation and owned tests, not enabled user workflows.
+Console group lookups remain available. Staged admission and authoritative peer
+ownership are required before re-enabling provider mutations.
+
 Console group lookups, registration-key creation/cleanup and peer deletion, plus
 worker registration tasks, use `github.com/open-uem/nats/netbirdapi`. It verifies
 HTTPS certificates, requires TLS 1.2 or newer with its default transport, refuses

@@ -184,6 +184,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		exerciseProfileEditor(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
 		exerciseProfileIssueHistory(t, h, e, ctx, tenantID, siteID)
 		exerciseManualExecutionRoutes(t, h, e, ctx, tenantID, siteID)
+		exerciseNetbirdOperationRoutes(t, h, e, ctx, tenantID, siteID)
 	})
 	t.Run("profile status matches current audience", func(t *testing.T) {
 		exerciseProfileStatusScope(t, h, e, ctx, tenantID, siteID, otherTenant.ID)
