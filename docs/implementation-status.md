@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [Linux running-executable provider](https://github.com/the-luap/openuem-agent/blob/c287f5bf31d5cf2980b4b9450ffeed6248a92fda/docs/linux-running-executable.md)
+  now retains both the kernel-selected image and its canonical protected path.
+  Native ELF format, root ownership, complete ancestry and exact inode/content
+  checks bind the running process to independently signed Linux agent bytes.
+  A copied image with identical bytes, generic file-open handle, changed ancestor
+  or equivalent-metadata rewrite cannot authorize enrollment. All native fixture
+  families pass in an isolated Linux race suite (1.903 seconds); macOS bootstrap,
+  enrollment and activation regressions plus full Linux/Windows builds pass.
+  Agent `c287f5b` passes all eleven CI jobs, including the dedicated native image
+  job and all existing Windows/macOS/Linux regressions. Linux package
+  staging, installed enrollment/activation commands and production installation
+  acceptance remain separate work.
+
 - [Native Linux publisher verification](https://github.com/the-luap/openuem-agent/blob/a3c7824daff4a8bf5cbd8f6a4218c48816d6e2a9/docs/linux-package-signatures.md)
   now verifies DEB/RPM packages against independently provisioned OpenPGP trust.
   Retained root-owned namespaces, exact bounded policy/key inventories, native
@@ -71,8 +84,10 @@ the table's package summaries do not remove any detail from the roadmap.
   and foreign publishers, altered payloads, weakened trust and child-lifetime
   checks. macOS signature/staging races and complete Linux/Windows agent builds
   pass. A dedicated native CI job requires all six test families to pass without
-  skips. Package staging, installed-executable admission, installed-command and
-  service integration, production signing and physical acceptance remain open.
+  skips. Agent `a3c7824` passes all ten CI jobs, including native Linux publisher
+  verification and Windows/macOS regressions. The later running-executable
+  provider is tracked above; package staging, installed-command and service
+  integration, production signing and physical acceptance remain open.
   The preceding agent CI at `7dc156b` passes all nine jobs, including twenty native
   Windows rotation-admission repetitions. The earlier one-off storage failure is
   not reproduced; more precise test-stage diagnostics remain enabled.
@@ -108,6 +123,14 @@ the table's package summaries do not remove any detail from the roadmap.
   All four complete local partitions pass with UTC: 176.916, 213.273, 232.744 and
   265.675 seconds. The partition runner returns Go's failing status without
   duplicating the long test-selection expression in a traceback.
+
+- Console CI `34879348764` passes all four Apple protocol partitions and both
+  platform builds, but the complete inventory package reaches Go's ten-minute
+  default while still advancing through ordinary fixtures. Inventory now has
+  four separate PostgreSQL/race jobs, retaining that per-run timeout. The shared
+  package-partition runner discovers all 437 inventory entries and all 517 Apple
+  entries, assigning each exactly once with no overlap. Inventory partitions
+  contain 110/109/109/109 entries; no test family is removed from coverage.
 
 - The [Linux native identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
   now implements durable encrypted storage beneath pinned private ancestors.

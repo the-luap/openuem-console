@@ -845,9 +845,13 @@ now checks DEB/RPM signatures against separately provisioned OpenPGP publishers,
 retains protected package/tool/trust namespaces and bounds native process groups.
 Its isolated Linux race suite verifies synthetic authorized and foreign packages,
 altered payloads, changed trust and cancellation/early-exit descendants.
-Linux package staging, installed-executable and installed-command admission,
-service activation, production publisher provisioning and physical
-installation/removal acceptance remain separate requirements.
+The [Linux running-executable provider](https://github.com/the-luap/openuem-agent/blob/c287f5bf31d5cf2980b4b9450ffeed6248a92fda/docs/linux-running-executable.md)
+now retains kernel and canonical executable identities under protected ancestors,
+checks native ELF format and validates separately signed agent bytes. Native
+fixtures reject byte-identical copies and changed images/namespaces.
+Linux package staging and installed-command admission, service activation,
+production publisher provisioning and physical installation/removal acceptance
+remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

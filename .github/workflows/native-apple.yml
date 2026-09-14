@@ -174,7 +174,7 @@ jobs:
       - name: ADE, notification persistence and TLS
         run: go test -race -count=1 -timeout=20m ./internal/mdm/ade ./internal/notifications ./internal/controllers/webserver
       - name: Gateway identity, route isolation, certificate login and CSRF
-        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/sessiontokens ./internal/security/loginproof ./internal/security/mfaadmission ./internal/security/sessiongeneration ./internal/security/audit ./internal/security/exporttext ./internal/inventory ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/... ./internal/controllers/sessions
+        run: go test -race -count=1 ./internal/security/clientidentity ./internal/security/access ./internal/security/oidcaccounts ./internal/security/sessiontokens ./internal/security/loginproof ./internal/security/mfaadmission ./internal/security/sessiongeneration ./internal/security/audit ./internal/security/exporttext ./internal/preferences ./internal/views/audit_views ./internal/gateway ./internal/controllers/authserver/handlers ./internal/controllers/router/... ./internal/controllers/sessions
       - name: Legacy session token decoder fuzzing
         run: go test -run '^$' -fuzz='^FuzzSessionTokenDecoder$' -fuzztime=15s -parallel=2 ./internal/security/sessiontokens
       - name: Existing console models and account lifecycles
@@ -208,7 +208,35 @@ jobs:
           go-version: '1.26.8'
           cache: true
       - name: Apple protocol and persistence race tests
-        run: python3 scripts/check-apple-protocol-shard.py --index ${{ matrix.shard }} --count 4
+        run: python3 scripts/check-go-test-shard.py --package ./internal/mdm/apple --index ${{ matrix.shard }} --count 4
+  inventory-protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openuem_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: openuem_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U openuem_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APPLE_MDM_TEST_DATABASE_URL: postgres://openuem_test:local-test-only@127.0.0.1:5432/openuem_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: Inventory and network workflow persistence race tests
+        run: python3 scripts/check-go-test-shard.py --package ./internal/inventory --index ${{ matrix.shard }} --count 4
   build:
     runs-on: ubuntu-latest
     strategy:
