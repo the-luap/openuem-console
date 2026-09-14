@@ -818,8 +818,11 @@ resolution. The [independent native current-absence observer](https://github.com
 now binds stable protected ancestry to repeated complete file, receipt, job and
 process checks, including processes from already deleted stage namespaces. The
 original uninstall and manifest continuation use the same stricter final check.
-Its separate remote verification lifecycle remains open; empty/incomplete stages
-are preserved and require a distinct reviewed cleanup policy.
+The [separate verification protocol, agent journal admission and console transport](netbird-removal-absence.md)
+now preserve original uncertainty while recording a distinct current-state
+result. The console request/delivery/resolution/history/UI lifecycle remains
+open; empty/incomplete stages are preserved and require a distinct reviewed
+cleanup policy.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

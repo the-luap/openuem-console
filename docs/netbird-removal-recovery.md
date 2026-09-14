@@ -57,7 +57,7 @@ also pass under the race detector; three timeout fixtures now keep their origina
 callback inputs immutable while testing a separate expired or alternate command.
 
 All consumers pin the published runtime module
-`v0.11.1-0.20260914130448-3606e2d2e6bd`. Agent native/journal/service race suites,
+`v0.11.1-0.20260914151935-517b4fe927dc`. Agent native/journal/service race suites,
 Darwin CGO, Linux and Windows agent builds, Darwin without-CGO native-package
 compilation, and Linux console/worker builds pass.
 
@@ -75,6 +75,7 @@ configures the dedicated publisher and joined workers, while scoped console form
 connect original proof, fresh review, queueing, history and explicit resolution.
 The [independent current-absence native layer](https://github.com/the-luap/openuem-agent/blob/febbc3d1b9e5b7ee39b80e8d0d04a27044952e0a/docs/netbird-removal-current-absence.md)
 now observes the complete supported layout without a manifest and strengthens
-the existing final checks. Its separate remote verification lifecycle,
+the existing final checks. Its [separate remote protocol and transport](netbird-removal-absence.md)
+are integrated with agent journal admission; the console lifecycle,
 empty/incomplete-stage cleanup and physical acceptance remain open. An absence
 observation cannot rewrite the original unconfirmed outcome.
