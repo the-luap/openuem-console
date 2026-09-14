@@ -61,6 +61,31 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Native Apple CI exposed two receipt regressions caused by structural comparison
+  of `time.Local` and UTC representations of the same persisted instant. The
+  assertions now normalize copied timestamps and still compare every assignment
+  field. Both integration fixtures reproduce the failure under UTC before the
+  correction; the affected organization-group/compatibility race tests now pass
+  under UTC (14.399 seconds) and Europe/Berlin (14.977 seconds). Production receipt
+  storage is unchanged. The growing Apple package exceeded its previous single
+  20-minute test budget; CI now distributes its complete discovered inventory
+  across four independent PostgreSQL jobs. Inventory verification covers all
+  517 entries exactly once, including eight fuzz seed suites, with the race
+  detector and the existing per-run timeout retained.
+
+- The [Linux native identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
+  now implements durable encrypted storage beneath pinned private ancestors.
+  A preprovisioned systemd host key binds each record and credential directory;
+  exclusive flushed publication retains uncertain outcomes, and surviving runtime
+  journals prevent missing credentials from authorizing a fresh enrollment.
+  The full owned Linux enrollment-store race suite passes in 116.771 seconds,
+  including native crypto, cross-process recovery, competing writers, partial
+  restores, missing prerequisites and a forced partial write. macOS store races
+  pass in 63.807 seconds; the Linux agent builds and Windows storage tests compile.
+  Linux signed-platform admission, installer trust and service activation remain
+  open. Storage tests with existing Windows/Mac protocol fixtures do not prove
+  those Linux integration boundaries.
+
 - [Independent NetBird staging cleanup](netbird-removal-stage-cleanup.md) now
   connects exact current native review to durable console request, single
   delivery, receipt observation, explicit resolution, joined dispatch and scoped
@@ -73,7 +98,7 @@ the table's package summaries do not remove any detail from the roadmap.
   original success from a missing receipt. Linux individual enrollment/publisher
   trust and physical installation/removal acceptance remain open.
   The [Linux service lease](https://github.com/the-luap/openuem-agent/blob/cea7c8549fb9e34982defc407b17b1f3a5e2e17c/docs/linux-service-ownership.md) now provides native process exclusion
-  and pinned private-namespace validation; it does not enable identity storage.
+  and pinned private-namespace validation, independently of the encrypted backend.
   Validation passed: 277 NetBird inventory race tests (942.714 seconds), all
   view/CSRF races, 2,871 Chrome cases, registered HTTP routes, runtime startup/
   shutdown and Linux console builds. Forty-one inventory tests and 81 browser

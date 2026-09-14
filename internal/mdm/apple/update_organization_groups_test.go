@@ -75,7 +75,7 @@ func TestUpdateOrganizationGroupAdmitsOnlyReviewedSiteAndRetainsOriginalCohort(t
 	workers.Wait()
 	for i := range receipts {
 		require.NoError(t, failures[i])
-		require.Equal(t, receipts[0], receipts[i])
+		requireSameUpdateGroupAssignment(t, receipts[0], receipts[i])
 	}
 	original := receipts[0]
 	require.Equal(t, Scope{TenantID: 1}, original.GroupScope)
@@ -106,7 +106,7 @@ func TestUpdateOrganizationGroupAdmitsOnlyReviewedSiteAndRetainsOriginalCohort(t
 	p0, a0, n0 := f.counts(t)
 	replay, err := s.AssignUpdatePlanFromOrganizationGroup(ctx, "organization", f.permissions, f.scope, f.sources, f.plan.ID, f.plan.Revision, f.group.ID, 1, key, f.selection)
 	require.NoError(t, err)
-	require.Equal(t, original, replay)
+	requireSameUpdateGroupAssignment(t, original, replay)
 	p, a, n := f.counts(t)
 	require.Equal(t, []int{p0, a0, n0}, []int{p, a, n})
 	require.Zero(t, p)
@@ -114,7 +114,7 @@ func TestUpdateOrganizationGroupAdmitsOnlyReviewedSiteAndRetainsOriginalCohort(t
 	require.ErrorIs(t, err, ErrConflict)
 	detail, err := s.UpdatePlanGroupAssignmentDetails(ctx, "operator", f.permissions, f.scope, f.plan.ID, original.ID)
 	require.NoError(t, err)
-	require.Equal(t, original, detail)
+	requireSameUpdateGroupAssignment(t, original, detail)
 	items, _, err := s.UpdatePlanGroupAssignments(ctx, "operator", f.permissions, f.scope, f.plan.ID, "")
 	require.NoError(t, err)
 	require.Len(t, items, 1)

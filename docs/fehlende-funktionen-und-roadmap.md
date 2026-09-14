@@ -830,8 +830,13 @@ receipts, explicit resolution and scoped history under joined dispatch. All seve
 request families share device and permanent UUID exclusion. Unknown objects and
 usable manifests remain preserved.
 The [Linux service-ownership primitive](https://github.com/the-luap/openuem-agent/blob/cea7c8549fb9e34982defc407b17b1f3a5e2e17c/docs/linux-service-ownership.md) now excludes competing root
-services and validates pinned private installation ancestry. Linux encrypted
-identity storage, enrollment/installation admission, service activation, publisher
+services and validates pinned private installation ancestry. The
+[Linux encrypted identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
+now uses a preprovisioned systemd host key, immutable exclusive publication,
+authenticated bounded reads and retained runtime evidence to prevent partial
+restoration from creating a fresh identity. The complete native Linux storage
+race suite passes, including concurrent processes and an interrupted write.
+Linux release/bootstrap and installation admission, service activation, publisher
 trust and physical installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must

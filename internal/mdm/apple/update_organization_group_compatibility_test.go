@@ -2,11 +2,25 @@ package apple
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
+
+func requireSameUpdateGroupAssignment(t *testing.T, expected, actual *UpdatePlanGroupAssignment) {
+	t.Helper()
+	require.NotNil(t, expected)
+	require.NotNil(t, actual)
+	// PostgreSQL and JSON may represent the same instant with Local and UTC
+	// locations. Compare exact timestamps and every receipt field, without
+	// treating the location's internal cache as persisted assignment data.
+	want, got := *expected, *actual
+	want.CreatedAt, got.CreatedAt = want.CreatedAt.UTC(), got.CreatedAt.UTC()
+	want.Plan.CreatedAt, got.Plan.CreatedAt = want.Plan.CreatedAt.UTC(), got.Plan.CreatedAt.UTC()
+	require.Equal(t, want, got)
+}
 
 func TestUpdateGroupReceiptSourceScopeVersionCompatibility(t *testing.T) {
 	f := ownedUpdateScheduleFixture(t)
@@ -54,7 +68,7 @@ func TestUpdateGroupReceiptSourceScopeVersionCompatibility(t *testing.T) {
 			result, err := s.scanUpdateGroupAssignment(s.db.QueryRow(`SELECT `+columns+` FROM mdm_apple_update_group_assignments WHERE id=$1`, original.ID, changed))
 			if state == "legacy" || state == "current" {
 				require.NoError(t, err)
-				require.Equal(t, original, result)
+				requireSameUpdateGroupAssignment(t, original, result)
 			} else {
 				require.ErrorIs(t, err, ErrUpdatePlanGroupIntegrity)
 				require.Nil(t, result)
