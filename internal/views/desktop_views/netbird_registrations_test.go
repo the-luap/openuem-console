@@ -33,10 +33,10 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/2/computers/owned-device/netbird/registrations", nil).WithContext(ctx), httptest.NewRecorder())
 	scope := access.Scope{TenantID: 1, SiteID: 2}
 	instant := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	for _, kind := range []string{"cleanup-ready", "cleanup-retry", "cleanup-long", "cleanup-absent", "cleanup-retained", "cleanup-changed", "cleanup-unavailable", "choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full", "unconfirmed-resolved", "history-resolved", "resolution-completed", "resolution-release", "resolution-cleanup", "resolution-no-delivery", "resolution-continue", "resolution-pending", "resolution-confirmed", "resolution-unknown-key", "resolution-missing-receipt", "resolution-active", "resolution-changed-key", "resolution-unavailable", "resolution-long", "resolution-withdraw", "resolution-withdraw-cleanup", "resolution-withdrawn", "resolution-recovery-unavailable", "resolution-retry-release", "resolution-retry-withdraw", "resolution-retry-long"} {
+	for _, kind := range []string{"peer-matched", "peer-long", "peer-retained", "peer-missing", "peer-unavailable", "peer-conflict", "peer-absent", "peer-cleanup-required", "peer-key-unknown", "peer-not-delivered", "peer-receipt", "peer-receipt-viewer", "cleanup-ready", "cleanup-retry", "cleanup-long", "cleanup-absent", "cleanup-retained", "cleanup-changed", "cleanup-unavailable", "choices", "choices-empty", "choices-long", "review", "review-empty", "review-long", "queued", "started", "completed", "stopped", "unconfirmed-create", "unconfirmed-delivery", "unconfirmed-cleanup", "unconfirmed-cleaned", "unconfirmed-viewer", "history", "history-empty", "history-full", "unconfirmed-resolved", "history-resolved", "resolution-completed", "resolution-release", "resolution-cleanup", "resolution-no-delivery", "resolution-continue", "resolution-pending", "resolution-confirmed", "resolution-unknown-key", "resolution-missing-receipt", "resolution-active", "resolution-changed-key", "resolution-unavailable", "resolution-long", "resolution-withdraw", "resolution-withdraw-cleanup", "resolution-withdrawn", "resolution-recovery-unavailable", "resolution-retry-release", "resolution-retry-withdraw", "resolution-retry-long"} {
 		t.Run(kind, func(t *testing.T) {
 			info.Principal = access.Principal{UserID: "owned-admin", Grants: []access.Grant{{Role: access.Administrator}}}
-			if kind == "unconfirmed-viewer" {
+			if kind == "unconfirmed-viewer" || kind == "peer-receipt-viewer" {
 				info.Principal.Grants = []access.Grant{{Role: access.Viewer, Scope: scope}}
 			}
 			target := inventory.ManualTarget{ID: "owned-device", Name: "Owned <NetBird endpoint>", Platform: "linux", Scope: scope}
@@ -56,6 +56,28 @@ func TestNetbirdRegistrationViews(t *testing.T) {
 			}
 			var component templ.Component
 			switch {
+			case strings.HasPrefix(kind, "peer-"):
+				r := &inventory.NetbirdRegistration{ID: "10000000-0000-4000-8000-000000000001", DeviceID: target.ID, Scope: scope, Status: "unconfirmed", RequestedAt: instant, ExpiresAt: instant.Add(2 * time.Minute), KeyAbsent: true, Key: &netbirdapi.ManagedKeyMetadata{ID: choice.ID}, Attempts: []string{"create", "deliver", "delete"}}
+				b := &inventory.NetbirdPeerBinding{ID: "20000000-0000-4000-8000-000000000002", Actor: "Owned <reviewer>", ManagementURL: management, CreatedAt: instant, Event: netbirdapi.ManagedPeerEvent{ID: "owned-provider-event", KeyID: choice.ID, PeerID: "owned-provider-peer", Timestamp: instant}, Peer: netbirdapi.ManagedPeerMetadata{ID: "owned-provider-peer", Name: choice.Name, CreatedAt: instant}}
+				v := &inventory.NetbirdPeerReview{Registration: r, Target: target, ManagementURL: management, Revision: strings.Repeat("a", 64), State: strings.TrimPrefix(kind, "peer-")}
+				if kind == "peer-matched" || kind == "peer-long" {
+					v.State = "matched"
+					v.CanBind = true
+					v.Event = &b.Event
+					v.Peer = &b.Peer
+				}
+				if kind == "peer-absent" {
+					v.Event = &b.Event
+				}
+				if kind == "peer-retained" || strings.HasPrefix(kind, "peer-receipt") {
+					r.PeerBinding = b
+					v.State = "retained"
+				}
+				if strings.HasPrefix(kind, "peer-receipt") {
+					component = NetbirdRegistrationReceipt(c, info, r)
+				} else {
+					component = NetbirdPeerBindingReview(c, info, v, "30000000-0000-4000-8000-000000000003")
+				}
 			case strings.HasPrefix(kind, "cleanup-"):
 				r := &inventory.NetbirdRegistration{ID: "10000000-0000-4000-8000-000000000001", DeviceID: target.ID, Scope: scope, Status: "unconfirmed", Key: &netbirdapi.ManagedKeyMetadata{ID: choice.ID}, Attempts: []string{"create", "deliver", "delete"}}
 				v := &inventory.NetbirdCleanupReview{Registration: r, Target: target, ManagementURL: management, Revision: strings.Repeat("a", 64), KeyState: "present", CanRetry: true}

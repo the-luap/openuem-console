@@ -100,8 +100,12 @@ existing peer, and returned IDs cannot inject URL paths. These requests use the
 published [peer API](https://docs.netbird.io/api/resources/peers).
 This matching check does not prove ownership: agent-reported IP addresses are
 mutable metadata, and shared provider accounts can contain another organization's
-peer. Authoritative peer association must be established before scoped deletion
-can be considered secure.
+peer. These legacy matching helpers are not sufficient for scoped deletion.
+Managed registration now offers a separate
+[retained peer association](netbird-peer-bindings.md) using the exact setup-key
+event and peer creation metadata. Its bounded event reader allows at most 10,000
+events within the same one-MiB response limit; a missing event never proves
+non-registration. Reviewed deletion of an associated peer remains separate work.
 
 Setup-key creation uses structured JSON for a one-off key, a one-day lifetime and
 usage limit one, following the published

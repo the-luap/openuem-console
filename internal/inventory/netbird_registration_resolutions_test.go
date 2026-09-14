@@ -376,8 +376,10 @@ func TestNetbirdRegistrationResolutionMigrationGuards(t *testing.T) {
 }
 
 func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T) {
-	for _, change := range []string{"cleanup-renewed", "cleanup-revoked", "cleanup-expired", "cleanup-consumer", "cleanup-moved", "renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"peer-renewed", "peer-revoked", "peer-expired", "peer-consumer", "peer-moved", "cleanup-renewed", "cleanup-revoked", "cleanup-expired", "cleanup-consumer", "cleanup-moved", "renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
 		t.Run(change, func(t *testing.T) {
+			peerBinding := strings.HasPrefix(change, "peer-")
+			change = strings.TrimPrefix(change, "peer-")
 			cleanup := strings.HasPrefix(change, "cleanup-")
 			change = strings.TrimPrefix(change, "cleanup-")
 			retry := strings.HasPrefix(change, "retry-")
@@ -451,6 +453,12 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			r := registrationRequest(t, f, s)
 			_, err = s.DispatchOne(ctx)
 			require.NoError(t, err)
+			if peerBinding {
+				exerciseNetbirdPeerBindingIdentity(t, f, p, s, r, change)
+				require.Zero(t, queries)
+				require.Zero(t, releases)
+				return
+			}
 			if cleanup {
 				exerciseNetbirdCleanupIdentity(t, f, p, s, r, change)
 				require.Zero(t, queries)

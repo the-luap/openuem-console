@@ -679,7 +679,17 @@ new browser cases and the full 2,367-case matrix pass, together with the complet
 inventory/audit race suites, registered-route fixtures and Linux console build. Key absence alone
 preserves the command block and original uncertain registration outcome.
 Missing creation responses without retained key identity remain unresolved.
-Trusted Unix installers, authoritative peer ownership, remaining user/provider secrets and
+[Retained provider peer associations](netbird-peer-bindings.md) now match the
+exact setup-key registration event to its provider peer ID and independently
+validate that peer's creation metadata using the original encrypted provider
+snapshot. Current authority and target identity, fresh review, explicit
+confirmation, atomic audit and permanent storage protect the association.
+Missing events never prove non-registration. The association leaves the original
+command result and admission barrier unchanged and does not prove the endpoint's
+current local WireGuard identity. All 39 new and 2,406 total browser cases pass;
+owned database, provider and registered-route fixtures cover evidence conflicts,
+scope and identity changes, concurrent forms, replay and audit rollback.
+Reviewed provider-peer deletion, trusted Unix installers, remaining user/provider secrets and
 physical/provider acceptance are still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must

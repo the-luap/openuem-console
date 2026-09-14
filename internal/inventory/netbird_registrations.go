@@ -65,6 +65,7 @@ type NetbirdRegistration struct {
 	ReleasedAt                                    *time.Time
 	Resolution                                    *NetbirdRegistrationResolution
 	LastCleanupRetry                              *NetbirdCleanupRetry
+	PeerBinding                                   *NetbirdPeerBinding
 	ID, DeviceID, Actor, Revision, Status, Reason string
 	Scope                                         access.Scope
 	Individual, ExtraDNS                          bool

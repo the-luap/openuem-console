@@ -21,6 +21,10 @@ func registrationEvidence(ctx context.Context, tx *sql.Tx, r *NetbirdRegistratio
 	r.Key, r.Delivered, r.KeyAbsent = nil, nil, false
 	r.CommandHash = ""
 	var err error
+	r.PeerBinding, err = readNetbirdPeerBinding(ctx, tx, r.ID)
+	if err != nil {
+		return "", err
+	}
 	r.LastCleanupRetry, err = readNetbirdCleanupRetry(ctx, tx, r.ID)
 	if err != nil {
 		return "", err

@@ -6,8 +6,10 @@ review, submission, receipts, history, queued cancellation and read-only cleanup
 checks. Startup owns and joins the registration dispatcher. The old registration
 alias accepts only the same complete reviewed request; raw legacy settings cannot
 bypass it. [Combined provider/agent resolution](netbird-registration-resolutions.md)
-now supports retained-key requests with matching evidence. Installation,
-authoritative provider-peer binding and real-provider acceptance remain open.
+now supports retained-key requests with matching evidence. A separate
+[provider peer association](netbird-peer-bindings.md) retains exact setup-key
+registration evidence. Installation, peer deletion and real-provider acceptance
+remain open.
 
 ## Admission and authority
 
@@ -124,8 +126,10 @@ its [failure ordering and remaining cases](netbird-registration-resolutions.md)
 and [permanent withdrawal](netbird-registration-withdrawals.md)
 and [explicit recovery attempts](netbird-resolution-retries.md)
 are documented separately. Unsuccessful recorded key removal now has its own
-[reviewed retry](netbird-cleanup-retries.md). Authoritative peer association and
-missing creation responses still need explicit recovery policy;
+[reviewed retry](netbird-cleanup-retries.md). A separately confirmed
+[provider peer association](netbird-peer-bindings.md) now retains the exact
+setup-key event and peer metadata without changing command outcomes. Peer deletion
+and missing creation responses still need explicit recovery policy;
 do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

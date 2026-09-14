@@ -32,12 +32,20 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	var mu sync.Mutex
 	creates, deletes, providerReads, deliveries := 0, 0, 0, 0
 	var key map[string]any
+	var peerEvents []map[string]any
+	var providerPeer map[string]any
 	absent, retainDelete, failRead := false, false, false
 	provider := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/api/events/audit":
+			providerReads++
+			_ = json.NewEncoder(w).Encode(peerEvents)
+		case r.Method == "GET" && r.URL.Path == "/api/peers/owned-peer":
+			providerReads++
+			_ = json.NewEncoder(w).Encode(providerPeer)
 		case r.Method == "GET" && r.URL.Path == "/api/groups":
 			providerReads++
 			_, _ = w.Write([]byte(`[{"id":"owned-group","name":"Office <Berlin>","peers_count":0}]`))
@@ -472,7 +480,61 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	require.Contains(t, page.Body.String(), "Latest removal attempt ID")
 	require.NotContains(t, page.Body.String(), "owned-private-registration-token")
 	require.NotContains(t, page.Body.String(), "owned-private-registration-key")
+
+	// Associate only an exact setup-key registration event and provider object.
+	mu.Lock()
+	peerTime := time.Now().UTC()
+	peerEvents = []map[string]any{{"id": "owned-peer-event", "activity_code": "peer.setupkey.add", "initiator_id": "owned-key", "target_id": "owned-peer", "timestamp": peerTime, "initiator_email": "private@example.test"}}
+	providerPeer = map[string]any{"id": "owned-peer", "name": "Owned <provider peer>", "created_at": peerTime.Add(-time.Millisecond), "user_id": "", "ephemeral": false}
+	mu.Unlock()
+	peerPath := cleanupReceipt + "/peer"
+	peerView, err := store.ReviewPeerBinding(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.True(t, peerView.CanBind)
+	peerForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "binding_id": {uuid.NewString()}, "revision": {peerView.Revision}}
+	for _, actor := range []string{"scoped-viewer", "scoped-operator"} {
+		require.Equal(t, 403, request(actor, "GET", peerPath, nil, "console-test-token").Code)
+		require.Equal(t, 403, request(actor, "POST", peerPath, peerForm, "console-test-token").Code)
+	}
+	require.Equal(t, 403, request("apple-console-admin", "POST", peerPath, peerForm, "").Code)
+	for _, alter := range []func(url.Values){func(v url.Values) { v.Del("confirmed") }, func(v url.Values) { v.Add("binding_id", uuid.NewString()) }, func(v url.Values) { v.Set("binding_id", "invalid") }, func(v url.Values) { v.Set("peer_id", "injected") }, func(v url.Values) { v.Set("provider_url", provider.URL) }} {
+		bad := url.Values{}
+		for k, values := range peerForm {
+			bad[k] = append([]string{}, values...)
+		}
+		alter(bad)
+		require.Equal(t, 400, request("apple-console-admin", "POST", peerPath, bad, "console-test-token").Code)
+	}
+	require.Equal(t, 400, request("apple-console-admin", "GET", peerPath+"?peer_id=injected", nil, "console-test-token").Code)
+	page = request("apple-console-admin", "GET", peerPath, nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Equal(t, "no-store", page.Header().Get("Cache-Control"))
+	require.Contains(t, page.Body.String(), "Confirm peer association")
+	require.Contains(t, page.Body.String(), "Owned &lt;provider peer&gt;")
+	response = request("apple-console-admin", "POST", peerPath, peerForm, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, peerPath, response.Header().Get("HX-Redirect"))
+	mu.Lock()
+	beforePeerReplay := providerReads
+	mu.Unlock()
+	require.Equal(t, 204, request("apple-console-admin", "POST", peerPath, peerForm, "console-test-token").Code)
+	mu.Lock()
+	require.Equal(t, beforePeerReplay, providerReads)
+	require.Equal(t, 5, creates)
+	require.Equal(t, 6, deletes)
+	mu.Unlock()
+	require.Equal(t, beforeCleanupControls, controls)
+	retained, err = store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.NotNil(t, retained.PeerBinding)
+	require.Nil(t, retained.ReleasedAt)
+	require.Equal(t, "unconfirmed", retained.Status)
+	page = request("scoped-viewer", "GET", cleanupReceipt, nil, "console-test-token")
+	require.Contains(t, page.Body.String(), "Retained provider peer")
+	require.NotContains(t, page.Body.String(), "private@example.test")
+	require.NotContains(t, page.Body.String(), "netbird-peer-review-link")
 	require.NoError(t, h.Model.Client.Agent.DeleteOneID(device).Exec(ctx))
+	require.Equal(t, 200, request("apple-console-admin", "GET", peerPath, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("scoped-viewer", "GET", path, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("scoped-viewer", "GET", receiptPath, nil, "console-test-token").Code)

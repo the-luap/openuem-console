@@ -29,6 +29,9 @@ type ownedRegistrationProvider struct {
 	failCreate, failDelete, retainDelete, failRead, drift bool
 	tokens                                                []string
 	onDelete                                              func()
+	events                                                []map[string]any
+	peer                                                  map[string]any
+	eventReads, peerReads, eventsStatus, peerStatus       int
 }
 
 func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *ownedRegistrationProvider {
@@ -40,6 +43,20 @@ func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *o
 		p.tokens = append(p.tokens, r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/api/events/audit":
+			p.eventReads++
+			if p.eventsStatus != 0 {
+				w.WriteHeader(p.eventsStatus)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(p.events)
+		case r.Method == "GET" && r.URL.Path == "/api/peers/owned-peer":
+			p.peerReads++
+			if p.peerStatus != 0 {
+				w.WriteHeader(p.peerStatus)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(p.peer)
 		case r.Method == "GET" && r.URL.Path == "/api/groups":
 			_, _ = w.Write([]byte(`[{"id":"owned-group","name":"Owned group","peers_count":0}]`))
 		case r.Method == "POST" && r.URL.Path == "/api/setup-keys":

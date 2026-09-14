@@ -61,6 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Retained NetBird provider peer associations](netbird-peer-bindings.md) now
+  bind one exact setup-key registration event to its provider peer ID using the
+  captured provider account. Independent peer metadata, current authority and
+  target identity, fresh review and explicit confirmation precede atomic
+  association/audit persistence. Missing events cannot prove non-registration;
+  local WireGuard identity, connectivity and command outcomes are not inferred.
+  Immutable history survives device removal and same-form replays make no
+  provider call. All 39 new and 2,406 total browser cases pass, alongside owned
+  database/provider and registered-route fixtures and the complete inventory,
+  audit and view race suites. Linux console, Linux/macOS/Windows agent and
+  Linux/Windows worker builds pass with the same immutable shared pin.
+  Provider-peer deletion and
+  real provider/native/physical acceptance remain open.
+
 - [Reviewed NetBird setup-key removal retries](netbird-cleanup-retries.md) now
   authorize one additional DELETE after fresh current authority and exact-key
   policy review. Attempt and audit commit before mutation; original encrypted
