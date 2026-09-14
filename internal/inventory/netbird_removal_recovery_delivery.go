@@ -32,7 +32,8 @@ func NewNetbirdRemovalRecoveryDeliveryStore(db *sql.DB, permissions *access.Stor
 type NetbirdRemovalRecoveryDelivery struct {
 	RequestID, CommandHash, Outcome, OriginalOutcome string
 	IssuedAt, ExpiresAt                              time.Time
-	RecordedAt, CompletedAt                          *time.Time
+	RecordedAt, CompletedAt, ReleasedAt              *time.Time
+	ReleasedBy, ResolutionID                         string
 	Receipt                                          *netbirdcommand.Receipt
 	ObservationID, ObservedBy, ObservedOutcome       string
 	ObservedAt                                       *time.Time
@@ -47,12 +48,12 @@ func readRemovalRecoveryDelivery(ctx context.Context, tx *sql.Tx, id string) (*N
 	}
 	c := netbirdcommand.Command{Identity: netbirdcommand.Identity{DeviceID: r.DeviceID, TenantID: int64(r.Scope.TenantID), SiteID: int64(r.Scope.SiteID), Individual: true}, RequestID: r.ID, Revision: r.Revision, Operation: "recover-removal", RemovalRecovery: r.Recovery}
 	err = tx.QueryRowContext(ctx, `SELECT a.request_id::text,a.command_hash,a.issued_at,a.expires_at,a.wire_version,a.certificate_hash,
- CASE WHEN i.completed_at IS NOT NULL THEN 'completed' ELSE coalesce(r.outcome,'pending') END,coalesce(r.outcome,'pending'),r.recorded_at,i.completed_at,
+ CASE WHEN i.completed_at IS NOT NULL THEN 'completed' WHEN i.released_at IS NOT NULL THEN 'released' ELSE coalesce(r.outcome,'pending') END,coalesce(r.outcome,'pending'),r.recorded_at,i.completed_at,i.released_at,coalesce(i.released_by,''),coalesce(i.resolution_id::text,''),
  coalesce((SELECT o.response->'receipt' FROM uem_netbird_removal_recovery_observations o WHERE o.request_id=i.id AND o.recorded_at=i.completed_at AND o.response->'receipt'->>'status'='completed' LIMIT 1),r.receipt),
  coalesce(o.id::text,''),coalesce(o.actor,''),coalesce(CASE WHEN o.response->>'outcome'='ok' THEN o.response->'receipt'->>'status' ELSE coalesce(o.response->>'outcome','unavailable') END,''),o.recorded_at
  FROM uem_netbird_removal_recovery_attempts a JOIN uem_netbird_removal_recoveries i ON i.id=a.request_id LEFT JOIN uem_netbird_removal_recovery_results r USING(request_id)
  LEFT JOIN LATERAL(SELECT * FROM uem_netbird_removal_recovery_observations WHERE request_id=a.request_id ORDER BY recorded_at DESC,id DESC LIMIT 1) o ON true
- WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &c.Version, &c.CertificateHash, &d.Outcome, &d.OriginalOutcome, &d.RecordedAt, &d.CompletedAt, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
+ WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &c.Version, &c.CertificateHash, &d.Outcome, &d.OriginalOutcome, &d.RecordedAt, &d.CompletedAt, &d.ReleasedAt, &d.ReleasedBy, &d.ResolutionID, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (s *NetbirdRemovalRecoveryStore) admitRecovery(parent context.Context, acto
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, err
 	}
-	if r.CancelledAt != nil || r.CompletedAt != nil || !time.Now().Before(r.ExpiresAt) {
+	if r.CancelledAt != nil || r.CompletedAt != nil || r.ReleasedAt != nil || !time.Now().Before(r.ExpiresAt) {
 		return nil, nil, nil, ErrNetbirdOperationConflict
 	}
 	source, err := s.source(ctx, tx, scope, device, r.OriginalID)
@@ -213,7 +214,7 @@ func (s *NetbirdRemovalRecoveryStore) finishRecovery(ctx context.Context, r *Net
 		return nil, err
 	}
 	if outcome == "completed" {
-		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removal_recoveries SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL`, r.ID, recorded); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removal_recoveries SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL AND released_at IS NULL`, r.ID, recorded); err != nil {
 			return nil, err
 		}
 	}

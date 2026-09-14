@@ -6,7 +6,8 @@ its immutable request and cancellation records, original-release foreign key,
 history index and common admission guards. The store provides review, request,
 scoped read and explicit cancellation. The delivery-enabled constructor adds
 [one durable native attempt and retained receipt observation](netbird-removal-recovery-delivery.md).
-Joined dispatch, reviewed resolution and public UI integration remain open.
+[Reviewed release/withdrawal resolution](netbird-removal-recovery-resolutions.md)
+also retains separate proof. Joined dispatch and public UI integration remain open.
 
 ## Original owned evidence
 
@@ -61,8 +62,8 @@ The existing UUID and device advisory locks now include recovery as a fifth
 family alongside connection, registration, installation and fresh removal. The
 database admission trigger protects direct inserts in every family as well.
 An unresolved recovery blocks other work; its UUID remains reserved after
-cancellation or verified completion. Expiry alone does not release the device
-barrier.
+cancellation, verified completion or confirmed owned resolution. Expiry alone
+does not release the device barrier.
 
 Database guards require an exact original released unconfirmed receipt and an
 exact source-free `manifest` descriptor. Unknown fields, replacement descriptors,

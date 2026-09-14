@@ -66,6 +66,12 @@ unconfirmed or pending. If observation commits before the initial executor
 returns, a late unconfirmed result cannot undo completion. The completion receipt
 and its timestamp remain tied to the retained observation.
 
+[Reviewed resolution](netbird-removal-recovery-resolutions.md) can separately
+confirm release or withdrawal using exact owned control proof. Delivery history
+then reports `released` with its resolution UUID, actor and timestamp, retaining
+the first delivery outcome. Released requests return history without native work
+or receipt observation; a late native result cannot replace terminal release.
+
 Reads reconstruct the complete historical version-five command from immutable
 request and attempt metadata and verify its canonical hash before trusting its
 receipt. Public records contain neither the historical certificate nor an
@@ -91,6 +97,6 @@ uninstall outcome and use no vendor remover or host NetBird state. The complete
 NetBird inventory suite, with 177 top-level tests plus subcases, passes with race
 detection against the owned PostgreSQL database. The Linux console build passes.
 
-Joined automatic dispatch, reviewed release/withdrawal resolution, coherent public
-history and UI remain separate integration work. Missing, empty or incomplete
+Joined automatic dispatch, coherent public history and UI remain separate
+integration work. Missing, empty or incomplete
 manifest policy and physical package/reboot acceptance also remain open.

@@ -6,8 +6,9 @@ now provide an explicit continuation of an interrupted macOS removal with a
 valid protected original manifest. Console transport and the
 [scoped request store](netbird-removal-recovery-requests.md),
 [durable native delivery and receipt observation](netbird-removal-recovery-delivery.md)
-are implemented. Dispatch, reviewed resolution and public UI integration remain
-open. No recovery route or automatic recovery delivery is enabled.
+are implemented. [Reviewed release and withdrawal](netbird-removal-recovery-resolutions.md)
+now provide independent resolution and lost-response reconciliation. Dispatch and
+public UI integration remain open. No recovery route or automatic recovery delivery is enabled.
 
 ## Evidence and independent attempt
 
@@ -66,5 +67,7 @@ The delivery store now persists one exact attempt before transport, excludes
 cancellation after admission and never redelivers retained attempts. Read-only
 receipt observation under current individual authority can confirm completion
 without changing the first recovery result or the original uninstall evidence.
-Joined dispatch, coherent history, reviewed resolution and public UI integration
-remain required.
+Reviewed resolution now retains each single-use review and exact control before
+transport. Owned release/withdrawal proof can clear the recovery barrier without
+changing its original result or the original uninstall. Joined dispatch, coherent
+history and public UI integration remain required.

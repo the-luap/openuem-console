@@ -42,7 +42,8 @@ type NetbirdRemovalRecovery struct {
 	Recovery                                                                   netbirdcommand.RemovalRecovery `json:"-"`
 	RequestedAt, ExpiresAt                                                     time.Time
 	CancellationID, CancelledBy                                                string
-	CancelledAt, CompletedAt                                                   *time.Time
+	CancelledAt, CompletedAt, ReleasedAt                                       *time.Time
+	ReleasedBy, ResolutionID                                                   string
 }
 
 // Public records explicitly serialize source-free recovery evidence without a
@@ -264,12 +265,12 @@ func (s *NetbirdRemovalRecoveryStore) Review(parent context.Context, actor strin
 	return &source.review, nil
 }
 
-const removalRecoveryColumns = `id::text,original_id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,recovery_digest,recovery,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at`
+const removalRecoveryColumns = `id::text,original_id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,recovery_digest,recovery,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at,released_at,coalesce(released_by,''),coalesce(resolution_id::text,'')`
 
 func scanRemovalRecovery(row interface{ Scan(...any) error }) (*NetbirdRemovalRecovery, error) {
 	var r NetbirdRemovalRecovery
 	var data []byte
-	err := row.Scan(&r.ID, &r.OriginalID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.RecoveryDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt)
+	err := row.Scan(&r.ID, &r.OriginalID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.RecoveryDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt, &r.ReleasedAt, &r.ReleasedBy, &r.ResolutionID)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +405,7 @@ func (s *NetbirdRemovalRecoveryStore) Cancel(parent context.Context, actor strin
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_removal_recovery_attempts WHERE request_id=$1)`, id).Scan(&attempted); err != nil {
 		return nil, err
 	}
-	if attempted || r.CompletedAt != nil {
+	if attempted || r.CompletedAt != nil || r.ReleasedAt != nil {
 		return nil, ErrNetbirdOperationConflict
 	}
 

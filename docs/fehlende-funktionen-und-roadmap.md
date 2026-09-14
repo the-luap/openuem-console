@@ -806,8 +806,12 @@ UUID/device barrier to five request families.
 [Durable recovery delivery and receipt observation](netbird-removal-recovery-delivery.md)
 now commit one exact version-five attempt before native transport, prevent
 cancellation or redelivery afterward, and preserve the first recovery result and
-original uninstall evidence when a current receipt confirms completion. Joined
-dispatch, reviewed resolution/UI and absent-manifest recovery remain open.
+original uninstall evidence when a current receipt confirms completion.
+[Reviewed recovery resolution](netbird-removal-recovery-resolutions.md) now adds
+single-use reviews, durable release/withdrawal controls, owned proof and receipt
+reconciliation under current authority. A later independent recovery can retain
+the same original uninstall reference with a fresh journal/native review. Joined
+dispatch, public history/UI and absent-manifest recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.
