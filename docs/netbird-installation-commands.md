@@ -30,16 +30,18 @@ commands before writing an attempt. Retained results remain readable even withou
 a runner. The console connection/registration publisher explicitly rejects this
 new command version; it cannot bypass future package-aware durable admission.
 Ordinary and registration state queries do not establish installation capability.
-No new broker subjects, stream filters, permissions or automatic retries are added.
+The installation command adds no broker subject, stream filter, permission or
+automatic retry. The separate preparation protocol has its own direct subject.
 
 ## Remaining installation integration
 
 The [durable installation request store](netbird-installation-requests.md) now
 authenticates the organization approval and exact individual target, supports an
 absent client, and retains intent/cancellation under the common console barrier.
-The [private native preparation](netbird-package-preparation.md) still needs
-authenticated delivery, a fresh approval/target check at command admission,
-exact prepared-package ownership, fixed native install/remove execution and
+The [private native preparation](netbird-package-preparation.md) now has an
+authenticated agent RPC, native ownership and bounded cleanup. It still needs
+console delivery admission, a fresh approval/target check at command admission,
+atomic prepared-package consumption, fixed native install/remove execution and
 verified resulting-state recovery. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.
 

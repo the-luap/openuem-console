@@ -59,3 +59,60 @@ authority requirements. Final preparation race checks pass in 7.715 seconds on
 macOS and 3.856 seconds on Linux; command/journal and service regressions also
 pass. XML and payload fuzz runs process 7,435 and 223,536 inputs; an additional
 fixed-count XAR run completes 1,000 inputs successfully.
+
+## Authenticated preparation endpoint
+
+The shared [preparation RPC](https://github.com/the-luap/openuem-nats/blob/fbef45520563fa80ee2809ca815cd2e8a1c549bd/docs/netbird-commands.md#authenticated-private-package-preparation)
+now carries a strict current individual identity, reviewed revision, live journal
+revision, request UUID, exact private package and bounded issue/expiry times on
+`agent.netbird.prepare.<device UUID>`. The individual-only `preparation-state`
+control discovers actual staging support. Ordinary/registration state does not
+establish that support, and staging support never advertises a native installer.
+
+The [native agent service](https://github.com/the-luap/openuem-agent/blob/f6279f12aec1d34a3eada562de0c83cc78ebb38b/docs/netbird-package-preparation.md#authenticated-service-ownership)
+opens a fixed private `netbird-preparation` sibling of
+the execution journal beneath its validated individual identity directory. One
+artifact may be retained. Download and inspection hold the common executor mutex,
+and the result requires unchanged ready journal state. A concurrent withdrawal
+invalidates preparation. Exact request replay verifies the same file without
+downloading again; changed source/review/deadline conflicts. Replacing the broker
+connection retains this owner, while current identity/certificate checks reject
+foreign or expired messages before download.
+
+The correlated response contains only identity, request UUID, complete hash and
+outcome. It exposes no URL or local path and is not durable execution evidence.
+Expiry, journal changes or service cancellation clear the cache. Shutdown joins
+downloads and cleanup before closing the journal. Under the exclusive journal
+lease, restart removes at most one strictly shaped private abandoned stage;
+unknown entries, symlinks or unsafe permissions prevent preparation. No recursive
+deletion or permission repair is used. Cleanup failures stop further preparation.
+During a live service, unexpected files are preserved and disable preparation;
+failed cleanup never invokes the broader startup recovery path. Native startup
+does not publish managed readiness if it cannot safely open its preparation owner.
+
+The [installation request store](netbird-installation-requests.md) still does not
+publish preparations or create delivery attempts. Its current cancellation guard
+must exclude attempted work before such a publisher is enabled. Fresh current
+approval/revocation and recipient checks, retained preparation/delivery intent,
+atomic consumption of the exact prepared package, native installation/removal
+and verified resulting-state recovery remain required. Linux additionally needs
+individual enrollment and independent publisher provenance. The production
+installation runner remains disabled on every platform.
+
+Owned broker/filesystem tests cover source correlation, exact replay, parallel
+admission, retained uncertainty, journal changes during download, connection
+replacement, expiry, partial crash files, symlinks and joined shutdown. A test
+through the real native binding rejects the wrong platform before any HTTP call.
+These tests do not run a NetBird installer, daemon or provider.
+All consumers pin `v0.11.1-0.20260914044144-fbef45520563`. The complete shared race
+suite passes; seeded preparation decoding fuzzes 11,748,164 inputs in 31.401
+seconds. Final macOS command/preparation/journal race suites pass in
+5.638/4.201/7.633 seconds and native agent regressions in 2.574 seconds.
+Linux journal/command/preparation race suites pass in 5.208/3.793/3.820 seconds.
+All six complete builds pass: Linux console, Linux/macOS/Windows agent and
+Linux/Windows worker. No console route, form or browser asset changed in this
+endpoint milestone; its installation publisher remains unconnected.
+The compiled console publisher fixtures also pass and confirm that installation
+commands still cannot use the connection/registration delivery path.
+The full native `internal/agent` race suite additionally passes in 24.424 seconds,
+covering runtime interactions beyond the focused NetBird fixtures.

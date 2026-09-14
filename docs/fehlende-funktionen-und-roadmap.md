@@ -722,6 +722,13 @@ retain the same operation barrier without persisting private package sources.
 the encrypted approval and exact individual target, including an absent client,
 and share the console request barrier with immutable cancellation and atomic audit.
 Concurrent revocation and approval replays use a fresh snapshot after row locking.
+[Authenticated agent preparation](netbird-package-preparation.md#authenticated-preparation-endpoint)
+now binds private staging to the current individual service identity and live
+journal revision, with exact replay, bounded cache/crash cleanup and joined
+shutdown. The separate readiness control does not advertise an installer.
+Owned broker/filesystem/native-binding tests, shared decoder fuzzing, macOS/Linux
+race suites and all six consumer/platform builds cover this endpoint. Console
+preparation delivery and durable attempt admission remain unconnected.
 Production installation remains disabled until its native runner and package-aware
 console admission are connected. Authenticated installer delivery and admission,
 execution, observation and recovery remain necessary before this preparation
