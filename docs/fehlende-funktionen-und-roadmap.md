@@ -840,8 +840,14 @@ The [shared Linux target protocol](https://github.com/the-luap/openuem-nats/blob
 now binds signed AMD64/ARM64 release/configuration metadata, exact invitation
 targets, local key proofs, scoped registry identities and confirmed renewal.
 Its additive migration preserves existing Windows/Mac identities and invitations.
-Native Linux package and installed-command admission, service activation, publisher
-trust and physical installation/removal acceptance remain separate requirements.
+The [native Linux publisher verifier](https://github.com/the-luap/openuem-agent/blob/a3c7824daff4a8bf5cbd8f6a4218c48816d6e2a9/docs/linux-package-signatures.md)
+now checks DEB/RPM signatures against separately provisioned OpenPGP publishers,
+retains protected package/tool/trust namespaces and bounds native process groups.
+Its isolated Linux race suite verifies synthetic authorized and foreign packages,
+altered payloads, changed trust and cancellation/early-exit descendants.
+Linux package staging, installed-executable and installed-command admission,
+service activation, production publisher provisioning and physical
+installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

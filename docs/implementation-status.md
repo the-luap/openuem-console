@@ -61,6 +61,22 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Native Linux publisher verification](https://github.com/the-luap/openuem-agent/blob/a3c7824daff4a8bf5cbd8f6a4218c48816d6e2a9/docs/linux-package-signatures.md)
+  now verifies DEB/RPM packages against independently provisioned OpenPGP trust.
+  Retained root-owned namespaces, exact bounded policy/key inventories, native
+  signature/digest checks and before/after byte checks reject unsafe or replaced
+  inputs. Native process-group cleanup retains the leader until descendants have
+  been stopped and joins cancellation without exposing diagnostics. The isolated
+  Linux race suite passes in 5.765 seconds with generated inert packages, valid
+  and foreign publishers, altered payloads, weakened trust and child-lifetime
+  checks. macOS signature/staging races and complete Linux/Windows agent builds
+  pass. A dedicated native CI job requires all six test families to pass without
+  skips. Package staging, installed-executable admission, installed-command and
+  service integration, production signing and physical acceptance remain open.
+  The preceding agent CI at `7dc156b` passes all nine jobs, including twenty native
+  Windows rotation-admission repetitions. The earlier one-off storage failure is
+  not reproduced; more precise test-stage diagnostics remain enabled.
+
 - The shared library at
   [`2dbc458eb28c`](https://github.com/the-luap/openuem-nats/commit/2dbc458eb28cc9cc24e70fb040b799055bf68b17)
   now accepts exact Linux AMD64/ARM64 enrollment and renewal proofs, signed
@@ -71,8 +87,9 @@ the table's package summaries do not remove any detail from the roadmap.
   Linux-seeded wire fuzzing passes 200,611 executions. Linux/Windows builds and
   enrollment Vet checks pass. Console, agent and worker now pin this same published
   runtime version. Console desktop/broker/command regression races and complete
-  Linux/Windows console builds pass. Native Linux package trust, installed-command
-  admission and service activation remain separate requirements.
+  Linux/Windows console builds pass. Native Linux package trust now has separate
+  implementation/evidence above; staging, installed-command admission and service
+  activation remain separate requirements.
 
 - Native Apple CI exposed receipt regressions caused by structural comparison
   of `time.Local` and UTC representations of the same persisted instant. The
@@ -101,9 +118,9 @@ the table's package summaries do not remove any detail from the roadmap.
   including native crypto, cross-process recovery, competing writers, partial
   restores, missing prerequisites and a forced partial write. macOS store races
   pass in 63.807 seconds; the Linux agent builds and Windows storage tests compile.
-  Linux signed-platform admission, installer trust and service activation remain
-  open. Storage tests with existing Windows/Mac protocol fixtures do not prove
-  those Linux integration boundaries.
+  The later Linux signed-platform and package-signature work is tracked above.
+  Storage tests with existing Windows/Mac protocol fixtures do not themselves
+  prove Linux installation and service integration boundaries.
 
 - [Independent NetBird staging cleanup](netbird-removal-stage-cleanup.md) now
   connects exact current native review to durable console request, single
