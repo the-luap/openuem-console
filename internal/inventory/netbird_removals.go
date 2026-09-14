@@ -219,7 +219,7 @@ func netbirdRequestConflict(ctx context.Context, tx *sql.Tx, device, id string) 
  OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))))
  OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))
  OR EXISTS(SELECT 1 FROM uem_netbird_removals WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))
- OR EXISTS(SELECT 1 FROM uem_netbird_removal_recoveries WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL))`, device, id).Scan(&pending)
+ OR EXISTS(SELECT 1 FROM uem_netbird_removal_recoveries WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL))`, device, id).Scan(&pending)
 	return pending, err
 }
 

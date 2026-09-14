@@ -4,8 +4,9 @@
 interrupted macOS uninstall with a valid original manifest. Migration 033 adds
 its immutable request and cancellation records, original-release foreign key,
 history index and common admission guards. The store provides review, request,
-scoped read and explicit cancellation. Native delivery and its resolution/UI
-integration remain separate work; this store never sends an execution command.
+scoped read and explicit cancellation. The delivery-enabled constructor adds
+[one durable native attempt and retained receipt observation](netbird-removal-recovery-delivery.md).
+Joined dispatch, reviewed resolution and public UI integration remain open.
 
 ## Original owned evidence
 
@@ -60,7 +61,8 @@ The existing UUID and device advisory locks now include recovery as a fifth
 family alongside connection, registration, installation and fresh removal. The
 database admission trigger protects direct inserts in every family as well.
 An unresolved recovery blocks other work; its UUID remains reserved after
-cancellation. Expiry alone does not release the device barrier.
+cancellation or verified completion. Expiry alone does not release the device
+barrier.
 
 Database guards require an exact original released unconfirmed receipt and an
 exact source-free `manifest` descriptor. Unknown fields, replacement descriptors,
@@ -72,9 +74,10 @@ Scoped reads require `ReadSoftware`. Cancellation requires `AssignSoftware` and
 an exact request revision, and retains a separate cancellation UUID and actor.
 Repeated cancellation is idempotent only with that same identity. It sends no
 native control, never changes the original uninstall and cannot erase request
-history. Request/read/cancellation audits commit with their corresponding state;
-an audit failure rolls back the operation. Delivery must add an immutable attempt
-barrier before configuring an executor so cancellation cannot cross native work.
+history. Once a delivery attempt is committed, cancellation is refused by both
+the store and database guard, including when no delivery result was saved.
+Request/read/cancellation audits commit with their corresponding state; an audit
+failure rolls back the operation.
 
 ## Verification
 
@@ -89,5 +92,5 @@ Tests do not execute a vendor remover or read/change host NetBird state.
 
 The full NetBird inventory suite passes with race detection against an owned
 PostgreSQL database, including the existing four families and the new recovery
-requests. The Linux console build also passes. Public routes and native delivery
-are not configured by this request-store change.
+requests. The Linux console build also passes. Public routes and automatic
+delivery are not configured by the request or delivery stores.

@@ -802,8 +802,12 @@ The console has a separate single-delivery publisher and correlated inspection
 transport. The [scoped recovery request store](netbird-removal-recovery-requests.md)
 now validates original owned unconfirmed release proof and fresh individual-agent
 review, retains immutable intent/cancellation and extends the common permanent
-UUID/device barrier to five request families. Native recovery delivery, dispatch,
-resolution/UI and absent-manifest recovery remain open.
+UUID/device barrier to five request families.
+[Durable recovery delivery and receipt observation](netbird-removal-recovery-delivery.md)
+now commit one exact version-five attempt before native transport, prevent
+cancellation or redelivery afterward, and preserve the first recovery result and
+original uninstall evidence when a current receipt confirms completion. Joined
+dispatch, reviewed resolution/UI and absent-manifest recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

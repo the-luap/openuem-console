@@ -14,9 +14,12 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
-// Recovery requests are a separate durable family. This store does not execute
-// native work or reinterpret an original uninstall result as completion.
-type NetbirdRemovalRecoveryStore struct{ base *NetbirdRemovalStore }
+// Recovery requests form a separate durable family. The original uninstall
+// and its release evidence remain unchanged by recovery delivery.
+type NetbirdRemovalRecoveryStore struct {
+	base    *NetbirdRemovalStore
+	execute NetbirdRemovalRecoveryExecutor
+}
 
 func NewNetbirdRemovalRecoveryStore(db *sql.DB, permissions *access.Store, individual bool, control NetbirdOperationControl) (*NetbirdRemovalRecoveryStore, error) {
 	base, err := NewNetbirdRemovalStore(db, permissions, individual, control)
@@ -39,7 +42,7 @@ type NetbirdRemovalRecovery struct {
 	Recovery                                                                   netbirdcommand.RemovalRecovery `json:"-"`
 	RequestedAt, ExpiresAt                                                     time.Time
 	CancellationID, CancelledBy                                                string
-	CancelledAt                                                                *time.Time
+	CancelledAt, CompletedAt                                                   *time.Time
 }
 
 // Public records explicitly serialize source-free recovery evidence without a
@@ -261,12 +264,12 @@ func (s *NetbirdRemovalRecoveryStore) Review(parent context.Context, actor strin
 	return &source.review, nil
 }
 
-const removalRecoveryColumns = `id::text,original_id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,recovery_digest,recovery,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at`
+const removalRecoveryColumns = `id::text,original_id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,recovery_digest,recovery,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at`
 
 func scanRemovalRecovery(row interface{ Scan(...any) error }) (*NetbirdRemovalRecovery, error) {
 	var r NetbirdRemovalRecovery
 	var data []byte
-	err := row.Scan(&r.ID, &r.OriginalID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.RecoveryDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt)
+	err := row.Scan(&r.ID, &r.OriginalID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.RecoveryDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -366,8 +369,7 @@ func (s *NetbirdRemovalRecoveryStore) Read(parent context.Context, actor string,
 	return r, tx.Commit()
 }
 
-// No native delivery is exposed by this request-only store. Delivery admission
-// must extend the cancellation guard before configuring its executor.
+// Cancel is available only before durable delivery admission.
 func (s *NetbirdRemovalRecoveryStore) Cancel(parent context.Context, actor string, scope access.Scope, device, id, revision, cancellation string) (*NetbirdRemovalRecovery, error) {
 	if parent == nil || !canonicalRequestID(device) || !canonicalRequestID(id) || !canonicalRequestID(cancellation) || cancellation == id || !netbirdcommand.ValidDigest(revision) {
 		return nil, ErrNetbirdOperationInvalid
@@ -398,6 +400,14 @@ func (s *NetbirdRemovalRecoveryStore) Cancel(parent context.Context, actor strin
 		}
 		return r, tx.Commit()
 	}
+	var attempted bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_removal_recovery_attempts WHERE request_id=$1)`, id).Scan(&attempted); err != nil {
+		return nil, err
+	}
+	if attempted || r.CompletedAt != nil {
+		return nil, ErrNetbirdOperationConflict
+	}
+
 	r, err = scanRemovalRecovery(tx.QueryRowContext(ctx, `UPDATE uem_netbird_removal_recoveries SET cancellation_id=$2,cancelled_by=$3,cancelled_at=clock_timestamp() WHERE id=$1 RETURNING `+removalRecoveryColumns, id, cancellation, actor))
 	if err != nil {
 		var state interface{ SQLState() string }

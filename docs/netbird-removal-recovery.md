@@ -4,8 +4,10 @@ The [shared version-five command and version-four inspection](https://github.com
 and [agent journal/native service integration](https://github.com/the-luap/openuem-agent/blob/c2eb88abec01ff90d205c3f4bc04a49f302be8d2/docs/netbird-removal-staging-recovery.md)
 now provide an explicit continuation of an interrupted macOS removal with a
 valid protected original manifest. Console transport and the
-[scoped request store](netbird-removal-recovery-requests.md) are implemented. Native
-delivery, dispatch, resolution and public UI integration remain open. No recovery route or automatic recovery delivery is enabled.
+[scoped request store](netbird-removal-recovery-requests.md),
+[durable native delivery and receipt observation](netbird-removal-recovery-delivery.md)
+are implemented. Dispatch, reviewed resolution and public UI integration remain
+open. No recovery route or automatic recovery delivery is enabled.
 
 ## Evidence and independent attempt
 
@@ -31,7 +33,7 @@ remain separate requirements.
 ## Direct console transport
 
 `PublishNetbirdRemovalRecovery` accepts only a valid fresh version-five command.
-Its future inventory caller must commit the exact delivery attempt first. It
+The delivery store commits the exact attempt and audit before calling it. It
 performs one deadline-bound direct NATS request, validates the complete correlated
 receipt and retains no JetStream message. A lost response returns unavailable;
 it never retries. Connection, installation and fresh-removal publishers reject
@@ -60,6 +62,9 @@ compilation, and Linux console/worker builds pass.
 The request store now verifies original owned unconfirmed release proof and
 current individual native review, retains immutable scoped intent and explicit
 cancellation, and shares permanent UUID/device exclusion with all other families.
-Next, native delivery must persist one exact attempt before transport and exclude
-cancellation after admission. Joined dispatch, coherent history, receipt
-observation, reviewed resolution and public UI integration remain required.
+The delivery store now persists one exact attempt before transport, excludes
+cancellation after admission and never redelivers retained attempts. Read-only
+receipt observation under current individual authority can confirm completion
+without changing the first recovery result or the original uninstall evidence.
+Joined dispatch, coherent history, reviewed resolution and public UI integration
+remain required.
