@@ -853,9 +853,15 @@ The [protected Linux staging provider](https://github.com/the-luap/openuem-agent
 now connects independently signed release metadata, exact-origin HTTPS, native
 publisher checks and retained private directory/file ownership. It rejects unsafe
 roots before downloading and preserves replaced namespaces during cleanup.
-Installed Linux command admission, service activation, production publisher
-provisioning and physical installation/removal acceptance remain separate
-requirements.
+The [installed Linux enrollment command](https://github.com/the-luap/openuem-agent/blob/04fb25c17a831e3a2025a6b274f8df4ce7b2fa8f/docs/native-linux-enrollment.md)
+now joins these providers to encrypted device identity issuance and same-key
+recovery. Its native fixtures cover actual DEB/RPM publishers, protected input
+ancestry, independently signed running images and canceled issuance. All twelve
+CI jobs pass. The [Linux readiness provider](https://github.com/the-luap/openuem-agent/blob/45a6e05ebd305f363899ee6bd617000f1dee2e1c/docs/native-linux-readiness.md)
+also connects successful runtime initialization to kernel-peer and signed device
+identity checks, with bounded native requests and joined shutdown. Linux service
+registration/activation, production publisher provisioning and physical
+installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

@@ -61,6 +61,30 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Native Linux readiness](https://github.com/the-luap/openuem-agent/blob/45a6e05ebd305f363899ee6bd617000f1dee2e1c/docs/native-linux-readiness.md)
+  now authenticates local initialization with a protected Unix socket, kernel
+  root-peer UID/PID and the enrolled device's signed nonce/identity/release proof.
+  Retained ancestors, exclusive ownership and exact socket cleanup preserve
+  replaced objects. Linux scheduler initialization now publishes readiness only
+  after successful setup and joins requests before releasing its identity keys.
+  Native transport/agent/service/lifecycle races pass in
+  4.145/28.158/3.089/1.028 seconds. Actual encrypted enrollment-to-readiness
+  integration, including long identity paths, passes in the full 6.464-second
+  enrollment suite. macOS regressions, Linux/Windows builds and Linux Vet pass.
+  Linux service registration/activation, final distribution and physical
+  installation/removal acceptance remain separate requirements.
+
+- The [installed Linux enrollment command](https://github.com/the-luap/openuem-agent/blob/04fb25c17a831e3a2025a6b274f8df4ce7b2fa8f/docs/native-linux-enrollment.md)
+  now joins the kernel-selected ELF image, independently signed release data,
+  native DEB/RPM publishers and encrypted host credentials. Full root-owned
+  input ancestry is checked before HTTPS; unsafe staging parents are rejected
+  before creation. Completed retries reuse the identity, and interrupted
+  issuance recovers the exact original pending keys. Five required native
+  families pass in 5.554 seconds; macOS command regressions, Linux/Windows
+  builds, Windows test compilation, Linux Vet and actual Linux entry-point help
+  pass. Agent `04fb25c` passes all twelve CI jobs. Its later readiness integration
+  is tracked above; Linux service activation remains separate work.
+
 - [Protected Linux bootstrap staging](https://github.com/the-luap/openuem-agent/blob/c76ca95fc22d263fd224ac550624c9383102eabc/docs/linux-package-staging.md)
   now joins signed Linux release/configuration data, exact-origin HTTPS and
   native DEB/RPM publisher checks under retained root/stage directory ownership.
@@ -70,8 +94,9 @@ the table's package summaries do not remove any detail from the roadmap.
   The combined native signature/bootstrap race suites pass in 5.518/1.999 seconds,
   with actual signed inert packages and production HTTPS/native staging paths.
   macOS command regressions, complete Linux/Windows agent builds and Linux Vet
-  checks pass. Installed Linux enrollment/activation commands, released installers
-  and physical acceptance remain separate requirements.
+  checks pass. Agent `c76ca95` passes all eleven CI jobs. Installed Linux enrollment
+  is tracked above; activation, released installers and physical acceptance remain
+  separate requirements.
 
 - The [Linux running-executable provider](https://github.com/the-luap/openuem-agent/blob/c287f5bf31d5cf2980b4b9450ffeed6248a92fda/docs/linux-running-executable.md)
   now retains both the kernel-selected image and its canonical protected path.
@@ -83,7 +108,7 @@ the table's package summaries do not remove any detail from the roadmap.
   enrollment and activation regressions plus full Linux/Windows builds pass.
   Agent `c287f5b` passes all eleven CI jobs, including the dedicated native image
   job and all existing Windows/macOS/Linux regressions. Protected Linux package
-  staging is tracked above; installed enrollment/activation commands and production
+  staging and installed enrollment are tracked above; activation and production
   installation acceptance remain separate work.
 
 - [Native Linux publisher verification](https://github.com/the-luap/openuem-agent/blob/a3c7824daff4a8bf5cbd8f6a4218c48816d6e2a9/docs/linux-package-signatures.md)
@@ -98,8 +123,8 @@ the table's package summaries do not remove any detail from the roadmap.
   pass. A dedicated native CI job requires all six test families to pass without
   skips. Agent `a3c7824` passes all ten CI jobs, including native Linux publisher
   verification and Windows/macOS regressions. The later running-executable
-  and staging providers are tracked above; installed-command and service
-  integration, production signing and physical acceptance remain open.
+  and staging providers and installed-command integration are tracked above;
+  service activation, production signing and physical acceptance remain open.
   The preceding agent CI at `7dc156b` passes all nine jobs, including twenty native
   Windows rotation-admission repetitions. The earlier one-off storage failure is
   not reproduced; more precise test-stage diagnostics remain enabled.
@@ -115,8 +140,8 @@ the table's package summaries do not remove any detail from the roadmap.
   enrollment Vet checks pass. Console, agent and worker now pin this same published
   runtime version. Console desktop/broker/command regression races and complete
   Linux/Windows console builds pass. Native Linux package trust now has separate
-  implementation/evidence above; staging, installed-command admission and service
-  activation remain separate requirements.
+  implementation/evidence above, as do staging and installed-command admission.
+  Service activation remains a separate requirement.
 
 - Native Apple CI exposed receipt regressions caused by structural comparison
   of `time.Local` and UTC representations of the same persisted instant. The
@@ -150,6 +175,9 @@ the table's package summaries do not remove any detail from the roadmap.
   service. Sharing one local database between all four groups exhausted PostgreSQL
   lock memory; separate instances with unchanged defaults resolved that fixture
   failure. Application behavior and the test assertions remain unchanged.
+  Console `c63653f4` passes all eight hosted inventory groups, all four Apple
+  groups, both builds and native Windows bootstrap checks. Its Broker, Gateway
+  and ACME workflows also pass; the longer main console test job remains running.
 
 - The [Linux native identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
   now implements durable encrypted storage beneath pinned private ancestors.
