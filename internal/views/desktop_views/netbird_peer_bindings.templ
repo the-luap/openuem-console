@@ -35,6 +35,8 @@ templ NetbirdPeerBindingReview(c echo.Context,info *partials.CommonInfo,v *inven
   </dl>
   if v.Registration.PeerBinding!=nil {
    @netbirdPeerBindingSummary(v.Registration.PeerBinding)
+   @netbirdPeerRemovalSummary(v.Registration)
+   <p><a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal" }>Review provider peer removal</a></p>
   } else {
    if v.ManagementURL!="" {
     <dl class="netbird-details"><dt>Original provider</dt><dd>{ v.ManagementURL }</dd></dl>

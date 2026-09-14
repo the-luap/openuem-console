@@ -47,6 +47,7 @@ import netbirdConnectionWithdrawals from "./netbird-connection-withdrawals.mjs";
 import netbirdResolutionRetries from "./netbird-resolution-retries.mjs";
 import netbirdCleanupRetries from "./netbird-cleanup-retries.mjs";
 import netbirdPeerBindings from "./netbird-peer-bindings.mjs";
+import netbirdPeerRemovals from "./netbird-peer-removals.mjs";
 import netbirdOperations from "./netbird-operations.mjs";
 import netbirdRegistrations from "./netbird-registrations.mjs";
 import desktopTaskHistory from "./desktop-task-history.mjs";
@@ -141,6 +142,7 @@ try {
         [netbirdResolutionRetries,27],
         [netbirdCleanupRetries,24],
         [netbirdPeerBindings,39],
+        [netbirdPeerRemovals,36],
         [netbirdConnectionWithdrawals,30],
         [desktopTaskHistory,18],
         [profileAudience,18],

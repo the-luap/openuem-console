@@ -376,8 +376,10 @@ func TestNetbirdRegistrationResolutionMigrationGuards(t *testing.T) {
 }
 
 func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T) {
-	for _, change := range []string{"peer-renewed", "peer-revoked", "peer-expired", "peer-consumer", "peer-moved", "cleanup-renewed", "cleanup-revoked", "cleanup-expired", "cleanup-consumer", "cleanup-moved", "renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"removal-deadline", "removal-renewed", "removal-revoked", "removal-expired", "removal-consumer", "removal-moved", "peer-renewed", "peer-revoked", "peer-expired", "peer-consumer", "peer-moved", "cleanup-renewed", "cleanup-revoked", "cleanup-expired", "cleanup-consumer", "cleanup-moved", "renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
 		t.Run(change, func(t *testing.T) {
+			peerRemoval := strings.HasPrefix(change, "removal-")
+			change = strings.TrimPrefix(change, "removal-")
 			peerBinding := strings.HasPrefix(change, "peer-")
 			change = strings.TrimPrefix(change, "peer-")
 			cleanup := strings.HasPrefix(change, "cleanup-")
@@ -453,6 +455,12 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			r := registrationRequest(t, f, s)
 			_, err = s.DispatchOne(ctx)
 			require.NoError(t, err)
+			if peerRemoval {
+				exerciseNetbirdPeerRemovalIdentity(t, f, p, s, r, change)
+				require.Zero(t, queries)
+				require.Zero(t, releases)
+				return
+			}
 			if peerBinding {
 				exerciseNetbirdPeerBindingIdentity(t, f, p, s, r, change)
 				require.Zero(t, queries)

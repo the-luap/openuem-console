@@ -61,6 +61,18 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reviewed NetBird provider-peer removal](netbird-peer-removals.md) now requires
+  a retained setup-key peer association and fresh exact creation identity under
+  current scope, authority and certificate expiry. Attempts and audit commit
+  before each separately confirmed DELETE; exact-ID GET absence commits
+  independently. Form replay and read-only checks never repeat removal, while
+  explicit new attempts preserve all earlier evidence. Original registration
+  outcomes and command barriers remain unchanged. Owned database/provider tests
+  and 36 new browser cases cover uncertainty, replay, concurrent forms, current
+  identity, strict confirmation and retained reader receipts. All 2,442 browser
+  cases, actual registered console route fixtures and the complete inventory
+  PostgreSQL and audit race suites pass, as does the Linux console build.
+
 - [Retained NetBird provider peer associations](netbird-peer-bindings.md) now
   bind one exact setup-key registration event to its provider peer ID using the
   captured provider account. Independent peer metadata, current authority and
@@ -72,8 +84,8 @@ the table's package summaries do not remove any detail from the roadmap.
   database/provider and registered-route fixtures and the complete inventory,
   audit and view race suites. Linux console, Linux/macOS/Windows agent and
   Linux/Windows worker builds pass with the same immutable shared pin.
-  Provider-peer deletion and
-  real provider/native/physical acceptance remain open.
+  Separately [reviewed removal](netbird-peer-removals.md) now uses these retained
+  associations. Real provider/native/physical acceptance remains open.
 
 - [Reviewed NetBird setup-key removal retries](netbird-cleanup-retries.md) now
   authorize one additional DELETE after fresh current authority and exact-key
@@ -103,9 +115,10 @@ the table's package summaries do not remove any detail from the roadmap.
   Native identity renewal/scope checks, owned broker/PostgreSQL route tests and
   all 51 new/2,145 total browser cases pass. Legacy mutating subjects and profile
   steps are rejected; workers withhold profiles containing active NetBird steps
-  before reading tokens or creating keys. Installation, registration, removal
-  and peer deletion are temporarily unavailable. Coordinated uncertainty
-  resolution and staged provider/installer lifecycle remain required; this is
+  before reading tokens or creating keys. Installation and local uninstallation
+  remain unavailable; managed registration and associated peer removal now have
+  the separate reviewed flows documented above. Trusted installers and remaining
+  lifecycle work are still required; this is
   an intermediate migration, not a completed NetBird feature.
 
 - [NetBird observations and profile identities](netbird-observations.md) now use
@@ -119,9 +132,9 @@ the table's package summaries do not remove any detail from the roadmap.
   macOS and Windows. Worker model/common PostgreSQL race suites pass in
   2.943/3.644 seconds, and Linux/Windows builds pass. Console model/view/handler
   race suites and its Linux build pass. All 18 new and 2,094 total browser cases
-  pass; the full matrix takes 103.498 seconds. Durable action/history workflows,
-  trusted Unix installers, authoritative peer ownership and physical/provider
-  acceptance remain required.
+  pass; the full matrix takes 103.498 seconds at that checkpoint. The later
+  action/history and provider-association flows are documented above. Trusted
+  Unix installers and physical/provider acceptance remain required.
 
 - [Agent NetBird command execution](https://github.com/the-luap/openuem-agent/blob/daf5188/docs/netbird-command-execution.md)
   now shares strict, bounded request validation and literal command arguments

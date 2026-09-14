@@ -90,8 +90,9 @@ Agent command/journal race tests pass on macOS; complete worker model/common rac
 tests pass with owned PostgreSQL on Linux. Full builds pass for the Linux console,
 Linux/macOS/Windows agent and Linux/Windows worker.
 
-Provider-peer deletion still needs its own reviewed durable intent, attempt and
-positive absence recovery. Missing key-creation responses, trusted installers,
+[Reviewed peer removal](netbird-peer-removals.md) now provides separate durable
+attempts and positive absence recovery for retained associations. Missing
+key-creation responses, trusted installers,
 remaining credential lifecycle work and real provider/native/physical acceptance
 remain separate work. These tests use owned fixtures; no installed NetBird
 executable, real provider account or physical endpoint is exercised.

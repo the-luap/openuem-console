@@ -608,8 +608,8 @@ Native initialization now binds the protected journal to the installation and
 joins managed subscriptions before releasing native identity ownership. Exact-site
 console review, submission, receipt, history and queued cancellation are wired and
 covered by real routes and 51 new/2,145 total browser cases. Old mutating agent
-subjects and profile steps are rejected. Installation, removal and peer deletion
-are temporarily unavailable; workers withhold profiles containing
+subjects and profile steps are rejected. Installation and local uninstallation
+remain unavailable; workers withhold profiles containing
 active legacy NetBird steps without creating provider keys. These restrictions
 are an intermediate migration state, not completed lifecycle support.
 [Reviewed resolution](netbird-resolutions.md) now persists immutable console
@@ -689,7 +689,16 @@ command result and admission barrier unchanged and does not prove the endpoint's
 current local WireGuard identity. All 39 new and 2,406 total browser cases pass;
 owned database, provider and registered-route fixtures cover evidence conflicts,
 scope and identity changes, concurrent forms, replay and audit rollback.
-Reviewed provider-peer deletion, trusted Unix installers, remaining user/provider secrets and
+[Reviewed provider-peer removal](netbird-peer-removals.md) now uses those permanent
+associations and a fresh exact-ID creation-identity check. Each separately
+confirmed attempt and audit commits before one DELETE; a separate positive read
+establishes absence. Lost replies and audit rollback recover through read-only
+checks. Same-form replay makes no provider call; new attempts require fresh
+review. Current identity, certificate expiry, source changes, concurrent forms,
+database guards and original command barriers are covered by owned fixtures.
+Thirty-six new and all 2,442 browser cases pass, as do registered console routes
+and the complete inventory race suite. Missing key-creation responses, trusted
+Unix installers, remaining user/provider secrets and
 physical/provider acceptance are still required.
 
 **Repositories:** this fork is the console. Complete distribution changes must

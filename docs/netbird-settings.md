@@ -79,12 +79,13 @@ database maintenance. Oversized legacy URLs cannot be edited until repaired.
 
 ## Shared provider requests
 
-The later [managed operation migration](netbird-operations.md) disables legacy
+The [managed operation migration](netbird-operations.md) disables legacy
 registration/key creation and peer deletion routes, and workers no longer
-generate active NetBird profile steps. The mutation client contracts below
-describe retained implementation and owned tests, not enabled user workflows.
-Console group lookups remain available. Staged admission and authoritative peer
-ownership are required before re-enabling provider mutations.
+generate active NetBird profile steps. [Managed registration](netbird-registrations.md)
+and [associated peer removal](netbird-peer-removals.md) now provide separate
+reviewed provider mutations with permanent attempts and retained evidence.
+Console group lookups remain available. The legacy name/IP helpers below do not
+authorize the new removal flow.
 
 Console group lookups, registration-key creation/cleanup and peer deletion, plus
 worker registration tasks, use `github.com/open-uem/nats/netbirdapi`. It verifies
@@ -105,7 +106,9 @@ Managed registration now offers a separate
 [retained peer association](netbird-peer-bindings.md) using the exact setup-key
 event and peer creation metadata. Its bounded event reader allows at most 10,000
 events within the same one-MiB response limit; a missing event never proves
-non-registration. Reviewed deletion of an associated peer remains separate work.
+non-registration. [Reviewed removal](netbird-peer-removals.md) now uses the retained
+association and exact creation identity, with independently committed attempts
+and positive absence evidence.
 
 Setup-key creation uses structured JSON for a one-off key, a one-day lifetime and
 usage limit one, following the published

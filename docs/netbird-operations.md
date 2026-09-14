@@ -8,8 +8,10 @@ the managed command/control subscriptions. Exact-site console pages provide
 review, submission, receipts, history and cancellation of unattempted requests.
 An empty legacy reply cannot be adapted into a successful execution receipt.
 
-This is a partial lifecycle migration. Install, uninstall, registration and peer
-removal are temporarily unavailable through the console. Agents reject old
+This is a partial lifecycle migration. Install and local uninstall remain
+unavailable through the console. [Managed registration](netbird-registrations.md)
+and [associated provider-peer removal](netbird-peer-removals.md) now have separate
+reviewed flows. Agents reject old
 mutating subjects and old NetBird profile steps. Workers withhold entire profiles
 containing active legacy NetBird steps before reading credentials or creating
 provider keys. Disabled NetBird steps do not block other profile tasks. Upgrade

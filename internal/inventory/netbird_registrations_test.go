@@ -32,6 +32,9 @@ type ownedRegistrationProvider struct {
 	events                                                []map[string]any
 	peer                                                  map[string]any
 	eventReads, peerReads, eventsStatus, peerStatus       int
+	peerDeletes                                           int
+	peerAbsent, retainPeerDelete, failPeerDelete          bool
+	onPeerDelete                                          func()
 }
 
 func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *ownedRegistrationProvider {
@@ -56,7 +59,24 @@ func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *o
 				w.WriteHeader(p.peerStatus)
 				return
 			}
+			if p.peerAbsent {
+				w.WriteHeader(404)
+				return
+			}
 			_ = json.NewEncoder(w).Encode(p.peer)
+		case r.Method == "DELETE" && r.URL.Path == "/api/peers/owned-peer":
+			p.peerDeletes++
+			if p.onPeerDelete != nil {
+				p.onPeerDelete()
+			}
+			if !p.retainPeerDelete {
+				p.peerAbsent = true
+			}
+			if p.failPeerDelete {
+				w.WriteHeader(500)
+				return
+			}
+			_, _ = w.Write([]byte(`{}`))
 		case r.Method == "GET" && r.URL.Path == "/api/groups":
 			_, _ = w.Write([]byte(`[{"id":"owned-group","name":"Owned group","peers_count":0}]`))
 		case r.Method == "POST" && r.URL.Path == "/api/setup-keys":

@@ -27,6 +27,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/registrations/:request/peer":
 			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer/removal":
+			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/tasks", "/computers/:uuid/execution", "/computers/:uuid/execution/review", "/computers/:uuid/execution/:request":
 			return access.ManageProfiles, true
 		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os", "/computers/:uuid/inventory/peripherals", "/computers/:uuid/monitors", "/computers/:uuid/printers", "/computers/:uuid/inventory/memory", "/computers/:uuid/inventory/shares", "/computers/:uuid/shares", "/computers/:uuid/inventory/security", "/security/:uuid/updates":
@@ -40,6 +42,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		case "/computers/:uuid/netbird/refresh":
 			return access.RefreshDevices, true
 		case "/computers/:uuid/netbird/registrations/:request/cleanup/retry":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer/removal", "/computers/:uuid/netbird/registrations/:request/peer/removal/check":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/registrations/:request/peer":
 			return access.ManageDeviceSecurity, true
@@ -107,6 +111,9 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	registration.POST("/:request/cleanup/retry", h.NetbirdCleanupRetry)
 	registration.GET("/:request/peer", h.NetbirdPeerBindingReview)
 	registration.POST("/:request/peer", h.NetbirdPeerBindingRequest)
+	registration.GET("/:request/peer/removal", h.NetbirdPeerRemovalReview)
+	registration.POST("/:request/peer/removal", h.NetbirdPeerRemovalRequest)
+	registration.POST("/:request/peer/removal/check", h.NetbirdPeerRemovalCheck)
 	registration.GET("/:request/resolution", h.NetbirdRegistrationResolutionReview)
 	registration.POST("/:request/resolution", h.NetbirdRegistrationResolutionRequest)
 	registration.POST("/:request/resolution/continue", h.NetbirdRegistrationResolutionContinue)

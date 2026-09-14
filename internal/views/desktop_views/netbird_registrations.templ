@@ -158,6 +158,7 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
    <p>This receipt does not establish current connectivity, provider peer identity or group membership. Removing the setup key does not disconnect a peer that already registered with it.</p>
   } else {
    @netbirdPeerBindingSummary(r.PeerBinding)
+   @netbirdPeerRemovalSummary(r)
    <p>Removing the setup key does not disconnect a peer that already registered with it.</p>
   }
   @netbirdCleanupRetrySummary(r.LastCleanupRetry)
@@ -189,6 +190,9 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
   }
   if (r.Status=="completed" || r.Status=="unconfirmed") && netbirdCanManage(info,r.Scope) {
    <p><a class="uk-button uk-button-default" id="netbird-peer-review-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/peer" }>Review provider peer association</a></p>
+   if r.PeerBinding!=nil {
+    <p><a class="uk-button uk-button-default" id="netbird-peer-removal-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/peer/removal" }>Review provider peer removal</a></p>
+   }
   }
   if r.Status=="queued" && len(r.Attempts)==0 && netbirdCanManage(info,r.Scope) {
    <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cancel" } class="netbird-confirm">

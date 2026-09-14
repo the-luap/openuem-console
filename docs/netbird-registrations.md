@@ -8,8 +8,8 @@ alias accepts only the same complete reviewed request; raw legacy settings canno
 bypass it. [Combined provider/agent resolution](netbird-registration-resolutions.md)
 now supports retained-key requests with matching evidence. A separate
 [provider peer association](netbird-peer-bindings.md) retains exact setup-key
-registration evidence. Installation, peer deletion and real-provider acceptance
-remain open.
+registration evidence, with separately [reviewed peer removal](netbird-peer-removals.md).
+Installation and real-provider acceptance remain open.
 
 ## Admission and authority
 
@@ -128,8 +128,9 @@ and [explicit recovery attempts](netbird-resolution-retries.md)
 are documented separately. Unsuccessful recorded key removal now has its own
 [reviewed retry](netbird-cleanup-retries.md). A separately confirmed
 [provider peer association](netbird-peer-bindings.md) now retains the exact
-setup-key event and peer metadata without changing command outcomes. Peer deletion
-and missing creation responses still need explicit recovery policy;
+setup-key event and peer metadata without changing command outcomes.
+[Peer removal](netbird-peer-removals.md) retains separately confirmed attempts and
+exact-ID absence evidence. Missing creation responses still need explicit recovery policy;
 do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

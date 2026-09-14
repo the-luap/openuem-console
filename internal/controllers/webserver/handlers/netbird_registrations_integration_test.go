@@ -34,6 +34,8 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	var key map[string]any
 	var peerEvents []map[string]any
 	var providerPeer map[string]any
+	peerDeletes := 0
+	peerAbsent := false
 	absent, retainDelete, failRead := false, false, false
 	provider := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -45,7 +47,15 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 			_ = json.NewEncoder(w).Encode(peerEvents)
 		case r.Method == "GET" && r.URL.Path == "/api/peers/owned-peer":
 			providerReads++
+			if peerAbsent {
+				w.WriteHeader(404)
+				return
+			}
 			_ = json.NewEncoder(w).Encode(providerPeer)
+		case r.Method == "DELETE" && r.URL.Path == "/api/peers/owned-peer":
+			peerDeletes++
+			peerAbsent = true
+			_, _ = w.Write([]byte(`{}`))
 		case r.Method == "GET" && r.URL.Path == "/api/groups":
 			providerReads++
 			_, _ = w.Write([]byte(`[{"id":"owned-group","name":"Office <Berlin>","peers_count":0}]`))
@@ -533,8 +543,73 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	require.Contains(t, page.Body.String(), "Retained provider peer")
 	require.NotContains(t, page.Body.String(), "private@example.test")
 	require.NotContains(t, page.Body.String(), "netbird-peer-review-link")
+
+	removalPath := peerPath + "/removal"
+	removalView, err := store.ReviewPeerRemoval(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.True(t, removalView.CanRemove)
+	removalForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "removal_id": {uuid.NewString()}, "revision": {removalView.Revision}}
+	checkForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}}
+	for _, actor := range []string{"scoped-viewer", "scoped-operator"} {
+		require.Equal(t, 403, request(actor, "GET", removalPath, nil, "console-test-token").Code)
+		require.Equal(t, 403, request(actor, "POST", removalPath, removalForm, "console-test-token").Code)
+		require.Equal(t, 403, request(actor, "POST", removalPath+"/check", checkForm, "console-test-token").Code)
+	}
+	require.Equal(t, 403, request("apple-console-admin", "POST", removalPath, removalForm, "").Code)
+	require.Equal(t, 403, request("apple-console-admin", "POST", removalPath+"/check", checkForm, "").Code)
+	for _, alter := range []func(url.Values){func(v url.Values) { v.Del("confirmed") }, func(v url.Values) { v.Add("removal_id", uuid.NewString()) }, func(v url.Values) { v.Add("revision", strings.Repeat("a", 64)) }, func(v url.Values) { v.Set("removal_id", "invalid") }, func(v url.Values) { v.Set("peer_id", "injected") }, func(v url.Values) { v.Set("provider_url", provider.URL) }} {
+		bad := url.Values{}
+		for k, values := range removalForm {
+			bad[k] = append([]string(nil), values...)
+		}
+		alter(bad)
+		require.Equal(t, 400, request("apple-console-admin", "POST", removalPath, bad, "console-test-token").Code)
+	}
+	require.Equal(t, 400, request("apple-console-admin", "GET", removalPath+"?peer_id=injected", nil, "console-test-token").Code)
+	require.Equal(t, 400, request("apple-console-admin", "POST", removalPath+"/check", removalForm, "console-test-token").Code)
+	page = request("apple-console-admin", "GET", removalPath, nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Equal(t, "no-store", page.Header().Get("Cache-Control"))
+	require.Contains(t, page.Body.String(), "Confirm peer removal")
+	require.Contains(t, page.Body.String(), "interrupt its network access")
+	mu.Lock()
+	require.Zero(t, peerDeletes)
+	mu.Unlock()
+	require.Equal(t, 204, request("apple-console-admin", "POST", removalPath+"/check", checkForm, "console-test-token").Code)
+	mu.Lock()
+	require.Zero(t, peerDeletes)
+	mu.Unlock()
+	response = request("apple-console-admin", "POST", removalPath, removalForm, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, removalPath, response.Header().Get("HX-Redirect"))
+	mu.Lock()
+	readsAfterRemoval := providerReads
+	require.Equal(t, 1, peerDeletes)
+	mu.Unlock()
+	require.Equal(t, 204, request("apple-console-admin", "POST", removalPath, removalForm, "console-test-token").Code)
+	require.Equal(t, 204, request("apple-console-admin", "POST", removalPath+"/check", checkForm, "console-test-token").Code)
+	mu.Lock()
+	require.Equal(t, readsAfterRemoval, providerReads)
+	require.Equal(t, 1, peerDeletes)
+	require.Equal(t, 5, creates)
+	require.Equal(t, 6, deletes)
+	mu.Unlock()
+	require.Equal(t, beforeCleanupControls, controls)
+	require.Equal(t, 5, deliveries)
+	retained, err = store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.NotNil(t, retained.PeerAbsence)
+	require.Equal(t, removalForm.Get("removal_id"), retained.LastPeerRemoval.ID)
+	require.Equal(t, "unconfirmed", retained.Status)
+	require.Nil(t, retained.ReleasedAt)
+	page = request("scoped-viewer", "GET", cleanupReceipt, nil, "console-test-token")
+	require.Contains(t, page.Body.String(), "Confirmed by an exact-ID provider read")
+	require.NotContains(t, page.Body.String(), "netbird-peer-removal-link")
+	require.NotContains(t, page.Body.String(), "owned-private-registration-token")
+	require.NotContains(t, page.Body.String(), "owned-private-registration-key")
 	require.NoError(t, h.Model.Client.Agent.DeleteOneID(device).Exec(ctx))
 	require.Equal(t, 200, request("apple-console-admin", "GET", peerPath, nil, "console-test-token").Code)
+	require.Equal(t, 200, request("apple-console-admin", "GET", removalPath, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("scoped-viewer", "GET", path, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("scoped-viewer", "GET", receiptPath, nil, "console-test-token").Code)
