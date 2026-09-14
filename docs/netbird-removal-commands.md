@@ -20,7 +20,7 @@ verify present/absent/unavailable results, reject changed hashes/certificates or
 old response versions, and prove that neither existing publisher sends a removal.
 The separate [removal request store](netbird-removal-requests.md) now retains
 fresh reviewed native state, exact-site software authority, immutable intent and
-queued cancellation under the common four-family UUID/device barrier. It still
+queued cancellation under the common four-family UUID/device barrier. It
 now has a [public reviewed lifecycle](netbird-removal-ui.md); its
 [joined dispatcher](netbird-removal-dispatch.md) processes committed requests.
 
@@ -59,13 +59,15 @@ now retains expiring reviews, owned control attempts and exact withdrawal/releas
 proofs, with read-only reconciliation for lost replies. [Joined dispatch](netbird-removal-dispatch.md)
 now binds the native store at startup and retains immutable preflight stops.
 The [public UI](netbird-removal-ui.md) now provides scoped review, confirmation,
-status/history, receipt observation and explicit resolution. Retained local
-staging recovery remains open.
+status/history, receipt observation and explicit resolution. [Manifest-backed
+local recovery](netbird-removal-recovery.md) now has separate shared command and
+inspection grammars, native journal/service admission and console transport.
+Its scoped request store, dispatcher and resolution/UI remain open.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.
 
 The console, agent and worker share immutable protocol revision
-`v0.11.1-0.20260914083905-10ed2cf2ed01`. The removal protocol and guarded native
-admission and native remover are present; console and retained-stage recovery
-workflows remain required.
+`v0.11.1-0.20260914130448-3606e2d2e6bd`. Original removal has a complete reviewed
+console lifecycle. Independent retained-stage recovery still requires its own
+console lifecycle and a separate policy for absent manifests.

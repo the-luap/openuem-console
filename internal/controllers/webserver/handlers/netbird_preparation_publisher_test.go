@@ -69,9 +69,11 @@ func TestNetbirdPublisherPreparationRequiresExactPrivateResponseAndNeverStreams(
 				require.Nil(t, got)
 				require.NotContains(t, err.Error(), "owned source")
 			}
-			p.ExpiresAt = p.IssuedAt
-			p.IssuedAt = p.IssuedAt.Add(-time.Minute)
-			_, err = h.PublishNetbirdPreparation(t.Context(), p)
+			// Keep the timed-out callback's original request immutable.
+			expired := p
+			expired.ExpiresAt = p.IssuedAt
+			expired.IssuedAt = p.IssuedAt.Add(-time.Minute)
+			_, err = h.PublishNetbirdPreparation(t.Context(), expired)
 			require.Error(t, err)
 		})
 	}

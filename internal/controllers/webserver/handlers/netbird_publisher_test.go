@@ -87,9 +87,11 @@ func TestNetbirdPublisherCorrelatedReceiptAndSingleDelivery(t *testing.T) {
 				require.Nil(t, result)
 				require.NotContains(t, err.Error(), "agent output")
 			}
-			c.ExpiresAt = c.IssuedAt
-			c.IssuedAt = c.IssuedAt.Add(-time.Second)
-			_, err = h.PublishNetbirdOperation(t.Context(), c)
+			// Keep the timed-out callback's original request immutable.
+			expired := c
+			expired.ExpiresAt = c.IssuedAt
+			expired.IssuedAt = c.IssuedAt.Add(-time.Second)
+			_, err = h.PublishNetbirdOperation(t.Context(), expired)
 			require.Error(t, err)
 		})
 	}

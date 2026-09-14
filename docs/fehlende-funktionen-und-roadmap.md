@@ -785,7 +785,7 @@ guards. [Joined dispatch](netbird-removal-dispatch.md) now processes requests wi
 bounded workers, immutable preflight stops and no automatic retry after native
 admission. [Scoped public UI](netbird-removal-ui.md) now provides current native
 review, explicit queue/cancel, coherent status, bounded history and reviewed
-resolution under software permissions. [Retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/bf9f98969a5ba134eab504da9fd30b2539bde39d/docs/netbird-removal-staging-recovery.md)
+resolution under software permissions. [Retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/c2eb88abec01ff90d205c3f4bc04a49f302be8d2/docs/netbird-removal-staging-recovery.md)
 now bind original manifests and current exact files across interrupted moves/purge
 to current typed service state, original/relocated audit-token process ownership,
 and separate native complete/partial/absent receipt evidence. Native absence now
@@ -794,8 +794,13 @@ on macOS. Private runtime-stop and remaining-payload purge primitives now preser
 exact audit/code and nested parent/file ownership. The private single-use owner
 now continues remaining-source moves, exact purge, recognized/orphan receipt
 completion and empty-scaffold cleanup against the reviewed original manifest.
-Explicit independent recovery commands, journal admission, console integration
-and absent-manifest recovery remain open.
+[Independent recovery commands and native journal/service admission](netbird-removal-recovery.md)
+now bind the exact original released uninstall and current ready-journal revision
+to a separate new attempt. Native mutation follows durable admission, joined
+cleanup precedes its result, and exact replay never reacquires the native stage.
+The console has a separate single-delivery publisher and correlated inspection
+transport. Scoped recovery storage, dispatch, resolution/UI and absent-manifest
+recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

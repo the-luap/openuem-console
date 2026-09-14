@@ -70,13 +70,16 @@ func TestNetbirdPublisherNativeInstallationUsesExactSeparateSingleDelivery(t *te
 			// Neither publisher can broaden its accepted command family accidentally.
 			_, err = h.PublishNetbirdOperation(t.Context(), c)
 			require.ErrorIs(t, err, inventory.ErrNetbirdOperationInvalid)
-			c.Version = 1
-			c.Operation = "up"
-			c.Package = packageapi.Package{}
-			c.ManagementURL = "https://owned.example.test"
-			c.ExpiresAt = at.Add(time.Minute)
-			require.True(t, c.Valid())
-			_, err = h.PublishNetbirdInstallation(t.Context(), c)
+			// A response timeout does not join the broker callback. Keep its
+			// original command immutable while checking a different family.
+			connection := c
+			connection.Version = 1
+			connection.Operation = "up"
+			connection.Package = packageapi.Package{}
+			connection.ManagementURL = "https://owned.example.test"
+			connection.ExpiresAt = at.Add(time.Minute)
+			require.True(t, connection.Valid())
+			_, err = h.PublishNetbirdInstallation(t.Context(), connection)
 			require.ErrorIs(t, err, inventory.ErrNetbirdOperationInvalid)
 		})
 	}
