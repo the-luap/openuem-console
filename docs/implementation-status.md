@@ -61,6 +61,33 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [loaded systemd state observer](https://github.com/the-luap/openuem-agent/blob/f046f33c00cf0da4027c6f8f7d90dca8aa6b776f/docs/linux-systemd-state.md)
+  now requires exact typed unit properties, the canonical literal invocation,
+  no foreign drop-ins or executable hooks, and consistent PID/start/invocation
+  identity. It performs only read operations and checks state again after the
+  service properties. Common races pass in 1.423 seconds; the complete native
+  unit/transport/publication/state suite passes in 7.322 seconds, with full
+  Linux/Windows builds and Linux Vet. Registration, startup and readiness fences
+  remain controller integration work.
+
+- [Protected Linux unit publication](https://github.com/the-luap/openuem-agent/blob/a257834f10e69fb7696967aaf086bfe27976efbd/docs/linux-unit-publication.md)
+  now retains root-owned ancestry and exact unit bytes/metadata, publishes a
+  flushed definition without overwriting an existing entry, and preserves
+  changed namespaces. Native races cover foreign definitions, cancellation,
+  retained retries and twelve concurrent publishers; the full native suite
+  passes in 7.299 seconds. Agent `a257834` passes all thirteen
+  [CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34895278218).
+  This primitive does not enable or start a service.
+
+- Intermittent native Windows DPAPI rotation-admission failures remain under
+  investigation. The [diagnostic run](https://github.com/the-luap/openuem-agent/actions/runs/34895202027)
+  identifies a rejected read of the newly published rotation intent, with no
+  reported publication failure. A separate native test with an open reader
+  preserves the expected exclusive-create result. Later repetitions pass,
+  including `a257834`, but that does not establish the underlying cause or a fix.
+  Additional native diagnostics retain operation/stage and numeric error codes
+  without logging paths or protected record material.
+
 - The [native systemd connection](https://github.com/the-luap/openuem-agent/blob/3627224c95b3cf473f0cdd8fde759b70d88f1694/docs/linux-systemd-connection.md)
   now pins the private socket namespace and verifies kernel UID 0/PID 1 before
   EXTERNAL authentication. It uses bounded authentication and calls, redacts

@@ -868,7 +868,12 @@ The [native systemd connection](https://github.com/the-luap/openuem-agent/blob/3
 now verifies the root manager's kernel PID before authentication, retains its
 socket namespace and bounds/cancels calls with joined shutdown. Its native
 synthetic peer tests include actual unprivileged processes and blocked writes.
-Protected service publication/registration/activation, production publisher provisioning and physical
+The [protected unit publisher](https://github.com/the-luap/openuem-agent/blob/a257834f10e69fb7696967aaf086bfe27976efbd/docs/linux-unit-publication.md)
+now writes one canonical definition without overwriting existing entries and
+passes native concurrent-publication checks and all thirteen CI jobs. The
+[loaded-state observer](https://github.com/the-luap/openuem-agent/blob/f046f33c00cf0da4027c6f8f7d90dca8aa6b776f/docs/linux-systemd-state.md)
+also verifies typed effective configuration and process identity through read-only
+D-Bus calls. Service registration/activation, production publisher provisioning and physical
 installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
