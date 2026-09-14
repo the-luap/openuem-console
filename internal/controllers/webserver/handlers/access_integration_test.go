@@ -248,6 +248,9 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 	t.Run("scoped desktop inventory", func(t *testing.T) {
 		exerciseDesktopInventoryPermissions(t, h, ctx, tenantID, siteID, sibling.ID, otherTenant.ID, otherSite.ID, request)
 	})
+	t.Run("scoped desktop notes", func(t *testing.T) {
+		exerciseDesktopNotesRoutes(t, h, ctx, tenantID, siteID, sibling.ID, otherTenant.ID, request)
+	})
 	t.Run("scoped desktop refresh", func(t *testing.T) {
 		exerciseDesktopRefreshRoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	})

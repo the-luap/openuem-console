@@ -569,6 +569,15 @@ reviews, migration audit visibility and manual payloads. The documented upgrade
 requires compatible workers first; automated version negotiation, wider provider
 secret migration, key rotation/recovery and physical acceptance remain open.
 
+[Desktop device notes](desktop-device-notes.md) now use a dedicated
+organization/server-administrator capability on all read/write aliases. Current
+permission and complete site membership locks remain held through audit commit;
+protected UUID revisions detect concurrent and older-writer changes. Conflicts
+preserve the draft for review against saved notes. Inventory audit records retain
+device/version references without note text. PostgreSQL/race and real router
+checks cover authorization, stale versions, CSRF, limits and audit rollback.
+Other legacy desktop mutations still need their individual SEC-01/SEC-02 work.
+
 [SMTP settings](smtp-settings.md) now has an exact-scope, server-admin editor with
 hidden secrets, explicit keep/replace/clear, atomic revision/audit checks and
 bounded startup migration. Saved-only test delivery retains a durable attempt

@@ -19,6 +19,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/computers/:uuid/notes":
+			return access.ManageDeviceNotes, true
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
 			return access.ReadSoftware, true
 		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request", "/computers/:uuid/netbird/removal-stage-cleanups/:request":
@@ -45,6 +47,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/computers/:uuid/notes":
+			return access.ManageDeviceNotes, true
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request/cancel", "/computers/:uuid/netbird/removal-stage-cleanups/:request/cancel", "/computers/:uuid/netbird/removal-absences/:request/observe", "/computers/:uuid/netbird/removal-stage-cleanups/:request/observe", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution", "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution/reconcile":

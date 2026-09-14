@@ -1,0 +1,51 @@
+package desktop_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+templ Notes(c echo.Context, info *partials.CommonInfo, data *inventory.DeviceNotes, draft, message string) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: data.DeviceName}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="min-w-0">
+				<h1 class="text-2xl font-semibold break-words">{ data.DeviceName }</h1>
+				<p class="uk-text-muted mt-2">{ i18n.T(ctx,"device_notes.title") }</p>
+				@mdm_views.Navigation(info)
+				@InventoryNavigation(info, data.DeviceID, "notes")
+			</div>
+			if message != "" {
+				<div role="alert" class="uk-alert uk-alert-warning">{ message }</div>
+			}
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx,"device_notes.edit") }</h2></div>
+				<div class="uk-card-body min-w-0">
+					<form method="post" action={ partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(data.DeviceID)+"/notes") } hx-boost="false">
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="revision" value={ data.Revision }/>
+						<label for="device-notes" class="block mb-2">{ i18n.T(ctx,"device_notes.draft") }</label>
+						<textarea id="device-notes" name="markdown" rows="12" class="uk-textarea w-full" aria-describedby="device-notes-help">{ draft }</textarea>
+						<p id="device-notes-help" class="uk-text-muted mt-2">{ i18n.T(ctx,"device_notes.help") }</p>
+						<button type="submit" class="uk-button uk-button-primary mt-4">{ i18n.T(ctx,"device_notes.save") }</button>
+					</form>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx,"device_notes.saved") }</h2></div>
+				<div class="uk-card-body min-w-0 break-words overflow-auto markdown-body">
+					if data.Notes == "" {
+						<p>{ i18n.T(ctx,"device_notes.empty") }</p>
+					} else {
+						@templ.Raw(notesPreview(data.Notes))
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

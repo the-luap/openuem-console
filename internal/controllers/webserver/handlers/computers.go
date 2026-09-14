@@ -14,12 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomarkdown/markdown"
 	"github.com/google/uuid"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/linde12/gowol"
-	"github.com/microcosm-cc/bluemonday"
 	"github.com/open-uem/ent"
 	openuem_ent "github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
@@ -1523,53 +1521,6 @@ func (h *Handler) ComputerMetadata(c echo.Context) error {
 	offline := h.IsAgentOffline(c)
 
 	return RenderView(c, computers_views.InventoryIndex(" | Deploy SW", computers_views.ComputerMetadata(c, p, agent, data, orgMetadata, confirmDelete, successMessage, itemsPerPage, commonInfo, netbird, offline), commonInfo))
-}
-
-func (h *Handler) Notes(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	agentId := c.Param("uuid")
-
-	if agentId == "" {
-		return RenderView(c, computers_views.InventoryIndex(" | Inventory", partials.Error(c, "an error occurred getting uuid param", "Computer", partials.GetNavigationUrl(commonInfo, "/computers"), commonInfo), commonInfo))
-	}
-
-	agent, err := h.Model.GetAgentById(agentId, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
-	}
-
-	if c.Request().Method == "POST" {
-		notes := c.FormValue("markdown")
-		if err := h.Model.SaveNotes(agentId, notes, commonInfo); err != nil {
-			return RenderSuccess(c, partials.SuccessMessage(i18n.T(c.Request().Context(), "notes.error", err.Error())))
-		}
-		return RenderSuccess(c, partials.SuccessMessage(i18n.T(c.Request().Context(), "notes.updated")))
-	}
-
-	maybeUnsafeHTML := markdown.ToHTML([]byte(agent.Notes), nil, nil)
-	renderedMarkdown := string(bluemonday.UGCPolicy().SanitizeBytes(maybeUnsafeHTML))
-
-	confirmDelete := c.QueryParam("delete") != ""
-	p := partials.PaginationAndSort{}
-
-	tenantID, err := strconv.Atoi(commonInfo.TenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-	}
-	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
-	}
-
-	offline := h.IsAgentOffline(c)
-
-	return RenderView(c, computers_views.InventoryIndex(" | Inventory", computers_views.Notes(c, p, agent, agent.Notes, renderedMarkdown, confirmDelete, commonInfo, netbird, offline), commonInfo))
 }
 
 func (h *Handler) ComputerConfirmDelete(c echo.Context) error {

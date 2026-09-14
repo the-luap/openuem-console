@@ -108,6 +108,12 @@ including filtered searches. Server administrators can still inspect ambiguous
 assignments to repair their membership.
 This view also works when individual desktop enrollment is disabled.
 
+[Device notes](desktop-device-notes.md) use the separate `devices.notes.manage`
+capability for reading and editing. Organization and server administrators can
+access notes in the selected scope. Viewers and operators cannot read them.
+Existing note routes share the same current-grant, single-site, revision and
+transactional audit checks; a conflicting edit preserves the submitted draft.
+
 Server administrators retain the existing desktop overview. Its edits, other
 legacy detail routes beyond the scoped projections, software deployment and
 remote actions still require a server administrator. Those individual desktop action permissions remain roadmap

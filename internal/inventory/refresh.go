@@ -93,6 +93,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		table, name string
 		kind        int
 	}{
+		{"agents", "uem_device_notes_revision", 23},
 		{"agents", "uem_netbird_agent_binding", 21},
 		{"site_agents", "uem_netbird_scope_binding", 29},
 		{"sites", "uem_netbird_site_binding", 17},

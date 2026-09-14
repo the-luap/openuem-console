@@ -645,27 +645,6 @@ func (m *Model) GetAgentMonitorsInfo(agentId string, c *partials.CommonInfo) (*e
 	}
 }
 
-func (m *Model) SaveNotes(agentId string, notes string, c *partials.CommonInfo) error {
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return err
-	}
-
-	if siteID == -1 {
-		return m.Client.Agent.UpdateOneID(agentId).
-			Where(agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID)))).
-			SetNotes(notes).Exec(context.Background())
-	} else {
-		return m.Client.Agent.UpdateOneID(agentId).
-			Where(agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID)))).
-			SetNotes(notes).Exec(context.Background())
-	}
-}
-
 func (m *Model) GetComputerManufacturers(c *partials.CommonInfo, f filters.AgentFilter) ([]string, error) {
 	var query *ent.ComputerQuery
 

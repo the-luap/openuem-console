@@ -61,6 +61,14 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Desktop [device notes](desktop-device-notes.md) now require organization or
+  server administration for both reads and edits on every existing alias. Current
+  permission and complete membership locks survive through audit commit; protected
+  UUID revisions detect concurrent and legacy changes. HTTP conflicts preserve
+  the draft beside current saved notes, with native CSRF forms and sanitized
+  Markdown. PostgreSQL/race and real router tests cover isolation, stale versions,
+  input limits and audit rollback; inventory audit events omit note contents.
+
 - Linux invitations now retain their architecture in the console selector,
   creation result and public installation instructions. The shared private
   listener/gateway allowlist admits exact Linux AMD64/ARM64 package downloads;
