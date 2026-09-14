@@ -210,6 +210,7 @@ func exerciseConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, ctx cont
 		exerciseTaskEditingScope(t, h, e, ctx, tenantID, siteID)
 		exerciseSMTPSettingsRoutes(t, h, e, ctx, tenantID)
 		exerciseNetbirdSettingsRoutes(t, h, e, ctx, tenantID)
+		exerciseNetbirdPackageRoutes(t, h, e, ctx, tenantID, otherTenant.ID)
 	})
 	t.Run("profile assignment binds revision and strict body fields", func(t *testing.T) {
 		var before, after int

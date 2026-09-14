@@ -153,6 +153,9 @@ func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc)
 	if _, ok := tagCapability(c.Request().Method, c.Path()); ok {
 		return next(c)
 	}
+	if _, ok := netbirdPackageCapability(c.Request().Method, c.Path()); ok {
+		return next(c)
+	}
 	if _, ok := windowsCapability(c.Request().Method, c.Path()); ok {
 		// Native Windows handlers and store transactions resolve live scope.
 		return next(c)

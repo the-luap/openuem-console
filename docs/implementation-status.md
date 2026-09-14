@@ -70,7 +70,14 @@ the table's package summaries do not remove any detail from the roadmap.
   distribution/component identity plus both executable architectures. Official
   artifacts pass read-only checks, including macOS notarization. Archive ambiguity,
   wrong architecture, bounded subprocesses and concurrent cleanup have adversarial
-  coverage. This component does not enable installation: approval/admission,
+  coverage. [Organization package approvals](netbird-package-approvals.md) now
+  adds an immutable approval/history workflow with encrypted sources, current
+  software rights, explicit confirmation, atomic audit and permanent revocation.
+  Concurrent requests, exact replay, privacy, CSRF and native/HTMX forms are covered
+  by owned fixtures and 30 new browser cases. All 2,472 browser cases, complete
+  inventory/audit race suites, registered routes and the Linux console build pass.
+  This does not enable installation:
+  authenticated installer delivery and admission,
   Linux publisher trust, install/remove execution and resulting-state recovery remain
   required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
   native service regressions pass. All supported console/agent/worker builds

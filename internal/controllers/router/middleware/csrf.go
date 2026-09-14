@@ -91,6 +91,9 @@ func scopedFormLimit(path string) int64 {
 	if route == "/admin/smtp" || route == "/admin/netbird" {
 		return 64 << 10
 	}
+	if route == "/netbird/packages" || route == "/netbird/packages/:approval/revoke" {
+		return 16 << 10
+	}
 	if route == "/admin/smtp/test" {
 		return 8192
 	}

@@ -16,6 +16,7 @@ templ NetbirdSettings(c echo.Context, review *consolesettings.NetbirdReview, inf
 				<div><h1 class="text-2xl font-semibold" tabindex="-1">NetBird settings</h1><p class="mt-2 text-sm">Organization configuration for NetBird management.</p></div>
 				<a href={ templ.SafeURL("/tenant/" + info.TenantID + "/admin/settings") } class="uk-button uk-button-default">General settings</a>
 			</header>
+			<a class="uk-button uk-button-default self-start" href={ "/tenant/"+info.TenantID+"/netbird/packages" }>NetBird package approvals</a>
 			if saved {
 				<p role="status" class="rounded border p-3">NetBird settings saved. This save does not contact the provider or change any device.</p>
 			}

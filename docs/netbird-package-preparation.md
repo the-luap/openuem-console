@@ -23,8 +23,11 @@ process cancellation. macOS streams bounded XAR/CPIO data without filesystem
 extraction or Installer code evaluation; ambiguous paths and unsupported layouts
 are rejected. Linux publisher provenance remains a separate requirement.
 
-Console approval and storage, authenticated installer capability/command,
-durable attempt admission, install/remove execution, resulting-state observation and
+[Organization approval and history](netbird-package-approvals.md) now stores exact
+descriptors with encrypted sources, current organization software authority,
+explicit confirmation, atomic audit and permanent revocation. Authenticated
+installer capability/command delivery, durable attempt admission, install/remove
+execution, resulting-state observation and
 uncertainty recovery are still open. Existing NetBird command versions continue
 to reject installer operations, and console installation remains unavailable.
 
@@ -47,7 +50,8 @@ Full builds pass for the Linux console, Linux/macOS/Windows agent and
 Linux/Windows worker with shared revision `c9543d8ca1f2887fb62b90b50d55b1c2944cc547`.
 The native-identity change additionally passes macOS/Linux preparation, command
 and journal race suites, native service regressions and fresh Linux/macOS/Windows
-agent builds. This change does not alter console routes, UI or database storage.
+agent builds. Those native-identity checks preceded the separately implemented
+console approval routes, UI and permanent storage.
 The agent's [native identity contract and evidence](https://github.com/the-luap/openuem-agent/blob/be468ae0b5d1c5d1c54545eeb3b5817fed15f845/docs/netbird-package-identity.md)
 document supported archive profiles, bounds, exact artifact hashes and remaining
 authority requirements. Final preparation race checks pass in 7.715 seconds on

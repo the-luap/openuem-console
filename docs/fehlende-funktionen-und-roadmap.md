@@ -709,7 +709,12 @@ the same file before use. Old unreferenced shell/unpinned installer helpers are
 removed. Preparation now verifies native DEB/RPM identity and macOS distribution,
 component receipt and bundled executable architectures. Bounded read-only checks
 of official packages, malformed archive/process fixtures, macOS/Linux race suites
-and all agent platform builds pass. Authenticated approval and installer admission,
+and all agent platform builds pass. [Organization package approvals](netbird-package-approvals.md)
+now record immutable descriptors with encrypted sources, publisher-review
+references, current software authority, explicit confirmation and atomic audit.
+History and permanent revocation support exact replay and current scope; concurrent
+forms and reader access have owned database, route and browser coverage.
+Authenticated installer delivery and admission,
 execution, observation and recovery remain necessary before this preparation
 component can enable installation or local uninstallation; Linux publisher trust
 and physical installation acceptance remain separate requirements.

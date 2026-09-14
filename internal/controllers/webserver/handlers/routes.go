@@ -178,6 +178,11 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/admin/rustdesk/inherit", h.ApplyGlobalRustDeskSettings, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/admin/netbird", h.NetbirdSettings, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/admin/netbird", h.NetbirdSettings, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/netbird/packages", h.NetbirdPackages, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/netbird/packages/new", h.NewNetbirdPackage, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/netbird/packages", h.ApproveNetbirdPackage, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/netbird/packages/:approval", h.NetbirdPackage, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/netbird/packages/:approval/revoke", h.RevokeNetbirdPackage, h.IsAuthenticated, h.AppleCSRF)
 
 	e.GET("/dashboard", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/dashboard", h.Dashboard, h.IsAuthenticated)

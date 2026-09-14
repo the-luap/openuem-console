@@ -174,6 +174,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/netbird/packages", "/netbird/packages/:approval/revoke":
+				limit = 16 << 10
 			case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
 				limit = 8192
 				if c.Request().ContentLength > limit {
