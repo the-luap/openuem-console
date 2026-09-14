@@ -104,7 +104,10 @@ The full NetBird inventory race suite passed against owned PostgreSQL in 605.970
 seconds. Registered HTTP lifecycle tests, shutdown cancellation/join race tests,
 and the Linux console and handler-test builds also passed.
 
-Manifest-backed macOS continuation is integrated. Missing, empty or incomplete
-manifest policies, Linux individual enrollment/publisher trust and physical
-installation/removal/reboot acceptance remain open, alongside the rest of the
-expanded roadmap. Native absence alone never rewrites an uncertain outcome.
+Manifest-backed macOS continuation is integrated. The [independent native
+current-absence layer](https://github.com/the-luap/openuem-agent/blob/febbc3d1b9e5b7ee39b80e8d0d04a27044952e0a/docs/netbird-removal-current-absence.md)
+now supplies a separate read-only observer, while its remote verification flow
+and empty/incomplete-stage cleanup remain open. Linux individual enrollment,
+publisher trust and physical installation/removal/reboot acceptance also remain
+open, alongside the rest of the expanded roadmap. Native absence alone never
+rewrites an uncertain outcome.

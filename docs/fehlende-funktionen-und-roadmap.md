@@ -814,7 +814,12 @@ the same original uninstall reference with a fresh journal/native review.
 [Joined processing, coherent retained history and scoped console forms](netbird-removal-recovery-ui.md)
 now connect the full manifest-backed continuation lifecycle, including original
 proof eligibility, one native attempt, pre-native cancellation and explicit
-resolution. Absent/empty/incomplete manifest recovery remains open.
+resolution. The [independent native current-absence observer](https://github.com/the-luap/openuem-agent/blob/febbc3d1b9e5b7ee39b80e8d0d04a27044952e0a/docs/netbird-removal-current-absence.md)
+now binds stable protected ancestry to repeated complete file, receipt, job and
+process checks, including processes from already deleted stage namespaces. The
+original uninstall and manifest continuation use the same stricter final check.
+Its separate remote verification lifecycle remains open; empty/incomplete stages
+are preserved and require a distinct reviewed cleanup policy.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

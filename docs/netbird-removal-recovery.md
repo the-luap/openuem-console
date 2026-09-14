@@ -73,4 +73,8 @@ transport. Owned release/withdrawal proof can clear the recovery barrier without
 changing its original result or the original uninstall. Inventory startup now
 configures the dedicated publisher and joined workers, while scoped console forms
 connect original proof, fresh review, queueing, history and explicit resolution.
-Absent/empty/incomplete manifest policies and physical acceptance remain open.
+The [independent current-absence native layer](https://github.com/the-luap/openuem-agent/blob/febbc3d1b9e5b7ee39b80e8d0d04a27044952e0a/docs/netbird-removal-current-absence.md)
+now observes the complete supported layout without a manifest and strengthens
+the existing final checks. Its separate remote verification lifecycle,
+empty/incomplete-stage cleanup and physical acceptance remain open. An absence
+observation cannot rewrite the original unconfirmed outcome.
