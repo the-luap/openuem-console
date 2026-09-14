@@ -61,6 +61,15 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Native NetBird removal protocol and journal admission](netbird-removal-commands.md)
+  now bind a source-free installed-state fingerprint to a separate version-four
+  command and version-three read-only inspection. The agent requires its own
+  native owner and inspected journal revision, preserves lost/cancelled outcomes
+  and restart/withdrawal barriers, and rejects unconfigured removal before admission.
+  Existing console publishers cannot deliver removal through another command family.
+  Native ownership/removal verification, runtime binding and the console lifecycle
+  remain open; these owned protocol/process/broker tests are not physical removal.
+
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.
   Coherent source-free receipts and 20-row history retain preparation, original

@@ -608,8 +608,9 @@ Native initialization now binds the protected journal to the installation and
 joins managed subscriptions before releasing native identity ownership. Exact-site
 console review, submission, receipt, history and queued cancellation are wired and
 covered by real routes and 51 new/2,145 total browser cases. Old mutating agent
-subjects and profile steps are rejected. Installation and local uninstallation
-remain unavailable; workers withhold profiles containing
+subjects and profile steps are rejected. Native installation now uses the
+[reviewed device workflow](netbird-installation-ui.md); local uninstallation
+remains unavailable. Workers withhold profiles containing
 active legacy NetBird steps without creating provider keys. These restrictions
 are an intermediate migration state, not completed lifecycle support.
 [Reviewed resolution](netbird-resolutions.md) now persists immutable console
@@ -742,7 +743,9 @@ after lost replies, certificate renewal or subsequent approval revocation withou
 repeating installation. [Automatic dispatch](netbird-installation-dispatch.md)
 now binds the native store into joined inventory workers. It resumes successful
 preparation, excludes every uncertain attempt from redelivery and retains
-preflight stops without erasing the common barrier. Lifecycle routes remain open.
+preflight stops without erasing the common barrier. The [device lifecycle UI](netbird-installation-ui.md)
+now exposes scoped approved-package choices, exact reviewed requests, retained
+preparation/delivery state, history, pre-native cancellation and explicit recovery.
 Native macOS installation now consumes that exact prepared artifact under an
 atomic journal revision check. Individually enrolled root agents with native ACL
 support advertise separate installation readiness, recheck native trust and
@@ -755,8 +758,13 @@ expiring reviews, current-authority control attempts and exact owned withdrawal 
 release proofs. Lost replies reconcile through read-only queries; further control
 attempts require a new review under the same permanent resolution UUID. Original
 uncertain installation results remain intact and release stays separate from
-completion. Lifecycle UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
-installation acceptance remain separate requirements.
+completion. The device lifecycle UI now exposes these distinct evidence states.
+[Native removal command and journal admission](netbird-removal-commands.md) bind
+exact inspected installed state, current individual identity and the common
+uncertainty/recovery barrier. The native removal observer/runner and console
+request/dispatch/recovery/UI remain to be connected. Linux individual enrollment,
+publisher trust and physical installation/removal acceptance remain separate
+requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
