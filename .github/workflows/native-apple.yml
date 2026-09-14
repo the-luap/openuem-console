@@ -235,6 +235,8 @@ jobs:
         with:
           go-version: '1.26.8'
           cache: true
+      - name: Generate console templates required by inventory fixtures
+        run: go tool templ generate
       - name: Inventory and network workflow persistence race tests
         run: python3 scripts/check-go-test-shard.py --package ./internal/inventory --index ${{ matrix.shard }} --count 4
   build:
