@@ -729,11 +729,16 @@ shutdown. The separate readiness control does not advertise an installer.
 Owned broker/filesystem/native-binding tests, shared decoder fuzzing, macOS/Linux
 race suites and all six consumer/platform builds cover this endpoint. Console
 preparation delivery and durable attempt admission remain unconnected.
-Production installation remains disabled until its native runner and package-aware
-console admission are connected. Authenticated installer delivery and admission,
-execution, observation and recovery remain necessary before this preparation
-component can enable installation or local uninstallation; Linux individual enrollment, publisher trust
-and physical installation acceptance remain separate requirements.
+Native macOS installation now consumes that exact prepared artifact under an
+atomic journal revision check. Individually enrolled root agents with native ACL
+support advertise separate installation readiness, recheck native trust and
+protected paths, and invoke the fixed system installer once. Completion requires
+the exact native receipt, every payload file hash and the protected vendor CLI
+link; cancellation and cleanup join before the journal result. Owned fixtures and
+read-only official-package evidence cover this component. Console preparation and
+command delivery, current approval admission, recovery UI and local removal still
+need integration. Linux individual enrollment, publisher trust and physical
+installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

@@ -77,8 +77,11 @@ Cancellation's database guard must then exclude attempted work; admitted or
 uncertain commands require their separate evidence/recovery path. Expiry does not
 silently erase the barrier. The [authenticated preparation agent endpoint](netbird-package-preparation.md#authenticated-preparation-endpoint)
 now owns exact private stages, but this store has no preparation publisher or
-attempt table. Operator UI, console preparation/delivery admission, native
-install/remove and resulting-state recovery remain required.
+attempt table. Operator UI, console preparation/delivery admission,
+resulting-state recovery and local removal remain required. Native macOS
+installation now consumes exact preparation under atomic journal admission and
+verifies native receipt, complete payload hashes and the vendor CLI link. This
+request store still does not deliver preparations or installation commands.
 
 The current individual enrollment validator and registry accept Windows/macOS,
 not Linux. Tests enroll macOS through the real owned registry fixture. Linux also

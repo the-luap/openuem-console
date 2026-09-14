@@ -27,10 +27,9 @@ are rejected. Linux publisher provenance remains a separate requirement.
 descriptors with encrypted sources, current organization software authority,
 explicit confirmation, atomic audit and permanent revocation. Authenticated
 installer capability/command delivery, console durable attempt admission,
-install/remove execution, resulting-state observation and uncertainty recovery
-are still open. The [version-three command and common journal](netbird-installation-commands.md)
-now retain exact installation intent; production execution remains unavailable
-until native installation and current approval admission are connected.
+console resulting-state recovery, lifecycle UI and local removal remain open. The [version-three command and common journal](netbird-installation-commands.md)
+now retain exact installation intent. Native macOS execution is implemented;
+console current-approval admission and delivery still require integration.
 
 This work uses inert TLS/filesystem/archive/process fixtures and read-only checks
 of exact official v0.78.1 ARM64 PKG, DEB and RPM artifacts. Native metadata matches
@@ -94,10 +93,12 @@ The [installation request store](netbird-installation-requests.md) still does no
 publish preparations or create delivery attempts. Its current cancellation guard
 must exclude attempted work before such a publisher is enabled. Fresh current
 approval/revocation and recipient checks, retained preparation/delivery intent,
-atomic consumption of the exact prepared package, native installation/removal
-and verified resulting-state recovery remain required. Linux additionally needs
-individual enrollment and independent publisher provenance. The production
-installation runner remains disabled on every platform.
+verified resulting-state recovery and local removal remain required. Native
+macOS installation now consumes the exact prepared package under atomic current
+journal admission, rechecks trust and verifies its receipt, complete payload and
+CLI link. It requires a root individual agent with native ACL support and advertises
+a separate `installation-state` capability. Linux additionally needs individual
+enrollment and independent publisher provenance. Console delivery remains disabled.
 
 Owned broker/filesystem tests cover source correlation, exact replay, parallel
 admission, retained uncertainty, journal changes during download, connection

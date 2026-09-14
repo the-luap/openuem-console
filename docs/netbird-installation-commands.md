@@ -24,11 +24,16 @@ identity can query that evidence or explicitly withdraw an unattempted command.
 Crash recovery retains the existing later-boot and explicit-release requirements.
 A release preserves uncertainty and does not prove package installation success.
 
-This is an integrated command/journal foundation, not an enabled installer. The
-agent has no production native installation runner and rejects new installation
-commands before writing an attempt. Retained results remain readable even without
-a runner. The console connection/registration publisher explicitly rejects this
-new command version; it cannot bypass future package-aware durable admission.
+Individually enrolled root macOS agents with native ACL support now consume an
+exact private preparation under atomic ready-journal revision admission. Their
+[native installation owner](https://github.com/the-luap/openuem-agent/blob/0b48339f1dfc72afdcb352232be115303282a1f8/docs/netbird-native-installation.md)
+rechecks package trust, invokes the fixed system installer once, then verifies the
+exact native receipt, every payload hash and the protected vendor CLI link.
+Cleanup and cancellation join before finishing the durable result. Other native
+owners reject new commands before admission, while retained results stay readable.
+The separate individual-only `installation-state` control advertises this support.
+The console connection/registration publisher still rejects this command version;
+it cannot bypass package-aware durable admission.
 Ordinary and registration state queries do not establish installation capability.
 The installation command adds no broker subject, stream filter, permission or
 automatic retry. The separate preparation protocol has its own direct subject.
@@ -40,9 +45,9 @@ authenticates the organization approval and exact individual target, supports an
 absent client, and retains intent/cancellation under the common console barrier.
 The [private native preparation](netbird-package-preparation.md) now has an
 authenticated agent RPC, native ownership and bounded cleanup. It still needs
-console delivery admission, a fresh approval/target check at command admission,
-atomic prepared-package consumption, fixed native install/remove execution and
-verified resulting-state recovery. Windows retains its software workflow;
+durable console preparation/delivery attempts, a fresh approval/target check at
+final command admission and verified resulting-state recovery. Native macOS prepared-package consumption and installation are now
+implemented; local removal remains unavailable. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.
 
 ## Verification
@@ -66,3 +71,13 @@ model/common PostgreSQL race regressions pass in 2.822/3.587 seconds. These chec
 validate the updated shared contract alongside existing approval, registration,
 connection, recovery and reporting behavior; they do not establish native
 installation acceptance.
+
+The native installation milestone uses published shared pin
+`v0.11.1-0.20260914054338-0060dbf7d6a4`. macOS installation/command/journal race
+suites and the complete agent runtime suite pass. Linux journal/command/installation
+race suites, macOS CGO-disabled tests and all six consumer/platform builds pass.
+The receipt fuzzer completes 1,479,183 inputs, and the official PKG read-only check
+confirms all ten payload files including complete CLI/UI hashes. The compiled
+console publisher guard still rejects version three through the existing delivery
+path. Native installation tests use inert callbacks and owned processes; physical
+endpoint installation and daemon acceptance remain unverified.
