@@ -881,9 +881,20 @@ connections per guest. An observed authentication-boundary stall is addressed
 with kernel-confirmed socket consumption under the unchanged deadline. These
 tests leave the agent inactive. The [readiness process probe](https://github.com/the-luap/openuem-agent/blob/ac3645e2a7bc428905a0060024a736621f9c4cee/docs/native-linux-readiness.md)
 also verifies the manager-observed PID against the actual socket peer before
-requesting its signed identity proof. The complete activation controller, operational
-configuration, production publisher provisioning and physical installation/removal
-acceptance remain separate requirements.
+requesting its signed identity proof. The
+[registration controller](https://github.com/the-luap/openuem-agent/blob/0aa8e36b791c7093075176be360bb66c0e0a6a3a/docs/linux-systemd-registration.md)
+now resumes interrupted canonical publication/enablement and passes all fourteen
+CI jobs. The [start controller](https://github.com/the-luap/openuem-agent/blob/def5a3d925dd696836b74803d3b7af1066525bfa/docs/linux-systemd-start.md)
+compares PID, invocation and both independently recorded start timestamps around
+signed readiness. Three fresh ARM64 guests exercise actual starts, retained
+invocations, initialization and identity conflicts. An AMD64 decoder-close panic
+now has a bounded complete-message transport fix and a passing native regression;
+updated AMD64 CI remains pending. The
+[operational configuration provider](https://github.com/the-luap/openuem-agent/blob/d32358109cb21db0e02745170ac479ebf82df963/docs/linux-operational-configuration.md)
+adds private INI/log admission, exclusive synchronized publication and phase
+checks with the real INI parser. The combined actual-manager activation fixture,
+public CLI dispatch, production publisher provisioning and physical
+installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

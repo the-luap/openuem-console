@@ -61,13 +61,40 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [Linux operational configuration provider](https://github.com/the-luap/openuem-agent/blob/d32358109cb21db0e02745170ac479ebf82df963/docs/linux-operational-configuration.md)
+  now prepares the fixed private INI and log directories through retained root
+  ancestry and exclusive, synchronized publication. Native fixtures preserve
+  valid administrator settings, reject foreign files and detect changes between
+  configuration, registration and readiness phases. The 27 required native
+  systemd/filesystem families pass in 9.454 seconds; the three required activation
+  provider families with the real INI parser pass in 1.059 seconds. Linux/Windows
+  builds and Linux Vet pass. The public Linux activation gate remains closed until
+  the combined actual-manager activation fixture and CLI dispatch are complete.
+
+- The [Linux start controller](https://github.com/the-luap/openuem-agent/blob/def5a3d925dd696836b74803d3b7af1066525bfa/docs/linux-systemd-start.md)
+  now binds signed readiness to the manager PID, invocation and separately recorded
+  command/main-process start times. Seven live families pass on three fresh ARM64
+  guests, including actual start, retry, initializing and foreign-identity cases.
+  AMD64 CI exposed a library panic on socket closure during D-Bus alignment; the
+  [message framing boundary](https://github.com/the-luap/openuem-agent/blob/def5a3d925dd696836b74803d3b7af1066525bfa/docs/linux-systemd-connection.md)
+  now admits bounded complete messages before decoding. Its deterministic native
+  regression passes; the updated AMD64 CI remains pending at this checkpoint.
+
+- [Persistent Linux registration](https://github.com/the-luap/openuem-agent/blob/0aa8e36b791c7093075176be360bb66c0e0a6a3a/docs/linux-systemd-registration.md)
+  resumes canonical files left before reload or after enablement, without starting
+  the service or replacing existing definitions. All fourteen jobs pass in
+  [registration CI](https://github.com/the-luap/openuem-agent/actions/runs/34902641636).
+  Fuzz targets now use one million executions and explicit test timeouts around
+  the documented [Go duration-cancellation race](https://github.com/golang/go/issues/75804),
+  preserving failures and eliminating neither targets nor assertions.
+
 - The [Linux readiness process probe](https://github.com/the-luap/openuem-agent/blob/ac3645e2a7bc428905a0060024a736621f9c4cee/docs/native-linux-readiness.md)
   now additionally requires the system manager's observed PID before sending a
   challenge. Another process with the same valid device identity fails, as do
   invalid PID ranges and mismatched identity with the expected PID. The updated
   native transport, agent, Linux service and lifecycle race suites pass in
   4.228/29.987/3.049/1.007 seconds; Linux/Windows builds and Linux Vet also pass.
-  The activation controller must still compare PID, start time and invocation
+  The subsequently added start controller compares PID, start times and invocation
   again after the proof before reporting success.
 
 - [Resolved Linux definitions and actual systemd validation](https://github.com/the-luap/openuem-agent/blob/9906eee82809c55fad37564831b780b4a09e922a/docs/linux-systemd-definition.md)
@@ -82,8 +109,8 @@ the table's package summaries do not remove any detail from the roadmap.
   `BEGIN` within the unchanged deadline. The complete native race suite passes in
   7.740 seconds. The [enablement owner](https://github.com/the-luap/openuem-agent/blob/9906eee82809c55fad37564831b780b4a09e922a/docs/linux-systemd-enablement.md)
   retains the actual protected symlink and detects foreign or replaced targets
-  and ancestry. These tests do not yet start the agent; the activation controller
-  and operational configuration remain integration work.
+  and ancestry. Those five tests leave the agent inactive; the later start and
+  operational-configuration fixtures extend this evidence as described above.
 
 - The [loaded systemd state observer](https://github.com/the-luap/openuem-agent/blob/f046f33c00cf0da4027c6f8f7d90dca8aa6b776f/docs/linux-systemd-state.md)
   now requires exact typed unit properties, the canonical literal invocation,
