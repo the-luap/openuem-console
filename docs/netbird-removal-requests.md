@@ -56,7 +56,8 @@ history has no device foreign key that would erase original evidence. Read-only
 history requires `software.read` in the original exact scope. Cancellation needs
 `software.assign`, the original review revision and its own permanent UUID.
 Once a native attempt exists, cancellation is permanently excluded. Only verified
-completion can open that attempt's barrier before explicit resolution is added.
+completion or a separately reviewed exact journal resolution can open that
+attempt's barrier.
 Exact cancellation replay preserves the first actor and timestamp. Audit failure
 rolls back request or cancellation atomically.
 
@@ -75,8 +76,9 @@ the shared admission change. Fixtures do not contact a vendor, deliver native
 commands or mutate an enrolled endpoint.
 
 Separate native attempts/results, direct delivery and original-receipt observation
-are implemented. Reviewed uncertain-operation recovery, retained local staging
-recovery, a joined dispatcher, bounded history pages and public UI remain required.
+and [reviewed uncertain-operation recovery](netbird-removal-resolutions.md) are
+implemented. Retained local staging recovery, a joined dispatcher, bounded history
+pages and public UI remain required.
 The already implemented
 [agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 provides exact native execution and repeated absence checks. Physical package,

@@ -30,6 +30,8 @@ func NewNetbirdRemovalDeliveryStore(db *sql.DB, permissions *access.Store, indiv
 // certificate or executable envelope. Pending is not retry authority.
 type NetbirdRemovalDelivery struct {
 	RequestID, CommandHash, Outcome, OriginalOutcome string
+	ReleasedAt                                       *time.Time
+	ReleasedBy, ResolutionID                         string
 	IssuedAt, ExpiresAt                              time.Time
 	RecordedAt, CompletedAt                          *time.Time
 	Receipt                                          *netbirdcommand.Receipt
@@ -41,12 +43,12 @@ func readRemovalDelivery(ctx context.Context, tx *sql.Tx, id string) (*NetbirdRe
 	var d NetbirdRemovalDelivery
 	var receipt []byte
 	err := tx.QueryRowContext(ctx, `SELECT a.request_id::text,a.command_hash,a.issued_at,a.expires_at,
- CASE WHEN i.completed_at IS NOT NULL THEN 'completed' ELSE coalesce(r.outcome,'pending') END,coalesce(r.outcome,'pending'),r.recorded_at,i.completed_at,
+ CASE WHEN i.completed_at IS NOT NULL THEN 'completed' WHEN i.released_at IS NOT NULL THEN 'released' ELSE coalesce(r.outcome,'pending') END,coalesce(r.outcome,'pending'),r.recorded_at,i.completed_at,i.released_at,coalesce(i.released_by,''),coalesce(i.resolution_id::text,''),
  coalesce((SELECT o.response->'receipt' FROM uem_netbird_removal_observations o WHERE o.request_id=i.id AND o.recorded_at=i.completed_at AND o.response->'receipt'->>'status'='completed' LIMIT 1),r.receipt),
  coalesce(o.id::text,''),coalesce(o.actor,''),coalesce(CASE WHEN o.response->>'outcome'='ok' THEN o.response->'receipt'->>'status' ELSE coalesce(o.response->>'outcome','unavailable') END,''),o.recorded_at
  FROM uem_netbird_removal_attempts a JOIN uem_netbird_removals i ON i.id=a.request_id LEFT JOIN uem_netbird_removal_results r USING(request_id)
  LEFT JOIN LATERAL(SELECT * FROM uem_netbird_removal_observations WHERE request_id=a.request_id ORDER BY recorded_at DESC,id DESC LIMIT 1) o ON true
- WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &d.Outcome, &d.OriginalOutcome, &d.RecordedAt, &d.CompletedAt, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
+ WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &d.Outcome, &d.OriginalOutcome, &d.RecordedAt, &d.CompletedAt, &d.ReleasedAt, &d.ReleasedBy, &d.ResolutionID, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +139,7 @@ func (s *NetbirdRemovalStore) admitRemoval(parent context.Context, actor string,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, err
 	}
-	if r.CancelledAt != nil || r.CompletedAt != nil || !time.Now().Before(r.ExpiresAt) {
+	if r.CancelledAt != nil || r.CompletedAt != nil || r.ReleasedAt != nil || !time.Now().Before(r.ExpiresAt) {
 		return nil, nil, nil, ErrNetbirdOperationConflict
 	}
 	source, err := s.source(ctx, tx, scope, device)
@@ -202,7 +204,7 @@ func (s *NetbirdRemovalStore) finishRemoval(ctx context.Context, r *NetbirdRemov
 		return nil, err
 	}
 	if outcome == "completed" {
-		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removals SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL`, r.ID, recorded); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removals SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL AND released_at IS NULL`, r.ID, recorded); err != nil {
 			return nil, err
 		}
 	}

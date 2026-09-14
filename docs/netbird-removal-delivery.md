@@ -3,8 +3,9 @@
 The console inventory layer now connects an exact [reviewed removal request](netbird-removal-requests.md)
 to one durable native attempt, direct delivery and retained result. The dedicated
 publisher accepts only the version-four removal grammar. Existing connection and
-installation publishers continue to reject it. Public routes, a joined dispatcher
-and the reviewed uncertainty-resolution UI remain separate work.
+installation publishers continue to reject it. [Reviewed resolution](netbird-removal-resolutions.md)
+now provides explicit withdrawal/release and read-only lost-control reconciliation.
+Public routes, a joined dispatcher and the resolution UI remain separate work.
 
 ## Fresh native admission
 
@@ -45,7 +46,7 @@ the durable attempt pending rather than granting redelivery.
 Native attempt admission permanently excludes queued cancellation, in both Go
 and database guards. The common connection/registration/installation/removal
 barrier remains closed for pending or uncertain attempts. Only retained completed
-evidence opens it in this component. A direct timestamp update cannot manufacture
+evidence or separately reviewed exact journal resolution opens it. A direct timestamp update cannot manufacture
 completion; it must match a validated result or original-receipt observation.
 Original UUIDs remain permanently reserved after completion.
 
@@ -86,8 +87,8 @@ and strict native-inspection transport tests. The complete NetBird inventory rac
 suite and Linux ARM64 console build cover the integrated change. No real vendor
 package, provider or enrolled endpoint is mutated by these fixtures.
 
-Explicit reviewed withdrawal/release, lost-control reconciliation, bounded joined
-dispatch, coherent history/status UI and retained local staging recovery remain
-required. The [native agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
+Explicit reviewed withdrawal/release and lost-control reconciliation are now
+implemented. Bounded joined dispatch, coherent history/status UI and retained
+local staging recovery remain required. The [native agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 already handles protected removal and repeated native absence verification.
 Physical package, interruption, reboot and desktop acceptance remains separate.

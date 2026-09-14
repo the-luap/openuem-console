@@ -85,9 +85,12 @@ the table's package summaries do not remove any detail from the roadmap.
   commit one exact attempt before direct delivery, exclude native cancellation
   and preserve original outcomes. Only correlated completion opens admission;
   absence-only evidence does not. Owned NATS and PostgreSQL races cover replay,
-  result loss, current-certificate observation and common exclusion. Explicit
-  resolution, joined dispatch/UI and retained-stage recovery remain open; owned
-  tests are not physical removal.
+  result loss, current-certificate observation and common exclusion. [Reviewed
+  resolution](netbird-removal-resolutions.md) now binds temporary reviews to one
+  permanent resolution UUID, immutable controls and exact owned proofs. Lost
+  replies reconcile read-only without reexecution; startup verifies every removal
+  guard. Joined dispatch/UI and retained-stage recovery remain open; owned tests
+  are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

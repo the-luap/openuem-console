@@ -777,8 +777,11 @@ cancellation, sharing the permanent UUID/device barrier with the other command
 families. [Native console delivery](netbird-removal-delivery.md) now persists one
 exact attempt before direct dispatch, excludes cancellation after admission and
 retains original results independently of later receipt recovery. Current native
-absence alone cannot rewrite an uncertain result. Explicit resolution, joined
-dispatch/UI and retained-stage recovery remain open.
+absence alone cannot rewrite an uncertain result. [Reviewed resolution](netbird-removal-resolutions.md)
+now retains expiring reviews, one permanent resolution identity, exact control
+attempts and owned release proofs. Lost replies reconcile read-only; original
+native uncertainty remains distinct. Startup also checks all required removal
+guards. Joined dispatch/UI and retained-stage recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

@@ -49,6 +49,8 @@ type NetbirdRemoval struct {
 	CancellationID, CancelledBy                                      string
 	CancelledAt                                                      *time.Time
 	CompletedAt                                                      *time.Time
+	ReleasedAt                                                       *time.Time
+	ReleasedBy, ResolutionID                                         string
 }
 
 type removalSource struct {
@@ -188,12 +190,12 @@ func (s *NetbirdRemovalStore) Review(parent context.Context, actor string, scope
 	return &r.review, nil
 }
 
-const removalColumns = `id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,descriptor_digest,descriptor,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at`
+const removalColumns = `id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,descriptor_digest,descriptor,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at,released_at,coalesce(released_by,''),coalesce(resolution_id::text,'')`
 
 func scanRemoval(row interface{ Scan(...any) error }) (*NetbirdRemoval, error) {
 	var r NetbirdRemoval
 	var data []byte
-	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.DescriptorDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt)
+	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.DescriptorDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt, &r.ReleasedAt, &r.ReleasedBy, &r.ResolutionID)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +218,7 @@ func netbirdRequestConflict(ctx context.Context, tx *sql.Tx, device, id string) 
  EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))))
  OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))))
  OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))
- OR EXISTS(SELECT 1 FROM uem_netbird_removals WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL))`, device, id).Scan(&pending)
+ OR EXISTS(SELECT 1 FROM uem_netbird_removals WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))`, device, id).Scan(&pending)
 	return pending, err
 }
 
@@ -353,7 +355,7 @@ func (s *NetbirdRemovalStore) Cancel(parent context.Context, actor string, scope
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_removal_attempts WHERE request_id=$1)`, id).Scan(&attempted); err != nil {
 		return nil, err
 	}
-	if attempted || r.CompletedAt != nil {
+	if attempted || r.CompletedAt != nil || r.ReleasedAt != nil {
 		return nil, ErrNetbirdOperationConflict
 	}
 	r, err = scanRemoval(tx.QueryRowContext(ctx, `UPDATE uem_netbird_removals SET cancellation_id=$2,cancelled_by=$3,cancelled_at=clock_timestamp() WHERE id=$1 RETURNING `+removalColumns, id, cancellation, actor))

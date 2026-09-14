@@ -53,8 +53,10 @@ now retains exact-site software rights, fresh reviewed intent, durable request
 history and common device exclusion. [Native delivery](netbird-removal-delivery.md)
 now commits one exact attempt before a direct version-four RPC, retains original
 outcomes and recovers lost completed receipts through read-only queries under the
-current certificate. Native admission excludes cancellation. Explicit resolution,
-joined dispatch and UI remain open.
+current certificate. Native admission excludes cancellation. [Explicit resolution](netbird-removal-resolutions.md)
+now retains expiring reviews, owned control attempts and exact withdrawal/release
+proofs, with read-only reconciliation for lost replies. Joined dispatch and UI
+remain open.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.

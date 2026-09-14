@@ -32,7 +32,7 @@ func (s *NetbirdRemovalStore) ObserveRemoval(parent context.Context, actor strin
 	if err != nil {
 		return nil, err
 	}
-	if r.CompletedAt != nil {
+	if r.CompletedAt != nil || r.ReleasedAt != nil {
 		if err = removalAudit(ctx, tx, actor, r, "read", "recorded"); err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ func recordRemovalObservation(ctx context.Context, tx *sql.Tx, r *NetbirdRemoval
 		return time.Time{}, err
 	}
 	if completed {
-		_, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removals SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL`, r.ID, recorded)
+		_, err = tx.ExecContext(ctx, `UPDATE uem_netbird_removals SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL AND released_at IS NULL`, r.ID, recorded)
 	}
 	return recorded, err
 }
