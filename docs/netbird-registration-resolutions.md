@@ -32,7 +32,9 @@ first removal. Cleanup uses the original encrypted provider origin/token and the
 exact key ID returned at creation. Its retained creation policy must match before
 DELETE. Only a subsequent exact-ID GET returning 404 establishes absence. The
 current resolving actor is audited without changing the original actor that
-binds the encrypted snapshot. A recorded DELETE is never repeated.
+binds the encrypted snapshot. This resolution flow never repeats a recorded
+DELETE; a separate [reviewed key removal attempt](netbird-cleanup-retries.md)
+can authorize another DELETE if the exact key and creation policy still match.
 
 **Confirm continuation** requires a fresh review of an existing resolution. It
 can start only a cleanup or agent release that has not yet been attempted. This
@@ -99,7 +101,8 @@ The [permanent withdrawal protocol](netbird-registration-withdrawals.md) now
 provides an explicit recovery path when the agent supports it and has no attempt.
 An undelivered release or withdrawal can now use a freshly confirmed
 [recovery attempt](netbird-resolution-retries.md) under the same resolution ID.
-A recorded DELETE whose key remains present still needs separate recovery.
+A recorded DELETE whose key remains present can use a separate
+[reviewed key removal retry](netbird-cleanup-retries.md).
 No control or provider mutation is automatically retried. No journal reset or mutable name/IP match substitutes
 for evidence. Confirmed resolution does not establish provider peer ownership,
 current connectivity or actual group membership. Trusted installers and physical

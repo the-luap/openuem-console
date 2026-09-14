@@ -2,9 +2,7 @@ package inventory
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -22,6 +20,11 @@ func registrationEvidence(ctx context.Context, tx *sql.Tx, r *NetbirdRegistratio
 	r.Attempts = []string{}
 	r.Key, r.Delivered, r.KeyAbsent = nil, nil, false
 	r.CommandHash = ""
+	var err error
+	r.LastCleanupRetry, err = readNetbirdCleanupRetry(ctx, tx, r.ID)
+	if err != nil {
+		return "", err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT stage,digest FROM uem_netbird_registration_attempts WHERE request_id=$1 AND revision=$2 ORDER BY created_at,stage`, r.ID, r.Revision)
 	if err != nil {
 		return "", err
@@ -145,8 +148,9 @@ func (s *NetbirdRegistrationStore) observe(ctx context.Context, snapshot registr
 }
 
 // Cleanup only uses the exact ID returned by creation and the original encrypted
-// provider credential. A recorded DELETE attempt is never sent again. A later
-// read may prove absence after a lost reply; other errors never mean absence.
+// provider credential. This path never repeats a recorded DELETE. A separate
+// reviewed cleanup retry may authorize another attempt. A later read may prove
+// absence after a lost reply; other errors never mean absence.
 func (s *NetbirdRegistrationStore) cleanup(ctx context.Context, r *NetbirdRegistration, snapshot registrationSnapshot) error {
 	return s.cleanupAs(ctx, r, snapshot, r.Actor)
 }
@@ -164,9 +168,7 @@ func (s *NetbirdRegistrationStore) cleanupAs(ctx context.Context, r *NetbirdRegi
 		return ErrNetbirdOperationChanged
 	}
 	if !attempted {
-		data, _ := json.Marshal([]any{r.ID, r.Revision, r.Key.ID, r.Key})
-		digest := sha256.Sum256(data)
-		if err = s.attemptAs(ctx, r, actor, "delete", hex.EncodeToString(digest[:])); err != nil {
+		if err = s.attemptAs(ctx, r, actor, "delete", netbirdCleanupDigest(r)); err != nil {
 			return err
 		}
 		if !absent {

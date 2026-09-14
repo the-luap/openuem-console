@@ -28,6 +28,7 @@ type ownedRegistrationProvider struct {
 	absent                                                bool
 	failCreate, failDelete, retainDelete, failRead, drift bool
 	tokens                                                []string
+	onDelete                                              func()
 }
 
 func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *ownedRegistrationProvider {
@@ -77,6 +78,9 @@ func newRegistrationProvider(t *testing.T, f *refreshFixture, providerID int) *o
 			_ = json.NewEncoder(w).Encode(key)
 		case r.Method == "DELETE" && r.URL.Path == "/api/setup-keys/12345":
 			p.deletes++
+			if p.onDelete != nil {
+				p.onDelete()
+			}
 			if !p.retainDelete {
 				p.absent = true
 			}

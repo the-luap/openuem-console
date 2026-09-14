@@ -376,13 +376,16 @@ func TestNetbirdRegistrationResolutionMigrationGuards(t *testing.T) {
 }
 
 func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T) {
-	for _, change := range []string{"renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"cleanup-renewed", "cleanup-revoked", "cleanup-expired", "cleanup-consumer", "cleanup-moved", "renewed", "withdraw-renewed", "retry-renewed", "retry-withdraw-renewed", "retry-revoked", "retry-expired", "retry-consumer", "retry-moved", "revoked", "expired", "consumer", "moved"} {
 		t.Run(change, func(t *testing.T) {
+			cleanup := strings.HasPrefix(change, "cleanup-")
+			change = strings.TrimPrefix(change, "cleanup-")
 			retry := strings.HasPrefix(change, "retry-")
 			change = strings.TrimPrefix(change, "retry-")
 			withdrawal := change == "withdraw-renewed"
 			f, id := netbirdFixture(t)
 			p := newRegistrationProvider(t, f, id)
+			p.retainDelete = cleanup
 			ctx := t.Context()
 			identities, err := registry.NewStore(f.db, strings.Repeat("r", 32))
 			require.NoError(t, err)
@@ -448,6 +451,12 @@ func TestNetbirdRegistrationResolutionUsesCurrentIndividualIdentity(t *testing.T
 			r := registrationRequest(t, f, s)
 			_, err = s.DispatchOne(ctx)
 			require.NoError(t, err)
+			if cleanup {
+				exerciseNetbirdCleanupIdentity(t, f, p, s, r, change)
+				require.Zero(t, queries)
+				require.Zero(t, releases)
+				return
+			}
 			require.True(t, registrationRead(t, f, s, r.ID).KeyAbsent)
 			resolver, err := inventory.NewNetbirdRegistrationResolutionStore(s, control)
 			require.NoError(t, err)

@@ -155,12 +155,14 @@ templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inv
    }
   </dl>
   <p>This receipt does not establish current connectivity, provider peer identity or group membership. Removing the setup key does not disconnect a peer that already registered with it.</p>
+  @netbirdCleanupRetrySummary(r.LastCleanupRetry)
   if r.Resolution!=nil {
    @netbirdResolutionRetrySummary(r.Resolution.LastRetry)
   }
   if r.Status=="unconfirmed" && r.ReleasedAt==nil {
    <p>The original outcome remains unconfirmed. Checking key removal does not repeat registration or release the device's command block.</p>
    if r.Key!=nil && !r.KeyAbsent && slices.Contains(r.Attempts,"delete") && netbirdCanManage(info,r.Scope) {
+    <p><a class="uk-button uk-button-default" id="netbird-cleanup-review-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup/review" }>Review another key removal attempt</a></p>
     <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-post={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-cleanup" hx-indicator="#netbird-pending">
      @mdm_views.CSRF(info)
      <input type="hidden" name="confirmed" value="yes"/>

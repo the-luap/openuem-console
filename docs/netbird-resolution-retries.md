@@ -19,8 +19,9 @@ resolution ID. Every attempt requires an unchecked confirmation and fresh review
 Registration recovery requires independently retained absence of the exact setup
 key. A recovery attempt does not create a provider key, repeat registration or
 repeat DELETE. An unattempted cleanup still uses the existing reviewed continuation
-flow. A missing provider creation response or an unsuccessful recorded DELETE
-needs separate recovery work.
+flow. An unsuccessful recorded DELETE can use a separate
+[reviewed key removal retry](netbird-cleanup-retries.md). A missing provider
+creation response without retained key identity still needs separate recovery.
 
 Execution can win a withdrawal race before or after the initial agent control
 was recorded. After local execution ends, a fresh review can authorize a release

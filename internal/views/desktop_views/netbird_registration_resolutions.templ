@@ -1,6 +1,7 @@
 package desktop_views
 
 import (
+ "slices"
  "github.com/labstack/echo/v4"
  "github.com/open-uem/openuem-console/internal/inventory"
  "github.com/open-uem/openuem-console/internal/views/mdm_views"
@@ -17,6 +18,7 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
    <dt>Agent evidence</dt><dd>{ netbirdRegistrationAgentState(v.AgentState) }</dd>
   </dl>
   <p>The original outcome remains unconfirmed. Resolution requires proof that the retained setup key is absent and matching evidence about device execution. It does not repeat registration or establish current connectivity, provider peer identity or group membership.</p>
+  @netbirdCleanupRetrySummary(v.Registration.LastCleanupRetry)
   if v.Resolution!=nil {
    <dl class="netbird-details">
     <dt>Resolution ID</dt><dd>{ v.Resolution.ID }</dd>
@@ -36,6 +38,9 @@ templ NetbirdRegistrationResolution(c echo.Context,info *partials.CommonInfo,v *
    <p role="status">Resolution confirmed. Further NetBird commands may be reviewed. The original registration result has not changed.</p>
   } else {
    <p role="status">Further NetBird commands remain blocked until resolution is confirmed.</p>
+   if v.Registration.Key!=nil && !v.Registration.KeyAbsent && slices.Contains(v.Registration.Attempts,"delete") {
+    <p><a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup/review" }>Review another key removal attempt</a></p>
+   }
    if v.CanResolve || v.CanContinue {
     if v.CanCleanup && !v.Registration.KeyAbsent {
      <p>Confirmation may start removal of the exact retained setup key. Agent release begins only after the provider confirms key absence. Removing a setup key does not disconnect a peer that already registered with it.</p>

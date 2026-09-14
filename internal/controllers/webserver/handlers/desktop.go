@@ -23,6 +23,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 			return access.ReadDevices, true
 		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/new", "/computers/:uuid/netbird/registrations/review", "/computers/:uuid/netbird/operations/review", "/computers/:uuid/netbird/operations/:request/resolution":
 			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/cleanup/review":
+			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/tasks", "/computers/:uuid/execution", "/computers/:uuid/execution/review", "/computers/:uuid/execution/:request":
 			return access.ManageProfiles, true
 		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os", "/computers/:uuid/inventory/peripherals", "/computers/:uuid/monitors", "/computers/:uuid/printers", "/computers/:uuid/inventory/memory", "/computers/:uuid/inventory/shares", "/computers/:uuid/shares", "/computers/:uuid/inventory/security", "/security/:uuid/updates":
@@ -35,6 +37,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/refresh":
 			return access.RefreshDevices, true
+		case "/computers/:uuid/netbird/registrations/:request/cleanup/retry":
+			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/registrations/:request/resolution/retry", "/computers/:uuid/netbird/operations/:request/resolution/retry", "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/:request/resolution/continue", "/computers/:uuid/netbird/registrations/:request/resolution/reconcile", "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
@@ -95,6 +99,8 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	registration.GET("/:request", h.NetbirdRegistrationReceipt)
 	registration.POST("/:request/cancel", h.NetbirdRegistrationCancel)
 	registration.POST("/:request/cleanup", h.NetbirdRegistrationCleanup)
+	registration.GET("/:request/cleanup/review", h.NetbirdCleanupReview)
+	registration.POST("/:request/cleanup/retry", h.NetbirdCleanupRetry)
 	registration.GET("/:request/resolution", h.NetbirdRegistrationResolutionReview)
 	registration.POST("/:request/resolution", h.NetbirdRegistrationResolutionRequest)
 	registration.POST("/:request/resolution/continue", h.NetbirdRegistrationResolutionContinue)

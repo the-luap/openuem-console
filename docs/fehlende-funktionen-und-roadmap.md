@@ -669,6 +669,16 @@ additional browser cases and owned broker tests cover permanent denial of late
 delivery across restart without running the original command. All 2,343 browser
 cases, the full inventory and audit race suites, current-identity cases, registered console
 routes, Linux console build and macOS/Linux agent race suites pass.
+[Reviewed setup-key removal retries](netbird-cleanup-retries.md) now provide a
+separate confirmation for unsuccessful recorded DELETEs. Every attempt retains
+its own UUID, actor, review and original key digest before contacting the captured
+provider account. A new exact-ID absence read supplies evidence; form replays and
+reconciliation do not resend DELETE. Current identity/scope, concurrent forms,
+audit rollback and permanent storage are covered by owned fixtures. Twenty-four
+new browser cases and the full 2,367-case matrix pass, together with the complete
+inventory/audit race suites, registered-route fixtures and Linux console build. Key absence alone
+preserves the command block and original uncertain registration outcome.
+Missing creation responses without retained key identity remain unresolved.
 Trusted Unix installers, authoritative peer ownership, remaining user/provider secrets and
 physical/provider acceptance are still required.
 

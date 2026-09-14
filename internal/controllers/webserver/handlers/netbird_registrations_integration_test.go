@@ -415,6 +415,63 @@ func exerciseNetbirdRegistrationRoutes(t *testing.T, h *Handler, e *echo.Echo, c
 	require.Equal(t, 4, creates)
 	require.Equal(t, 4, deletes)
 	mu.Unlock()
+
+	// An unsuccessful recorded DELETE requires a separate reviewed attempt.
+	command = inventory.NetbirdOperationCommand{}
+	withdrawalID = ""
+	mu.Lock()
+	retainDelete = true
+	mu.Unlock()
+	review, err = store.Review(ctx, "apple-console-admin", scope, device, []string{"owned-group"}, true)
+	require.NoError(t, err)
+	form.Set("request_id", uuid.NewString())
+	form.Set("revision", review.Revision)
+	require.Equal(t, 204, request("apple-console-admin", "POST", path, form, "console-test-token").Code)
+	_, err = store.DispatchOne(ctx)
+	require.NoError(t, err)
+	cleanupReceipt := path + "/" + form.Get("request_id")
+	cleanupPath := cleanupReceipt + "/cleanup"
+	for _, actor := range []string{"scoped-viewer", "scoped-operator"} {
+		require.Equal(t, 403, request(actor, "GET", cleanupPath+"/review", nil, "console-test-token").Code)
+	}
+	beforeCleanupControls := controls
+	page = request("apple-console-admin", "GET", cleanupPath+"/review", nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Equal(t, "no-store", page.Header().Get("Cache-Control"))
+	require.Contains(t, page.Body.String(), "Confirm key removal retry")
+	require.Contains(t, page.Body.String(), "one new removal attempt")
+	require.Equal(t, 400, request("apple-console-admin", "GET", cleanupPath+"/review?key_id=injected", nil, "console-test-token").Code)
+	cleanupView, err := store.ReviewCleanup(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	cleanupForm := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "retry_id": {uuid.NewString()}, "revision": {cleanupView.Revision}}
+	exerciseNetbirdRetryFormRejections(t, request, cleanupPath+"/retry", cleanupForm)
+	mu.Lock()
+	retainDelete = false
+	mu.Unlock()
+	response = request("apple-console-admin", "POST", cleanupPath+"/retry", cleanupForm, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, cleanupPath+"/review", response.Header().Get("HX-Redirect"))
+	mu.Lock()
+	beforeCleanupReads := providerReads
+	require.Equal(t, 5, creates)
+	require.Equal(t, 6, deletes)
+	mu.Unlock()
+	require.Equal(t, 204, request("apple-console-admin", "POST", cleanupPath+"/retry", cleanupForm, "console-test-token").Code)
+	mu.Lock()
+	require.Equal(t, beforeCleanupReads, providerReads)
+	require.Equal(t, 6, deletes)
+	mu.Unlock()
+	require.Equal(t, beforeCleanupControls, controls)
+	require.Equal(t, 5, deliveries)
+	retained, err = store.Read(ctx, "apple-console-admin", scope, device, form.Get("request_id"))
+	require.NoError(t, err)
+	require.Equal(t, "unconfirmed", retained.Status)
+	require.True(t, retained.KeyAbsent)
+	require.Nil(t, retained.ReleasedAt)
+	page = request("scoped-viewer", "GET", cleanupReceipt, nil, "console-test-token")
+	require.Contains(t, page.Body.String(), "Latest removal attempt ID")
+	require.NotContains(t, page.Body.String(), "owned-private-registration-token")
+	require.NotContains(t, page.Body.String(), "owned-private-registration-key")
 	require.NoError(t, h.Model.Client.Agent.DeleteOneID(device).Exec(ctx))
 	require.Equal(t, 200, request("scoped-viewer", "GET", path, nil, "console-test-token").Code)
 	require.Equal(t, 200, request("apple-console-admin", "GET", resolutionPath, nil, "console-test-token").Code)

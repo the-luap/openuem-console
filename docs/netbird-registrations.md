@@ -93,7 +93,9 @@ expiry; the local record remains unconfirmed and blocks further mutations.
 
 Restart never repeats key creation or device registration. If a key was retained
 before rollback, recovery may perform its first cleanup under current device
-security authority. A recorded cleanup attempt is never sent again. Read-only
+security authority. Automatic recovery never repeats a recorded cleanup attempt.
+A separate [reviewed removal retry](netbird-cleanup-retries.md) can authorize one
+new DELETE for the same retained key. Read-only
 `ReconcileCleanup` can retain later proof of absence after a lost DELETE reply;
 it preserves the original uncertain outcome and admission barrier.
 
@@ -121,8 +123,9 @@ Combined resolution is implemented for retained keys and matching agent evidence
 its [failure ordering and remaining cases](netbird-registration-resolutions.md)
 and [permanent withdrawal](netbird-registration-withdrawals.md)
 and [explicit recovery attempts](netbird-resolution-retries.md)
-are documented separately. Authoritative peer association, missing creation
-responses and unsuccessful recorded removal still need explicit recovery policy;
+are documented separately. Unsuccessful recorded key removal now has its own
+[reviewed retry](netbird-cleanup-retries.md). Authoritative peer association and
+missing creation responses still need explicit recovery policy;
 do not clear journals, retry POST, or infer ownership from mutable reports. Trusted installers,
 native Windows execution, interactive-desktop and physical/provider acceptance
 must be validated separately from owned fixtures and cross-compilation.

@@ -97,10 +97,16 @@ func (s *NetbirdResolutionStore) begin(ctx context.Context, actor string, scope 
 // currentTarget uses current inventory and enrollment authority, not historical
 // read permission. Provider settings/installation reports are not release identity.
 func (s *NetbirdResolutionStore) currentTarget(ctx context.Context, tx *sql.Tx, r *NetbirdOperation) (*NetbirdResolutionReview, string, error) {
-	if s.operations.individual != r.Individual {
+	return s.operations.resolutionTarget(ctx, tx, r)
+}
+
+// Provider cleanup shares the same current authority checks without sending an
+// agent command or depending on an agent response.
+func (s *NetbirdOperationStore) resolutionTarget(ctx context.Context, tx *sql.Tx, r *NetbirdOperation) (*NetbirdResolutionReview, string, error) {
+	if s.individual != r.Individual {
 		return nil, "", ErrNetbirdOperationChanged
 	}
-	manual := &ManualExecutionStore{db: s.operations.db, permissions: s.operations.permissions, individual: s.operations.individual}
+	manual := &ManualExecutionStore{db: s.db, permissions: s.permissions, individual: s.individual}
 	target, err := manual.target(ctx, tx, r.Scope, r.DeviceID)
 	if err != nil {
 		return nil, "", err

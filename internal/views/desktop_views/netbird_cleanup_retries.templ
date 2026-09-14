@@ -1,0 +1,73 @@
+package desktop_views
+
+import (
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ netbirdCleanupRetrySummary(r *inventory.NetbirdCleanupRetry) {
+ if r!=nil {
+  <dl class="netbird-details">
+   <dt>Key removal retries</dt><dd>{ strconv.FormatInt(r.Sequence,10) }</dd>
+   <dt>Latest removal attempt ID</dt><dd>{ r.ID }</dd>
+   <dt>Attempted by</dt><dd>{ r.Actor }</dd>
+   <dt>Attempt recorded</dt><dd>@mdm_views.Timestamp(&r.CreatedAt)</dd>
+  </dl>
+  <p>Each removal attempt is permanently recorded. An attempt alone does not confirm key absence.</p>
+ }
+}
+
+templ NetbirdCleanupReview(c echo.Context,info *partials.CommonInfo,v *inventory.NetbirdCleanupReview,retryID string) {
+ @netbirdPage(c,info,v.Registration.DeviceID,"Review NetBird key removal") {
+  @netbirdTarget(v.Target)
+  <dl class="netbird-details">
+   <dt>Original request</dt><dd>{ v.Registration.ID }</dd>
+   <dt>Original outcome</dt><dd>Registration is unconfirmed</dd>
+   if v.ManagementURL!="" {
+    <dt>Original provider</dt><dd>{ v.ManagementURL }</dd>
+   }
+   <dt>Provider key ID</dt><dd>{ v.Registration.Key.ID }</dd>
+   <dt>Setup key</dt><dd>{ netbirdRegistrationKeyState(v.KeyState) }</dd>
+  </dl>
+  @netbirdCleanupRetrySummary(v.Registration.LastCleanupRetry)
+  <p>The original outcome remains unconfirmed. Key removal does not disconnect a peer that already registered with it. Registration resolution separately requires matching evidence about device execution.</p>
+  if v.Registration.ReleasedAt!=nil {
+   <p role="status">Registration resolution has already been confirmed.</p>
+  } else {
+   <p role="status">Further NetBird commands remain blocked until registration resolution is confirmed.</p>
+  }
+  if v.CanRetry {
+   <p>The previous removal attempt did not establish key absence. Confirmation authorizes one new removal attempt for the exact retained key at the original provider. It does not create a key, repeat registration or send a device command.</p>
+   <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup/retry" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup/retry" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-cleanup-submit,#netbird-cleanup-confirm" hx-indicator="#netbird-cleanup-pending" class="netbird-confirm">
+    @mdm_views.CSRF(info)
+    <input type="hidden" name="retry_id" value={ retryID }/>
+    <input type="hidden" name="revision" value={ v.Revision }/>
+    <label class="netbird-checkbox" for="netbird-cleanup-confirm"><input id="netbird-cleanup-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the original provider and exact key identity and authorize one new key removal attempt.</span></label>
+    <button type="submit" id="netbird-cleanup-submit" class="uk-button uk-button-primary">Confirm key removal retry</button>
+    <span id="netbird-cleanup-pending" class="htmx-indicator" role="status">Attempting key removal…</span>
+   </form>
+  } else if v.KeyState=="absent" {
+   if v.Registration.KeyAbsent {
+    <p role="status">Key absence is retained. Review registration resolution to check the remaining evidence.</p>
+   } else {
+    <p>The provider currently confirms key absence. Check key removal to retain this evidence; no new removal attempt is needed.</p>
+    <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-cleanup-check" hx-indicator="#netbird-cleanup-pending">
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="confirmed" value="yes"/>
+     <button type="submit" id="netbird-cleanup-check" class="uk-button uk-button-default">Check key removal</button>
+     <span id="netbird-cleanup-pending" class="htmx-indicator" role="status">Checking key removal…</span>
+    </form>
+   }
+  } else {
+   <p>Removal is blocked until the provider confirms that the exact key and its retained creation policy still match.</p>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/cleanup/review" }>Review again</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/resolution" }>Review registration resolution</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID }>Original receipt</a>
+  </div>
+ }
+}

@@ -61,6 +61,16 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Reviewed NetBird setup-key removal retries](netbird-cleanup-retries.md) now
+  authorize one additional DELETE after fresh current authority and exact-key
+  policy review. Attempt and audit commit before mutation; original encrypted
+  provider identity, immutable attempt history and original registration outcome
+  are preserved. Key absence requires a separate positive read and cannot alone
+  release the device command barrier. Strict routes and 24 new browser cases
+  cover explicit confirmation, pending forms, blocked states and long content.
+  All 2,367 browser cases, the full inventory/audit race suites and actual
+  registered-route fixtures and the Linux console build pass.
+
 - [Reviewed NetBird resolution](netbird-resolutions.md) now persists immutable
   intent before one release control and retains matching agent evidence before
   reopening console admission. Lost replies use read-only reconciliation with

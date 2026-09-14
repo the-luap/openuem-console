@@ -64,6 +64,7 @@ type NetbirdRegistration struct {
 	CommandHash, ReleasedBy                       string
 	ReleasedAt                                    *time.Time
 	Resolution                                    *NetbirdRegistrationResolution
+	LastCleanupRetry                              *NetbirdCleanupRetry
 	ID, DeviceID, Actor, Revision, Status, Reason string
 	Scope                                         access.Scope
 	Individual, ExtraDNS                          bool

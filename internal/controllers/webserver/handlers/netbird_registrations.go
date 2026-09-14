@@ -185,3 +185,34 @@ func (h *Handler) NetbirdRegistrationCleanup(c echo.Context) error {
 	}
 	return netbirdRedirect(c, desktop_views.NetbirdRegistrationPath(info, c.Param("uuid"))+"/"+c.Param("request"))
 }
+
+func (h *Handler) NetbirdCleanupReview(c echo.Context) error {
+	if _, err := netbirdRegistrationValues(c); err != nil {
+		return netbirdFailure(err)
+	}
+	info, scope, err := h.netbirdRegistrationInfo(c)
+	if err != nil {
+		return err
+	}
+	v, err := h.NetbirdRegistrations.ReviewCleanup(c.Request().Context(), info.Principal.UserID, scope, c.Param("uuid"), c.Param("request"))
+	if err != nil {
+		return netbirdFailure(err)
+	}
+	return RenderView(c, computers_views.InventoryIndex(" | Review NetBird key removal", desktop_views.NetbirdCleanupReview(c, info, v, uuid.NewString()), info))
+}
+
+func (h *Handler) NetbirdCleanupRetry(c echo.Context) error {
+	values, err := netbirdRegistrationValues(c, "retry_id", "revision")
+	if err != nil {
+		return netbirdFailure(err)
+	}
+	info, scope, err := h.netbirdRegistrationInfo(c)
+	if err != nil {
+		return err
+	}
+	_, err = h.NetbirdRegistrations.RetryCleanup(c.Request().Context(), info.Principal.UserID, scope, c.Param("uuid"), c.Param("request"), values.Get("retry_id"), values.Get("revision"))
+	if err != nil {
+		return netbirdFailure(err)
+	}
+	return netbirdRedirect(c, desktop_views.NetbirdRegistrationPath(info, c.Param("uuid"))+"/"+c.Param("request")+"/cleanup/review")
+}
