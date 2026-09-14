@@ -799,8 +799,11 @@ now bind the exact original released uninstall and current ready-journal revisio
 to a separate new attempt. Native mutation follows durable admission, joined
 cleanup precedes its result, and exact replay never reacquires the native stage.
 The console has a separate single-delivery publisher and correlated inspection
-transport. Scoped recovery storage, dispatch, resolution/UI and absent-manifest
-recovery remain open.
+transport. The [scoped recovery request store](netbird-removal-recovery-requests.md)
+now validates original owned unconfirmed release proof and fresh individual-agent
+review, retains immutable intent/cancellation and extends the common permanent
+UUID/device barrier to five request families. Native recovery delivery, dispatch,
+resolution/UI and absent-manifest recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

@@ -3,9 +3,9 @@
 The [shared version-five command and version-four inspection](https://github.com/the-luap/openuem-nats/blob/ffb798edf585da5bef34537096c46556b56eda50/docs/netbird-removal-recovery.md)
 and [agent journal/native service integration](https://github.com/the-luap/openuem-agent/blob/c2eb88abec01ff90d205c3f4bc04a49f302be8d2/docs/netbird-removal-staging-recovery.md)
 now provide an explicit continuation of an interrupted macOS removal with a
-valid protected original manifest. The console transport is implemented; its
-scoped request store, delivery dispatcher, resolution flow and public UI remain
-to be connected. No recovery route or automatic recovery delivery is enabled.
+valid protected original manifest. Console transport and the
+[scoped request store](netbird-removal-recovery-requests.md) are implemented. Native
+delivery, dispatch, resolution and public UI integration remain open. No recovery route or automatic recovery delivery is enabled.
 
 ## Evidence and independent attempt
 
@@ -57,8 +57,9 @@ All consumers pin the published runtime module
 Darwin CGO, Linux and Windows agent builds, Darwin without-CGO native-package
 compilation, and Linux console/worker builds pass.
 
-The next console work must retain exact-site software authority, current identity
-and original owned release proof; store an immutable reviewed recovery request;
-extend the existing permanent UUID/common-device barrier; persist one attempt
-before transport; and expose history, cancellation, receipt observation and
-explicit resolution. These requirements cannot be supplied by the transport alone.
+The request store now verifies original owned unconfirmed release proof and
+current individual native review, retains immutable scoped intent and explicit
+cancellation, and shares permanent UUID/device exclusion with all other families.
+Next, native delivery must persist one exact attempt before transport and exclude
+cancellation after admission. Joined dispatch, coherent history, receipt
+observation, reviewed resolution and public UI integration remain required.

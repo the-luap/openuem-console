@@ -45,10 +45,10 @@ without contacting the agent. It does not require the current installation,
 certificate or device inventory still to match historical state. Changed actor,
 scope, device, descriptor digest or review revision under the same UUID conflicts.
 
-All four request families share UUID and device advisory locks and a common
-conflict query. A database admission trigger also enforces exclusion for direct
-inserts. Pending removal excludes connection, registration and installation;
-their unresolved requests exclude removal. Cancellation releases the device slot
+All five request families, including [manifest recovery](netbird-removal-recovery-requests.md),
+share UUID and device advisory locks and a common conflict query. A database admission trigger also enforces exclusion for direct
+inserts. Pending removal excludes connection, registration, installation and
+manifest recovery; their unresolved requests exclude removal. Cancellation releases the device slot
 but never makes its original UUID reusable in another family. Expiry alone does
 not release a pending request.
 
@@ -80,7 +80,9 @@ Separate native attempts/results, direct delivery and original-receipt observati
 and [reviewed uncertain-operation recovery](netbird-removal-resolutions.md) are
 implemented. [Joined dispatch](netbird-removal-dispatch.md) now consumes committed
 requests once. [Bounded history pages and public UI](netbird-removal-ui.md) now
-connect these lifecycles. Retained local staging recovery remains required.
+connect these lifecycles. Retained local staging recovery now has separate
+[reviewed request storage](netbird-removal-recovery-requests.md); its native delivery
+and public lifecycle remain to be connected.
 The already implemented
 [agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 provides exact native execution and repeated absence checks. Physical package,

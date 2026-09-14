@@ -20,7 +20,7 @@ verify present/absent/unavailable results, reject changed hashes/certificates or
 old response versions, and prove that neither existing publisher sends a removal.
 The separate [removal request store](netbird-removal-requests.md) now retains
 fresh reviewed native state, exact-site software authority, immutable intent and
-queued cancellation under the common four-family UUID/device barrier. It
+queued cancellation under the common five-family UUID/device barrier. It
 now has a [public reviewed lifecycle](netbird-removal-ui.md); its
 [joined dispatcher](netbird-removal-dispatch.md) processes committed requests.
 
@@ -62,7 +62,9 @@ The [public UI](netbird-removal-ui.md) now provides scoped review, confirmation,
 status/history, receipt observation and explicit resolution. [Manifest-backed
 local recovery](netbird-removal-recovery.md) now has separate shared command and
 inspection grammars, native journal/service admission and console transport.
-Its scoped request store, dispatcher and resolution/UI remain open.
+Its [scoped request store](netbird-removal-recovery-requests.md) now retains exact
+original release proof and current native review. Native delivery, dispatch and
+resolution/UI remain open.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.
