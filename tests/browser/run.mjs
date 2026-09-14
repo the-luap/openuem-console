@@ -44,6 +44,7 @@ import smtpSettings from "./smtp-settings.mjs";
 import netbirdSettings from "./netbird-settings.mjs";
 import netbirdPackages from "./netbird-packages.mjs";
 import netbirdInstallations from "./netbird-installations.mjs";
+import netbirdRemovals from "./netbird-removals.mjs";
 import netbirdProfiles from "./netbird-profiles.mjs";
 import netbirdConnectionWithdrawals from "./netbird-connection-withdrawals.mjs";
 import netbirdResolutionRetries from "./netbird-resolution-retries.mjs";
@@ -140,6 +141,7 @@ try {
         [netbirdSettings,21],
         [netbirdPackages,30],
         [netbirdInstallations,90],
+        [netbirdRemovals,78],
         [netbirdProfiles,18],
         [netbirdOperations,75],
         [netbirdRegistrations,117],

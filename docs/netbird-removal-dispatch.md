@@ -49,6 +49,7 @@ the stores once and join shutdown without a broker. Removal and adjacent
 installation-dispatch regressions and the Linux ARM64 console build cover the
 integration.
 
-Scoped status/history pages and public removal routes remain open. Retained local
-staging recovery and physical package/interruption/reboot/desktop acceptance are
+[Scoped status/history pages and public removal routes](netbird-removal-ui.md)
+now queue and inspect this lifecycle. Retained local staging recovery and physical
+package/interruption/reboot/desktop acceptance are
 separate; journal release never deletes local staging or proves removal.

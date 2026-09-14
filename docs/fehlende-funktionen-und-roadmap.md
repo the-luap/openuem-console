@@ -783,7 +783,9 @@ attempts and owned release proofs. Lost replies reconcile read-only; original
 native uncertainty remains distinct. Startup also checks all required removal
 guards. [Joined dispatch](netbird-removal-dispatch.md) now processes requests with
 bounded workers, immutable preflight stops and no automatic retry after native
-admission. Public UI and retained-stage recovery remain open.
+admission. [Scoped public UI](netbird-removal-ui.md) now provides current native
+review, explicit queue/cancel, coherent status, bounded history and reviewed
+resolution under software permissions. Retained-stage recovery remains open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

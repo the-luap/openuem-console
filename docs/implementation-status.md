@@ -93,8 +93,14 @@ the table's package summaries do not remove any detail from the roadmap.
   retains immutable preflight stops and never automatically retries an admitted
   attempt. Owned races cover restart, competing workers, audit failure, recipient
   drift and joined shutdown; runtime startup and Linux ARM64 build pass.
-  Public UI and retained-stage recovery remain open; owned tests are not physical
-  removal.
+  The [scoped removal UI](netbird-removal-ui.md) now connects native review,
+  explicit queue/cancel, coherent original-result status, twenty-row history and
+  reviewed resolution. Software readers retain original-scope history; current
+  software assignment rights govern every review/action. Registered route tests
+  cover ordinary/HTMX forms, raw-body bounds, CSRF, no automatic redelivery and
+  exact read-only recovery. Seventy-eight new responsive Chrome cases cover
+  confirmation, absence, long metadata, pending progress and retained uncertainty.
+  Retained-stage recovery remains open; owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

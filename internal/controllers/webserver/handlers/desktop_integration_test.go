@@ -298,6 +298,9 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	t.Run("reviewed native NetBird installation lifecycle", func(t *testing.T) {
 		exerciseNetbirdInstallationRoutes(t, h, ctx, tenantID, siteID, otherTenant.ID)
 	})
+	t.Run("reviewed native NetBird removal lifecycle", func(t *testing.T) {
+		exerciseNetbirdRemovalRoutes(t, h, ctx, tenantID, siteID, otherTenant.ID)
+	})
 	runDesktopBrowserFixture(t, h, ctx)
 }
 

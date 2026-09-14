@@ -4,7 +4,8 @@ The inventory layer now retains source-free removal intent independently of
 connection commands, provider-peer deletion and approved installation packages.
 `NetbirdRemovalStore` provides exact-site review, immutable request admission,
 historical reads and explicit queued cancellation. A [joined dispatcher](netbird-removal-dispatch.md)
-now processes committed requests asynchronously; public routes remain separate.
+now processes committed requests asynchronously; the [scoped UI](netbird-removal-ui.md)
+provides exact review, confirmation and retained status/history.
 The separate [delivery owner](netbird-removal-delivery.md) now rechecks this intent,
 commits one native attempt and retains original results and receipt observations.
 
@@ -78,8 +79,8 @@ commands or mutate an enrolled endpoint.
 Separate native attempts/results, direct delivery and original-receipt observation
 and [reviewed uncertain-operation recovery](netbird-removal-resolutions.md) are
 implemented. [Joined dispatch](netbird-removal-dispatch.md) now consumes committed
-requests once. Retained local staging recovery, bounded history pages and public
-UI remain required.
+requests once. [Bounded history pages and public UI](netbird-removal-ui.md) now
+connect these lifecycles. Retained local staging recovery remains required.
 The already implemented
 [agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 provides exact native execution and repeated absence checks. Physical package,
