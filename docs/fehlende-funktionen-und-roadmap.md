@@ -823,8 +823,11 @@ now preserve original uncertainty while recording a distinct current-state
 result. Scoped review, immutable request/attempt/result storage, one direct
 delivery, retained observations, explicit resolution, joined dispatch and history
 forms are integrated. All six request families share device and permanent UUID
-exclusion. Empty/incomplete stages are preserved and require a distinct reviewed
-cleanup policy.
+exclusion. The [independent scaffold cleanup protocol, native owner, agent
+admission and console transport](netbird-removal-stage-cleanup.md) now bind a
+separately reviewed current scaffold and incomplete metadata scope. Unknown
+objects and usable manifests remain preserved. The console cleanup request,
+delivery, resolution and operator workflow still need integration.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

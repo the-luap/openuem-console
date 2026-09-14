@@ -113,14 +113,15 @@ before form parsing. Duplicate, unknown and mixed query/body fields are refused.
 Reader pages expose no mutations. History and receipt pages are `no-store`, escape
 retained metadata and omit certificates, broker keys and executable envelopes.
 
-Empty or incomplete stages remain preserved and need a separate reviewed cleanup
-policy. Manifest continuation cannot silently fall back to verification or stage
+Empty or incomplete stages remain preserved by this read-only workflow.
+[Independent scaffold cleanup](netbird-removal-stage-cleanup.md) has its own
+reviewed native owner and agent admission; its console lifecycle remains open. Manifest continuation cannot silently fall back to verification or stage
 cleanup. Linux individual enrollment, publisher trust and physical-device
 acceptance remain separate roadmap requirements.
 
 ## Verification
 
-All consumers pin runtime module `v0.11.1-0.20260914151935-517b4fe927dc`. Shared
+The initial integration pinned runtime module `v0.11.1-0.20260914151935-517b4fe927dc`. Shared
 command/package race tests pass; verification decoder fuzzing passed 341,756
 inputs. Full agent native package/journal/command races, isolated Linux
 journal/command suites and macOS/Linux/Windows agent builds pass. Owned NATS
