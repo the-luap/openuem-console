@@ -215,7 +215,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     services:
       postgres:
         image: postgres:17-alpine
@@ -238,7 +238,7 @@ jobs:
       - name: Generate console templates required by inventory fixtures
         run: go tool templ generate
       - name: Inventory and network workflow persistence race tests
-        run: python3 scripts/check-go-test-shard.py --package ./internal/inventory --index ${{ matrix.shard }} --count 4
+        run: python3 scripts/check-go-test-shard.py --package ./internal/inventory --index ${{ matrix.shard }} --count 8
   build:
     runs-on: ubuntu-latest
     strategy:

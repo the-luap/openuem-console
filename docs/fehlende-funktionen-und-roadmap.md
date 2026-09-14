@@ -849,9 +849,13 @@ The [Linux running-executable provider](https://github.com/the-luap/openuem-agen
 now retains kernel and canonical executable identities under protected ancestors,
 checks native ELF format and validates separately signed agent bytes. Native
 fixtures reject byte-identical copies and changed images/namespaces.
-Linux package staging and installed-command admission, service activation,
-production publisher provisioning and physical installation/removal acceptance
-remain separate requirements.
+The [protected Linux staging provider](https://github.com/the-luap/openuem-agent/blob/c76ca95fc22d263fd224ac550624c9383102eabc/docs/linux-package-staging.md)
+now connects independently signed release metadata, exact-origin HTTPS, native
+publisher checks and retained private directory/file ownership. It rejects unsafe
+roots before downloading and preserves replaced namespaces during cleanup.
+Installed Linux command admission, service activation, production publisher
+provisioning and physical installation/removal acceptance remain separate
+requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
