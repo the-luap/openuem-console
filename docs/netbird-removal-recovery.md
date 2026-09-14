@@ -7,8 +7,9 @@ valid protected original manifest. Console transport and the
 [scoped request store](netbird-removal-recovery-requests.md),
 [durable native delivery and receipt observation](netbird-removal-recovery-delivery.md)
 are implemented. [Reviewed release and withdrawal](netbird-removal-recovery-resolutions.md)
-now provide independent resolution and lost-response reconciliation. Dispatch and
-public UI integration remain open. No recovery route or automatic recovery delivery is enabled.
+now provide independent resolution and lost-response reconciliation.
+[Joined dispatch, coherent history and scoped console routes](netbird-removal-recovery-ui.md)
+complete the manifest-backed continuation workflow.
 
 ## Evidence and independent attempt
 
@@ -69,5 +70,7 @@ receipt observation under current individual authority can confirm completion
 without changing the first recovery result or the original uninstall evidence.
 Reviewed resolution now retains each single-use review and exact control before
 transport. Owned release/withdrawal proof can clear the recovery barrier without
-changing its original result or the original uninstall. Joined dispatch, coherent
-history and public UI integration remain required.
+changing its original result or the original uninstall. Inventory startup now
+configures the dedicated publisher and joined workers, while scoped console forms
+connect original proof, fresh review, queueing, history and explicit resolution.
+Absent/empty/incomplete manifest policies and physical acceptance remain open.

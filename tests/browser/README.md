@@ -1,11 +1,12 @@
 # Console form browser regression
 
 Run the real rendered console templates and repository assets in a disposable
-headless Chrome session. The runner covers 2,640 cases. The table highlights
+headless Chrome session. The runner covers 2,715 cases. The table highlights
 coverage; [run.mjs](run.mjs) defines the complete suite matrix:
 
 | Form | Case matrix | Cases |
 | --- | --- | ---: |
+| Native NetBird removal continuations | 22 review, progress, history, resolution and long-metadata states × three widths; nine pending/duplicate-submit checks | 75 |
 | Native NetBird removals | 23 review, absence, progress, history, recovery and long-metadata states × three widths; nine pending/duplicate-submit checks | 78 |
 | Native NetBird installations | 27 choice, review, progress, history, recovery and long-metadata states × three widths; nine pending/duplicate-submit checks | 90 |
 | Enterprise Wi-Fi | System/User × existing/copied trust × three TLS ranges × three widths; reader at each width | 39 |

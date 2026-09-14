@@ -32,33 +32,34 @@ import (
 )
 
 type Handler struct {
-	smtpTestSender         consolesettings.SMTPTestSender
-	winGetSource           func(context.Context, winget.Coordinate) (*winget.Snapshot, error)
-	IndividualAgentService *openuem_nats.ServiceConnection
-	IndividualBroker       *consolebroker.Broker
-	Access                 *access.Store
-	OIDCAccounts           *oidcaccounts.Store
-	Preferences            *preferences.Store
-	Audit                  *audit.Store
-	InventoryRefresh       *inventory.RefreshStore
-	ManualExecution        *inventory.ManualExecutionStore
-	NetbirdOperations      *inventory.NetbirdOperationStore
-	NetbirdResolutions     *inventory.NetbirdResolutionStore
-	NetbirdRegistrations   *inventory.NetbirdRegistrationStore
-	NetbirdInstallations   *inventory.NetbirdInstallationStore
-	NetbirdRemovals        *inventory.NetbirdRemovalStore
-	inventoryPublisher     inventoryPublisher
-	PublicOrigin           string
-	Model                  *models.Model
-	Apple                  *apple.Store
-	AppleSetupError        string
-	Windows                *windows.Store
-	WindowsOptions         windows.EnrollmentOptions
-	WindowsSetupError      string
-	Desktop                *desktop.Store
-	DesktopCatalog         *desktop.Catalog
-	DesktopBootstrapReady  bool
-	DesktopSetupError      string
+	smtpTestSender           consolesettings.SMTPTestSender
+	winGetSource             func(context.Context, winget.Coordinate) (*winget.Snapshot, error)
+	IndividualAgentService   *openuem_nats.ServiceConnection
+	IndividualBroker         *consolebroker.Broker
+	Access                   *access.Store
+	OIDCAccounts             *oidcaccounts.Store
+	Preferences              *preferences.Store
+	Audit                    *audit.Store
+	InventoryRefresh         *inventory.RefreshStore
+	ManualExecution          *inventory.ManualExecutionStore
+	NetbirdOperations        *inventory.NetbirdOperationStore
+	NetbirdResolutions       *inventory.NetbirdResolutionStore
+	NetbirdRegistrations     *inventory.NetbirdRegistrationStore
+	NetbirdInstallations     *inventory.NetbirdInstallationStore
+	NetbirdRemovals          *inventory.NetbirdRemovalStore
+	NetbirdRemovalRecoveries *inventory.NetbirdRemovalRecoveryStore
+	inventoryPublisher       inventoryPublisher
+	PublicOrigin             string
+	Model                    *models.Model
+	Apple                    *apple.Store
+	AppleSetupError          string
+	Windows                  *windows.Store
+	WindowsOptions           windows.EnrollmentOptions
+	WindowsSetupError        string
+	Desktop                  *desktop.Store
+	DesktopCatalog           *desktop.Catalog
+	DesktopBootstrapReady    bool
+	DesktopSetupError        string
 
 	NetbirdRegistrationResolutions *inventory.NetbirdRegistrationResolutionStore
 

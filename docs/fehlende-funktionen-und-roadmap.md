@@ -810,8 +810,11 @@ original uninstall evidence when a current receipt confirms completion.
 [Reviewed recovery resolution](netbird-removal-recovery-resolutions.md) now adds
 single-use reviews, durable release/withdrawal controls, owned proof and receipt
 reconciliation under current authority. A later independent recovery can retain
-the same original uninstall reference with a fresh journal/native review. Joined
-dispatch, public history/UI and absent-manifest recovery remain open.
+the same original uninstall reference with a fresh journal/native review.
+[Joined processing, coherent retained history and scoped console forms](netbird-removal-recovery-ui.md)
+now connect the full manifest-backed continuation lifecycle, including original
+proof eligibility, one native attempt, pre-native cancellation and explicit
+resolution. Absent/empty/incomplete manifest recovery remains open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

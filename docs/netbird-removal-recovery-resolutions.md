@@ -100,6 +100,6 @@ and release. Tests execute no vendor remover or host NetBird mutation. The full
 NetBird inventory suite, with 188 top-level tests plus subcases, passes with race
 detection against the owned PostgreSQL database. The Linux console build passes.
 
-Joined dispatch, coherent public history/UI, missing or empty manifest policies
-and physical installation/removal acceptance remain separate work. No recovery
-route or automatic processing is enabled by these stores.
+[Joined dispatch, coherent public history and scoped UI](netbird-removal-recovery-ui.md)
+now expose these reviewed resolutions. Missing or empty manifest policies and
+physical installation/removal acceptance remain separate work.

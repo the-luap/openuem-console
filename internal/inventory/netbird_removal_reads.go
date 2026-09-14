@@ -12,10 +12,11 @@ import (
 // Removal status is a coherent snapshot of retained evidence. It never
 // consults a device or depends on present native state or enrollment ownership.
 type NetbirdRemovalStatus struct {
-	Request      *NetbirdRemoval
-	Delivery     *NetbirdRemovalDelivery
-	DispatchStop *NetbirdRemovalDispatchStop
-	Resolution   *NetbirdRemovalResolution
+	CanReviewRecovery bool
+	Request           *NetbirdRemoval
+	Delivery          *NetbirdRemovalDelivery
+	DispatchStop      *NetbirdRemovalDispatchStop
+	Resolution        *NetbirdRemovalResolution
 }
 
 func (s NetbirdRemovalStatus) State() string {
@@ -47,6 +48,14 @@ func readRemovalStatus(ctx context.Context, tx *sql.Tx, scope access.Scope, devi
 		return nil, err
 	}
 	out := &NetbirdRemovalStatus{Request: r}
+	if r.ReleasedAt != nil && r.Descriptor.Platform == "macos" {
+		_, proofErr := readRemovalRecoveryOriginal(ctx, tx, scope, device, id)
+		if proofErr == nil {
+			out.CanReviewRecovery = true
+		} else if !errors.Is(proofErr, ErrNetbirdOperationConflict) && !errors.Is(proofErr, ErrNotFound) {
+			return nil, proofErr
+		}
+	}
 	out.Delivery, err = readRemovalDelivery(ctx, tx, id)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err

@@ -5,7 +5,8 @@ observation to the [reviewed recovery request store](netbird-removal-recovery-re
 Migration 034 adds immutable attempt, result and observation records, guarded
 completion, cancellation exclusion and the updated five-family device barrier.
 The original uninstall, its unconfirmed outcome and its owned release proof remain
-unchanged. No route or automatic dispatcher is enabled by this store.
+unchanged. [Inventory startup and the scoped console workflow](netbird-removal-recovery-ui.md)
+now configure automatic dispatch and reviewed public actions.
 
 ## Admission before native execution
 
@@ -97,6 +98,6 @@ uninstall outcome and use no vendor remover or host NetBird state. The complete
 NetBird inventory suite, with 177 top-level tests plus subcases, passes with race
 detection against the owned PostgreSQL database. The Linux console build passes.
 
-Joined automatic dispatch, coherent public history and UI remain separate
-integration work. Missing, empty or incomplete
-manifest policy and physical package/reboot acceptance also remain open.
+Joined dispatch, coherent public history and scoped UI are now integrated.
+Missing, empty or incomplete manifest policy and physical package/reboot
+acceptance remain open.

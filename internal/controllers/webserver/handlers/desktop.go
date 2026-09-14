@@ -21,9 +21,9 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution":
+		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/installations/new", "/computers/:uuid/netbird/installations/review", "/computers/:uuid/netbird/installations/:request/resolution":
 			return access.AssignSoftware, true
@@ -47,7 +47,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
 			return access.AssignSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request/cancel", "/computers/:uuid/netbird/registrations/:request/cleanup", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request/cancel", "/computers/:uuid/netbird/connect", "/computers/:uuid/netbird/disconnect", "/computers/:uuid/netbird/switchprofile", "/computers/:uuid/netbird/install", "/computers/:uuid/netbird/uninstall", "/computers/:uuid/netbird/register", "/computers/:uuid/netbird/deletepeer":
 			return access.ManageDeviceSecurity, true
@@ -132,6 +132,16 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	removal.GET("/:request/resolution", h.NetbirdRemovalResolutionReview)
 	removal.POST("/:request/resolution", h.NetbirdRemovalResolve)
 	removal.POST("/:request/resolution/reconcile", h.NetbirdRemovalReconcile)
+	recovery := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-recoveries", h.IsAuthenticated, h.AppleCSRF)
+	recovery.GET("", h.NetbirdRemovalRecoveryHistory)
+	recovery.GET("/review", h.NetbirdRemovalRecoveryReview)
+	recovery.POST("", h.NetbirdRemovalRecoveryRequest)
+	recovery.GET("/:request", h.NetbirdRemovalRecoveryReceipt)
+	recovery.POST("/:request/cancel", h.NetbirdRemovalRecoveryCancel)
+	recovery.POST("/:request/observe", h.NetbirdRemovalRecoveryObserve)
+	recovery.GET("/:request/resolution", h.NetbirdRemovalRecoveryResolutionReview)
+	recovery.POST("/:request/resolution", h.NetbirdRemovalRecoveryResolve)
+	recovery.POST("/:request/resolution/reconcile", h.NetbirdRemovalRecoveryReconcile)
 	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
 	registration.GET("", h.NetbirdRegistrationHistory)
 	registration.GET("/new", h.NetbirdRegistrationChoices)

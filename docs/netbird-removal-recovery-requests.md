@@ -7,7 +7,8 @@ history index and common admission guards. The store provides review, request,
 scoped read and explicit cancellation. The delivery-enabled constructor adds
 [one durable native attempt and retained receipt observation](netbird-removal-recovery-delivery.md).
 [Reviewed release/withdrawal resolution](netbird-removal-recovery-resolutions.md)
-also retains separate proof. Joined dispatch and public UI integration remain open.
+also retains separate proof. [Joined dispatch and scoped console forms](netbird-removal-recovery-ui.md)
+now connect the complete manifest-backed request lifecycle.
 
 ## Original owned evidence
 
@@ -93,5 +94,6 @@ Tests do not execute a vendor remover or read/change host NetBird state.
 
 The full NetBird inventory suite passes with race detection against an owned
 PostgreSQL database, including the existing four families and the new recovery
-requests. The Linux console build also passes. Public routes and automatic
-delivery are not configured by the request or delivery stores.
+requests. The Linux console build also passes. Inventory startup configures the
+dedicated delivery publisher and joined dispatcher; scoped console routes expose
+reviewed requests and retained history.
