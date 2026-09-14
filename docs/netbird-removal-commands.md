@@ -25,8 +25,14 @@ It verifies protected receipt/BOM and bundle objects, exact package file lists,
 NetBird publisher signatures, native ACLs, the CLI link and supported daemon plist
 under matching before/after snapshots. First-pass file handles prevent immediate
 inode reuse from hiding an exchange during verification. This private filesystem
-evidence is not exposed as a complete removal-state response: actual launchd and
-process ownership must still be joined before runtime removal support is enabled.
+evidence is now joined by the [private runtime ownership observer](https://github.com/the-luap/openuem-agent/blob/eed274908645e816d16bab818465c0e06e63094b/docs/netbird-removal-runtime.md).
+Kernel audit tokens, dynamic code validity and repeated process scans bind the
+actual running instances. A typed system-domain launchd enumeration distinguishes
+loaded, unloaded and unavailable evidence, and a running job PID must match the
+root NetBird CLI. Two rounds of file/job/process evidence construct the complete
+source-free descriptor privately. The observer remains unconfigured until native
+execution and verified absence are connected; removal-state is still unavailable
+through deployed services.
 
 Shared race/fuzz tests, agent journal/command/preparation race tests, owned native
 agent/service/enrollment regressions and all supported consumer builds cover this

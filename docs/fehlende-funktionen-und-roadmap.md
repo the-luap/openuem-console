@@ -764,8 +764,11 @@ exact inspected installed state, current individual identity and the common
 uncertainty/recovery barrier. Private native filesystem inspection now verifies
 protected receipt/BOM, complete bundle files, publisher signatures, ACLs, CLI link
 and daemon plist across matching snapshots, retaining first-pass file handles.
-The complete launchd/process observer, native remover and console request/dispatch/
-recovery/UI remain to be connected. Linux individual enrollment,
+The private combined observer now adds kernel audit-token process identity,
+dynamic signature validation and typed loaded-system-job ownership, with two
+matching rounds of file/job/process evidence. Native execution and absence
+verification, observer/runtime binding and console request/dispatch/recovery/UI
+remain to be connected. Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.
 

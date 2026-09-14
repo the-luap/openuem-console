@@ -70,8 +70,10 @@ the table's package summaries do not remove any detail from the roadmap.
   The agent's private filesystem inspector now binds protected receipts, complete
   bundle contents, NetBird publisher signatures, ACLs, CLI link and daemon plist
   across stable snapshots, with retained handles preventing immediate inode reuse.
-  Actual launchd/process ownership, native removal verification, runtime binding
-  and the console lifecycle remain open; owned tests are not physical removal.
+  The combined observer now binds actual kernel process generations, dynamic code
+  signatures and loaded system launchd ownership through repeated snapshots.
+  Native execution/absence verification, runtime binding and the console lifecycle
+  remain open; owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.
