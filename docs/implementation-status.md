@@ -66,8 +66,12 @@ the table's package summaries do not remove any detail from the roadmap.
   agent download stage. Independent bounded HTTPS, native macOS PKG trust, repeated
   file-identity/hash checks and replacement-safe cleanup are covered by inert
   fixtures. The unreferenced remote-shell and unpinned installer helpers have
-  been removed. This component does not enable installation: approval/admission,
-  native metadata, install/remove execution and resulting-state recovery remain
+  been removed. Native preflight now verifies exact DEB/RPM identity and macOS
+  distribution/component identity plus both executable architectures. Official
+  artifacts pass read-only checks, including macOS notarization. Archive ambiguity,
+  wrong architecture, bounded subprocesses and concurrent cleanup have adversarial
+  coverage. This component does not enable installation: approval/admission,
+  Linux publisher trust, install/remove execution and resulting-state recovery remain
   required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
   native service regressions pass. All supported console/agent/worker builds
   pass with the same immutable shared revision.

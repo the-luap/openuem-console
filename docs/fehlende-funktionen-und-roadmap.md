@@ -706,9 +706,13 @@ organization approval, platform/architecture, native package version, HTTPS
 source, size and digest. The agent privately stages bounded downloads without
 redirects or enrollment credentials, requires native macOS PKG trust and rechecks
 the same file before use. Old unreferenced shell/unpinned installer helpers are
-removed. Native package identity, authenticated approval and installer admission,
+removed. Preparation now verifies native DEB/RPM identity and macOS distribution,
+component receipt and bundled executable architectures. Bounded read-only checks
+of official packages, malformed archive/process fixtures, macOS/Linux race suites
+and all agent platform builds pass. Authenticated approval and installer admission,
 execution, observation and recovery remain necessary before this preparation
-component can enable installation or local uninstallation.
+component can enable installation or local uninstallation; Linux publisher trust
+and physical installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
