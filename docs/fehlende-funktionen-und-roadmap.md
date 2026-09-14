@@ -888,13 +888,27 @@ CI jobs. The [start controller](https://github.com/the-luap/openuem-agent/blob/d
 compares PID, invocation and both independently recorded start timestamps around
 signed readiness. Three fresh ARM64 guests exercise actual starts, retained
 invocations, initialization and identity conflicts. An AMD64 decoder-close panic
-now has a bounded complete-message transport fix and a passing native regression;
-updated AMD64 CI remains pending. The
+now has a bounded complete-message transport fix; its native regression and actual
+AMD64 systemd job pass in [CI](https://github.com/the-luap/openuem-agent/actions/runs/34905386944).
+The
 [operational configuration provider](https://github.com/the-luap/openuem-agent/blob/d32358109cb21db0e02745170ac479ebf82df963/docs/linux-operational-configuration.md)
 adds private INI/log admission, exclusive synchronized publication and phase
-checks with the real INI parser. The combined actual-manager activation fixture,
-public CLI dispatch, production publisher provisioning and physical
-installation/removal acceptance remain separate requirements.
+checks with the real INI parser. The
+[public Linux activation command](https://github.com/the-luap/openuem-agent/blob/443f1e76d1d6ec115dabf5da47c8216b6a268896/docs/native-linux-activation.md)
+now joins those providers before logger/service startup. Nine live families pass
+on each of three fresh ARM64 guests, including public activation and retry with
+actual encrypted credentials and unchanged device scope/records after the test
+issuer closes. Four native activation families, actual CLI help, common races,
+Linux/Windows builds and Linux Vet pass; all fourteen updated
+[cross-platform CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34907075050)
+pass, including the actual AMD64 systemd fixture. The console now displays Linux
+AMD64/ARM64 invitations correctly and its shared gateway/listener allowlist admits
+their exact approved package downloads. PostgreSQL/HTTP2 and pinned mutual-TLS
+gateway tests verify the signed target, scoped identity and unchanged claim retry;
+the complete console route fixture verifies scoped Linux invitation creation.
+The helper proves local readiness, not broker/inventory delivery. Production
+publisher provisioning, installer distribution and physical installation/removal
+acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

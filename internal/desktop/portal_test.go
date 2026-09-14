@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,8 +15,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/bootstrap"
 	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/openuem-console/internal/desktop/protocol"
 )
 
 func newPortalFixture(t *testing.T) *publicFixture {
@@ -26,6 +31,75 @@ func newPortalFixture(t *testing.T) *publicFixture {
 	}
 	defer clear(key)
 	return newPublicFixtureWithAgent(t, true, key)
+}
+
+func TestLinuxPortalPreservesApprovedTargetThroughDownloadsAndClaim(t *testing.T) {
+	for _, target := range []struct{ architecture, format, label string }{{"amd64", "deb", "Linux (x64)"}, {"arm64", "rpm", "Linux (ARM64)"}} {
+		t.Run(target.architecture, func(t *testing.T) {
+			public, private, err := ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer clear(private)
+			f := newPublicTargetFixture(t, true, "linux", target.architecture, target.format, private)
+			path := strings.TrimSuffix(f.path(""), "/")
+			for _, method := range []string{"GET", "HEAD", "GET"} {
+				response, data := publicRequest(t, f.server.Client(), f.server.URL, method, path, nil, nil)
+				if response.StatusCode != 200 || response.ProtoMajor != 2 {
+					t.Fatal("Linux portal unavailable over native TLS", response.StatusCode)
+				}
+				if method == "HEAD" {
+					if len(data) != 0 {
+						t.Fatal("Linux portal HEAD returned a body")
+					}
+				} else {
+					for _, text := range []string{target.label, "Linux activation requires root access and systemd", "verifies the approved package publisher", "Download approved agent"} {
+						if !bytes.Contains(data, []byte(text)) {
+							t.Fatal("Linux portal omitted its target or native prerequisites", text)
+						}
+					}
+					if bytes.Contains(data, []byte("Windows (")) || bytes.Contains(data, []byte("Login Items")) {
+						t.Fatal("Linux invitation showed another platform's instructions")
+					}
+					if directory := os.Getenv("OPENUEM_DESKTOP_PORTAL_ARTIFACTS"); directory != "" {
+						if os.MkdirAll(directory, 0700) != nil || os.WriteFile(filepath.Join(directory, "desktop-portal-linux-"+target.architecture+".html"), data, 0600) != nil {
+							t.Fatal("could not write owned Linux portal artifact")
+						}
+					}
+				}
+			}
+			response, configuration := publicRequest(t, f.server.Client(), f.server.URL, "GET", f.path("configuration"), nil, nil)
+			verified, err := bootstrap.Verify(configuration, bootstrap.Trust{Origin: f.handler.origin, BootstrapKeys: []ed25519.PublicKey{public}, ReleaseKeys: []ed25519.PublicKey{f.public}, Platform: "linux", Architecture: target.architecture}, time.Now())
+			if response.StatusCode != 200 || err != nil || verified.Artifact() != f.invitation.Artifact || verified.Config().TenantID != 1 || verified.Config().SiteID != 1 {
+				t.Fatal("Linux portal configuration lost its signed target or scope", err)
+			}
+			response, packageBytes := publicRequest(t, f.server.Client(), f.server.URL, "GET", protocol.DownloadPath(f.invitation.ReleaseDigest, "linux", target.architecture), nil, nil)
+			if response.StatusCode != 200 || verified.VerifyPackage(bytes.NewReader(packageBytes)) != nil || !strings.Contains(response.Header.Get("Content-Disposition"), f.invitation.Artifact.Filename) {
+				t.Fatal("Linux download did not match the approved package")
+			}
+			var uses, identities int
+			if err := f.store.db.QueryRow(`SELECT (SELECT uses FROM uem_agent_invitations WHERE id=$1),(SELECT count(*) FROM uem_agent_identities)`, f.invitation.ID).Scan(&uses, &identities); err != nil || uses != 0 || identities != 0 {
+				t.Fatal("Linux browser reads consumed enrollment", err)
+			}
+			request, err := json.Marshal(f.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var previous enrollment.Response
+			for attempt := 0; attempt < 2; attempt++ {
+				response, data := publicRequest(t, f.server.Client(), f.server.URL, "POST", f.path("claim"), request, map[string]string{"Content-Type": "application/json"})
+				var issued enrollment.Response
+				if response.StatusCode != 200 || json.Unmarshal(data, &issued) != nil || issued.TenantID != 1 || issued.SiteID != 1 || issued.DeviceID == "" || (attempt != 0 && (issued.DeviceID != previous.DeviceID || issued.Certificate != previous.Certificate)) {
+					t.Fatal("Linux claim or retry lost its scoped individual identity", response.StatusCode)
+				}
+				previous = issued
+			}
+			var platform, architecture string
+			if err := f.store.db.QueryRow(`SELECT platform,architecture FROM uem_agent_identities WHERE id=$1`, previous.DeviceID).Scan(&platform, &architecture); err != nil || platform != "linux" || architecture != target.architecture {
+				t.Fatal("issued Linux identity lost its native target", err)
+			}
+		})
+	}
 }
 
 func TestDesktopPortalAndInvitationDownloadNeverClaimOrReserveAnIdentity(t *testing.T) {

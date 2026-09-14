@@ -37,7 +37,7 @@ fast switching, APNs delivery and profile effects still need Mac hardware accept
 | --- | --- | --- |
 | NET-01 | Reviewed resumable installation with supplied TLS or automatic DNS-01 and retained renewal service; provider-neutral DNS-01 issuer with pinned lego, protected account identity and atomic publication; native HTTPS gateway with atomic public TLS file renewal, retained live streams and per-handshake lifetime checks; exact public Apple route allowlist; source-network admin restriction; pinned mutual TLS on all backends; canonical login origin; optional exact agent WSS, upgrade limits and stream shutdown tested against real NATS; optional desktop metadata/configuration/key/claim/download routes with pinned private TLS and bounded streaming; optional exact Windows discovery/XCEP/WSTEP/SyncML routes with pinned gateway identity; synthetic TLS/PostgreSQL tests | Released-agent authorization/enrollment integration; deployment firewall proof; live DNS/ACME provider operations, proxy/browser/timeouts/load acceptance |
 | SEC-01 | Header-only certificate login removed; verified bounded OIDC flows, permanent issuer/subject account bindings, explicit administrator migration and atomic audited registration; trusted gateway boundary; OCSP certificate/freshness binding; canonical redirects; global request-token/Origin CSRF; persisted server/organization/site grants, native Apple and individual desktop enrollment capabilities, permission administration/history; existing sessions rechecked; scoped desktop overview with explicit inventory projection, transaction-bound authorization and audit, incomplete-report handling and linked Mac navigation; durable scoped inventory refresh with current-authority dispatch checks, independent attempt evidence, bounded retries and truthful delivery states; scoped software, network, storage, peripheral, memory-module, share and security report search and 25-entry pagination with transaction-bound read audits | Remaining legacy desktop detail/action permissions beyond scoped inventory reads and refresh; audit all existing mutation paths; complete authorization and direct-access regression matrix |
-| ENR-01 | Device-generated Apple SCEP enrollment with one-time challenge, exact request retries, separate encrypted RA, scoped certificate pinning and TLS/gateway/PostgreSQL tests; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows/macOS activation, macOS app bundle assembly and authenticated local readiness, and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS signed-release registration/approval acceptance, signed installer distribution, binding migration/updates, renewal and release integration |
+| ENR-01 | Device-generated Apple SCEP enrollment with one-time challenge, exact request retries, separate encrypted RA, scoped certificate pinning and TLS/gateway/PostgreSQL tests; shared desktop CSR/broker-key proof, limited PostgreSQL invitations and CA issuance, scoped subjects, bounded broker authorization/session outbox, executable auth/disconnect and worker TLS/NKey services, protected broker setup, durable fixed-consumer reconciliation, worker body/profile/task checks; scoped console authority setup/import, release-bound invitation creation, metadata and revocation; approved-release-bound public HTTPS claims, scanner-safe metadata and public installation instructions; Windows DPAPI/macOS Keychain/Linux encrypted host-key storage, durable claim recovery, native command authorization and installed-agent admission, verified scope/checkpoints, protected executable binding, explicit service arguments, Windows/macOS/Linux activation, macOS app bundle assembly and authenticated local readiness, and opt-in scoped WSS runtime; real-broker/database tests and passing related-repository CI | Reference installation wiring; macOS signed-release registration/approval acceptance, signed installer distribution, binding migration/updates, renewal and release integration |
 | APP-01 | Instance-generated public CSR and encrypted per-request key; authorized request history/download/revocation; certificate-only import with offline Apple chain/production usage verification and a mandatory fresh TLS/HTTP2 APNs connection gate; atomic renewal revision/topic checks, account metadata, setup warning and persistent scoped SMTP expiry reminders/history; pinned vendor envelope verification/download, offline vendor signing utility and PostgreSQL/console route tests | Deployment vendor authority/operations and automatic service transport; independent certificate revocation checking; deployment SMTP delivery and actual Apple issuance/renewal/device continuity |
 | UX-01 | Roadmap and supporting authored documentation in English; permission-aware navigation/forms; shared header wrapping and rendered access-page checks at 390/768/1440 px; persisted account language selection, browser default, English catalog fallback and responsive profile checks; shared localized UTC report timestamps with exact instants, preserved audit precision and browser fallback | Shared platform navigation/components, remaining locale keys, pagination/filter/export/bulk consistency, remaining dates/states, redacted errors, build summary, full accessible responsive browser acceptance |
 | ENR-02 | Public Apple instructions, confirmed browser-bound claims, GET/HEAD scanner safety, local QR, bounded encrypted retries, status/expiry/revocation help; real-browser native form and download checks; scoped desktop invitation creation, public administrator-assisted installation page, metadata/claim/download protocol with exact gateway routes, file verification and safe same-key recovery | Physical iPhone/iPad and Safari acceptance; macOS signed-release activation acceptance and finished Windows/Mac installer flows |
@@ -61,6 +61,38 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- Linux invitations now retain their architecture in the console selector,
+  creation result and public installation instructions. The shared private
+  listener/gateway allowlist admits exact Linux AMD64/ARM64 package downloads;
+  previously the stored Linux target could be mislabeled as Windows and its
+  download path was rejected. PostgreSQL/HTTP2 tests verify release-bound DEB/RPM
+  downloads, scanner-safe reads, scoped claims and unchanged retry identity.
+  Gateway tests cover Windows, Mac and both Linux architectures through pinned
+  mutual TLS, with and without the agent broker, while rejecting aliases and
+  direct backend access. The affected protocol/desktop race suites pass in
+  1.390/20.065 seconds, the complete console route fixture in 87.788 seconds,
+  desktop view races in 1.903 seconds, and the full Linux build and Vet pass.
+  Chromium renders the saved public page and console invitation result at
+  390/768/1440 pixels without document/body overflow; the expanded administrator
+  instructions and mobile/desktop captures were inspected.
+
+- The [public Linux activation command](https://github.com/the-luap/openuem-agent/blob/443f1e76d1d6ec115dabf5da47c8216b6a268896/docs/native-linux-activation.md)
+  now accepts completed AMD64/ARM64 enrollment before logger/service startup and
+  joins running-image admission, encrypted identity, protected configuration,
+  persistent registration and process-bound readiness. Nine live families pass
+  on each of three fresh ARM64 RAM-only systemd guests. The public command test
+  enrolls once, closes its loopback issuer, reopens real encrypted credentials and
+  invokes public activation and retry without injected providers. It preserves
+  every encrypted record and the original device/tenant/site scope. Four native
+  activation families pass under the race detector in 1.069 seconds; actual CLI
+  help creates no configuration/log files. Common regressions, full Linux/Windows
+  builds and Linux Vet pass. All fourteen jobs pass in
+  [AMD64 and cross-platform CI](https://github.com/the-luap/openuem-agent/actions/runs/34907075050)
+  including the actual AMD64 systemd fixture. The guest helper models local
+  readiness; production signing,
+  installer distribution, broker/inventory acceptance and physical installation
+  still require their separate evidence.
+
 - The [Linux operational configuration provider](https://github.com/the-luap/openuem-agent/blob/d32358109cb21db0e02745170ac479ebf82df963/docs/linux-operational-configuration.md)
   now prepares the fixed private INI and log directories through retained root
   ancestry and exclusive, synchronized publication. Native fixtures preserve
@@ -68,8 +100,9 @@ the table's package summaries do not remove any detail from the roadmap.
   configuration, registration and readiness phases. The 27 required native
   systemd/filesystem families pass in 9.454 seconds; the three required activation
   provider families with the real INI parser pass in 1.059 seconds. Linux/Windows
-  builds and Linux Vet pass. The public Linux activation gate remains closed until
-  the combined actual-manager activation fixture and CLI dispatch are complete.
+  builds and Linux Vet pass. All fourteen jobs pass in
+  [provider CI](https://github.com/the-luap/openuem-agent/actions/runs/34905386944).
+  The later combined fixture and public CLI integration are recorded above.
 
 - The [Linux start controller](https://github.com/the-luap/openuem-agent/blob/def5a3d925dd696836b74803d3b7af1066525bfa/docs/linux-systemd-start.md)
   now binds signed readiness to the manager PID, invocation and separately recorded
@@ -78,7 +111,8 @@ the table's package summaries do not remove any detail from the roadmap.
   AMD64 CI exposed a library panic on socket closure during D-Bus alignment; the
   [message framing boundary](https://github.com/the-luap/openuem-agent/blob/def5a3d925dd696836b74803d3b7af1066525bfa/docs/linux-systemd-connection.md)
   now admits bounded complete messages before decoding. Its deterministic native
-  regression passes; the updated AMD64 CI remains pending at this checkpoint.
+  regression and the actual AMD64 systemd job pass in
+  [provider CI](https://github.com/the-luap/openuem-agent/actions/runs/34905386944/job/104180730660).
 
 - [Persistent Linux registration](https://github.com/the-luap/openuem-agent/blob/0aa8e36b791c7093075176be360bb66c0e0a6a3a/docs/linux-systemd-registration.md)
   resumes canonical files left before reload or after enablement, without starting
@@ -172,8 +206,9 @@ the table's package summaries do not remove any detail from the roadmap.
   enrollment suite. macOS regressions, Linux/Windows builds and Linux Vet pass.
   Agent `45a6e05` passes all thirteen
   [CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34890889990).
-  Linux service registration/activation, final distribution and physical
-  installation/removal acceptance remain separate requirements.
+  The later Linux service registration/activation integration is recorded above.
+  Final distribution and physical installation/removal acceptance remain separate
+  requirements.
 
 - The [installed Linux enrollment command](https://github.com/the-luap/openuem-agent/blob/04fb25c17a831e3a2025a6b274f8df4ce7b2fa8f/docs/native-linux-enrollment.md)
   now joins the kernel-selected ELF image, independently signed release data,
@@ -184,7 +219,7 @@ the table's package summaries do not remove any detail from the roadmap.
   families pass in 5.554 seconds; macOS command regressions, Linux/Windows
   builds, Windows test compilation, Linux Vet and actual Linux entry-point help
   pass. Agent `04fb25c` passes all twelve CI jobs. Its later readiness integration
-  is tracked above; Linux service activation remains separate work.
+  and service activation are tracked above.
 
 - [Protected Linux bootstrap staging](https://github.com/the-luap/openuem-agent/blob/c76ca95fc22d263fd224ac550624c9383102eabc/docs/linux-package-staging.md)
   now joins signed Linux release/configuration data, exact-origin HTTPS and

@@ -20,7 +20,8 @@ func prepareInstallerInvitation(t *testing.T, f *catalogTestFixture) (*Installer
 	if _, err := f.catalog.Accept(context.Background(), data, "release-pipeline"); err != nil {
 		t.Fatal(err)
 	}
-	options := registry.InvitationOptions{Scope: registry.Scope{TenantID: 1, SiteID: 1}, Platform: "windows", Architecture: "amd64", MaxUses: 1, ExpiresAt: time.Now().Add(30 * time.Minute)}
+	target := f.manifest.Artifacts[0]
+	options := registry.InvitationOptions{Scope: registry.Scope{TenantID: 1, SiteID: 1}, Platform: target.Platform, Architecture: target.Architecture, MaxUses: 1, ExpiresAt: time.Now().Add(30 * time.Minute)}
 	invitation, err := f.store.InviteInstaller(context.Background(), f.catalog, options, verified.Digest(), "https://uem.example.test", "organization-admin")
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +31,12 @@ func prepareInstallerInvitation(t *testing.T, f *catalogTestFixture) (*Installer
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := keys.Request(token, "windows", "amd64", "Approved Windows endpoint")
+	t.Cleanup(func() { keys.Broker.Wipe() })
+	deviceName := "Approved Windows endpoint"
+	if target.Platform == "linux" {
+		deviceName = "Approved Linux endpoint"
+	}
+	request, err := keys.Request(token, target.Platform, target.Architecture, deviceName)
 	if err != nil {
 		t.Fatal(err)
 	}

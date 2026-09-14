@@ -49,7 +49,16 @@ func newPublicFixture(t *testing.T, bootstrapKeys ...ed25519.PrivateKey) *public
 
 func newPublicFixtureWithAgent(t *testing.T, bindAgent bool, bootstrapKeys ...ed25519.PrivateKey) *publicFixture {
 	t.Helper()
+	return newPublicTargetFixture(t, bindAgent, "windows", "amd64", "msi", bootstrapKeys...)
+}
+
+func newPublicTargetFixture(t *testing.T, bindAgent bool, platform, architecture, format string, bootstrapKeys ...ed25519.PrivateKey) *publicFixture {
+	t.Helper()
 	f := newCatalogFixture(t)
+	f.manifest.Artifacts[0].Platform = platform
+	f.manifest.Artifacts[0].Architecture = architecture
+	f.manifest.Artifacts[0].Format = format
+	f.manifest.Artifacts[0].Filename = "openuem-agent-0.12.0-" + platform + "-" + architecture + "." + format
 	if bindAgent {
 		f.manifest.Artifacts[0].AgentSize = 1
 		f.manifest.Artifacts[0].AgentSHA256 = strings.Repeat("a", 64)
@@ -261,7 +270,20 @@ func publicTestIdentity(t *testing.T, name string) (tls.Certificate, []byte) {
 }
 
 func TestPublicDesktopThroughGatewayRejectsDirectAccessAndAdministratorAliases(t *testing.T) {
+	for _, target := range []struct{ platform, architecture, format string }{{"windows", "amd64", "msi"}, {"macos", "arm64", "pkg"}, {"linux", "amd64", "deb"}, {"linux", "arm64", "rpm"}} {
+		t.Run(target.platform+"/"+target.architecture, func(t *testing.T) {
+			exercisePublicDesktopThroughGateway(t, target.platform, target.architecture, target.format)
+		})
+	}
+}
+
+func exercisePublicDesktopThroughGateway(t *testing.T, platform, architecture, format string) {
+	t.Helper()
 	f := newCatalogFixture(t)
+	f.manifest.Artifacts[0].Platform = platform
+	f.manifest.Artifacts[0].Architecture = architecture
+	f.manifest.Artifacts[0].Format = format
+	f.manifest.Artifacts[0].Filename = "openuem-agent-0.12.0-" + platform + "-" + architecture + "." + format
 	f.manifest.Artifacts[0].AgentSize = 1
 	f.manifest.Artifacts[0].AgentSHA256 = strings.Repeat("a", 64)
 	_, bootstrapKey, err := ed25519.GenerateKey(rand.Reader)
@@ -322,7 +344,7 @@ func TestPublicDesktopThroughGatewayRejectsDirectAccessAndAdministratorAliases(t
 			client := &http.Client{Transport: transport}
 			defer client.CloseIdleConnections()
 			tokenPath := "/enroll/desktop/" + claim.Invitation
-			for _, path := range []string{tokenPath, tokenPath + "/invitation", tokenPath + "/metadata", tokenPath + "/configuration", "/enroll/desktop/bootstrap-keys", protocol.DownloadPath(invitation.ReleaseDigest, "windows", "amd64")} {
+			for _, path := range []string{tokenPath, tokenPath + "/invitation", tokenPath + "/metadata", tokenPath + "/configuration", "/enroll/desktop/bootstrap-keys", protocol.DownloadPath(invitation.ReleaseDigest, platform, architecture)} {
 				response, data := publicRequest(t, client, server.URL, "GET", path, nil, map[string]string{"Client-Cert": "forged", "X-SSL-Client-Cert": "forged", "X-Forwarded-For": "10.42.1.1"})
 				if response.StatusCode != 200 {
 					t.Fatal("public route failed through gateway", response.StatusCode, string(data))
@@ -332,6 +354,12 @@ func TestPublicDesktopThroughGatewayRejectsDirectAccessAndAdministratorAliases(t
 				response, _ := publicRequest(t, client, server.URL, "GET", path, nil, map[string]string{"X-Forwarded-For": "10.42.1.1"})
 				if response.StatusCode != 403 {
 					t.Fatal("unlisted public path reached a backend", response.StatusCode)
+				}
+			}
+			for _, suffix := range []string{"/", "/admin", "?", "?download=1"} {
+				response, _ := publicRequest(t, client, server.URL, "GET", protocol.DownloadPath(invitation.ReleaseDigest, platform, architecture)+suffix, nil, nil)
+				if response.StatusCode != 403 {
+					t.Fatal("download alias crossed the public gateway boundary", response.StatusCode)
 				}
 			}
 			// Knowing either a forwarded certificate or an endpoint private key

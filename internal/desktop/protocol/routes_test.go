@@ -37,6 +37,31 @@ func TestBootstrapRoutesHaveExactReadOnlyMethodsAndPaths(t *testing.T) {
 	}
 }
 
+func TestReleaseDownloadRoutesRetainExactTargetAndReadOnlyBoundary(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	for _, platform := range []string{"windows", "macos", "linux"} {
+		for _, architecture := range []string{"amd64", "arm64"} {
+			path := DownloadPath(digest, platform, architecture)
+			for _, method := range []string{"GET", "HEAD"} {
+				route, ok := Parse(httptest.NewRequest(method, "https://uem.example.test"+path, nil))
+				if !ok || route != (Route{Kind: "download", Digest: digest, Platform: platform, Architecture: architecture}) {
+					t.Fatal("download lost its approved target")
+				}
+			}
+			for _, method := range []string{"POST", "PUT", "PATCH", "DELETE", "OPTIONS"} {
+				if _, ok := Parse(httptest.NewRequest(method, "https://uem.example.test"+path, nil)); ok {
+					t.Fatal("download accepted a write or unsupported method")
+				}
+			}
+			for _, invalid := range []string{path + "/", path + "/admin", path + "?", path + "?target=other", path + "#fragment", strings.Replace(path, "/releases/", "/releas%65s/", 1), strings.Replace(path, "/"+platform+"/", "//"+platform+"/", 1), DownloadPath(strings.ToUpper(digest), platform, architecture), DownloadPath(digest, "freebsd", architecture), DownloadPath(digest, platform, "386")} {
+				if _, ok := Parse(httptest.NewRequest("GET", "https://uem.example.test"+invalid, nil)); ok {
+					t.Fatal("download normalized an alias or unsupported target")
+				}
+			}
+		}
+	}
+}
+
 func TestIdentityRenewalRoutesRequireExactDeviceOperationAndPOST(t *testing.T) {
 	id := "11111111-1111-4111-8111-111111111111"
 	for _, operation := range []string{"prepare", "confirm", "resolve"} {

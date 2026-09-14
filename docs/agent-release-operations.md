@@ -76,6 +76,7 @@ pipeline calls its `Sign` function after native package signing/verification.
 An envelope contains a domain-separated Ed25519 signature over the exact payload.
 That payload binds version, sequence, timestamps and each target's filename,
 byte size and SHA-256 digest. Windows supports `exe`/`msi`, Mac supports `pkg`,
+and Linux supports `deb`/`rpm`,
 with explicit `amd64`/`arm64` selection. Unknown fields, ambiguous JSON, unsupported
 targets and unapproved filenames are rejected. Validity is at most thirty days;
 packages are bounded to 512 MiB each.

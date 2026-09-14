@@ -13,7 +13,7 @@
 {{if .Compatible}}
 {{if gt .Remaining 0}}
 <section aria-labelledby="install-title"><h2 id="install-title">Install with your IT administrator</h2>
-<ol><li>Download the approved agent for <strong>{{.Target}}</strong>. Your computer must match this type.</li><li>Open the installer and follow your operating system's signature and administrator prompts. Do not bypass a security warning.</li><li>Your IT administrator completes enrollment with the installed agent and your explicit management approval. The organization may collect inventory and perform administrator management actions.</li></ol>
+<ol><li>Download the approved agent for <strong>{{.Target}}</strong>. Your computer must match this type.</li><li>{{if .Linux}}Your IT administrator verifies the approved package publisher and installs the package for your Linux distribution.{{else}}Open the installer and follow your operating system's signature and administrator prompts. Do not bypass a security warning.{{end}}</li><li>Your IT administrator completes enrollment with the installed agent and your explicit management approval. The organization may collect inventory and perform administrator management actions.</li></ol>
 <a class="button" href="{{.PackageURL}}" download>Download approved agent</a>
 <p class="muted">Opening this page or downloading a file does not enroll your computer. {{if eq .Remaining 1}}One computer can enroll with this invitation.{{else}}Up to {{.Remaining}} computers can enroll with this invitation.{{end}}</p>
 </section>
@@ -26,6 +26,7 @@
 <p class="muted">The invitation is limited and sensitive. Share it only with the intended administrator. The signed configuration does not supply a permanent device private key or establish its own release trust.</p>
 <p>After enrollment, your IT administrator runs the installed agent's <code>activate</code> command with the same protected identity directory. Verify that the computer appears online in the management console.</p>
 {{if .Mac}}<p>If macOS requests background-service approval, an administrator must allow OpenUEM Agent in System Settings &gt; General &gt; Login Items, then retry activation. A pending approval does not mean the agent is running.</p>{{end}}
+{{if .Linux}}<p>Linux activation requires root access and systemd. Your administrator must provision the protected host credential key and trusted package publisher before enrollment. Existing service or configuration conflicts must be resolved before activation; keep the enrolled identity for retry.</p>{{end}}
 </details>
 {{else}}
 <section aria-labelledby="unavailable-title"><h2 id="unavailable-title">Enrollment is not ready</h2><p>Your administrator must configure a compatible approved agent release and signed enrollment configuration before this invitation can be used.</p></section>

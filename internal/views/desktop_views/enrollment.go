@@ -29,6 +29,12 @@ type InvitationForm struct {
 }
 
 func targetLabel(platform, architecture string) string {
+	if platform == "linux" {
+		if architecture == "arm64" {
+			return "Linux — ARM64"
+		}
+		return "Linux — x64"
+	}
 	if platform == "macos" {
 		if architecture == "arm64" {
 			return "Mac — Apple silicon"

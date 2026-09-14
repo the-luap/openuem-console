@@ -1,6 +1,6 @@
 # Public desktop enrollment protocol
 
-The console can run a separate, private HTTPS listener for individual Windows/Mac
+The console can run a separate, private HTTPS listener for individual Windows/Mac/Linux
 enrollment and approved installer downloads. The gateway exposes its exact routes
 on the canonical public HTTPS origin. No console routes are registered on this
 listener. It serves independently signed bootstrap configuration, the claim
@@ -8,8 +8,9 @@ protocol and [existing identity renewal](desktop-identity-renewal.md).
 The [console invitation form](desktop-console-invitations.md) now
 provides an administrator-assisted public installation page and limited token-file
 download. The agent provides separate administrator
-[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md) and
-[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) commands. The Mac flow distinguishes native approval
+[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md),
+[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) and
+[Linux activation](https://github.com/the-luap/openuem-agent/blob/443f1e76d1d6ec115dabf5da47c8216b6a268896/docs/native-linux-activation.md) commands. The Mac flow distinguishes native approval
 from authenticated local readiness. Finished native installers, their automatic
 activation flow and positive signed-release registration acceptance remain open.
 
@@ -99,7 +100,7 @@ payload digest, not a package hash.
 | `POST /enroll/desktop/identities/<device-uuid>/renewal/prepare` | Verify the current identity and candidate key proofs; retain exact candidate issuance without changing current credentials |
 | `POST /enroll/desktop/identities/<device-uuid>/renewal/confirm` | Verify both candidate keys and atomically activate the retained generation for the same device; recover a committed confirmation on exact retry |
 | `POST /enroll/desktop/identities/<device-uuid>/renewal/resolve` | Recover the exact current confirmed outcome or permanently cancel an unconfirmed candidate while its original identity is still current and authorized |
-| `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows` or `macos`, architecture is `amd64` or `arm64` |
+| `GET` or `HEAD /enroll/desktop/releases/<digest>/<platform>/<architecture>` | Verify and serve the current approved target; platform is `windows`, `macos` or `linux`, architecture is `amd64` or `arm64` |
 
 The base invitation URL now serves the public installation page. Page, invitation
 file, metadata, configuration and package reads do not reserve a use,
@@ -239,6 +240,18 @@ Two TLS legs verify anonymous/foreign direct-backend rejection, forwarding-heade
 replacement, optional-broker routing and denied public administrator aliases.
 A streaming gateway test crosses a short ordinary HTTP deadline and verifies that
 gateway closure cancels the private download.
+
+Linux AMD64/ARM64 fixtures additionally verify the public target label, native
+systemd/root instructions, signed DEB/RPM configuration and package bytes, and
+same-key claim recovery with retained scope. The console invitation fixture
+checks both approved Linux targets and denies creation to readers. Windows, Mac
+and both Linux architectures traverse the actual pinned TLS gateway with and
+without the agent broker; noncanonical download aliases remain private. These
+tests use inert package bytes and do not establish native package signing or
+physical installation acceptance.
+The saved Linux page and invitation result also render at 390/768/1440 pixels
+in isolated Chromium without document/body overflow. The public administrator
+details remain expandable at all three widths.
 
 The public server/gateway implementation at console commit `0268458` passed
 [console CI](https://github.com/the-luap/openuem-console/actions/runs/34181569389).

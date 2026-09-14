@@ -42,6 +42,8 @@ func prepareDesktopInvitationCatalog(t *testing.T, h *Handler, ctx context.Conte
 		{Platform: "windows", Architecture: "amd64", Format: "msi", Filename: "openuem-agent-0.12.0-windows-amd64.msi", Size: int64(len(content)), SHA256: hex.EncodeToString(digest[:]), AgentSize: int64(len(agent)), AgentSHA256: hex.EncodeToString(agentDigest[:])},
 		// Older preview artifacts are excluded from native invitation forms.
 		{Platform: "macos", Architecture: "arm64", Format: "pkg", Filename: "openuem-agent-0.12.0-macos-arm64.pkg", Size: int64(len(content)), SHA256: hex.EncodeToString(digest[:])},
+		{Platform: "linux", Architecture: "amd64", Format: "deb", Filename: "openuem-agent-0.12.0-linux-amd64.deb", Size: int64(len(content)), SHA256: hex.EncodeToString(digest[:]), AgentSize: int64(len(agent)), AgentSHA256: hex.EncodeToString(agentDigest[:])},
+		{Platform: "linux", Architecture: "arm64", Format: "rpm", Filename: "openuem-agent-0.12.0-linux-arm64.rpm", Size: int64(len(content)), SHA256: hex.EncodeToString(digest[:]), AgentSize: int64(len(agent)), AgentSHA256: hex.EncodeToString(agentDigest[:])},
 	}}
 	data, err := artifacts.Sign(manifest, private, now)
 	if err != nil {
@@ -91,6 +93,9 @@ func exerciseDesktopInvitationCreation(t *testing.T, h *Handler, ctx context.Con
 		if operator.Code != 200 || !strings.Contains(operator.Body.String(), "Create invitation</button>") || !strings.Contains(operator.Body.String(), release.Digest()) || strings.Contains(operator.Body.String(), `value="macos/arm64"`) {
 			t.Fatal("operator form did not select the compatible approved release", operator.Code)
 		}
+		if !strings.Contains(operator.Body.String(), `value="linux/amd64">Linux — x64</option>`) || !strings.Contains(operator.Body.String(), `value="linux/arm64">Linux — ARM64</option>`) {
+			t.Fatal("approved Linux targets were mislabeled in the invitation form")
+		}
 		artifact("desktop-create-invitation", operator)
 		invitationForm := strings.Split(operator.Body.String(), `name="release_digest"`)
 		if len(invitationForm) != 2 {
@@ -127,7 +132,7 @@ func exerciseDesktopInvitationCreation(t *testing.T, h *Handler, ctx context.Con
 			{"foreign body site", func(f url.Values) { f.Set("site_id", fmt.Sprint(siblingID)) }, 400},
 			{"foreign origin", func(f url.Values) { f.Set("public_origin", "https://other.example.test") }, 400},
 			{"preview target", func(f url.Values) { f.Set("target", "macos/arm64") }, 400},
-			{"unsupported target", func(f url.Values) { f.Set("target", "linux/amd64") }, 400},
+			{"unsupported target", func(f url.Values) { f.Set("target", "freebsd/amd64") }, 400},
 			{"zero uses", func(f url.Values) { f.Set("max_uses", "0") }, 400},
 			{"excessive uses", func(f url.Values) { f.Set("max_uses", "1001") }, 400},
 			{"unlisted expiry", func(f url.Values) { f.Set("hours", "10000") }, 400},
@@ -173,6 +178,26 @@ func exerciseDesktopInvitationCreation(t *testing.T, h *Handler, ctx context.Con
 			t.Fatal("invitation listing exposed a recoverable token")
 		}
 		artifact("desktop-created-invitation", rec)
+	})
+	t.Run("approved Linux invitations retain native target and scoped authorization", func(t *testing.T) {
+		for _, target := range []struct{ architecture, label string }{{"amd64", "Linux — x64"}, {"arm64", "Linux — ARM64"}} {
+			before := count()
+			f := form()
+			f.Set("target", "linux/"+target.architecture)
+			if rec := request("scoped-viewer", "POST", base+"/desktop/invitations", f); rec.Code != 403 || count() != before {
+				t.Fatal("viewer created a Linux invitation", rec.Code)
+			}
+			rec := request("scoped-operator", "POST", base+"/desktop/invitations", f)
+			match := regexp.MustCompile(`id="desktop-invitation-token"[^>]*>([^<]+)</textarea>`).FindStringSubmatch(rec.Body.String())
+			if rec.Code != 200 || !strings.Contains(rec.Body.String(), target.label) || len(match) != 2 || count() != before+1 {
+				t.Fatal("approved Linux invitation was not created with its target", rec.Code)
+			}
+			metadata, err := h.Desktop.InstallerMetadata(ctx, catalog, match[1], h.PublicOrigin)
+			if err != nil || metadata.Platform != "linux" || metadata.Architecture != target.architecture || metadata.TenantID != tenantID || metadata.SiteID != siteID || metadata.ReleaseDigest != release.Digest() || metadata.AvailableUses != 1 {
+				t.Fatal("Linux invitation lost its admitted platform, scope or release", err)
+			}
+			artifact("desktop-created-linux-"+target.architecture+"-invitation", rec)
+		}
 	})
 	t.Run("missing configuration signer or changed package prevents creation", func(t *testing.T) {
 		before := count()

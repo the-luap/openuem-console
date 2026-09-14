@@ -1,13 +1,14 @@
 # Desktop invitations in the console
 
-The Desktop enrollment page now creates release-bound Windows/macOS invitations
+The Desktop enrollment page now creates release-bound Windows/macOS/Linux invitations
 for the explicitly selected organization and site. This connects console operators
 to the [native agent enrollment command](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
 It is an administrator workflow with a [public installation page](desktop-public-protocol.md)
 for each created link. Finished signed end-user installers, guided native consent
 and installer-driven activation remain open. Administrators can use the separate
-[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md) and
-[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) commands after completed enrollment. Positive macOS
+[Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md),
+[macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) and
+[Linux activation](https://github.com/the-luap/openuem-agent/blob/443f1e76d1d6ec115dabf5da47c8216b6a268896/docs/native-linux-activation.md) commands after completed enrollment. Positive macOS
 registration/approval acceptance with the final signed release remains outstanding.
 
 ## Availability and scope
@@ -72,6 +73,9 @@ invalid limits, unsupported/preview targets, stale releases, package mutation,
 missing signers, exact expiry/scope, atomic audit and token-free subsequent lists.
 Rendered-form regression checks also enforce real HTML boolean-attribute semantics
 so the default expiry and unselected target survive browser parsing.
+Linux AMD64/ARM64 targets retain their correct labels in the form and result;
+the router verifies each created invitation's platform, architecture, approved
+release and authorized scope without issuing a device identity.
 
 A disposable browser fixture exercised native authority setup, single-site
 navigation, required confirmation, successful creation and the subsequent list.

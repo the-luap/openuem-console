@@ -41,7 +41,7 @@ func Parse(r *http.Request) (Route, bool) {
 			return Route{Kind: p[4], Token: p[3]}, true
 		}
 	}
-	if len(p) == 7 && p[3] == "releases" && read && (p[5] == "windows" || p[5] == "macos") && (p[6] == "amd64" || p[6] == "arm64") {
+	if len(p) == 7 && p[3] == "releases" && read && (p[5] == "windows" || p[5] == "macos" || p[5] == "linux") && (p[6] == "amd64" || p[6] == "arm64") {
 		digest, err := hex.DecodeString(p[4])
 		if err == nil && len(digest) == 32 && hex.EncodeToString(digest) == p[4] {
 			return Route{Kind: "download", Digest: p[4], Platform: p[5], Architecture: p[6]}, true
