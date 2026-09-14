@@ -8,7 +8,8 @@ for the original command receipt. Construction starts no automatic dispatcher or
 route. [Reviewed withdrawal and release](netbird-installation-resolutions.md)
 now use separate expiring reviews, immutable controls and exact owned proofs.
 [Inventory startup](netbird-installation-dispatch.md) now binds its automatic
-dispatcher. The lifecycle UI remains separate integration work.
+dispatcher. The [device lifecycle UI](netbird-installation-ui.md) now exposes
+reviewed requests, retained evidence and explicit recovery.
 
 ## Fresh authority and exact prepared bytes
 
@@ -117,7 +118,7 @@ not download packages or run a real NetBird installer, daemon or provider.
 
 The native macOS agent implementation verifies installer trust, protected paths,
 receipt identity, complete payload hashes and the vendor CLI link. Physical
-installation/upgrade/reboot acceptance, lifecycle UI, Linux
+installation/upgrade/reboot acceptance, Linux
 individual enrollment/publisher trust and
 local removal remain necessary for the complete management workflow.
 

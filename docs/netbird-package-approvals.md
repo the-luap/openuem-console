@@ -93,10 +93,10 @@ authenticates the private descriptor and recipient under revocation exclusion,
 retains intent in the common console barrier and supports pre-delivery cancellation.
 The [version-three command and agent journal](netbird-installation-commands.md)
 now preserve exact installation intent and share the common uncertainty barrier.
-Authenticated installer capability and command delivery must load and authenticate
-the exact retained descriptor, recheck revocation with current target authority,
-and durably admit execution under the common NetBird operation barrier. Native
-install/remove, resulting-state observation and uncertainty recovery still need
-implementation. Independent Linux publisher trust and real installation/provider/
-physical acceptance remain separate evidence. Approval routes perform no download,
+The [delivery service](netbird-installation-delivery.md), [joined dispatcher](netbird-installation-dispatch.md)
+and [device lifecycle UI](netbird-installation-ui.md) now authenticate the retained
+package and recipient, recheck revocation and readiness, and preserve uncertain
+results with explicit reviewed recovery. Native local removal, independent Linux
+publisher trust and real installation/provider/physical acceptance remain separate
+evidence. Approval routes perform no download,
 provider request, agent command or installation.

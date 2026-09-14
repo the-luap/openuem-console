@@ -1,6 +1,6 @@
 .netbird-operations { min-width: 0; max-width: 76rem; margin-inline: auto; }
 .netbird-operations .uk-card-body { display: grid; gap: 1.25rem; min-width: 0; }
-.netbird-operations h2 { font-size: 1.25rem; font-weight: 600; }
+.netbird-operations h2 { overflow-wrap: anywhere; min-width: 0; font-size: 1.25rem; font-weight: 600; }
 .netbird-details { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(0, 3fr); gap: .7rem 1.4rem; margin: 0; }
 .netbird-details dt { font-weight: 600; }
 .netbird-details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -15,8 +15,8 @@
 .netbird-state { font-weight: 600; }
 #netbird-pending { display: none; }
 .htmx-request #netbird-pending, #netbird-pending.htmx-request { display: inline; }
-.netbird-history { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
-.netbird-history li { display: grid; gap: .4rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); padding-bottom: 1rem; }
+.netbird-history { min-width: 0; grid-template-columns: minmax(0, 1fr); list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
+.netbird-history li { min-width: 0; grid-template-columns: minmax(0, 1fr); display: grid; gap: .4rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); padding-bottom: 1rem; }
 .netbird-history a { text-decoration: underline; text-underline-offset: .2em; }
 .netbird-id { overflow-wrap: anywhere; }
 .netbird-operations a:focus-visible, .netbird-operations button:focus-visible, .netbird-operations input:focus-visible, .netbird-operations select:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
@@ -35,3 +35,5 @@
 .netbird-registration-choices{min-width:0;max-width:100%}
 .netbird-group-list{min-width:0;grid-template-columns:minmax(0,1fr)}
 .netbird-group-list .netbird-checkbox>span{min-width:0;overflow-wrap:anywhere}
+
+.netbird-installation-choice .uk-button { max-width: 100%; overflow-wrap: anywhere; }

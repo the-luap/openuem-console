@@ -93,7 +93,18 @@ templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.N
     <p role="status">No selectable profiles were reported.</p>
    }
   }
-  <p>Managed installation and local uninstallation are not yet available. Provider peer removal is available through retained registration evidence.</p>
+  if page.Target.Platform=="macos" || page.Target.Platform=="linux" {
+   <div class="netbird-actions">
+    if info.Principal.Can(access.ReadSoftware,page.Target.Scope) {
+<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info,page.Target.ID) }>Installation history</a>
+}
+    if info.Principal.Can(access.AssignSoftware,page.Target.Scope) {
+<a class="uk-button uk-button-primary" href={ NetbirdInstallationPath(info,page.Target.ID)+"/new" }>Install approved NetBird package</a>
+}
+   </div>
+   <p>Native installation requires a ready, individually enrolled agent. Package and device readiness are checked before confirmation.</p>
+  }
+  <p>Local uninstallation is not yet available. Provider peer removal is available through retained registration evidence.</p>
  }
 }
 

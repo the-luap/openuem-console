@@ -295,6 +295,9 @@ func exerciseDesktopConsolePermissions(t *testing.T, h *Handler, e *echo.Echo, c
 	exerciseAppleIKEv2Certificates(t, h, ctx, tenantID, siteID, otherTenant.ID, request)
 	exerciseADEPlatformSSORoutes(t, h, ctx, tenantID, siteID, sibling.ID, request)
 	exerciseAppleProfileRevisions(t, h, ctx, tenantID, siteID, request)
+	t.Run("reviewed native NetBird installation lifecycle", func(t *testing.T) {
+		exerciseNetbirdInstallationRoutes(t, h, ctx, tenantID, siteID, otherTenant.ID)
+	})
 	runDesktopBrowserFixture(t, h, ctx)
 }
 

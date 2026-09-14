@@ -4,8 +4,8 @@ Inventory startup now binds `Handler.NetbirdInstallations` to the existing direc
 preparation, installation and control publishers. Its joined worker loop processes
 reviewed installation requests automatically. It adds no legacy installer route,
 new wire version, alternate package source or automatic control resolution. The
-organization package approval pages already exist; device installation lifecycle
-routes and views remain to be connected.
+organization package approval pages and the [device installation lifecycle
+routes and views](netbird-installation-ui.md) are connected.
 
 ## Selection and one-time delivery
 
@@ -68,7 +68,7 @@ redelivery; the existing bounded result transaction retains uncertainty even if
 the caller disconnected. Explicit request cancellation remains possible while
 preparation is in flight.
 
-## Verification and remaining UI
+## Verification and device UI
 
 Owned PostgreSQL race tests exercise queued and preprepared requests, process
 restart, lost preparation/native replies, missing result transactions, preflight
@@ -78,12 +78,12 @@ runtime test starts the actual inventory subsystem with an isolated schema,
 checks installation-store binding and repeated startup, and joins shutdown
 without a broker. No actual package, installer, daemon or external device is used.
 
-The remaining device UI must expose reviewed package choice, queue/preparation/
-delivery state, scoped history, pre-install cancellation, positive receipt
-observation and explicit expiring resolution review. It must distinguish stopped,
-cancelled, uncertain, released and completed evidence. Existing organization
-package approval/revocation pages should be reused. Local removal and physical
-installation/upgrade/reboot acceptance remain separate requirements.
+The [device UI](netbird-installation-ui.md) exposes reviewed package choice,
+queue/preparation/delivery state, scoped history, pre-install cancellation,
+positive receipt observation and explicit expiring resolution review. Stopped,
+cancelled, uncertain, released and completed evidence remain distinct. Existing
+organization package approval/revocation pages are reused. Local removal and
+physical installation/upgrade/reboot acceptance remain separate requirements.
 
 The complete inventory race suite passes in 436.269 seconds, the focused
 installation/dispatch/recovery suite in 70.268 seconds, and the complete audit

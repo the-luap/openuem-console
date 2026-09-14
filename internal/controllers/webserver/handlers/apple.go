@@ -176,7 +176,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 			switch appleRoute(c.Path()) {
 			case "/netbird/packages", "/netbird/packages/:approval/revoke":
 				limit = 16 << 10
-			case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
+			case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile", "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
 				limit = 8192
 				if c.Request().ContentLength > limit {
 					return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "Form is too large")
@@ -205,7 +205,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 				limit = 8192
 			}
 			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
-			if route := appleRoute(c.Path()); route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" {
+			if route := appleRoute(c.Path()); route == "/computers/:uuid/netbird/installations" || route == "/computers/:uuid/netbird/installations/:request/cancel" || route == "/computers/:uuid/netbird/installations/:request/observe" || route == "/computers/:uuid/netbird/installations/:request/resolution" || route == "/computers/:uuid/netbird/installations/:request/resolution/reconcile" || route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" {
 				if err := c.Request().ParseForm(); err != nil {
 					var oversized *http.MaxBytesError
 					if errors.As(err, &oversized) {

@@ -61,6 +61,19 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Native NetBird device installation UI](netbird-installation-ui.md) now connects
+  scoped approved-package choice and exact review to the joined dispatcher.
+  Coherent source-free receipts and 20-row history retain preparation, original
+  delivery, dispatch stops, observations and reviewed recovery separately.
+  Explicit pre-native cancellation, expiring withdrawal/release review and
+  read-only recovery reconciliation use current software rights, strict forms
+  and CSRF. No uncertain request is automatically redelivered. Linux individual
+  enrollment/publisher trust, local removal and physical acceptance remain open.
+  All 90 new/2,562 total browser cases, the complete view race suite, owned audit
+  and CSRF race tests, registered HTTP routes and Linux ARM64 console build pass.
+  The complete inventory PostgreSQL race suite passes in 488.699 seconds, including
+  scoped history and pagination after package revocation.
+
 - [NetBird Unix package preparation](netbird-package-preparation.md) now has an
   exact organization/approval/target/source/size/hash descriptor and a private
   agent download stage. Independent bounded HTTPS, native macOS PKG trust, repeated
@@ -85,10 +98,11 @@ the table's package summaries do not remove any detail from the roadmap.
   the encrypted approval and exact individual recipient, support an absent client,
   share the console request barrier and retain audited pre-delivery cancellation.
   Concurrent revocation and approval replays use fresh snapshots after row locks.
-  This does not enable installation:
-  authenticated installer delivery and admission,
-  Linux individual enrollment and publisher trust, install/remove execution and resulting-state recovery remain
-  required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
+  Subsequent [delivery](netbird-installation-delivery.md),
+  [dispatch](netbird-installation-dispatch.md) and [device UI](netbird-installation-ui.md)
+  now connect native installation and explicit resulting-state recovery. Linux
+  individual enrollment/publisher trust, local removal and physical acceptance
+  remain required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
   native service regressions pass. All supported console/agent/worker builds
   pass with the same immutable shared revision.
 
@@ -146,8 +160,9 @@ the table's package summaries do not remove any detail from the roadmap.
   Native identity renewal/scope checks, owned broker/PostgreSQL route tests and
   all 51 new/2,145 total browser cases pass. Legacy mutating subjects and profile
   steps are rejected; workers withhold profiles containing active NetBird steps
-  before reading tokens or creating keys. Installation and local uninstallation
-  remain unavailable; managed registration and associated peer removal now have
+  before reading tokens or creating keys. Native installation now has the
+  [separate reviewed workflow](netbird-installation-ui.md); local uninstallation
+  remains unavailable. Managed registration and associated peer removal have
   the separate reviewed flows documented above. Trusted installers and remaining
   lifecycle work are still required; this is
   an intermediate migration, not a completed NetBird feature.

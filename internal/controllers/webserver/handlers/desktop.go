@@ -19,6 +19,10 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
+			return access.ReadSoftware, true
+		case "/computers/:uuid/netbird/installations/new", "/computers/:uuid/netbird/installations/review", "/computers/:uuid/netbird/installations/:request/resolution":
+			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request", "/computers/:uuid/netbird", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request":
 			return access.ReadDevices, true
 		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/new", "/computers/:uuid/netbird/registrations/review", "/computers/:uuid/netbird/operations/review", "/computers/:uuid/netbird/operations/:request/resolution":
@@ -37,6 +41,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
+			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request/cancel", "/computers/:uuid/netbird/registrations/:request/cleanup", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request/cancel", "/computers/:uuid/netbird/connect", "/computers/:uuid/netbird/disconnect", "/computers/:uuid/netbird/switchprofile", "/computers/:uuid/netbird/install", "/computers/:uuid/netbird/uninstall", "/computers/:uuid/netbird/register", "/computers/:uuid/netbird/deletepeer":
 			return access.ManageDeviceSecurity, true
 		case "/computers/:uuid/netbird/refresh":
@@ -99,6 +105,17 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	netbird.POST("/:request/resolution", h.NetbirdResolutionRequest)
 	netbird.POST("/:request/resolution/reconcile", h.NetbirdResolutionReconcile)
 	netbird.POST("/:request/resolution/retry", h.NetbirdResolutionRetry)
+	installation := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/installations", h.IsAuthenticated, h.AppleCSRF)
+	installation.GET("", h.NetbirdInstallationHistory)
+	installation.GET("/new", h.NetbirdInstallationChoices)
+	installation.GET("/review", h.NetbirdInstallationReview)
+	installation.POST("", h.NetbirdInstallationRequest)
+	installation.GET("/:request", h.NetbirdInstallationReceipt)
+	installation.POST("/:request/cancel", h.NetbirdInstallationCancel)
+	installation.POST("/:request/observe", h.NetbirdInstallationObserve)
+	installation.GET("/:request/resolution", h.NetbirdInstallationResolutionReview)
+	installation.POST("/:request/resolution", h.NetbirdInstallationResolve)
+	installation.POST("/:request/resolution/reconcile", h.NetbirdInstallationReconcile)
 	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
 	registration.GET("", h.NetbirdRegistrationHistory)
 	registration.GET("/new", h.NetbirdRegistrationChoices)

@@ -5,7 +5,8 @@ installation. `ReviewInstallationResolution`, `ResolveInstallation`,
 `ReconcileInstallationResolution` and `ReadInstallationResolution` operate on the
 original installation UUID and reviewed installation revision. They never invoke
 or resend the native installation command. [Runtime dispatch](netbird-installation-dispatch.md)
-now binds the store; lifecycle routes remain separate integration work.
+now binds the store; the [device lifecycle routes](netbird-installation-ui.md)
+expose explicit review, confirmation and reconciliation.
 
 ## Review and admission
 
@@ -113,7 +114,7 @@ exercise proof ownership and verify immutable/startup guards. These fixtures do
 not download a package, run an installer or control an external device.
 
 The shared agent contract and runtime pins are unchanged. The existing agent
-continues to enforce installation, withdrawal and release ownership. Lifecycle UI, local removal and physical installation/upgrade/reboot
+continues to enforce installation, withdrawal and release ownership. Local removal and physical installation/upgrade/reboot
 acceptance remain outstanding in the complete management workflow.
 
 The complete inventory race suite and the complete audit race suite pass. The
