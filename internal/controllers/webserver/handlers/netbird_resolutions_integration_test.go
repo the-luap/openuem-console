@@ -124,6 +124,7 @@ func exerciseNetbirdResolutionRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx
 	require.Equal(t, "unconfirmed", retained.Status)
 	require.Nil(t, retained.Result)
 	require.Equal(t, 2, releases)
+	exerciseNetbirdConnectionWithdrawalRoutes(t, h, e, ctx, scope, device, path)
 }
 
 func exerciseNetbirdRetryFormRejections(t *testing.T, request func(string, string, string, url.Values, string) *httptest.ResponseRecorder, path string, form url.Values) {
@@ -140,4 +141,89 @@ func exerciseNetbirdRetryFormRejections(t *testing.T, request func(string, strin
 		alter(bad)
 		require.Equal(t, 400, request("apple-console-admin", "POST", path, bad, "console-test-token").Code)
 	}
+}
+
+func exerciseNetbirdConnectionWithdrawalRoutes(t *testing.T, h *Handler, e *echo.Echo, ctx context.Context, scope access.Scope, device, path string) {
+	t.Helper()
+	oldStore, oldResolver := h.NetbirdOperations, h.NetbirdResolutions
+	defer func() { h.NetbirdOperations = oldStore; h.NetbirdResolutions = oldResolver }()
+	var command inventory.NetbirdOperationCommand
+	s, err := inventory.NewNetbirdOperationStore(h.Model.DB, h.Access, false, func(context.Context, netbirdcommand.Identity) (netbirdcommand.State, error) {
+		return netbirdcommand.State{Status: "ready", Revision: strings.Repeat("b", 64), Remaining: 4096}, nil
+	}, func(_ context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
+		command = c
+		return nil, errors.New("owned command was not delivered")
+	})
+	require.NoError(t, err)
+	v, err := s.Review(ctx, "apple-console-admin", scope, device, "down", "")
+	require.NoError(t, err)
+	r, err := s.Request(ctx, "apple-console-admin", scope, device, uuid.NewString(), "down", "", v.Revision)
+	require.NoError(t, err)
+	_, err = s.DispatchOne(ctx)
+	require.NoError(t, err)
+	withdrawals, queries := 0, 0
+	resolutionID := ""
+	resolver, err := inventory.NewNetbirdResolutionStore(s, func(_ context.Context, c netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error) {
+		queries++
+		if c.Kind == "withdraw" {
+			withdrawals++
+			require.Equal(t, r.Revision, c.Revision)
+			require.Equal(t, "down", c.Operation)
+			if withdrawals > 1 {
+				resolutionID = c.RequestID
+			}
+			return nil, errors.New("owned withdrawal request or response lost")
+		}
+		if resolutionID == "" {
+			p, e := netbirdcommand.ControlResponseFor(c, "missing")
+			return &p, e
+		}
+		p, e := netbirdcommand.ControlResponseFor(c, "ok")
+		require.NoError(t, e)
+		p.Receipt, e = netbirdcommand.ReceiptFor(command, "withdrawn")
+		require.NoError(t, e)
+		p.ReleaseID = resolutionID
+		return &p, nil
+	})
+	require.NoError(t, err)
+	h.NetbirdOperations, h.NetbirdResolutions = s, resolver
+	request := ownedTagHTTPRequest(t, h, e, ctx)
+	location := path + "/" + r.ID + "/resolution"
+	page := request("apple-console-admin", "GET", location, nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Contains(t, page.Body.String(), "Confirm withdrawal")
+	require.Contains(t, page.Body.String(), "rejects any later delivery")
+	review, err := resolver.Review(ctx, "apple-console-admin", scope, device, r.ID)
+	require.NoError(t, err)
+	form := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {uuid.NewString()}, "revision": {review.Revision}}
+	for _, actor := range []string{"scoped-viewer", "scoped-operator"} {
+		require.Equal(t, 403, request(actor, "POST", location, form, "console-test-token").Code)
+	}
+	require.Equal(t, 403, request("apple-console-admin", "POST", location, form, "").Code)
+	response := request("apple-console-admin", "POST", location, form, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, 1, withdrawals)
+	before := queries
+	require.Equal(t, 204, request("apple-console-admin", "POST", location, form, "console-test-token").Code)
+	require.Equal(t, before, queries)
+	page = request("apple-console-admin", "GET", location, nil, "console-test-token")
+	require.Equal(t, 200, page.Code, page.Body.String())
+	require.Contains(t, page.Body.String(), "Confirm recovery attempt")
+	review, err = resolver.Review(ctx, "apple-console-admin", scope, device, r.ID)
+	require.NoError(t, err)
+	require.Equal(t, "withdraw", review.RetryKind)
+	retry := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {form.Get("resolution_id")}, "retry_id": {uuid.NewString()}, "revision": {review.Revision}}
+	exerciseNetbirdRetryFormRejections(t, request, location+"/retry", retry)
+	response = request("apple-console-admin", "POST", location+"/retry", retry, "console-test-token")
+	require.Equal(t, 204, response.Code, response.Body.String())
+	require.Equal(t, 2, withdrawals)
+	check := url.Values{"csrf": {"console-test-token"}, "confirmed": {"yes"}, "resolution_id": {form.Get("resolution_id")}}
+	require.Equal(t, 204, request("apple-console-admin", "POST", location+"/reconcile", check, "console-test-token").Code)
+	retained, err := s.Read(ctx, "apple-console-admin", scope, device, r.ID)
+	require.NoError(t, err)
+	require.NotNil(t, retained.ReleasedAt)
+	require.Equal(t, "unconfirmed", retained.Status)
+	page = request("apple-console-admin", "GET", location, nil, "console-test-token")
+	require.Contains(t, page.Body.String(), "Resolution confirmed")
+	require.NotContains(t, page.Body.String(), `name="confirmed"`)
 }

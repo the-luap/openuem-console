@@ -22,7 +22,10 @@ request and delivery digest, current scope/identity generations, key state,
 retained stage attempts, agent receipt/journal and existing resolution metadata.
 An explicit form confirmation rechecks that fingerprint. Individual mode uses
 the current certificate, broker identity and active provisioned command consumer;
-certificate renewal does not change the original command digest.
+certificate renewal does not change the original command digest. A fully
+correlated version-two completed receipt discovered during capability review
+can also be acknowledged after key absence, as described in the
+[shared recovery query handling](netbird-connection-withdrawals.md).
 
 If the retained key has never had a cleanup attempt, confirmation may start its
 first removal. Cleanup uses the original encrypted provider origin/token and the
@@ -85,8 +88,8 @@ Real registered-route tests exercise permissions, CSRF, strict forms, read-only
 review/reconciliation, explicit continuation and retained historical receipts.
 Browser cases cover keyboard confirmation, pending input locks across both
 forms, focus recovery, blocked states and long content at 390, 768 and 1,440 pixels.
-All 117 registration cases and the full 2,313-case browser matrix pass. The full
-inventory PostgreSQL race suite passes in 200.398 seconds, including current
+All 117 registration cases and the full 2,343-case browser matrix pass. The full
+inventory PostgreSQL race suite passes in 216.401 seconds, including current
 individual identity, permanent withdrawal and cleanup by another authorized actor. The audit race suite, affected
 view race tests, registered-route fixtures and Linux console build also pass.
 

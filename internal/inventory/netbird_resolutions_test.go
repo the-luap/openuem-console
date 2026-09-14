@@ -247,8 +247,12 @@ func TestNetbirdResolutionReviewAndAdmissionBoundaries(t *testing.T) {
 }
 
 func TestNetbirdResolutionIndividualCurrentIdentityAfterLostReply(t *testing.T) {
-	for _, change := range []string{"renewed", "revoked", "expired", "consumer", "moved"} {
+	for _, change := range []string{"renewed", "revoked", "expired", "consumer", "moved", "withdraw-renewed", "withdraw-revoked", "withdraw-expired", "withdraw-consumer", "withdraw-moved", "withdraw-retry-renewed"} {
 		t.Run(change, func(t *testing.T) {
+			withdrawal := strings.HasPrefix(change, "withdraw-")
+			change = strings.TrimPrefix(change, "withdraw-")
+			retry := strings.HasPrefix(change, "retry-")
+			change = strings.TrimPrefix(change, "retry-")
 			f, _ := netbirdFixture(t)
 			ctx := t.Context()
 			identities, err := registry.NewStore(f.db, strings.Repeat("r", 32))
@@ -272,7 +276,7 @@ func TestNetbirdResolutionIndividualCurrentIdentityAfterLostReply(t *testing.T) 
 			require.NoError(t, err)
 			var command inventory.NetbirdOperationCommand
 			s, err := inventory.NewNetbirdOperationStore(f.db, f.permissions, true, func(_ context.Context, i netbirdcommand.Identity) (netbirdcommand.State, error) {
-				if command.RequestID == "" {
+				if command.RequestID == "" || withdrawal {
 					return netbirdReady(ctx, i)
 				}
 				hash, _ := command.Digest()
@@ -286,16 +290,28 @@ func TestNetbirdResolutionIndividualCurrentIdentityAfterLostReply(t *testing.T) 
 			_, err = s.DispatchOne(ctx)
 			require.NoError(t, err)
 			releaseID := ""
-			queries := 0
+			queries, controls := 0, 0
 			certificate := ""
 			resolver, err := inventory.NewNetbirdResolutionStore(s, func(_ context.Context, c netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error) {
-				if c.Kind == "release" {
+				if c.Kind == "release" || c.Kind == "withdraw" {
+					controls++
 					require.Empty(t, releaseID)
-					releaseID = c.RequestID
+					if !retry || controls > 1 {
+						releaseID = c.RequestID
+					}
 					return nil, errors.New("owned lost reply")
 				}
 				queries++
 				certificate = c.CertificateHash
+				if withdrawal {
+					if releaseID == "" {
+						p, e := netbirdcommand.ControlResponseFor(c, "missing")
+						return &p, e
+					}
+					require.Equal(t, r.Revision, c.Revision)
+					require.Equal(t, r.Operation, c.Operation)
+					return netbirdResolutionResponse(t, f, c, "withdrawn", releaseID), nil
+				}
 				return netbirdResolutionResponse(t, f, c, "unconfirmed", releaseID), nil
 			})
 			require.NoError(t, err)
@@ -304,6 +320,11 @@ func TestNetbirdResolutionIndividualCurrentIdentityAfterLostReply(t *testing.T) 
 			d, err := resolver.Resolve(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, uuid.NewString(), review.Revision)
 			require.NoError(t, err)
 			require.Nil(t, d.ConfirmedAt)
+			if retry {
+				review, err = resolver.Review(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID)
+				require.NoError(t, err)
+				require.True(t, review.CanRetry)
+			}
 			before := queries
 			switch change {
 			case "renewed":
@@ -318,6 +339,20 @@ func TestNetbirdResolutionIndividualCurrentIdentityAfterLostReply(t *testing.T) 
 				err = f.client.Agent.UpdateOneID(f.id).RemoveSiteIDs(f.scope.SiteID).AddSiteIDs(f.otherSite).Exec(ctx)
 			}
 			require.NoError(t, err)
+			if retry {
+				_, err = resolver.Retry(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID, uuid.NewString(), review.Revision)
+				require.ErrorIs(t, err, inventory.ErrNetbirdOperationChanged)
+				require.Equal(t, 1, controls)
+				fresh, e := resolver.Review(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID)
+				require.NoError(t, e)
+				_, err = resolver.Retry(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID, uuid.NewString(), fresh.Revision)
+				require.NoError(t, err)
+				require.Equal(t, 2, controls)
+				var retainedCertificate string
+				require.NoError(t, f.db.QueryRowContext(ctx, `SELECT control->>'certificate_hash' FROM uem_netbird_resolution_retries WHERE request_id=$1`, r.ID).Scan(&retainedCertificate))
+				require.Equal(t, strings.Repeat("a", 64), retainedCertificate)
+				before = queries
+			}
 			result, err := resolver.Reconcile(ctx, "tag-admin", r.Scope, r.DeviceID, r.ID, d.ID)
 			if change == "renewed" {
 				require.NoError(t, err)

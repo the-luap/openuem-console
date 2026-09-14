@@ -118,16 +118,6 @@ func (s *NetbirdRegistrationResolutionStore) currentTarget(ctx context.Context, 
 	}
 	return &NetbirdRegistrationResolutionReview{Registration: r, Target: agent.Target, agent: agent, generation: generation}, nil
 }
-func registrationRecoveryControl(ctx context.Context, v *NetbirdResolutionReview, kind, id string) netbirdcommand.ControlRequest {
-	durationKind := kind
-	if kind == "withdraw" {
-		durationKind = "release"
-	}
-	c := netbirdControlRequest(ctx, v, durationKind, id)
-	c.Version, c.Kind = netbirdcommand.RecoveryVersion, kind
-	c.Revision, c.Operation = v.Operation.Revision, v.Operation.Operation
-	return c
-}
 
 func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, v *NetbirdRegistrationResolutionReview) error {
 	if !slices.Contains(v.Registration.Attempts, "deliver") {
@@ -143,7 +133,7 @@ func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, 
 	v.canWithdraw = false
 	a.query = netbirdControlRequest(ctx, a, "receipt", uuid.NewString())
 	if v.Resolution != nil && v.Resolution.Kind == "withdraw" {
-		a.query = registrationRecoveryControl(ctx, a, "receipt", uuid.NewString())
+		a.query = netbirdRecoveryControl(ctx, a, "receipt", uuid.NewString())
 	}
 	response, err := s.agent.request(ctx, a.query)
 	if err != nil {
@@ -153,7 +143,7 @@ func (s *NetbirdRegistrationResolutionStore) agentEvidence(ctx context.Context, 
 	if response.Outcome == "missing" && a.query.Version != netbirdcommand.RecoveryVersion {
 		// A correlated version-two response, not a legacy missing receipt, proves
 		// that the owner supports durable withdrawal and extended receipt queries.
-		a.query = registrationRecoveryControl(ctx, a, "receipt", uuid.NewString())
+		a.query = netbirdRecoveryControl(ctx, a, "receipt", uuid.NewString())
 		response, err = s.agent.request(ctx, a.query)
 		if err != nil {
 			v.AgentState = "recovery-unavailable"
@@ -455,7 +445,7 @@ func (s *NetbirdRegistrationResolutionStore) advance(ctx context.Context, tx *sq
 			if !allowNew || !v.canWithdraw {
 				return s.pending(ctx, tx, r, d, actor)
 			}
-			c = registrationRecoveryControl(ctx, v.agent, "withdraw", d.ID)
+			c = netbirdRecoveryControl(ctx, v.agent, "withdraw", d.ID)
 		}
 		if err := s.recordControl(ctx, r, d, actor, c); err != nil {
 			return nil, err

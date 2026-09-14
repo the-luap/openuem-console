@@ -45,9 +45,9 @@ func (h *Handler) PublishNetbirdOperation(parent context.Context, c inventory.Ne
 	return &inventory.NetbirdOperationResult{RequestID: receipt.RequestID, DeviceID: receipt.DeviceID, Revision: receipt.Revision, CommandHash: receipt.CommandHash, Operation: receipt.Operation, Success: true}, nil
 }
 
-// RequestNetbirdControl never retries a release. Callers own its immutable
+// RequestNetbirdControl never retries a mutating control. Callers own its immutable
 // resolution identity and must persist it before publishing. A fresh read-only
-// receipt query can recover a lost release reply without changing that identity.
+// receipt query can recover a lost control reply without changing that identity.
 func (h *Handler) RequestNetbirdControl(parent context.Context, c netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error) {
 	if parent == nil || !c.Executable(c.Identity, time.Now()) {
 		return nil, inventory.ErrNetbirdOperationInvalid

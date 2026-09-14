@@ -117,6 +117,9 @@ func (s *NetbirdResolutionStore) Retry(parent context.Context, actor string, sco
 		return nil, ErrNetbirdOperationChanged
 	}
 	c := netbirdControlRequest(ctx, v, "release", d.ID)
+	if v.RetryKind == "withdraw" {
+		c = netbirdRecoveryControl(ctx, v, "withdraw", d.ID)
+	}
 	if err = recordNetbirdResolutionRetry(ctx, s.operations.db, "operation", r, d.ID, id, actor, revision, d.LastRetry, c); err != nil {
 		return nil, err
 	}
@@ -171,7 +174,7 @@ func (s *NetbirdRegistrationResolutionStore) Retry(parent context.Context, actor
 	}
 	c := netbirdControlRequest(ctx, v.agent, "release", d.ID)
 	if v.RetryKind == "withdraw" {
-		c = registrationRecoveryControl(ctx, v.agent, "withdraw", d.ID)
+		c = netbirdRecoveryControl(ctx, v.agent, "withdraw", d.ID)
 	}
 	if err = recordNetbirdResolutionRetry(ctx, s.registrations.operations.db, "registration", v.agent.Operation, d.ID, id, actor, revision, d.LastRetry, c); err != nil {
 		return nil, err

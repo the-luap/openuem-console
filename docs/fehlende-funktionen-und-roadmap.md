@@ -657,7 +657,18 @@ forms never resend controls; read-only checks can recover lost proof. Current
 certificate renewal, concurrent confirmations, audit rollback, guarded storage
 and 27 additional browser cases cover this path. All 2,313 browser cases, the full
 inventory and audit race suites, registered routes and the Linux console build
-pass. Connection-command withdrawal still needs console support.
+pass at that checkpoint. [Permanent connection withdrawal](netbird-connection-withdrawals.md)
+now covers connect, disconnect and profile switch with explicit version-two
+capability evidence, exact original metadata and independently retained intent.
+Read-only checks recover proof; reviewed retries preserve the original resolution
+UUID, including a release phase when execution wins the withdrawal race. Database
+guards and current-identity checks reject unsupported, active, full or mismatched
+states. Late completion observed during capability review can be acknowledged
+with a fully correlated version-two receipt for either command family. Thirty
+additional browser cases and owned broker tests cover permanent denial of late
+delivery across restart without running the original command. All 2,343 browser
+cases, the full inventory and audit race suites, current-identity cases, registered console
+routes, Linux console build and macOS/Linux agent race suites pass.
 Trusted Unix installers, authoritative peer ownership, remaining user/provider secrets and
 physical/provider acceptance are still required.
 

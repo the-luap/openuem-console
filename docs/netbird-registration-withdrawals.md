@@ -72,14 +72,14 @@ individual identity, loss of either request or reply, immutable audit ordering,
 late completed/unconfirmed execution and read-only proof recovery. Actual console
 routes test the reviewed form and separate outcome metadata. Twelve additional
 responsive browser cases cover permanent-withdrawal wording, confirmation,
-pending proof and unsupported agents; all 117 registration cases and all 2,313
+pending proof and unsupported agents; all 117 registration cases and all 2,343
 cases in the full browser matrix pass. The complete inventory PostgreSQL race
-suite passes in 200.398 seconds. Agent race suites pass on Linux and macOS,
+suite passes in 216.401 seconds. Agent race suites pass on Linux and macOS,
 worker models/common pass with owned PostgreSQL on Linux, and agent builds for
 Linux/macOS/Windows plus console/worker Linux and worker Windows builds pass.
 
-The agent protocol can represent connection-command withdrawals, but the console
-connection-resolution flow has not adopted this recovery path yet. Provider peer
+The console also supports [permanent connection-command withdrawal](netbird-connection-withdrawals.md)
+for connect, disconnect and profile switch. Provider peer
 ownership, trusted installers and physical endpoint/provider acceptance remain
 separate work. These tests use owned fixtures and never invoke an installed
 NetBird executable or a live provider.

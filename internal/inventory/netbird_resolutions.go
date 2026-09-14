@@ -15,7 +15,7 @@ import (
 )
 
 // NetbirdOperationControl sends a single correlated control. It must honor its
-// deadline and never retry releases. The store checks the response again.
+// deadline and never retry mutating controls. The store checks the response again.
 type NetbirdOperationControl func(context.Context, netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error)
 
 type NetbirdResolutionStore struct {
@@ -44,6 +44,8 @@ type NetbirdResolutionReview struct {
 	Revision, Outcome string
 	CanRelease        bool
 	CanRetry          bool
+	CanWithdraw       bool
+	RetryKind         string
 	Resolution        *NetbirdResolution
 	identity          netbirdcommand.Identity
 	identityExpiry    time.Time
@@ -141,6 +143,17 @@ func netbirdControlRequest(ctx context.Context, v *NetbirdResolutionReview, kind
 	return netbirdcommand.ControlRequest{Version: netbirdcommand.Version, Identity: v.identity, RequestID: id, Kind: kind, ReferenceID: v.Operation.ID, CommandHash: v.Operation.CommandHash, IssuedAt: now, ExpiresAt: expires}
 }
 
+func netbirdRecoveryControl(ctx context.Context, v *NetbirdResolutionReview, kind, id string) netbirdcommand.ControlRequest {
+	durationKind := kind
+	if kind == "withdraw" {
+		durationKind = "release"
+	}
+	c := netbirdControlRequest(ctx, v, durationKind, id)
+	c.Version, c.Kind = netbirdcommand.RecoveryVersion, kind
+	c.Revision, c.Operation = v.Operation.Revision, v.Operation.Operation
+	return c
+}
+
 func (s *NetbirdResolutionStore) request(ctx context.Context, c netbirdcommand.ControlRequest) (*netbirdcommand.ControlResponse, error) {
 	if !c.Executable(c.Identity, time.Now()) {
 		return nil, ErrNetbirdOperationNotReady
@@ -172,35 +185,71 @@ func (s *NetbirdResolutionStore) review(ctx context.Context, tx *sql.Tx, r *Netb
 		return v, nil
 	}
 	v.query = netbirdControlRequest(ctx, v, "receipt", uuid.NewString())
+	if v.Resolution != nil && v.Resolution.Kind == "withdraw" {
+		v.query = netbirdRecoveryControl(ctx, v, "receipt", uuid.NewString())
+	}
 	v.response, err = s.request(ctx, v.query)
 	if err != nil {
 		return nil, err
 	}
 	v.Outcome = v.response.Outcome
+	if v.Outcome == "missing" && v.query.Version != netbirdcommand.RecoveryVersion {
+		// A legacy missing receipt cannot establish permanent-withdrawal support.
+		v.query = netbirdRecoveryControl(ctx, v, "receipt", uuid.NewString())
+		v.response, err = s.request(ctx, v.query)
+		if err != nil {
+			v.Outcome = "recovery-unavailable"
+		} else {
+			v.Outcome = v.response.Outcome
+		}
+	}
 	var journal netbirdcommand.State
-	if v.response.Outcome == "ok" {
+	if v.Outcome == "missing" {
+		journal, err = s.resolutionJournal(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		eligible := journal.Status == "ready" && journal.Remaining > 0
+		if eligible {
+			v.Outcome = "not-received"
+			v.CanWithdraw = v.Resolution == nil
+			v.CanRetry = v.Resolution != nil && v.Resolution.Kind == "withdraw" && (v.Resolution.LastRetry == nil || v.Resolution.LastRetry.Kind != "release")
+			if v.CanRetry {
+				v.RetryKind = "withdraw"
+			}
+		} else {
+			v.Outcome = "waiting"
+			if journal.Status == "full" {
+				v.Outcome = "full"
+			}
+		}
+	}
+	if v.Outcome == "ok" {
 		if !netbirdResolutionReceipt(v, v.response) {
 			return nil, ErrNetbirdOperationConflict
 		}
 		v.Outcome = v.response.Receipt.Status
-		if v.Outcome == "completed" {
+		if v.Outcome == "withdrawn" {
+			if v.Resolution == nil || v.Resolution.Kind != "withdraw" || v.response.ReleaseID != v.Resolution.ID {
+				v.Outcome = "conflict"
+			}
+		} else if v.Outcome == "completed" {
 			v.CanRelease = v.Resolution == nil
 		} else if v.response.ReleaseID != "" {
 			if v.Resolution == nil || v.response.ReleaseID != v.Resolution.ID {
 				v.Outcome = "conflict"
 			}
 		} else if v.Outcome == "unconfirmed" {
-			deadline := netbirdControlRequest(ctx, v, "receipt", uuid.NewString()).ExpiresAt
-			probe, cancel := context.WithDeadline(ctx, deadline)
-			journal, err = s.operations.inspect(probe, v.identity)
-			valid := err == nil && probe.Err() == nil && journal.Valid()
-			cancel()
-			if !valid {
-				return nil, ErrNetbirdOperationNotReady
+			journal, err = s.resolutionJournal(ctx, v)
+			if err != nil {
+				return nil, err
 			}
 			eligible := journal.Status == "unconfirmed" && journal.CanRelease && journal.PendingID == r.ID && journal.PendingHash == r.CommandHash
 			v.CanRelease = eligible && v.Resolution == nil
-			v.CanRetry = eligible && v.Resolution != nil && v.Resolution.Kind == "release"
+			v.CanRetry = eligible && v.Resolution != nil && (v.Resolution.Kind == "release" || v.Resolution.Kind == "withdraw")
+			if v.CanRetry {
+				v.RetryKind = "release"
+			}
 			if !eligible {
 				v.Outcome = "waiting"
 			}
@@ -208,10 +257,26 @@ func (s *NetbirdResolutionStore) review(ctx context.Context, tx *sql.Tx, r *Netb
 	}
 	// Time, query UUID and response request hash are deliberately excluded: a
 	// fresh read of the same evidence must preserve the reviewed revision.
-	data, _ := json.Marshal([]any{generation, r.ID, r.CommandHash, v.Outcome, v.response.ReleaseID, v.response.Receipt, journal, v.CanRelease, v.CanRetry, v.Resolution})
+	var release string
+	var receipt netbirdcommand.Receipt
+	if v.response != nil {
+		release, receipt = v.response.ReleaseID, v.response.Receipt
+	}
+	data, _ := json.Marshal([]any{generation, r.ID, r.CommandHash, v.Outcome, release, receipt, journal, v.CanRelease, v.CanWithdraw, v.CanRetry, v.RetryKind, v.Resolution})
 	digest := sha256.Sum256(data)
 	v.Revision = hex.EncodeToString(digest[:])
 	return v, nil
+}
+
+func (s *NetbirdResolutionStore) resolutionJournal(ctx context.Context, v *NetbirdResolutionReview) (netbirdcommand.State, error) {
+	deadline := netbirdControlRequest(ctx, v, "receipt", uuid.NewString()).ExpiresAt
+	probe, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	journal, err := s.operations.inspect(probe, v.identity)
+	if err != nil || probe.Err() != nil || !journal.Valid() {
+		return netbirdcommand.State{}, ErrNetbirdOperationNotReady
+	}
+	return journal, nil
 }
 
 func (s *NetbirdResolutionStore) Review(parent context.Context, actor string, scope access.Scope, device, id string) (*NetbirdResolutionReview, error) {
@@ -264,6 +329,9 @@ func (s *NetbirdResolutionStore) finish(ctx context.Context, tx *sql.Tx, v *Netb
 	if matched && d.Kind == "acknowledge" {
 		matched = p.Receipt.Status == "completed" && p.ReleaseID == ""
 	}
+	if matched && d.Kind == "withdraw" {
+		matched = (p.Receipt.Status == "withdrawn" && p.ReleaseID == d.ID) || (c.Kind == "receipt" && p.Receipt.Status == "completed" && p.ReleaseID == "") || (d.LastRetry != nil && d.LastRetry.Kind == "release" && p.Receipt.Status == "unconfirmed" && p.ReleaseID == d.ID)
+	}
 	if !matched {
 		if err := netbirdOperationAudit(ctx, tx, v.Operation, actor, "resolution.observe", "failure"); err != nil {
 			return nil, err
@@ -296,7 +364,7 @@ func (s *NetbirdResolutionStore) finish(ctx context.Context, tx *sql.Tx, v *Netb
 	return d, tx.Commit()
 }
 
-// Resolve persists one immutable intent before release. Replays return it and
+// Resolve persists one immutable intent before a mutating control. Replays return it and
 // never send another mutating control, including after outer transaction failure.
 func (s *NetbirdResolutionStore) Resolve(parent context.Context, actor string, scope access.Scope, device, id, resolutionID, revision string) (*NetbirdResolution, error) {
 	if !canonicalRequestID(resolutionID) || !validManualRevision(revision) {
@@ -329,7 +397,7 @@ func (s *NetbirdResolutionStore) Resolve(parent context.Context, actor string, s
 	if err != nil {
 		return nil, err
 	}
-	if !v.CanRelease || v.Revision != revision {
+	if (!v.CanRelease && !v.CanWithdraw) || v.Revision != revision {
 		return nil, ErrNetbirdOperationChanged
 	}
 	kind := "acknowledge"
@@ -339,6 +407,10 @@ func (s *NetbirdResolutionStore) Resolve(parent context.Context, actor string, s
 		kind = "release"
 		c = netbirdControlRequest(ctx, v, "release", resolutionID)
 	}
+	if v.CanWithdraw {
+		kind = "withdraw"
+		c = netbirdRecoveryControl(ctx, v, "withdraw", resolutionID)
+	}
 	if err = s.recordIntent(ctx, r, actor, resolutionID, revision, kind, c); err != nil {
 		return nil, err
 	}
@@ -346,7 +418,7 @@ func (s *NetbirdResolutionStore) Resolve(parent context.Context, actor string, s
 	if err != nil {
 		return nil, err
 	}
-	if kind == "release" {
+	if kind == "release" || kind == "withdraw" {
 		p, err = s.request(ctx, c)
 		// Loss of a response leaves the immutable intent available for read-only
 		// reconciliation. No private transport error is retained or exposed.
@@ -358,7 +430,7 @@ func (s *NetbirdResolutionStore) Resolve(parent context.Context, actor string, s
 }
 
 // Reconcile only queries the original command under current target identity. It
-// cannot create an intent, retry a release or change the original outcome.
+// cannot create an intent, retry a mutation or change the original outcome.
 func (s *NetbirdResolutionStore) Reconcile(parent context.Context, actor string, scope access.Scope, device, id, resolutionID string) (*NetbirdResolution, error) {
 	if !canonicalRequestID(resolutionID) {
 		return nil, ErrNetbirdOperationInvalid
@@ -388,6 +460,9 @@ func (s *NetbirdResolutionStore) Reconcile(parent context.Context, actor string,
 		return nil, err
 	}
 	c := netbirdControlRequest(ctx, v, "receipt", uuid.NewString())
+	if d.Kind == "withdraw" {
+		c = netbirdRecoveryControl(ctx, v, "receipt", uuid.NewString())
+	}
 	p, err := s.request(ctx, c)
 	if err != nil {
 		return nil, err

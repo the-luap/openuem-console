@@ -31,7 +31,7 @@ func TestNetbirdOperationViews(t *testing.T) {
 	c := echo.New().NewContext(httptest.NewRequest("GET", "/tenant/1/site/2/computers/owned-device/netbird", nil).WithContext(ctx), httptest.NewRecorder())
 	scope := access.Scope{TenantID: 1, SiteID: 2}
 	instant := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	for _, kind := range []string{"overview", "overview-empty", "overview-long", "overview-viewer", "review-up", "review-down", "review-switch", "review-long", "queued", "sending", "completed", "stopped", "unconfirmed", "released", "history", "history-empty", "resolution-completed", "resolution-release", "resolution-pending", "resolution-confirmed", "resolution-waiting", "resolution-missing", "resolution-conflict", "resolution-long", "resolution-retry", "resolution-retry-long"} {
+	for _, kind := range []string{"overview", "overview-empty", "overview-long", "overview-viewer", "review-up", "review-down", "review-switch", "review-long", "queued", "sending", "completed", "stopped", "unconfirmed", "released", "history", "history-empty", "resolution-completed", "resolution-release", "resolution-pending", "resolution-confirmed", "resolution-waiting", "resolution-missing", "resolution-conflict", "resolution-long", "resolution-retry", "resolution-retry-long", "resolution-withdraw", "resolution-withdraw-long", "resolution-withdraw-pending", "resolution-withdrawn", "resolution-withdraw-completed", "resolution-retry-withdraw", "resolution-withdraw-retry-release", "resolution-recovery-unavailable", "resolution-withdraw-waiting", "resolution-full"} {
 		t.Run(kind, func(t *testing.T) {
 			info.Principal = access.Principal{UserID: "owned-admin", Grants: []access.Grant{{Role: access.Administrator}}}
 			if kind == "overview-viewer" {
@@ -63,15 +63,49 @@ func TestNetbirdOperationViews(t *testing.T) {
 						v.Resolution.ConfirmedBy = "Owned <reviewer>"
 					}
 				}
+				switch kind {
+				case "resolution-withdraw", "resolution-withdraw-long":
+					v.Outcome = "not-received"
+					v.CanWithdraw = true
+				case "resolution-withdraw-pending", "resolution-withdrawn", "resolution-withdraw-completed", "resolution-retry-withdraw", "resolution-withdraw-retry-release", "resolution-withdraw-waiting":
+					v.Resolution = &inventory.NetbirdResolution{ID: "10000000-0000-4000-8000-000000000004", RequestID: op.ID, Actor: "Owned <operator>", Kind: "withdraw", CreatedAt: instant}
+					v.Outcome = "not-received"
+					if kind == "resolution-withdrawn" {
+						v.Outcome = "withdrawn"
+					}
+					if kind == "resolution-withdraw-completed" {
+						v.Outcome = "completed"
+					}
+					if kind == "resolution-withdraw-waiting" {
+						v.Outcome = "waiting"
+					}
+					if kind == "resolution-withdraw-retry-release" {
+						v.Outcome = "unconfirmed"
+						v.CanRetry = true
+						v.RetryKind = "release"
+					}
+				case "resolution-recovery-unavailable":
+					v.Outcome = "recovery-unavailable"
+				case "resolution-full":
+					v.Outcome = "full"
+				}
 				if strings.HasPrefix(kind, "resolution-retry") {
 					v.CanRetry = true
+					v.RetryKind = "release"
+					if kind == "resolution-retry-withdraw" {
+						v.RetryKind = "withdraw"
+					}
 					v.Resolution.LastRetry = &inventory.NetbirdResolutionRetry{ID: "50000000-0000-4000-8000-000000000005", Actor: "Owned <reviewer>", Kind: "release", Sequence: 2, CreatedAt: instant}
 					if strings.HasSuffix(kind, "long") {
 						v.Resolution.LastRetry.Actor = strings.Repeat("W", 255)
 					}
 					component = NetbirdResolution(c, info, v, "30000000-0000-4000-8000-000000000003")
 				} else {
-					component = NetbirdResolution(c, info, v, "10000000-0000-4000-8000-000000000004")
+					id := "10000000-0000-4000-8000-000000000004"
+					if v.CanRetry {
+						id = "30000000-0000-4000-8000-000000000003"
+					}
+					component = NetbirdResolution(c, info, v, id)
 				}
 			case strings.HasPrefix(kind, "overview"):
 				page := &inventory.NetbirdOverview{Target: target, Installed: true, ManagementConnected: true, Profile: name, Profiles: []nats.NetbirdProfile{{ID: profile, Name: name, Active: true}}, ManagementURL: management, Version: "owned-version", LastContact: &instant}
