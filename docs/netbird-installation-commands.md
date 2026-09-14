@@ -51,7 +51,8 @@ with exact durable attempt/results and both native capability checks. The
 fresh command attempts after rechecking approval, target and the complete live
 preparation. It recovers positive completion through read-only receipt queries;
 [reviewed withdrawal/release](netbird-installation-resolutions.md) is now available
-in the delivery store. Automatic dispatch and lifecycle UI remain open.
+in the delivery store. [Automatic dispatch](netbird-installation-dispatch.md) now
+binds it to inventory runtime; lifecycle UI remains open.
 Native macOS prepared-package consumption and installation are now implemented; local removal
 remains unavailable. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.

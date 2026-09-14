@@ -86,7 +86,8 @@ observations can recover completion after lost replies and certificate renewal
 without redelivery or rewriting the original result. Uncertain/missing receipts
 use [explicit reviewed withdrawal/release](netbird-installation-resolutions.md);
 expiry never silently erases
-the barrier. Automatic dispatch, lifecycle UI and local removal remain open.
+the barrier. [Automatic dispatch](netbird-installation-dispatch.md) now processes
+reviewed requests; lifecycle UI and local removal remain open.
 
 The current individual enrollment validator and registry accept Windows/macOS,
 not Linux. Tests enroll macOS through the real owned registry fixture. Linux also

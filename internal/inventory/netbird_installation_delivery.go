@@ -139,6 +139,13 @@ func (s *NetbirdInstallationStore) admitInstallation(parent context.Context, act
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, err
 	}
+	stopped, err := readInstallationDispatchStop(ctx, tx, id)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if stopped != nil {
+		return nil, nil, nil, ErrNetbirdOperationConflict
+	}
 	if r.CancelledAt != nil || r.CompletedAt != nil || r.ReleasedAt != nil || !time.Now().Before(r.ExpiresAt) {
 		return nil, nil, nil, ErrNetbirdOperationConflict
 	}

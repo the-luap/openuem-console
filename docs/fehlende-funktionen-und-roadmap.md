@@ -739,7 +739,10 @@ fresh command attempt before direct delivery. Any native attempt excludes
 cancellation; completed receipt evidence opens the shared device barrier while
 preserving the permanent UUID. Read-only observations recover positive completion
 after lost replies, certificate renewal or subsequent approval revocation without
-repeating installation. Automatic dispatch and lifecycle routes remain unconnected.
+repeating installation. [Automatic dispatch](netbird-installation-dispatch.md)
+now binds the native store into joined inventory workers. It resumes successful
+preparation, excludes every uncertain attempt from redelivery and retains
+preflight stops without erasing the common barrier. Lifecycle routes remain open.
 Native macOS installation now consumes that exact prepared artifact under an
 atomic journal revision check. Individually enrolled root agents with native ACL
 support advertise separate installation readiness, recheck native trust and
@@ -752,7 +755,7 @@ expiring reviews, current-authority control attempts and exact owned withdrawal 
 release proofs. Lost replies reconcile through read-only queries; further control
 attempts require a new review under the same permanent resolution UUID. Original
 uncertain installation results remain intact and release stays separate from
-completion. Dispatch, lifecycle UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
+completion. Lifecycle UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
 installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
