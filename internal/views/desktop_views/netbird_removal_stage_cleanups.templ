@@ -1,0 +1,328 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/open-uem/nats/netbirdcommand"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+func NetbirdRemovalStageCleanupPath(info *partials.CommonInfo, device string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(device)+"/netbird/removal-stage-cleanups")
+}
+func netbirdRemovalStageCleanupLabel(state string) string {
+	switch state {
+	case "queued":
+		return "Queued for staging cleanup"
+	case "delivery_pending":
+		return "Cleanup dispatched; awaiting its receipt"
+	case "unconfirmed":
+		return "Cleanup outcome is unconfirmed"
+	case "stopped":
+		return "Stopped before cleanup"
+	case "cancelled":
+		return "Cancelled before cleanup"
+	case "completed":
+		return "Reviewed staging cleanup completed"
+	case "released":
+		return "Reviewed resolution confirmed; cleanup result retained"
+	default:
+		return "Awaiting retained evidence"
+	}
+}
+func netbirdRemovalStageCleanupStop(reason string) string {
+	switch reason {
+	case "expired":
+		return "The request expired before cleanup could be admitted."
+	case "not_authorized":
+		return "The original requester no longer has permission to assign software at this site."
+	case "source_changed":
+		return "The cleanup scope, original release, recipient or required agent readiness no longer matches the reviewed request."
+	default:
+		return "Automatic processing could not continue."
+	}
+}
+
+templ netbirdRemovalStageCleanupDescriptor(p netbirdcommand.RemovalStageCleanup) {
+ <h3>Original reference and cleanup scope</h3>
+ <p>The original uninstall retains its own result. This separate request removes only the reviewed empty staging directories and incomplete manifest metadata.</p>
+ <dl class="netbird-details">
+  <dt>Original uninstall request</dt><dd>{p.Original.RequestID}</dd>
+  <dt>Original release ID</dt><dd>{p.Original.ReleaseID}</dd>
+  <dt>Cleanup profile</dt><dd>Official macOS package staging</dd>
+  <dt>Empty directories to remove</dt><dd>{fmt.Sprint(p.DirectoryCount)}</dd>
+  <dt>Incomplete manifest metadata</dt><dd>
+   if p.ManifestPresent {
+    {fmt.Sprintf("%d bytes",p.ManifestBytes)}
+   } else {
+    None
+   }
+  </dd>
+  <dt>Current cleanup fingerprint</dt><dd>{p.StateDigest}</dd>
+  <dt>Reviewed journal revision</dt><dd>{p.JournalRevision}</dd>
+ </dl>
+}
+
+templ NetbirdRemovalStageCleanupReview(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdRemovalStageCleanupReview, requestID string) {
+	@netbirdPage(c, info, v.Target.ID, "Review retained NetBird staging cleanup") {
+		@netbirdTarget(v.Target)
+ @netbirdRemovalStageCleanupDescriptor(v.StageCleanup)
+ <div class="netbird-impact">
+  <p>Confirmation queues a separate cleanup of the exact reviewed staging left by the original NetBird uninstall. The agent rechecks current package absence and the complete cleanup scope before execution.</p>
+  <p>This action removes the reviewed empty directories and any listed incomplete manifest metadata. Unknown files, package payloads and running processes prevent cleanup. Its separate result does not confirm that the original uninstall succeeded.</p>
+ </div>
+ <form method="post" action={NetbirdRemovalStageCleanupPath(info,v.Target.ID)} hx-post={NetbirdRemovalStageCleanupPath(info,v.Target.ID)} hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+  @mdm_views.CSRF(info)
+  <input type="hidden" name="original_id" value={v.StageCleanup.Original.RequestID}/>
+  <input type="hidden" name="request_id" value={requestID}/>
+  <input type="hidden" name="stage_cleanup_digest" value={v.StageCleanupDigest}/>
+  <input type="hidden" name="revision" value={v.Revision}/>
+  <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the original reference and cleanup scope and authorize removal of these empty directories and any listed incomplete manifest metadata.</span></label>
+  <button class="uk-button uk-button-primary" id="netbird-submit" type="submit">Queue staging cleanup</button>
+  <span class="htmx-indicator" id="netbird-pending" role="status">Queuing staging cleanup…</span>
+ </form>
+		<a href={ NetbirdRemovalStageCleanupPath(info, v.Target.ID) }>Cleanup history</a>
+	}
+}
+
+templ NetbirdRemovalStageCleanupReceipt(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdRemovalStageCleanupStatus, cancellationID string) {
+	@netbirdPage(c, info, v.Request.DeviceID, "NetBird staging cleanup") {
+		<p role="status" class="netbird-state">{ netbirdRemovalStageCleanupLabel(v.State()) }</p>
+		if v.DispatchStop!=nil {
+			<p>{ netbirdRemovalStageCleanupStop(v.DispatchStop.Reason) }</p>
+		}
+		if v.State()=="completed" {
+			<p>This separate cleanup completed for the reviewed staging and verified current absence of the supported NetBird package at the recorded time. The original uninstall retains its own outcome. Later device changes require a new review.</p>
+		} else if v.State()=="released" {
+			<p>Owned resolution evidence allows new NetBird operations. It does not confirm that this cleanup completed or remove retained local data. The original uninstall remains unchanged.</p>
+		} else if v.Delivery!=nil {
+			<p>Cleanup cannot be cancelled or repeated. Check its retained receipt or review resolution if the outcome remains unclear.</p>
+
+		}
+		<dl class="netbird-details">
+			<dt>Request ID</dt>
+			<dd>{ v.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ v.Request.DeviceID }</dd>
+			<dt>Organization / site</dt>
+			<dd>{ fmt.Sprintf("%d / %d",v.Request.Scope.TenantID,v.Request.Scope.SiteID) }</dd>
+			<dt>Requested by</dt>
+			<dd>{ v.Request.Actor }</dd>
+			<dt>Requested</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.RequestedAt)
+</dd>
+			<dt>Admission deadline</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.ExpiresAt)
+</dd>
+			if v.DispatchStop!=nil {
+				<dt>Automatic processing stopped</dt>
+				<dd>@mdm_views.Timestamp(&v.DispatchStop.RecordedAt)</dd>
+			}
+			if v.Delivery!=nil {
+				<dt>Cleanup dispatched</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.IssuedAt)
+</dd>
+				<dt>Cleanup deadline</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.ExpiresAt)
+</dd>
+				<dt>First cleanup delivery outcome</dt>
+				<dd>{ v.Delivery.OriginalOutcome }</dd>
+				<dt>First cleanup result retained</dt>
+				<dd>@mdm_views.Timestamp(v.Delivery.RecordedAt)
+</dd>
+				if v.Delivery.ObservedAt!=nil {
+					<dt>Latest receipt check</dt>
+					<dd>@mdm_views.Timestamp(v.Delivery.ObservedAt)
+</dd>
+					<dt>Observed result</dt>
+					<dd>{ v.Delivery.ObservedOutcome }</dd>
+				}
+			}
+			if v.Request.CompletedAt!=nil {
+				<dt>Staging cleanup completed</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CompletedAt)
+</dd>
+			}
+			if v.Request.CancelledAt!=nil {
+				<dt>Cancelled</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CancelledAt)
+</dd>
+				<dt>Cancelled by</dt>
+				<dd>{ v.Request.CancelledBy }</dd>
+			}
+			if v.Request.ReleasedAt!=nil {
+				<dt>Resolution confirmed</dt>
+				<dd>@mdm_views.Timestamp(v.Request.ReleasedAt)
+</dd>
+				<dt>Confirmed by</dt>
+				<dd>{ v.Request.ReleasedBy }</dd>
+			}
+		</dl>
+		<p><a href={NetbirdRemovalPath(info,v.Request.DeviceID)+"/"+v.Request.OriginalID}>Original uninstall receipt</a></p>
+		<details><summary>Reviewed cleanup and original reference</summary>@netbirdRemovalStageCleanupDescriptor(v.Request.StageCleanup)
+</details>
+		if v.Resolution!=nil {
+			@netbirdRemovalStageCleanupResolutionSummary(v.Resolution)
+		}
+		if v.Request.CancelledAt==nil && v.Request.CompletedAt==nil && v.Request.ReleasedAt==nil && info.Principal.Can(access.AssignSoftware,v.Request.Scope) {
+			if v.Delivery==nil {
+				<p>Cancellation prevents cleanup from being admitted for this request.</p>
+				<form method="post" action={ NetbirdRemovalStageCleanupPath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/cancel" } class="netbird-confirm">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="revision" value={ v.Request.Revision }/>
+					<input type="hidden" name="cancellation_id" value={ cancellationID }/>
+					<label class="netbird-checkbox" for="netbird-cancel"><input id="netbird-cancel" type="checkbox" name="confirmed" value="yes" required/><span>Cancel this request if cleanup has not been admitted.</span></label>
+					<button class="uk-button uk-button-default" type="submit">Cancel cleanup request</button>
+				</form>
+			} else {
+				@netbirdRemovalStageCleanupEvidenceForm(info, v.Request, "observe", "", "Check retained receipt")
+				<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/resolution" }>Review cleanup resolution</a>
+				if v.Resolution!=nil {
+					@netbirdRemovalStageCleanupEvidenceForm(info, v.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile resolution evidence")
+				}
+			}
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, v.Request.DeviceID) + "/" + v.Request.ID }>Reload status</a>
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, v.Request.DeviceID) }>Cleanup history</a>
+		</div>
+	}
+}
+
+templ netbirdRemovalStageCleanupEvidenceForm(info *partials.CommonInfo, r *inventory.NetbirdRemovalStageCleanup, suffix, resolutionID, label string) {
+	<form method="post" action={ NetbirdRemovalStageCleanupPath(info, r.DeviceID) + "/" + r.ID + "/" + suffix } class="netbird-confirm">
+		@mdm_views.CSRF(info)
+		<input type="hidden" name="confirmed" value="yes"/>
+		<input type="hidden" name="revision" value={ r.Revision }/>
+		if resolutionID!="" {
+			<input type="hidden" name="resolution_id" value={ resolutionID }/>
+		}
+		<button class="uk-button uk-button-default" type="submit">{ label }</button>
+	</form>
+}
+
+templ netbirdRemovalStageCleanupResolutionSummary(d *inventory.NetbirdRemovalStageCleanupResolution) {
+	<dl class="netbird-details">
+		<dt>Resolution ID</dt>
+		<dd>{ d.ID }</dd>
+		<dt>Resolution requested by</dt>
+		<dd>{ d.Actor }</dd>
+		<dt>Resolution requested</dt>
+		<dd>@mdm_views.Timestamp(&d.CreatedAt)
+</dd>
+		if d.LastAttempt!=nil {
+			<dt>Latest resolution attempt</dt>
+			<dd>{ fmt.Sprintf("%d: %s",d.LastAttempt.Sequence,d.LastAttempt.Kind) }</dd>
+			<dt>Attempted by</dt>
+			<dd>{ d.LastAttempt.Actor }</dd>
+			<dt>Attempted</dt>
+			<dd>@mdm_views.Timestamp(&d.LastAttempt.CreatedAt)
+</dd>
+			<dt>Retained outcome</dt>
+			<dd>{ d.LastAttempt.Outcome }</dd>
+		}
+	</dl>
+}
+
+templ NetbirdRemovalStageCleanupResolution(c echo.Context, info *partials.CommonInfo, status *inventory.NetbirdRemovalStageCleanupStatus, v *inventory.NetbirdRemovalStageCleanupResolutionReview) {
+	@netbirdPage(c, info, status.Request.DeviceID, "Review cleanup resolution") {
+		<dl class="netbird-details">
+			<dt>Cleanup request</dt>
+			<dd>{ status.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ status.Request.DeviceID }</dd>
+			<dt>Agent evidence</dt>
+			<dd>{ netbirdRemovalStageCleanupResolutionState(v.Outcome) }</dd>
+			if v.ExpiresAt!=nil {
+				<dt>Review expires</dt>
+				<dd>@mdm_views.Timestamp(v.ExpiresAt)
+</dd>
+			}
+		</dl>
+		if v.Resolution!=nil {
+			@netbirdRemovalStageCleanupResolutionSummary(v.Resolution)
+		}
+		if v.Revision!="" && (v.Kind=="withdraw" || v.Kind=="release") {
+			if v.Kind=="withdraw" {
+				<p>Confirmation permanently blocks any later delivery of this cleanup request if the agent has not attempted it. New NetBird operations become available only after matching withdrawal proof is retained.</p>
+			} else {
+				<p>The agent permits explicit release of this unconfirmed cleanup entry. Release allows further NetBird operations after matching proof; it does not complete this cleanup or remove retained local data.</p>
+			}
+			if v.Resolution!=nil {
+				<p>This is an additional explicitly reviewed control using the same permanent resolution ID. It does not resend the cleanup command.</p>
+			}
+			<form method="post" action={ NetbirdRemovalStageCleanupPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-post={ NetbirdRemovalStageCleanupPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+				@mdm_views.CSRF(info)
+				<input type="hidden" name="revision" value={ status.Request.Revision }/>
+				<input type="hidden" name="resolution_id" value={ v.ResolutionID }/>
+				<input type="hidden" name="review_revision" value={ v.Revision }/>
+				<label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed this evidence and authorize the described resolution action and further NetBird operations after matching proof.</span></label>
+				<button class="uk-button uk-button-primary" id="netbird-submit" type="submit">{ map[string]string{"withdraw":"Confirm permanent withdrawal","release":"Confirm reviewed release"}[v.Kind] }</button>
+				<span class="htmx-indicator" id="netbird-pending" role="status">Recording resolution attempt…</span>
+			</form>
+			<p>If this review expires or the evidence changes, review again before confirming.</p>
+		} else if v.Outcome!="completed" && v.Outcome!="released" {
+			<p role="status">No new resolution action is currently eligible. Missing or uncertain evidence keeps further NetBird operations blocked.</p>
+		}
+		if v.Resolution!=nil && v.Outcome!="completed" && v.Outcome!="released" {
+			@netbirdRemovalStageCleanupEvidenceForm(info, status.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile resolution evidence")
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" }>Review again</a>
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, status.Request.DeviceID) + "/" + status.Request.ID }>Cleanup receipt</a>
+		</div>
+	}
+}
+
+func netbirdRemovalStageCleanupResolutionState(state string) string {
+	switch state {
+	case "not-received":
+		return "No attempt retained; permanent withdrawal is available"
+	case "unconfirmed":
+		return "The exact cleanup entry is unconfirmed and eligible for release"
+	case "awaiting-confirmation":
+		return "The owned resolution result is visible and awaits reconciliation"
+	case "completed":
+		return "A matching completed cleanup receipt is retained"
+	case "released":
+		return "Resolution is already confirmed"
+	case "conflict":
+		return "The observed resolution identity conflicts with this request"
+	case "waiting":
+		return "The current journal does not permit resolution"
+	default:
+		return "Matching resolution evidence is currently unavailable"
+	}
+}
+
+templ NetbirdRemovalStageCleanupHistory(c echo.Context, info *partials.CommonInfo, scope access.Scope, device string, page *inventory.NetbirdRemovalStageCleanupHistory) {
+	@netbirdPage(c, info, device, "NetBird staging cleanup history") {
+		<p>Retained requests and outcomes for this device at the selected organization and site. Opening history does not contact the agent.</p>
+		if len(page.Requests)==0 {
+			<p role="status">No cleanup requests are recorded here.</p>
+		} else {
+			<ul class="netbird-history">
+				for _,v:=range page.Requests {
+					<li>
+						<a href={ NetbirdRemovalStageCleanupPath(info, device) + "/" + v.Request.ID } class="netbird-id">{ "Staging cleanup · "+v.Request.ID }</a>
+						<span>{ netbirdRemovalStageCleanupLabel(v.State()) }</span>
+						<span>{ "Requested by "+v.Request.Actor }</span>
+						@mdm_views.Timestamp(&v.Request.RequestedAt)
+					</li>
+				}
+			</ul>
+		}
+		<div class="netbird-actions">
+			if page.Next!="" {
+				<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info, device) + "?before=" + url.QueryEscape(page.Next) }>Older requests</a>
+			}
+			if info.Principal.Can(access.AssignSoftware,scope) {
+				<a class="uk-button uk-button-primary" href={ NetbirdRemovalPath(info, device) }>Removal history</a>
+			}
+		</div>
+	}
+}

@@ -47,6 +47,7 @@ import netbirdInstallations from "./netbird-installations.mjs";
 import netbirdRemovals from "./netbird-removals.mjs";
 import netbirdRemovalRecoveries from "./netbird-removal-recoveries.mjs";
 import netbirdRemovalAbsences from "./netbird-removal-absences.mjs";
+import netbirdRemovalStageCleanups from "./netbird-removal-stage-cleanups.mjs";
 import netbirdProfiles from "./netbird-profiles.mjs";
 import netbirdConnectionWithdrawals from "./netbird-connection-withdrawals.mjs";
 import netbirdResolutionRetries from "./netbird-resolution-retries.mjs";
@@ -146,6 +147,7 @@ try {
         [netbirdRemovals,78],
         [netbirdRemovalRecoveries,75],
         [netbirdRemovalAbsences,75],
+        [netbirdRemovalStageCleanups,81],
         [netbirdProfiles,18],
         [netbirdOperations,75],
         [netbirdRegistrations,117],

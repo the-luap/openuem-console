@@ -115,7 +115,8 @@ retained metadata and omit certificates, broker keys and executable envelopes.
 
 Empty or incomplete stages remain preserved by this read-only workflow.
 [Independent scaffold cleanup](netbird-removal-stage-cleanup.md) has its own
-reviewed native owner and agent admission; its console lifecycle remains open. Manifest continuation cannot silently fall back to verification or stage
+reviewed native owner, agent admission and complete separate console lifecycle.
+Manifest continuation cannot silently fall back to verification or stage
 cleanup. Linux individual enrollment, publisher trust and physical-device
 acceptance remain separate roadmap requirements.
 

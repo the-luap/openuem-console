@@ -69,6 +69,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		return err
 	}
 	w.Handler.NetbirdRemovalAbsences = absence
+	stageCleanup, err := inventory.NewNetbirdRemovalStageCleanupDeliveryStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.RequestNetbirdControl, w.Handler.PublishNetbirdRemovalStageCleanup)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdRemovalStageCleanups = stageCleanup
 
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
@@ -90,7 +95,10 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		go func() { defer close(recoveryDone); recovery.Run(run, slog.Default()) }()
 		absenceDone := make(chan struct{})
 		go func() { defer close(absenceDone); absence.Run(run, slog.Default()) }()
+		stageCleanupDone := make(chan struct{})
+		go func() { defer close(stageCleanupDone); stageCleanup.Run(run, slog.Default()) }()
 		manual.Run(run, slog.Default())
+		<-stageCleanupDone
 		<-absenceDone
 		<-recoveryDone
 		<-removalDone

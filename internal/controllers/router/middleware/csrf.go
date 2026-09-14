@@ -100,6 +100,9 @@ func scopedFormLimit(path string) int64 {
 	if route == "/computers/:uuid/netbird/removal-absences" || route == "/computers/:uuid/netbird/removal-absences/:request/cancel" || route == "/computers/:uuid/netbird/removal-absences/:request/observe" || route == "/computers/:uuid/netbird/removal-absences/:request/resolution" || route == "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile" {
 		return 8192
 	}
+	if route == "/computers/:uuid/netbird/removal-stage-cleanups" || route == "/computers/:uuid/netbird/removal-stage-cleanups/:request/cancel" || route == "/computers/:uuid/netbird/removal-stage-cleanups/:request/observe" || route == "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution" || route == "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution/reconcile" {
+		return 8192
+	}
 	if route == "/netbird/packages" || route == "/netbird/packages/:approval/revoke" {
 		return 16 << 10
 	}

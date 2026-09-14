@@ -21,9 +21,9 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-absences/:request":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request", "/computers/:uuid/netbird/removal-stage-cleanups/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-absences/review", "/computers/:uuid/netbird/removal-absences/:request/resolution":
+		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-absences/review", "/computers/:uuid/netbird/removal-stage-cleanups/review", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/installations/new", "/computers/:uuid/netbird/installations/review", "/computers/:uuid/netbird/installations/:request/resolution":
 			return access.AssignSoftware, true
@@ -47,7 +47,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
 			return access.AssignSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-absences/:request/cancel", "/computers/:uuid/netbird/removal-absences/:request/observe", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request/cancel", "/computers/:uuid/netbird/removal-stage-cleanups/:request/cancel", "/computers/:uuid/netbird/removal-absences/:request/observe", "/computers/:uuid/netbird/removal-stage-cleanups/:request/observe", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution", "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution/reconcile":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request/cancel", "/computers/:uuid/netbird/registrations/:request/cleanup", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request/cancel", "/computers/:uuid/netbird/connect", "/computers/:uuid/netbird/disconnect", "/computers/:uuid/netbird/switchprofile", "/computers/:uuid/netbird/install", "/computers/:uuid/netbird/uninstall", "/computers/:uuid/netbird/register", "/computers/:uuid/netbird/deletepeer":
 			return access.ManageDeviceSecurity, true
@@ -152,6 +152,16 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	absence.GET("/:request/resolution", h.NetbirdRemovalAbsenceResolutionReview)
 	absence.POST("/:request/resolution", h.NetbirdRemovalAbsenceResolve)
 	absence.POST("/:request/resolution/reconcile", h.NetbirdRemovalAbsenceReconcile)
+	stageCleanup := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-stage-cleanups", h.IsAuthenticated, h.AppleCSRF)
+	stageCleanup.GET("", h.NetbirdRemovalStageCleanupHistory)
+	stageCleanup.GET("/review", h.NetbirdRemovalStageCleanupReview)
+	stageCleanup.POST("", h.NetbirdRemovalStageCleanupRequest)
+	stageCleanup.GET("/:request", h.NetbirdRemovalStageCleanupReceipt)
+	stageCleanup.POST("/:request/cancel", h.NetbirdRemovalStageCleanupCancel)
+	stageCleanup.POST("/:request/observe", h.NetbirdRemovalStageCleanupObserve)
+	stageCleanup.GET("/:request/resolution", h.NetbirdRemovalStageCleanupResolutionReview)
+	stageCleanup.POST("/:request/resolution", h.NetbirdRemovalStageCleanupResolve)
+	stageCleanup.POST("/:request/resolution/reconcile", h.NetbirdRemovalStageCleanupReconcile)
 	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
 	registration.GET("", h.NetbirdRegistrationHistory)
 	registration.GET("/new", h.NetbirdRegistrationChoices)

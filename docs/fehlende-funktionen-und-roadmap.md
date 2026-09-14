@@ -822,15 +822,17 @@ The [separate verification protocol, agent journal admission and complete consol
 now preserve original uncertainty while recording a distinct current-state
 result. Scoped review, immutable request/attempt/result storage, one direct
 delivery, retained observations, explicit resolution, joined dispatch and history
-forms are integrated. All six request families share device and permanent UUID
-exclusion. The [independent scaffold cleanup protocol, native owner, agent
-admission and console transport](netbird-removal-stage-cleanup.md) now bind a
-separately reviewed current scaffold and incomplete metadata scope. Unknown
-objects and usable manifests remain preserved. The console cleanup request,
-delivery, resolution and operator workflow still need integration.
-Linux individual enrollment,
-publisher trust and physical installation/removal acceptance remain separate
-requirements.
+forms are integrated. The [independent scaffold cleanup protocol, native owner,
+agent admission and complete console lifecycle](netbird-removal-stage-cleanup.md)
+now bind a separately reviewed current scaffold and incomplete metadata scope.
+The console retains exact review, immutable intent and one delivery, independent
+receipts, explicit resolution and scoped history under joined dispatch. All seven
+request families share device and permanent UUID exclusion. Unknown objects and
+usable manifests remain preserved.
+The [Linux service-ownership primitive](https://github.com/the-luap/openuem-agent/blob/cea7c8549fb9e34982defc407b17b1f3a5e2e17c/docs/linux-service-ownership.md) now excludes competing root
+services and validates pinned private installation ancestry. Linux encrypted
+identity storage, enrollment/installation admission, service activation, publisher
+trust and physical installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

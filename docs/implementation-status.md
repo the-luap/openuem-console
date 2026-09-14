@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Independent NetBird staging cleanup](netbird-removal-stage-cleanup.md) now
+  connects exact current native review to durable console request, single
+  delivery, receipt observation, explicit resolution, joined dispatch and scoped
+  history. The operator confirms the displayed empty-directory count and bounded
+  incomplete manifest metadata. Missing metadata is displayed explicitly. All
+  seven NetBird request families share device exclusion and permanent UUIDs;
+  original uninstall outcomes remain unchanged. The separate
+  [read-only absence lifecycle](netbird-removal-absence.md) and manifest-backed
+  continuation are also integrated. These workflows do not infer cleanup or
+  original success from a missing receipt. Linux individual enrollment/publisher
+  trust and physical installation/removal acceptance remain open.
+  The [Linux service lease](https://github.com/the-luap/openuem-agent/blob/cea7c8549fb9e34982defc407b17b1f3a5e2e17c/docs/linux-service-ownership.md) now provides native process exclusion
+  and pinned private-namespace validation; it does not enable identity storage.
+  Validation passed: 277 NetBird inventory race tests (942.714 seconds), all
+  view/CSRF races, 2,871 Chrome cases, registered HTTP routes, runtime startup/
+  shutdown and Linux console builds. Forty-one inventory tests and 81 browser
+  cases specifically cover the new cleanup lifecycle.
+
 - [Native NetBird removal protocol and journal admission](netbird-removal-commands.md)
   now bind a source-free installed-state fingerprint to a separate version-four
   command and version-three read-only inspection. The agent requires its own
@@ -116,8 +134,9 @@ the table's package summaries do not remove any detail from the roadmap.
   native/orphan receipt completion and partial-scaffold cleanup, retaining its
   original review and descriptors. Complete-owner interruption fixtures and
   native owned-volume forget tests pass with full races and platform builds.
-  Explicit recovery commands, journal admission, console integration and an
-  absent-manifest policy remain open; owned tests are not physical removal.
+  The subsequent continuation, independent absence and staging-cleanup
+  lifecycles above now provide explicit command, journal and console integration.
+  Owned tests are not physical removal acceptance.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.
