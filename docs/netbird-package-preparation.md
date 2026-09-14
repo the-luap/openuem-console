@@ -89,23 +89,27 @@ During a live service, unexpected files are preserved and disable preparation;
 failed cleanup never invokes the broader startup recovery path. Native startup
 does not publish managed readiness if it cannot safely open its preparation owner.
 
-The [installation request store](netbird-installation-requests.md) still does not
-publish preparations or create delivery attempts. Its current cancellation guard
-must exclude attempted work before such a publisher is enabled. Fresh current
-approval/revocation and recipient checks, retained preparation/delivery intent,
-verified resulting-state recovery and local removal remain required. Native
-macOS installation now consumes the exact prepared package under atomic current
+The [console preparation component](netbird-console-preparation.md) now binds one
+exact request to immutable attempt/result storage and a direct preparation RPC.
+It rechecks current approval/recipient authority and both native capabilities,
+commits admission before RPC and holds no database lock through download. Before
+native command delivery is enabled, the cancellation guard must exclude native
+command attempts; preparation alone remains cancellable. Fresh current
+approval/revocation and recipient checks at native command admission, retained
+command delivery intent, verified resulting-state recovery and local removal
+remain required. Native macOS installation now consumes the exact prepared package under atomic current
 journal admission, rechecks trust and verifies its receipt, complete payload and
 CLI link. It requires a root individual agent with native ACL support and advertises
 a separate `installation-state` capability. Linux additionally needs individual
-enrollment and independent publisher provenance. Console delivery remains disabled.
+enrollment and independent publisher provenance. Console native command delivery
+remains disabled.
 
 Owned broker/filesystem tests cover source correlation, exact replay, parallel
 admission, retained uncertainty, journal changes during download, connection
 replacement, expiry, partial crash files, symlinks and joined shutdown. A test
 through the real native binding rejects the wrong platform before any HTTP call.
 These tests do not run a NetBird installer, daemon or provider.
-All consumers pin `v0.11.1-0.20260914044144-fbef45520563`. The complete shared race
+That endpoint milestone used `v0.11.1-0.20260914044144-fbef45520563`. The complete shared race
 suite passes; seeded preparation decoding fuzzes 11,748,164 inputs in 31.401
 seconds. Final macOS command/preparation/journal race suites pass in
 5.638/4.201/7.633 seconds and native agent regressions in 2.574 seconds.

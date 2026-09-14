@@ -15,14 +15,15 @@ import (
 	"github.com/open-uem/openuem-console/internal/security/access"
 )
 
-// NetbirdInstallationStore retains reviewed installation intent. It does not
-// publish a command or equate ordinary journal readiness with installer support.
-// A later dispatcher must authenticate preparation and recheck this source before
-// committing a delivery attempt; request cancellation is currently pre-delivery.
+// NetbirdInstallationStore retains reviewed installation intent. Its optional
+// preparation constructor admits one authenticated download/inspection RPC.
+// Native command delivery must recheck current source authority and persist its
+// own attempt; preparation and ordinary journal readiness cannot authorize it.
 type NetbirdInstallationStore struct {
 	packages   *NetbirdPackageStore
 	inspect    NetbirdOperationInspector
 	individual bool
+	prepare    NetbirdPreparationExecutor
 }
 
 func NewNetbirdInstallationStore(db *sql.DB, permissions *access.Store, individual bool, master string, inspect NetbirdOperationInspector) (*NetbirdInstallationStore, error) {
@@ -321,8 +322,9 @@ func (s *NetbirdInstallationStore) Read(parent context.Context, actor string, sc
 	return r, nil
 }
 
-// Cancel applies only to this pre-delivery request phase. Introducing command
-// attempts must extend its database guard before any dispatcher is enabled.
+// Cancel applies before native command delivery, including during preparation.
+// Preparation cannot undo cancellation. Introducing native command attempts must
+// extend the database guard before that dispatcher is enabled.
 func (s *NetbirdInstallationStore) Cancel(parent context.Context, actor string, scope access.Scope, device, id, revision, cancellation string) (*NetbirdInstallation, error) {
 	if !canonicalRequestID(device) || !canonicalRequestID(id) || !canonicalRequestID(cancellation) || !netbirdcommand.ValidDigest(revision) {
 		return nil, ErrNetbirdOperationInvalid

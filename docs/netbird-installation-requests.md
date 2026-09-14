@@ -4,7 +4,8 @@
 requests, scoped history reads and explicit cancellation before delivery. It
 connects organization package approval storage to a particular individually
 enrolled Unix device. This is a backend component; construction enables no route,
-dispatcher, package download or native installer.
+dispatcher or native installer. The optional [preparation constructor](netbird-console-preparation.md)
+now admits one separately requested, authenticated download/inspection RPC.
 
 ## Current authority and exact source
 
@@ -70,18 +71,21 @@ while the server uses shared credentials.
 ## Integration boundary
 
 A queued request is retained intent, not a delivered or admitted agent command.
-The component has no publisher or worker. Before enabling delivery, the dispatcher
-must authenticate private preparation and native capability, recheck current
-approval/revocation and target source, and durably retain the exact command attempt.
+The optional preparation component now verifies both native capabilities and
+retains one exact download/inspection attempt before its direct RPC. Native command
+delivery must still recheck current approval/revocation and target source and
+durably retain the exact command attempt.
 Cancellation's database guard must then exclude attempted work; admitted or
 uncertain commands require their separate evidence/recovery path. Expiry does not
 silently erase the barrier. The [authenticated preparation agent endpoint](netbird-package-preparation.md#authenticated-preparation-endpoint)
-now owns exact private stages, but this store has no preparation publisher or
-attempt table. Operator UI, console preparation/delivery admission,
-resulting-state recovery and local removal remain required. Native macOS
+now owns exact private stages. [Console preparation admission](netbird-console-preparation.md)
+adds immutable attempt/results and a bounded direct publisher without holding a
+database transaction during download. Operator UI, native command delivery
+admission, resulting-state recovery and local removal remain required. Native macOS
 installation now consumes exact preparation under atomic journal admission and
 verifies native receipt, complete payload hashes and the vendor CLI link. This
-request store still does not deliver preparations or installation commands.
+store only sends preparation through its explicitly configured method; it does
+not yet dispatch a native installation command.
 
 The current individual enrollment validator and registry accept Windows/macOS,
 not Linux. Tests enroll macOS through the real owned registry fixture. Linux also

@@ -728,15 +728,20 @@ journal revision, with exact replay, bounded cache/crash cleanup and joined
 shutdown. The separate readiness control does not advertise an installer.
 Owned broker/filesystem/native-binding tests, shared decoder fuzzing, macOS/Linux
 race suites and all six consumer/platform builds cover this endpoint. Console
-preparation delivery and durable attempt admission remain unconnected.
+[preparation admission](netbird-console-preparation.md) now retains exact attempts
+and source-free results around one bounded direct RPC. It requires both native
+capabilities, current approval/recipient/assignment authority and the reviewed
+journal revision. Download holds no database transaction; concurrent revocation
+and pre-install cancellation remain possible. Exact repeat calls read retained
+evidence without redelivery. Native command dispatch remains unconnected.
 Native macOS installation now consumes that exact prepared artifact under an
 atomic journal revision check. Individually enrolled root agents with native ACL
 support advertise separate installation readiness, recheck native trust and
 protected paths, and invoke the fixed system installer once. Completion requires
 the exact native receipt, every payload file hash and the protected vendor CLI
 link; cancellation and cleanup join before the journal result. Owned fixtures and
-read-only official-package evidence cover this component. Console preparation and
-command delivery, current approval admission, recovery UI and local removal still
+read-only official-package evidence cover this component. Console native command
+delivery, fresh approval admission, recovery UI and local removal still
 need integration. Linux individual enrollment, publisher trust and physical
 installation acceptance remain separate requirements.
 

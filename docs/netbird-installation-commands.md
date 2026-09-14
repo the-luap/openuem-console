@@ -44,10 +44,13 @@ The [durable installation request store](netbird-installation-requests.md) now
 authenticates the organization approval and exact individual target, supports an
 absent client, and retains intent/cancellation under the common console barrier.
 The [private native preparation](netbird-package-preparation.md) now has an
-authenticated agent RPC, native ownership and bounded cleanup. It still needs
-durable console preparation/delivery attempts, a fresh approval/target check at
-final command admission and verified resulting-state recovery. Native macOS prepared-package consumption and installation are now
-implemented; local removal remains unavailable. Windows retains its software workflow;
+authenticated agent RPC, native ownership and bounded cleanup. Its
+[console preparation admission](netbird-console-preparation.md) is now implemented
+with exact durable attempt/results and both native capability checks. Native
+command delivery attempts, a fresh approval/target check at final command
+admission and verified resulting-state recovery remain required. Native macOS
+prepared-package consumption and installation are now implemented; local removal
+remains unavailable. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.
 
 ## Verification
