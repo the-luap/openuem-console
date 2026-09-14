@@ -71,8 +71,9 @@ Audit failures roll back metadata and retain the original unresolved attempt.
 
 The full NetBird inventory race suite and Linux ARM64 console build cover this
 integration. Fixtures do not mutate vendor software or enrolled endpoints.
-Joined automatic dispatch, scoped status/history UI and retained local staging
-recovery remain open. Journal release does not clear staging; the
+[Joined automatic dispatch](netbird-removal-dispatch.md) is now implemented.
+Scoped status/history UI and retained local staging recovery remain open.
+Journal release does not clear staging; the
 [native execution owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 continues to reject a fresh removal while interrupted staging remains. Physical
 package, interruption, reboot and desktop acceptance remains separate.

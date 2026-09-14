@@ -5,7 +5,8 @@ to one durable native attempt, direct delivery and retained result. The dedicate
 publisher accepts only the version-four removal grammar. Existing connection and
 installation publishers continue to reject it. [Reviewed resolution](netbird-removal-resolutions.md)
 now provides explicit withdrawal/release and read-only lost-control reconciliation.
-Public routes, a joined dispatcher and the resolution UI remain separate work.
+A [joined dispatcher](netbird-removal-dispatch.md) now processes committed requests;
+public routes and the resolution UI remain separate work.
 
 ## Fresh native admission
 
@@ -88,7 +89,8 @@ suite and Linux ARM64 console build cover the integrated change. No real vendor
 package, provider or enrolled endpoint is mutated by these fixtures.
 
 Explicit reviewed withdrawal/release and lost-control reconciliation are now
-implemented. Bounded joined dispatch, coherent history/status UI and retained
-local staging recovery remain required. The [native agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
+implemented, including [bounded joined dispatch](netbird-removal-dispatch.md).
+Coherent history/status UI and retained local staging recovery remain required.
+The [native agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 already handles protected removal and repeated native absence verification.
 Physical package, interruption, reboot and desktop acceptance remains separate.

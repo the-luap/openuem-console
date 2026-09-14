@@ -21,7 +21,8 @@ old response versions, and prove that neither existing publisher sends a removal
 The separate [removal request store](netbird-removal-requests.md) now retains
 fresh reviewed native state, exact-site software authority, immutable intent and
 queued cancellation under the common four-family UUID/device barrier. It still
-has no public removal route or dispatcher.
+has no public removal route; its [joined dispatcher](netbird-removal-dispatch.md)
+now processes committed requests.
 
 The agent now also has a [private native package ownership inspector](https://github.com/the-luap/openuem-agent/blob/ee54842a8fe8e065ed935742a0d5e349b3421a63/docs/netbird-removal-ownership.md).
 It verifies protected receipt/BOM and bundle objects, exact package file lists,
@@ -55,8 +56,9 @@ now commits one exact attempt before a direct version-four RPC, retains original
 outcomes and recovers lost completed receipts through read-only queries under the
 current certificate. Native admission excludes cancellation. [Explicit resolution](netbird-removal-resolutions.md)
 now retains expiring reviews, owned control attempts and exact withdrawal/release
-proofs, with read-only reconciliation for lost replies. Joined dispatch and UI
-remain open.
+proofs, with read-only reconciliation for lost replies. [Joined dispatch](netbird-removal-dispatch.md)
+now binds the native store at startup and retains immutable preflight stops.
+Public UI remains open.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.

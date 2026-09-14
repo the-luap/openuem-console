@@ -139,6 +139,13 @@ func (s *NetbirdRemovalStore) admitRemoval(parent context.Context, actor string,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, err
 	}
+	stopped, err := readRemovalDispatchStop(ctx, tx, id)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if stopped != nil {
+		return nil, nil, nil, ErrNetbirdOperationConflict
+	}
 	if r.CancelledAt != nil || r.CompletedAt != nil || r.ReleasedAt != nil || !time.Now().Before(r.ExpiresAt) {
 		return nil, nil, nil, ErrNetbirdOperationConflict
 	}

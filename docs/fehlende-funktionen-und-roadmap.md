@@ -781,7 +781,9 @@ absence alone cannot rewrite an uncertain result. [Reviewed resolution](netbird-
 now retains expiring reviews, one permanent resolution identity, exact control
 attempts and owned release proofs. Lost replies reconcile read-only; original
 native uncertainty remains distinct. Startup also checks all required removal
-guards. Joined dispatch/UI and retained-stage recovery remain open.
+guards. [Joined dispatch](netbird-removal-dispatch.md) now processes requests with
+bounded workers, immutable preflight stops and no automatic retry after native
+admission. Public UI and retained-stage recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

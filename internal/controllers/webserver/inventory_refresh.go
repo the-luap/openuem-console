@@ -54,6 +54,11 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		return err
 	}
 	w.Handler.NetbirdInstallations = installation
+	removal, err := inventory.NewNetbirdRemovalDeliveryStore(w.Handler.Model.DB, w.Handler.Access, w.Handler.IndividualAgentService != nil, w.Handler.RequestNetbirdControl, w.Handler.PublishNetbirdRemoval)
+	if err != nil {
+		return err
+	}
+	w.Handler.NetbirdRemovals = removal
 
 	run, cancel := context.WithCancel(context.Background())
 	w.inventoryCancel = cancel
@@ -69,7 +74,10 @@ func (w *WebServer) startInventoryRefresh(ctx context.Context) error {
 		go func() { defer close(registrationDone); registration.Run(run, slog.Default()) }()
 		installationDone := make(chan struct{})
 		go func() { defer close(installationDone); installation.Run(run, slog.Default()) }()
+		removalDone := make(chan struct{})
+		go func() { defer close(removalDone); removal.Run(run, slog.Default()) }()
 		manual.Run(run, slog.Default())
+		<-removalDone
 		<-installationDone
 		<-registrationDone
 		<-refreshDone

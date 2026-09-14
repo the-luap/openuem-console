@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNetbirdInstallationRuntimeBindsStoresAndJoinsWithoutBroker(t *testing.T) {
+func TestNetbirdInstallationAndRemovalRuntimeBindsStoresAndJoinsWithoutBroker(t *testing.T) {
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for isolated inventory startup integration")
@@ -55,15 +55,18 @@ func TestNetbirdInstallationRuntimeBindsStoresAndJoinsWithoutBroker(t *testing.T
 	require.NoError(t, w.startInventoryRefresh(t.Context()))
 	t.Cleanup(w.stopInventoryRefresh)
 	require.NotNil(t, w.Handler.NetbirdInstallations)
+	require.NotNil(t, w.Handler.NetbirdRemovals)
 	installation := w.Handler.NetbirdInstallations
+	removal := w.Handler.NetbirdRemovals
 	require.NoError(t, w.startInventoryRefresh(t.Context()))
 	require.Same(t, installation, w.Handler.NetbirdInstallations)
+	require.Same(t, removal, w.Handler.NetbirdRemovals)
 	done := make(chan struct{})
 	go func() { w.stopInventoryRefresh(); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatal("inventory startup did not join installation workers")
+		t.Fatal("inventory startup did not join installation and removal workers")
 	}
 	select {
 	case <-w.inventoryDone:
