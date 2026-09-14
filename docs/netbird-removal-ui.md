@@ -88,13 +88,14 @@ The full inventory race suite and Linux ARM64 console/handler builds cover the
 integration. Fixtures do not remove vendor software or contact enrolled devices.
 
 Retained local staging recovery remains required. Its [private combined
-observer and execution primitives](https://github.com/the-luap/openuem-agent/blob/833d0b0f7b59d606afe3859f524c4f6c9e062905/docs/netbird-removal-staging-recovery.md)
+observer and native recovery owner](https://github.com/the-luap/openuem-agent/blob/bf9f98969a5ba134eab504da9fd30b2539bde39d/docs/netbird-removal-staging-recovery.md)
 now distinguishes exact original evidence, partial moves/purge and unknown
 replacements, binding current service/process ownership and native receipt state.
 Native absence uses successful typed package lists, including an empty database.
-Private runtime stop and remaining-payload purge recheck exact ownership;
-remaining-source moves, receipt/scaffold completion, complete native continuation
-and its reviewed public lifecycle remain open.
+The private single-use owner now joins runtime stop, remaining-source moves,
+exact purge, native/orphan receipt completion and partial-scaffold cleanup.
+Explicit recovery commands, journal admission, absent-manifest recovery and the
+reviewed public lifecycle remain open.
 Journal release never removes staging, and fresh native removal continues to
 reject interrupted staging.
 Physical package, interruption, reboot, desktop and provider acceptance remain

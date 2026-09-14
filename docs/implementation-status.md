@@ -100,7 +100,7 @@ the table's package summaries do not remove any detail from the roadmap.
   cover ordinary/HTMX forms, raw-body bounds, CSRF, no automatic redelivery and
   exact read-only recovery. Seventy-eight new responsive Chrome cases cover
   confirmation, absence, long metadata, pending progress and retained uncertainty.
-  [Private retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/833d0b0f7b59d606afe3859f524c4f6c9e062905/docs/netbird-removal-staging-recovery.md)
+  [Private retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/bf9f98969a5ba134eab504da9fd30b2539bde39d/docs/netbird-removal-staging-recovery.md)
   now validates original manifest bytes/ownership and exact remaining files
   across interrupted moves, partial purge and scaffold cleanup. Unknown source,
   payload or scaffold replacements remain unavailable; receipt presence stays
@@ -112,8 +112,12 @@ the table's package summaries do not remove any detail from the roadmap.
   races and platform builds. Private runtime stop and partial-payload purge now
   recheck audit/code identity and every nested parent/file before mutation.
   Unknown replacements survive and original manifests/receipts remain retained.
-  Remaining-source moves, receipt/scaffold completion and explicit recovery
-  admission/execution remain open; owned tests are not physical removal.
+  A private single-use owner now joins remaining-source moves, exact purge,
+  native/orphan receipt completion and partial-scaffold cleanup, retaining its
+  original review and descriptors. Complete-owner interruption fixtures and
+  native owned-volume forget tests pass with full races and platform builds.
+  Explicit recovery commands, journal admission, console integration and an
+  absent-manifest policy remain open; owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

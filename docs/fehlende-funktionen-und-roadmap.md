@@ -785,15 +785,17 @@ guards. [Joined dispatch](netbird-removal-dispatch.md) now processes requests wi
 bounded workers, immutable preflight stops and no automatic retry after native
 admission. [Scoped public UI](netbird-removal-ui.md) now provides current native
 review, explicit queue/cancel, coherent status, bounded history and reviewed
-resolution under software permissions. [Retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/833d0b0f7b59d606afe3859f524c4f6c9e062905/docs/netbird-removal-staging-recovery.md)
-now binds original manifests and current exact files across interrupted moves/purge
+resolution under software permissions. [Retained-stage recovery components](https://github.com/the-luap/openuem-agent/blob/bf9f98969a5ba134eab504da9fd30b2539bde39d/docs/netbird-removal-staging-recovery.md)
+now bind original manifests and current exact files across interrupted moves/purge
 to current typed service state, original/relocated audit-token process ownership,
 and separate native complete/partial/absent receipt evidence. Native absence now
 uses a successful typed package list; an empty regexp search exits unsuccessfully
 on macOS. Private runtime-stop and remaining-payload purge primitives now preserve
-exact audit/code and nested parent/file ownership. Remaining-source moves,
-receipt/scaffold completion, explicit recovery admission and the complete native
-continuation remain open.
+exact audit/code and nested parent/file ownership. The private single-use owner
+now continues remaining-source moves, exact purge, recognized/orphan receipt
+completion and empty-scaffold cleanup against the reviewed original manifest.
+Explicit independent recovery commands, journal admission, console integration
+and absent-manifest recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.
