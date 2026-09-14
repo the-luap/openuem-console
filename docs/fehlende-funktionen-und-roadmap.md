@@ -873,8 +873,17 @@ now writes one canonical definition without overwriting existing entries and
 passes native concurrent-publication checks and all thirteen CI jobs. The
 [loaded-state observer](https://github.com/the-luap/openuem-agent/blob/f046f33c00cf0da4027c6f8f7d90dca8aa6b776f/docs/linux-systemd-state.md)
 also verifies typed effective configuration and process identity through read-only
-D-Bus calls. Service registration/activation, production publisher provisioning and physical
-installation/removal acceptance remain separate requirements.
+D-Bus calls. The [definition resolver and live manager fixture](https://github.com/the-luap/openuem-agent/blob/9906eee82809c55fad37564831b780b4a09e922a/docs/linux-systemd-definition.md)
+now resolve the complete unit search path before publication, reject actual vendor
+definitions and verify the protected persistent enablement link. Three fresh
+RAM-only virtual machines pass on ARM64 and AMD64 CI, including twenty immediate
+connections per guest. An observed authentication-boundary stall is addressed
+with kernel-confirmed socket consumption under the unchanged deadline. These
+tests leave the agent inactive. The [readiness process probe](https://github.com/the-luap/openuem-agent/blob/ac3645e2a7bc428905a0060024a736621f9c4cee/docs/native-linux-readiness.md)
+also verifies the manager-observed PID against the actual socket peer before
+requesting its signed identity proof. The complete activation controller, operational
+configuration, production publisher provisioning and physical installation/removal
+acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and

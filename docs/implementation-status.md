@@ -61,6 +61,30 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [Linux readiness process probe](https://github.com/the-luap/openuem-agent/blob/ac3645e2a7bc428905a0060024a736621f9c4cee/docs/native-linux-readiness.md)
+  now additionally requires the system manager's observed PID before sending a
+  challenge. Another process with the same valid device identity fails, as do
+  invalid PID ranges and mismatched identity with the expected PID. The updated
+  native transport, agent, Linux service and lifecycle race suites pass in
+  4.228/29.987/3.049/1.007 seconds; Linux/Windows builds and Linux Vet also pass.
+  The activation controller must still compare PID, start time and invocation
+  again after the proof before reporting success.
+
+- [Resolved Linux definitions and actual systemd validation](https://github.com/the-luap/openuem-agent/blob/9906eee82809c55fad37564831b780b4a09e922a/docs/linux-systemd-definition.md)
+  now require `LoadUnit` resolution before new publication, rejecting existing
+  vendor units, aliases and incomplete negative evidence. A RAM-only QEMU guest
+  authenticates actual root systemd PID 1 without host cgroup mounts or a
+  privileged container. All five live tests pass in three fresh ARM64 guests and
+  in the [AMD64 CI job](https://github.com/the-luap/openuem-agent/actions/runs/34900668298/job/104165584730),
+  including twenty immediate new connections per guest and actual persistent
+  enablement. An earlier first-call timeout was traced to coalesced authentication
+  and binary input; the connection now waits for kernel-confirmed consumption of
+  `BEGIN` within the unchanged deadline. The complete native race suite passes in
+  7.740 seconds. The [enablement owner](https://github.com/the-luap/openuem-agent/blob/9906eee82809c55fad37564831b780b4a09e922a/docs/linux-systemd-enablement.md)
+  retains the actual protected symlink and detects foreign or replaced targets
+  and ancestry. These tests do not yet start the agent; the activation controller
+  and operational configuration remain integration work.
+
 - The [loaded systemd state observer](https://github.com/the-luap/openuem-agent/blob/f046f33c00cf0da4027c6f8f7d90dca8aa6b776f/docs/linux-systemd-state.md)
   now requires exact typed unit properties, the canonical literal invocation,
   no foreign drop-ins or executable hooks, and consistent PID/start/invocation
