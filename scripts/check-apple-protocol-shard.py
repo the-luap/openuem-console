@@ -45,4 +45,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        # The Go command already reports its failure. Do not repeat a multi-KiB
+        # selection expression in a Python traceback.
+        raise SystemExit(error.returncode) from None

@@ -92,7 +92,7 @@ func TestUpdateOrganizationPromotionKeepsReviewedSitePilotProofAndOriginalReplay
 	replay, err := s.PromoteUpdatePlanOrganizationGroup(ctx, "organization", f.permissions, f.scope, f.sources, q)
 	require.NoError(t, err)
 	require.Equal(t, original.ID, replay.ID)
-	require.Equal(t, original.Evidence.AssessedAt, replay.Evidence.AssessedAt)
+	require.WithinDuration(t, original.Evidence.AssessedAt, replay.Evidence.AssessedAt, 0)
 	p, a, n := f.counts(t)
 	require.Equal(t, []int{p0, a0, n0}, []int{p, a, n})
 	require.Zero(t, p)

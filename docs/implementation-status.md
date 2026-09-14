@@ -61,7 +61,20 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
-- Native Apple CI exposed two receipt regressions caused by structural comparison
+- The shared library at
+  [`2dbc458eb28c`](https://github.com/the-luap/openuem-nats/commit/2dbc458eb28cc9cc24e70fb040b799055bf68b17)
+  now accepts exact Linux AMD64/ARM64 enrollment and renewal proofs, signed
+  configuration and one selected `deb`/`rpm` artifact per target. Migration 015
+  extends registry platform constraints while retaining existing identities,
+  invitations and key ownership. Full shared race tests pass, including registry
+  checks in 90.961 seconds; final renewal regressions pass in 36.078 seconds and
+  Linux-seeded wire fuzzing passes 200,611 executions. Linux/Windows builds and
+  enrollment Vet checks pass. Console, agent and worker now pin this same published
+  runtime version. Console desktop/broker/command regression races and complete
+  Linux/Windows console builds pass. Native Linux package trust, installed-command
+  admission and service activation remain separate requirements.
+
+- Native Apple CI exposed receipt regressions caused by structural comparison
   of `time.Local` and UTC representations of the same persisted instant. The
   assertions now normalize copied timestamps and still compare every assignment
   field. Both integration fixtures reproduce the failure under UTC before the
@@ -72,6 +85,12 @@ the table's package summaries do not remove any detail from the roadmap.
   across four independent PostgreSQL jobs. Inventory verification covers all
   517 entries exactly once, including eight fuzz seed suites, with the race
   detector and the existing per-run timeout retained.
+  Complete local partition execution also exposed two promotion-history timestamp
+  assertions with the same UTC issue. These now compare exact instants with zero
+  tolerance; promotion regressions pass under Europe/Berlin (13.677 seconds).
+  All four complete local partitions pass with UTC: 176.916, 213.273, 232.744 and
+  265.675 seconds. The partition runner returns Go's failing status without
+  duplicating the long test-selection expression in a traceback.
 
 - The [Linux native identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
   now implements durable encrypted storage beneath pinned private ancestors.

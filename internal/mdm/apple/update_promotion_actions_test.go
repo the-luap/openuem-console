@@ -78,7 +78,7 @@ func TestUpdatePromotionConcurrentReplayRetainsProofAndLaterPolicies(t *testing.
 	require.ErrorIs(t, err, ErrNotFound)
 	detail, err := f.store.UpdatePromotionDetails(ctx, "operator", f.permissions, f.scope, q.PilotPlanID, q.PilotAssignmentID, first.ID)
 	require.NoError(t, err)
-	require.Equal(t, first.Evidence.AssessedAt, detail.Evidence.AssessedAt)
+	require.WithinDuration(t, first.Evidence.AssessedAt, detail.Evidence.AssessedAt, 0)
 	require.Equal(t, first.Assignment.ID, detail.Assignment.ID)
 	items, next, err := f.store.UpdatePromotions(ctx, "operator", f.permissions, f.scope, q.PilotPlanID, q.PilotAssignmentID, "")
 	require.NoError(t, err)

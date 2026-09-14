@@ -57,7 +57,7 @@ func TestUpdatePromotionHistoryKeysetPreservesOriginalProofAfterLaterChanges(t *
 	require.NoError(t, err)
 	require.Equal(t, original.Plan.Definition.Name, detail.Pilot.Plan.Definition.Name)
 	require.Equal(t, original.Plan.Definition.Name, detail.Assignment.Plan.Definition.Name)
-	require.Equal(t, first.Evidence.AssessedAt, detail.Evidence.AssessedAt)
+	require.WithinDuration(t, first.Evidence.AssessedAt, detail.Evidence.AssessedAt, 0)
 	_, _, err = f.store.UpdatePromotions(ctx, "viewer", f.permissions, f.scope, q.PilotPlanID, q.PilotAssignmentID, "")
 	require.ErrorIs(t, err, access.ErrDenied)
 	_, err = f.store.db.Exec(`CREATE FUNCTION owned_promotion_read_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('apple.update.plan.promotion.read','apple.update.plan.promotion.list') THEN RAISE EXCEPTION 'owned promotion read audit failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER owned_promotion_read_failure BEFORE INSERT ON mdm_apple_audit FOR EACH ROW EXECUTE FUNCTION owned_promotion_read_failure()`)

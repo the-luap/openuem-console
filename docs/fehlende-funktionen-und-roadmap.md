@@ -836,7 +836,11 @@ now uses a preprovisioned systemd host key, immutable exclusive publication,
 authenticated bounded reads and retained runtime evidence to prevent partial
 restoration from creating a fresh identity. The complete native Linux storage
 race suite passes, including concurrent processes and an interrupted write.
-Linux release/bootstrap and installation admission, service activation, publisher
+The [shared Linux target protocol](https://github.com/the-luap/openuem-nats/blob/2dbc458eb28cc9cc24e70fb040b799055bf68b17/enrollment/README.md)
+now binds signed AMD64/ARM64 release/configuration metadata, exact invitation
+targets, local key proofs, scoped registry identities and confirmed renewal.
+Its additive migration preserves existing Windows/Mac identities and invitations.
+Native Linux package and installed-command admission, service activation, publisher
 trust and physical installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
