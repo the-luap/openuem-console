@@ -61,6 +61,17 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [NetBird Unix package preparation](netbird-package-preparation.md) now has an
+  exact organization/approval/target/source/size/hash descriptor and a private
+  agent download stage. Independent bounded HTTPS, native macOS PKG trust, repeated
+  file-identity/hash checks and replacement-safe cleanup are covered by inert
+  fixtures. The unreferenced remote-shell and unpinned installer helpers have
+  been removed. This component does not enable installation: approval/admission,
+  native metadata, install/remove execution and resulting-state recovery remain
+  required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
+  native service regressions pass. All supported console/agent/worker builds
+  pass with the same immutable shared revision.
+
 - [Reviewed NetBird provider-peer removal](netbird-peer-removals.md) now requires
   a retained setup-key peer association and fresh exact creation identity under
   current scope, authority and certificate expiry. Attempts and audit commit

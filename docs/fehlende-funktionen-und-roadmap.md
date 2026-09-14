@@ -701,6 +701,15 @@ and the complete inventory race suite. Missing key-creation responses, trusted
 Unix installers, remaining user/provider secrets and
 physical/provider acceptance are still required.
 
+[Unix package preparation](netbird-package-preparation.md) now binds an exact
+organization approval, platform/architecture, native package version, HTTPS
+source, size and digest. The agent privately stages bounded downloads without
+redirects or enrollment credentials, requires native macOS PKG trust and rechecks
+the same file before use. Old unreferenced shell/unpinned installer helpers are
+removed. Native package identity, authenticated approval and installer admission,
+execution, observation and recovery remain necessary before this preparation
+component can enable installation or local uninstallation.
+
 **Repositories:** this fork is the console. Complete distribution changes must
 also be versioned in the relevant agent, installer, updater, NATS, worker, PKI and
 deployment repositories. Console pages alone cannot replace these changes.
