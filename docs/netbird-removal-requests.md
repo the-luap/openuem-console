@@ -5,6 +5,8 @@ connection commands, provider-peer deletion and approved installation packages.
 `NetbirdRemovalStore` provides exact-site review, immutable request admission,
 historical reads and explicit queued cancellation. It is not yet wired to public
 routes or a native dispatcher; creating a request does not deliver a command.
+The separate [delivery owner](netbird-removal-delivery.md) now rechecks this intent,
+commits one native attempt and retains original results and receipt observations.
 
 ## Current native review
 
@@ -53,6 +55,8 @@ Request metadata and cancellation are immutable, deletion is prohibited and
 history has no device foreign key that would erase original evidence. Read-only
 history requires `software.read` in the original exact scope. Cancellation needs
 `software.assign`, the original review revision and its own permanent UUID.
+Once a native attempt exists, cancellation is permanently excluded. Only verified
+completion can open that attempt's barrier before explicit resolution is added.
 Exact cancellation replay preserves the first actor and timestamp. Audit failure
 rolls back request or cancellation atomically.
 
@@ -70,10 +74,10 @@ The complete NetBird inventory race suite and Linux ARM64 console build cover
 the shared admission change. Fixtures do not contact a vendor, deliver native
 commands or mutate an enrolled endpoint.
 
-Separate native attempt/results, direct dispatch, original-receipt observation,
-reviewed uncertain-operation recovery, retained local staging recovery, bounded
-history pages and public UI remain required. Native delivery must permanently
-exclude queued cancellation before it can be enabled. The already implemented
+Separate native attempts/results, direct delivery and original-receipt observation
+are implemented. Reviewed uncertain-operation recovery, retained local staging
+recovery, a joined dispatcher, bounded history pages and public UI remain required.
+The already implemented
 [agent owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
 provides exact native execution and repeated absence checks. Physical package,
 interruption, reboot and desktop acceptance remains separate from owned fixtures.

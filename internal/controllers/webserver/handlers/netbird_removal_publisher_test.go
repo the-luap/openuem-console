@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -13,6 +14,92 @@ import (
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNetbirdRemovalPublisherSendsOneExactDirectCommand(t *testing.T) {
+	h, nc, js := netbirdPublisherFixture(t)
+	for _, outcome := range []string{"completed", "unconfirmed", "busy", "rejected", "withdrawn", "wrong-hash", "wrong-operation", "no-reply", "cancelled", "expired", "other-version"} {
+		t.Run(outcome, func(t *testing.T) {
+			at := time.Now().UTC()
+			c := netbirdcommand.Command{Version: netbirdcommand.RemovalVersion, Identity: netbirdcommand.Identity{DeviceID: uuid.NewString(), TenantID: 3, SiteID: 4, Individual: true, CertificateHash: strings.Repeat("a", 64)}, RequestID: uuid.NewString(), Revision: strings.Repeat("b", 64), Operation: "uninstall", IssuedAt: at, ExpiresAt: at.Add(netbirdcommand.RemovalLifetime), Removal: packageapi.Removal{Schema: 1, Platform: "macos", Architecture: "arm64", Format: "pkg", PackageID: "io.netbird.client", Version: "0.78.1", StateDigest: strings.Repeat("c", 64)}}
+			var calls atomic.Int32
+			subject, _ := netbirdcommand.Subject(c.DeviceID)
+			sub, err := nc.Subscribe(subject, func(msg *nats.Msg) {
+				calls.Add(1)
+				decoded, err := netbirdcommand.Decode(msg.Data)
+				if err != nil || decoded != c {
+					t.Error("removal envelope changed")
+					_ = msg.Respond(nil)
+					return
+				}
+				if outcome == "no-reply" {
+					return
+				}
+				status := outcome
+				if status == "wrong-hash" || status == "wrong-operation" {
+					status = "completed"
+				}
+				r, err := netbirdcommand.ReceiptFor(c, status)
+				if err != nil {
+					t.Error(err)
+					_ = msg.Respond(nil)
+					return
+				}
+				if outcome == "wrong-hash" {
+					r.CommandHash = strings.Repeat("d", 64)
+				}
+				if outcome == "wrong-operation" {
+					r.Operation = "install"
+				}
+				data, _ := netbirdcommand.EncodeReceipt(r)
+				_ = msg.Respond(data)
+			})
+			require.NoError(t, err)
+			defer sub.Unsubscribe()
+			require.NoError(t, nc.Flush())
+			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+			defer cancel()
+			if outcome == "cancelled" {
+				cancel()
+			}
+			if outcome == "expired" {
+				c.IssuedAt = c.IssuedAt.Add(-time.Hour)
+				c.ExpiresAt = c.ExpiresAt.Add(-time.Hour)
+			}
+			if outcome == "other-version" {
+				c.Version = netbirdcommand.InstallationVersion
+			}
+			r, err := h.PublishNetbirdRemoval(ctx, c)
+			switch outcome {
+			case "wrong-hash", "wrong-operation":
+				require.ErrorIs(t, err, inventory.ErrNetbirdOperationConflict)
+				require.Nil(t, r)
+				require.EqualValues(t, 1, calls.Load())
+			case "no-reply":
+				require.ErrorIs(t, err, inventory.ErrNetbirdOperationNotReady)
+				require.Nil(t, r)
+				require.EqualValues(t, 1, calls.Load())
+			case "cancelled":
+				require.ErrorIs(t, err, inventory.ErrNetbirdOperationNotReady)
+				require.Nil(t, r)
+				require.Zero(t, calls.Load())
+			case "expired", "other-version":
+				require.ErrorIs(t, err, inventory.ErrNetbirdOperationInvalid)
+				require.Nil(t, r)
+				require.Zero(t, calls.Load())
+			default:
+				require.NoError(t, err)
+				require.Equal(t, outcome, r.Status)
+				require.True(t, r.Matches(c))
+				require.EqualValues(t, 1, calls.Load())
+			}
+		})
+	}
+	stream, err := js.Stream(t.Context(), "AGENTS_STREAM")
+	require.NoError(t, err)
+	info, err := stream.Info(t.Context())
+	require.NoError(t, err)
+	require.Zero(t, info.State.Msgs)
+}
 
 func TestNetbirdRemovalCannotUseConnectionOrInstallationPublisher(t *testing.T) {
 	h, nc, js := netbirdPublisherFixture(t)

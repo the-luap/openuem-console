@@ -81,8 +81,13 @@ the table's package summaries do not remove any detail from the roadmap.
   fresh native review, exact-site software authority, immutable source-free intent
   and queued cancellation under the common UUID/device barrier. PostgreSQL races
   cover recipient drift, replay, audit rollback and cross-family exclusion.
-  Console dispatch/receipt recovery/UI and retained-stage recovery remain open;
-  owned tests are not physical removal.
+  [Native delivery and original-receipt recovery](netbird-removal-delivery.md) now
+  commit one exact attempt before direct delivery, exclude native cancellation
+  and preserve original outcomes. Only correlated completion opens admission;
+  absence-only evidence does not. Owned NATS and PostgreSQL races cover replay,
+  result loss, current-certificate observation and common exclusion. Explicit
+  resolution, joined dispatch/UI and retained-stage recovery remain open; owned
+  tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

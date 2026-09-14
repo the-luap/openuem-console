@@ -23,13 +23,14 @@ type NetbirdRemovalStore struct {
 	permissions *access.Store
 	individual  bool
 	control     NetbirdOperationControl
+	execute     NetbirdRemovalExecutor
 }
 
 func NewNetbirdRemovalStore(db *sql.DB, permissions *access.Store, individual bool, control NetbirdOperationControl) (*NetbirdRemovalStore, error) {
 	if db == nil || permissions == nil || control == nil {
 		return nil, ErrNetbirdOperationInvalid
 	}
-	return &NetbirdRemovalStore{db, permissions, individual, control}, nil
+	return &NetbirdRemovalStore{db: db, permissions: permissions, individual: individual, control: control}, nil
 }
 
 type NetbirdRemovalReview struct {
@@ -47,6 +48,7 @@ type NetbirdRemoval struct {
 	RequestedAt, ExpiresAt                                           time.Time
 	CancellationID, CancelledBy                                      string
 	CancelledAt                                                      *time.Time
+	CompletedAt                                                      *time.Time
 }
 
 type removalSource struct {
@@ -186,12 +188,12 @@ func (s *NetbirdRemovalStore) Review(parent context.Context, actor string, scope
 	return &r.review, nil
 }
 
-const removalColumns = `id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,descriptor_digest,descriptor,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at`
+const removalColumns = `id::text,device_id,tenant_id,site_id,actor,revision,journal_revision,descriptor_digest,descriptor,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at`
 
 func scanRemoval(row interface{ Scan(...any) error }) (*NetbirdRemoval, error) {
 	var r NetbirdRemoval
 	var data []byte
-	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.DescriptorDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt)
+	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.Revision, &r.JournalRevision, &r.DescriptorDigest, &data, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +216,7 @@ func netbirdRequestConflict(ctx context.Context, tx *sql.Tx, device, id string) 
  EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))))
  OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))))
  OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))
- OR EXISTS(SELECT 1 FROM uem_netbird_removals WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL))`, device, id).Scan(&pending)
+ OR EXISTS(SELECT 1 FROM uem_netbird_removals WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL))`, device, id).Scan(&pending)
 	return pending, err
 }
 
@@ -312,9 +314,8 @@ func (s *NetbirdRemovalStore) Read(parent context.Context, actor string, scope a
 	return r, nil
 }
 
-// Cancellation currently applies only to queued intent: this store has no
-// native delivery path. Native attempt admission must exclude cancellation when
-// that separately configured executor is introduced.
+// Cancellation applies only before native delivery. An admitted attempt retains
+// its original outcome and requires separately reviewed recovery.
 func (s *NetbirdRemovalStore) Cancel(parent context.Context, actor string, scope access.Scope, device, id, revision, cancellation string) (*NetbirdRemoval, error) {
 	if parent == nil || !canonicalRequestID(device) || !canonicalRequestID(id) || !canonicalRequestID(cancellation) || cancellation == id || !netbirdcommand.ValidDigest(revision) {
 		return nil, ErrNetbirdOperationInvalid
@@ -347,6 +348,13 @@ func (s *NetbirdRemovalStore) Cancel(parent context.Context, actor string, scope
 			return nil, err
 		}
 		return r, nil
+	}
+	var attempted bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_removal_attempts WHERE request_id=$1)`, id).Scan(&attempted); err != nil {
+		return nil, err
+	}
+	if attempted || r.CompletedAt != nil {
+		return nil, ErrNetbirdOperationConflict
 	}
 	r, err = scanRemoval(tx.QueryRowContext(ctx, `UPDATE uem_netbird_removals SET cancellation_id=$2,cancelled_by=$3,cancelled_at=clock_timestamp() WHERE id=$1 RETURNING `+removalColumns, id, cancellation, actor))
 	if err != nil {

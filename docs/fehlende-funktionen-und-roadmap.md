@@ -774,7 +774,11 @@ execution together; interrupted staging is retained and blocks fresh removal.
 The [console request store](netbird-removal-requests.md) now adds current native
 review, immutable source-free intent, exact-site software rights and queued
 cancellation, sharing the permanent UUID/device barrier with the other command
-families. Console dispatch/receipt recovery/UI and retained-stage recovery remain open.
+families. [Native console delivery](netbird-removal-delivery.md) now persists one
+exact attempt before direct dispatch, excludes cancellation after admission and
+retains original results independently of later receipt recovery. Current native
+absence alone cannot rewrite an uncertain result. Explicit resolution, joined
+dispatch/UI and retained-stage recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

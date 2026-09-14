@@ -50,8 +50,11 @@ run a real vendor installer, daemon or remover.
 
 Unconfigured services still reject fresh removal before admission. The console
 now retains exact-site software rights, fresh reviewed intent, durable request
-history and common device exclusion. It still needs one native dispatch per
-immutable attempt, source-free receipts, explicit recovery and UI for removal.
+history and common device exclusion. [Native delivery](netbird-removal-delivery.md)
+now commits one exact attempt before a direct version-four RPC, retains original
+outcomes and recovers lost completed receipts through read-only queries under the
+current certificate. Native admission excludes cancellation. Explicit resolution,
+joined dispatch and UI remain open.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.
