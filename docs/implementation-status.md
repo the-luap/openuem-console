@@ -76,6 +76,11 @@ the table's package summaries do not remove any detail from the roadmap.
   Concurrent requests, exact replay, privacy, CSRF and native/HTMX forms are covered
   by owned fixtures and 30 new browser cases. All 2,472 browser cases, complete
   inventory/audit race suites, registered routes and the Linux console build pass.
+  The [exact installation command and agent journal](netbird-installation-commands.md)
+  now bind package and individual recipient, retain private-source-free attempts,
+  share connection/registration exclusion and preserve withdrawal/recovery across
+  restart and lost replies. New attempts are rejected without a native runner;
+  the console connection publisher cannot bypass package-aware admission.
   This does not enable installation:
   authenticated installer delivery and admission,
   Linux publisher trust, install/remove execution and resulting-state recovery remain

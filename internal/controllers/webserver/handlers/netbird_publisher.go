@@ -11,14 +11,17 @@ import (
 
 // PublishNetbirdOperation sends once on the versioned direct subject. The
 // operation store must commit the exact command digest before entering here.
+// Installation requires separate package-aware durable admission; recognizing
+// its wire version must not expand the connection/registration delivery path.
 func (h *Handler) PublishNetbirdOperation(parent context.Context, c inventory.NetbirdOperationCommand) (*inventory.NetbirdOperationResult, error) {
-	if parent == nil || !c.Executable(c.Identity, time.Now()) {
+	if parent == nil || c.Version != netbirdcommand.Version && c.Version != netbirdcommand.RegistrationVersion || !c.Executable(c.Identity, time.Now()) {
 		return nil, inventory.ErrNetbirdOperationInvalid
 	}
 	data, err := netbirdcommand.Encode(c)
 	if err != nil {
 		return nil, err
 	}
+	defer clear(data)
 	subject, err := netbirdcommand.Subject(c.DeviceID)
 	if err != nil {
 		return nil, err

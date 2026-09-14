@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	openuem "github.com/open-uem/nats"
 	"github.com/open-uem/nats/netbirdcommand"
+	packageapi "github.com/open-uem/nats/netbirdinstall"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/stretchr/testify/require"
 )
@@ -145,6 +146,34 @@ func TestNetbirdPublisherLiveControlRejectsUnrelatedEvidence(t *testing.T) {
 	h.setInventoryPublisher(nil)
 	_, err = h.InspectNetbirdJournal(ctx, identity)
 	require.ErrorIs(t, err, inventory.ErrNetbirdOperationNotReady)
+	stream, err := js.Stream(t.Context(), "AGENTS_STREAM")
+	require.NoError(t, err)
+	info, err := stream.Info(t.Context())
+	require.NoError(t, err)
+	require.Zero(t, info.State.Msgs)
+}
+
+func TestNetbirdPublisherRequiresSeparateInstallationAdmission(t *testing.T) {
+	h, nc, js := netbirdPublisherFixture(t)
+	at := time.Now().UTC()
+	c := netbirdcommand.Command{Version: netbirdcommand.InstallationVersion, Identity: netbirdcommand.Identity{DeviceID: uuid.NewString(), TenantID: 3, SiteID: 4, Individual: true, CertificateHash: strings.Repeat("a", 64)}, RequestID: uuid.NewString(), Revision: strings.Repeat("b", 64), Operation: "install", IssuedAt: at, ExpiresAt: at.Add(netbirdcommand.InstallationLifetime)}
+	c.Package = packageapi.Package{Schema: 1, ApprovalID: uuid.NewString(), TenantID: c.TenantID, Platform: "macos", Architecture: "arm64", Format: "pkg", PackageID: "io.netbird.client", Version: "0.78.1", URL: "https://owned.example.test/netbird.pkg?private=owned-source", Size: 1234, SHA256: strings.Repeat("c", 64)}
+	require.True(t, c.Valid())
+	subject, err := netbirdcommand.Subject(c.DeviceID)
+	require.NoError(t, err)
+	var calls atomic.Int32
+	sub, err := nc.Subscribe(subject, func(msg *nats.Msg) { calls.Add(1); _ = msg.Respond(nil) })
+	require.NoError(t, err)
+	defer sub.Unsubscribe()
+	require.NoError(t, nc.Flush())
+	result, err := h.PublishNetbirdOperation(t.Context(), c)
+	require.ErrorIs(t, err, inventory.ErrNetbirdOperationInvalid)
+	require.Nil(t, result)
+	require.NoError(t, nc.Flush())
+	// A round trip on the same subscription drains any earlier publication.
+	_, err = nc.Request(subject, nil, time.Second)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, calls.Load())
 	stream, err := js.Stream(t.Context(), "AGENTS_STREAM")
 	require.NoError(t, err)
 	info, err := stream.Info(t.Context())

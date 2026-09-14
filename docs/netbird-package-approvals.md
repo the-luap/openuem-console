@@ -88,6 +88,8 @@ in 1.482 seconds, and the affected administrator/desktop view suites in 1.915 an
 also pass. No package, provider or physical-device execution is part of these checks.
 
 This completes the approval/history workflow, not the installer lifecycle.
+The [version-three command and agent journal](netbird-installation-commands.md)
+now preserve exact installation intent and share the common uncertainty barrier.
 Authenticated installer capability and command delivery must load and authenticate
 the exact retained descriptor, recheck revocation with current target authority,
 and durably admit execution under the common NetBird operation barrier. Native

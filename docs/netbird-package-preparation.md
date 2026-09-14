@@ -26,10 +26,11 @@ are rejected. Linux publisher provenance remains a separate requirement.
 [Organization approval and history](netbird-package-approvals.md) now stores exact
 descriptors with encrypted sources, current organization software authority,
 explicit confirmation, atomic audit and permanent revocation. Authenticated
-installer capability/command delivery, durable attempt admission, install/remove
-execution, resulting-state observation and
-uncertainty recovery are still open. Existing NetBird command versions continue
-to reject installer operations, and console installation remains unavailable.
+installer capability/command delivery, console durable attempt admission,
+install/remove execution, resulting-state observation and uncertainty recovery
+are still open. The [version-three command and common journal](netbird-installation-commands.md)
+now retain exact installation intent; production execution remains unavailable
+until native installation and current approval admission are connected.
 
 This work uses inert TLS/filesystem/archive/process fixtures and read-only checks
 of exact official v0.78.1 ARM64 PKG, DEB and RPM artifacts. Native metadata matches
