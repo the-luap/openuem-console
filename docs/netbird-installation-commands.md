@@ -46,9 +46,12 @@ absent client, and retains intent/cancellation under the common console barrier.
 The [private native preparation](netbird-package-preparation.md) now has an
 authenticated agent RPC, native ownership and bounded cleanup. Its
 [console preparation admission](netbird-console-preparation.md) is now implemented
-with exact durable attempt/results and both native capability checks. Native
-command delivery attempts, a fresh approval/target check at final command
-admission and verified resulting-state recovery remain required. Native macOS
+with exact durable attempt/results and both native capability checks. The
+[native delivery component](netbird-installation-delivery.md) now retains
+fresh command attempts after rechecking approval, target and the complete live
+preparation. It recovers positive completion through read-only receipt queries;
+uncertain withdrawal/release, automatic dispatch and lifecycle UI remain open.
+Native macOS
 prepared-package consumption and installation are now implemented; local removal
 remains unavailable. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.

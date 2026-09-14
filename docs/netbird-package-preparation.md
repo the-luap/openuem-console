@@ -92,17 +92,19 @@ does not publish managed readiness if it cannot safely open its preparation owne
 The [console preparation component](netbird-console-preparation.md) now binds one
 exact request to immutable attempt/result storage and a direct preparation RPC.
 It rechecks current approval/recipient authority and both native capabilities,
-commits admission before RPC and holds no database lock through download. Before
-native command delivery is enabled, the cancellation guard must exclude native
-command attempts; preparation alone remains cancellable. Fresh current
-approval/revocation and recipient checks at native command admission, retained
-command delivery intent, verified resulting-state recovery and local removal
-remain required. Native macOS installation now consumes the exact prepared package under atomic current
+commits admission before RPC and holds no database lock through download. The
+[native delivery component](netbird-installation-delivery.md) now rechecks
+current authority and exact preparation, retains one fresh command attempt and
+verifies/retrieves its completed receipt. Native attempts exclude cancellation;
+preparation alone remains cancellable. Explicit uncertain-operation recovery,
+automatic dispatch, lifecycle UI and local removal remain required. Native macOS
+installation now consumes the exact prepared package under atomic current
 journal admission, rechecks trust and verifies its receipt, complete payload and
 CLI link. It requires a root individual agent with native ACL support and advertises
 a separate `installation-state` capability. Linux additionally needs individual
-enrollment and independent publisher provenance. Console native command delivery
-remains disabled.
+enrollment and independent publisher provenance. Native delivery is available
+through its separately configured backend method;
+automatic dispatch and lifecycle routes remain unconnected.
 
 Owned broker/filesystem tests cover source correlation, exact replay, parallel
 admission, retained uncertainty, journal changes during download, connection

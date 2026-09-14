@@ -76,15 +76,15 @@ that old prepared artifact until its bounded cache expiry; a new UUID cannot
 silently replace it. A `prepared` database row does not prove that the cache still
 exists, that the device has not restarted, or that approval/assignment is current.
 
-The next native-delivery stage must lock the request again, reject cancellation,
-recheck current actor/approval/recipient/journal authority, reconstruct and verify
-the exact preparation digest and its lifetime, then durably admit a fresh
-version-three command before sending it. Its issue time must not precede the
-preparation. Native command attempts must also extend the cancellation guard;
-uncertain installation requires retained receipts and explicit recovery, not
-pre-delivery cancellation. The existing connection/registration publisher still
-rejects version three. Native command dispatch, lifecycle UI and local removal
-remain separate integration work.
+The [native delivery stage](netbird-installation-delivery.md) now locks the request
+again, rejects cancellation, rechecks current authority, reconstructs and verifies
+the exact preparation digest, then commits a fresh version-three command attempt
+before one delivery. Its issue time cannot precede preparation. Native attempts
+exclude cancellation in both the API and database. Completed receipt evidence
+opens the shared device barrier; missing or uncertain results require read-only
+observation or a future explicit withdrawal/release workflow. The old connection/
+registration publisher still rejects version three. Automatic dispatch, lifecycle
+UI and local removal remain integration work.
 
 ## Verification
 

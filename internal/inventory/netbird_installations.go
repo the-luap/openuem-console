@@ -17,13 +17,15 @@ import (
 
 // NetbirdInstallationStore retains reviewed installation intent. Its optional
 // preparation constructor admits one authenticated download/inspection RPC.
-// Native command delivery must recheck current source authority and persist its
-// own attempt; preparation and ordinary journal readiness cannot authorize it.
+// Its delivery constructor additionally rechecks current source authority and
+// persists one native attempt; preparation alone cannot authorize installation.
 type NetbirdInstallationStore struct {
 	packages   *NetbirdPackageStore
 	inspect    NetbirdOperationInspector
 	individual bool
 	prepare    NetbirdPreparationExecutor
+	execute    NetbirdInstallationExecutor
+	control    NetbirdOperationControl
 }
 
 func NewNetbirdInstallationStore(db *sql.DB, permissions *access.Store, individual bool, master string, inspect NetbirdOperationInspector) (*NetbirdInstallationStore, error) {
@@ -56,6 +58,7 @@ type NetbirdInstallation struct {
 	RequestedAt, ExpiresAt                                                     time.Time
 	CancellationID, CancelledBy                                                string
 	CancelledAt                                                                *time.Time
+	CompletedAt                                                                *time.Time
 }
 
 type installationSource struct {
@@ -220,11 +223,11 @@ func (s *NetbirdInstallationStore) Review(parent context.Context, actor string, 
 	return &r.review, nil
 }
 
-const installationColumns = `id::text,device_id,tenant_id,site_id,actor,approval_id::text,approval_digest,revision,journal_revision,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at`
+const installationColumns = `id::text,device_id,tenant_id,site_id,actor,approval_id::text,approval_digest,revision,journal_revision,requested_at,expires_at,coalesce(cancellation_id::text,''),coalesce(cancelled_by,''),cancelled_at,completed_at`
 
 func scanInstallation(row interface{ Scan(...any) error }) (*NetbirdInstallation, error) {
 	var r NetbirdInstallation
-	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.ApprovalID, &r.ApprovalDigest, &r.Revision, &r.JournalRevision, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt)
+	err := row.Scan(&r.ID, &r.DeviceID, &r.Scope.TenantID, &r.Scope.SiteID, &r.Actor, &r.ApprovalID, &r.ApprovalDigest, &r.Revision, &r.JournalRevision, &r.RequestedAt, &r.ExpiresAt, &r.CancellationID, &r.CancelledBy, &r.CancelledAt, &r.CompletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +268,7 @@ func (s *NetbirdInstallationStore) Request(parent context.Context, actor string,
 		return nil, err
 	}
 	var pending bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE device_id=$1 AND cancelled_at IS NULL)`, device, id).Scan(&pending)
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL)`, device, id).Scan(&pending)
 	if err != nil {
 		return nil, err
 	}
@@ -323,8 +326,8 @@ func (s *NetbirdInstallationStore) Read(parent context.Context, actor string, sc
 }
 
 // Cancel applies before native command delivery, including during preparation.
-// Preparation cannot undo cancellation. Introducing native command attempts must
-// extend the database guard before that dispatcher is enabled.
+// Preparation cannot undo cancellation. Native delivery attempts permanently
+// exclude this operation; only verified completion or explicit recovery can proceed.
 func (s *NetbirdInstallationStore) Cancel(parent context.Context, actor string, scope access.Scope, device, id, revision, cancellation string) (*NetbirdInstallation, error) {
 	if !canonicalRequestID(device) || !canonicalRequestID(id) || !canonicalRequestID(cancellation) || !netbirdcommand.ValidDigest(revision) {
 		return nil, ErrNetbirdOperationInvalid
@@ -357,6 +360,13 @@ func (s *NetbirdInstallationStore) Cancel(parent context.Context, actor string, 
 			return nil, err
 		}
 		return r, nil
+	}
+	var attempted bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_installation_attempts WHERE request_id=$1)`, id).Scan(&attempted); err != nil {
+		return nil, err
+	}
+	if attempted || r.CompletedAt != nil {
+		return nil, ErrNetbirdOperationConflict
 	}
 	r, err = scanInstallation(tx.QueryRowContext(ctx, `UPDATE uem_netbird_installations SET cancellation_id=$2,cancelled_by=$3,cancelled_at=clock_timestamp() WHERE id=$1 RETURNING `+installationColumns, id, cancellation, actor))
 	if err != nil {

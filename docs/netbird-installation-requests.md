@@ -70,22 +70,22 @@ while the server uses shared credentials.
 
 ## Integration boundary
 
-A queued request is retained intent, not a delivered or admitted agent command.
-The optional preparation component now verifies both native capabilities and
-retains one exact download/inspection attempt before its direct RPC. Native command
-delivery must still recheck current approval/revocation and target source and
-durably retain the exact command attempt.
-Cancellation's database guard must then exclude attempted work; admitted or
-uncertain commands require their separate evidence/recovery path. Expiry does not
-silently erase the barrier. The [authenticated preparation agent endpoint](netbird-package-preparation.md#authenticated-preparation-endpoint)
-now owns exact private stages. [Console preparation admission](netbird-console-preparation.md)
-adds immutable attempt/results and a bounded direct publisher without holding a
-database transaction during download. Operator UI, native command delivery
-admission, resulting-state recovery and local removal remain required. Native macOS
-installation now consumes exact preparation under atomic journal admission and
-verifies native receipt, complete payload hashes and the vendor CLI link. This
-store only sends preparation through its explicitly configured method; it does
-not yet dispatch a native installation command.
+A queued request is retained intent. The optional
+[preparation component](netbird-console-preparation.md) verifies both native
+capabilities and retains one exact attempt before its direct RPC. The
+[native delivery component](netbird-installation-delivery.md) now rechecks current
+approval and target authority, reconstructs the complete live preparation, then
+commits one exact command attempt before installation delivery. Neither download
+nor native execution holds a database transaction.
+
+Cancellation remains available before native delivery, including while preparation
+is in flight. Any native command attempt excludes cancellation, even if a direct
+SQL cancellation was already waiting. Only retained completed receipt evidence
+opens the shared device barrier; completed UUIDs remain reserved. Read-only
+observations can recover completion after lost replies and certificate renewal
+without redelivery or rewriting the original result. Uncertain/missing receipts
+still need explicit reviewed withdrawal/release; expiry never silently erases
+the barrier. Automatic dispatch, lifecycle UI and local removal remain open.
 
 The current individual enrollment validator and registry accept Windows/macOS,
 not Linux. Tests enroll macOS through the real owned registry fixture. Linux also

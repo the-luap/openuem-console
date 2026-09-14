@@ -733,16 +733,21 @@ and source-free results around one bounded direct RPC. It requires both native
 capabilities, current approval/recipient/assignment authority and the reviewed
 journal revision. Download holds no database transaction; concurrent revocation
 and pre-install cancellation remain possible. Exact repeat calls read retained
-evidence without redelivery. Native command dispatch remains unconnected.
+evidence without redelivery. [Native delivery admission](netbird-installation-delivery.md)
+now reconstructs that preparation, rechecks current authority and persists one
+fresh command attempt before direct delivery. Any native attempt excludes
+cancellation; completed receipt evidence opens the shared device barrier while
+preserving the permanent UUID. Read-only observations recover positive completion
+after lost replies, certificate renewal or subsequent approval revocation without
+repeating installation. Automatic dispatch and lifecycle routes remain unconnected.
 Native macOS installation now consumes that exact prepared artifact under an
 atomic journal revision check. Individually enrolled root agents with native ACL
 support advertise separate installation readiness, recheck native trust and
 protected paths, and invoke the fixed system installer once. Completion requires
 the exact native receipt, every payload file hash and the protected vendor CLI
 link; cancellation and cleanup join before the journal result. Owned fixtures and
-read-only official-package evidence cover this component. Console native command
-delivery, fresh approval admission, recovery UI and local removal still
-need integration. Linux individual enrollment, publisher trust and physical
+read-only official-package evidence cover this component. Explicit withdrawal/release for uncertain native operations, dispatch, lifecycle
+UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
 installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
