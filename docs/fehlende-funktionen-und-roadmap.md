@@ -785,7 +785,10 @@ guards. [Joined dispatch](netbird-removal-dispatch.md) now processes requests wi
 bounded workers, immutable preflight stops and no automatic retry after native
 admission. [Scoped public UI](netbird-removal-ui.md) now provides current native
 review, explicit queue/cancel, coherent status, bounded history and reviewed
-resolution under software permissions. Retained-stage recovery remains open.
+resolution under software permissions. [Retained-stage file inspection](https://github.com/the-luap/openuem-agent/blob/49f1fbd828f0d8e69750d215b0879c348594720a/docs/netbird-removal-staging-recovery.md)
+now validates original manifests and current exact files across interrupted
+moves/purge; runtime/receipt inspection and explicitly admitted native recovery
+remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

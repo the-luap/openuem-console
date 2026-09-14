@@ -87,8 +87,12 @@ The complete browser matrix includes these cases alongside existing workflows.
 The full inventory race suite and Linux ARM64 console/handler builds cover the
 integration. Fixtures do not remove vendor software or contact enrolled devices.
 
-Retained local staging recovery remains required. Journal release never removes
-staging, and fresh native removal continues to reject interrupted staging.
+Retained local staging recovery remains required. Its [private manifest and
+remaining-file observers](https://github.com/the-luap/openuem-agent/blob/49f1fbd828f0d8e69750d215b0879c348594720a/docs/netbird-removal-staging-recovery.md)
+now distinguish exact original evidence, partial moves/purge and unknown
+replacements; native continuation and its reviewed public lifecycle remain open.
+Journal release never removes staging, and fresh native removal continues to
+reject interrupted staging.
 Physical package, interruption, reboot, desktop and provider acceptance remain
 separate from owned fixture evidence. The legacy unreviewed uninstall route stays
 unavailable; local removal uses this reviewed lifecycle.

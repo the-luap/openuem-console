@@ -100,7 +100,12 @@ the table's package summaries do not remove any detail from the roadmap.
   cover ordinary/HTMX forms, raw-body bounds, CSRF, no automatic redelivery and
   exact read-only recovery. Seventy-eight new responsive Chrome cases cover
   confirmation, absence, long metadata, pending progress and retained uncertainty.
-  Retained-stage recovery remains open; owned tests are not physical removal.
+  [Private retained-stage inspection](https://github.com/the-luap/openuem-agent/blob/49f1fbd828f0d8e69750d215b0879c348594720a/docs/netbird-removal-staging-recovery.md)
+  now validates original manifest bytes/ownership and exact remaining files
+  across interrupted moves, partial purge and scaffold cleanup. Unknown source,
+  payload or scaffold replacements remain unavailable; receipt presence stays
+  distinct from native completion. Native/runtime receipt inspection and explicit
+  recovery admission/execution remain open; owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.
