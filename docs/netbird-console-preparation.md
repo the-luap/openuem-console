@@ -82,7 +82,7 @@ the exact preparation digest, then commits a fresh version-three command attempt
 before one delivery. Its issue time cannot precede preparation. Native attempts
 exclude cancellation in both the API and database. Completed receipt evidence
 opens the shared device barrier; missing or uncertain results require read-only
-observation or a future explicit withdrawal/release workflow. The old connection/
+observation or [explicit reviewed withdrawal/release](netbird-installation-resolutions.md). The old connection/
 registration publisher still rejects version three. Automatic dispatch, lifecycle
 UI and local removal remain integration work.
 

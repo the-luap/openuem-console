@@ -84,7 +84,8 @@ SQL cancellation was already waiting. Only retained completed receipt evidence
 opens the shared device barrier; completed UUIDs remain reserved. Read-only
 observations can recover completion after lost replies and certificate renewal
 without redelivery or rewriting the original result. Uncertain/missing receipts
-still need explicit reviewed withdrawal/release; expiry never silently erases
+use [explicit reviewed withdrawal/release](netbird-installation-resolutions.md);
+expiry never silently erases
 the barrier. Automatic dispatch, lifecycle UI and local removal remain open.
 
 The current individual enrollment validator and registry accept Windows/macOS,

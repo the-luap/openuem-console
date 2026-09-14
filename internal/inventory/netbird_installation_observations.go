@@ -32,7 +32,7 @@ func (s *NetbirdInstallationStore) ObserveInstallation(parent context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	if r.CompletedAt != nil {
+	if r.CompletedAt != nil || r.ReleasedAt != nil {
 		if err = installationAudit(ctx, tx, actor, r, "read", "recorded"); err != nil {
 			return nil, err
 		}
@@ -60,37 +60,9 @@ func (s *NetbirdInstallationStore) ObserveInstallation(parent context.Context, a
 	if !query.Executable(query.Identity, time.Now()) {
 		return nil, ErrNetbirdOperationNotReady
 	}
-	control, err := netbirdcommand.EncodeControl(query)
-	if err != nil {
-		return nil, ErrNetbirdOperationInvalid
-	}
-	hash, err := query.Digest()
-	if err != nil {
-		return nil, ErrNetbirdOperationInvalid
-	}
-	call, finish := context.WithDeadline(ctx, query.ExpiresAt)
-	response, callErr := s.control(call, query)
-	valid := callErr == nil && call.Err() == nil && response != nil && response.Matches(query)
-	finish()
-	var data any
-	completed := false
-	if valid {
-		encoded, err := netbirdcommand.EncodeControlResponse(query, *response)
-		if err != nil {
-			return nil, ErrNetbirdOperationConflict
-		}
-		data = string(encoded)
-		completed = response.Outcome == "ok" && response.Receipt.Status == "completed" && response.ReleaseID == ""
-	}
-	var recorded time.Time
-	err = tx.QueryRowContext(ctx, `INSERT INTO uem_netbird_installation_observations(id,request_id,actor,control_hash,control,response) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb) RETURNING recorded_at`, query.RequestID, id, actor, hash, string(control), data).Scan(&recorded)
-	if err != nil {
+	response := s.installationControl(ctx, query)
+	if _, err = recordInstallationObservation(ctx, tx, r, actor, query, response); err != nil {
 		return nil, err
-	}
-	if completed {
-		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_installations SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL`, id, recorded); err != nil {
-			return nil, err
-		}
 	}
 	if err = installationStageAudit(ctx, tx, r, actor, "resolution.observe", "receipt"); err != nil {
 		return nil, err
@@ -103,4 +75,48 @@ func (s *NetbirdInstallationStore) ObserveInstallation(parent context.Context, a
 		return nil, err
 	}
 	return d, nil
+}
+
+// All read-only installation controls retain the same strict, source-free evidence.
+func recordInstallationObservation(ctx context.Context, tx *sql.Tx, r *NetbirdInstallation, actor string, query netbirdcommand.ControlRequest, response *netbirdcommand.ControlResponse) (time.Time, error) {
+	control, err := netbirdcommand.EncodeControl(query)
+	if err != nil {
+		return time.Time{}, err
+	}
+	hash, err := query.Digest()
+	if err != nil {
+		return time.Time{}, err
+	}
+	var data any
+	completed := false
+	if response != nil {
+		encoded, err := netbirdcommand.EncodeControlResponse(query, *response)
+		if err != nil {
+			return time.Time{}, ErrNetbirdOperationConflict
+		}
+		data = string(encoded)
+		completed = response.Outcome == "ok" && response.Receipt.Status == "completed" && response.ReleaseID == ""
+	}
+	var recorded time.Time
+	err = tx.QueryRowContext(ctx, `INSERT INTO uem_netbird_installation_observations(id,request_id,actor,control_hash,control,response) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb) RETURNING recorded_at`, query.RequestID, r.ID, actor, hash, string(control), data).Scan(&recorded)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if completed {
+		_, err = tx.ExecContext(ctx, `UPDATE uem_netbird_installations SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL AND released_at IS NULL`, r.ID, recorded)
+	}
+	return recorded, err
+}
+
+func (s *NetbirdInstallationStore) installationControl(ctx context.Context, c netbirdcommand.ControlRequest) *netbirdcommand.ControlResponse {
+	if !c.Executable(c.Identity, time.Now()) || ctx.Err() != nil {
+		return nil
+	}
+	call, cancel := context.WithDeadline(ctx, c.ExpiresAt)
+	defer cancel()
+	p, err := s.control(call, c)
+	if err != nil || call.Err() != nil || p == nil || !p.Matches(c) {
+		return nil
+	}
+	return p
 }

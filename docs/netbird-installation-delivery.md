@@ -5,8 +5,9 @@ preparation to one native installation command and read-only receipt recovery.
 Its `Install` method requires a successful retained preparation. `ReadDelivery`
 returns scoped public evidence; `ObserveInstallation` queries the current agent
 for the original command receipt. Construction starts no automatic dispatcher or
-route. The lifecycle UI and explicit withdrawal/release workflow remain separate
-integration work.
+route. [Reviewed withdrawal and release](netbird-installation-resolutions.md)
+now use separate expiring reviews, immutable controls and exact owned proofs.
+The lifecycle UI remains separate integration work.
 
 ## Fresh authority and exact prepared bytes
 
@@ -63,8 +64,8 @@ successful transport exchange establishes rollback of remote native work.
 
 After any delivery attempt, the cancellation API and database trigger both reject
 cancellation, including when an UPDATE began waiting before the attempt committed.
-Only cancellation before native delivery remains available. Completion and
-cancellation are mutually exclusive and immutable. All installation, connection
+Only cancellation before native delivery remains available. Completion,
+cancellation and separately proved release are mutually exclusive and immutable. All installation, connection
 and registration admission queries and the database admission function use the
 same updated device barrier. Completed UUIDs stay permanently reserved.
 
@@ -85,18 +86,20 @@ unconfirmed, withdrawn or released evidence cannot open the console barrier.
 Only an exact `completed` receipt with no release identity marks completion.
 Original delivery results remain immutable: a later confirmed observation can
 recover a missing or uncertain result without rewriting that original history.
-Repeat observations of already completed work read the retained evidence.
+Repeat observations of already completed or released work read the retained evidence.
 
 A missing receipt is not proof that a delayed command can never arrive. Explicit
-reviewed withdrawal and uncertain-attempt release still need their own console
-workflow before these cases can open admission. Existing agent boot, withdrawal
+reviewed withdrawal and uncertain-attempt release now have their own
+[console workflow](netbird-installation-resolutions.md), with an expiring review
+and exact proof bearing the retained resolution UUID before admission opens. Existing agent boot, withdrawal
 and release protections continue to apply. There is no cancellation or retry
 fallback for an uncertain native delivery.
 
 ## Evidence and remaining integration
 
 Public delivery history includes command hash/times, original result timestamp,
-completion timestamp, correlated receipt and latest observation summary. It
+completion or separate release metadata, original outcome, correlated receipt
+and latest observation summary. It
 contains no private package, certificate or executable envelope. `software.read`
 authorizes historical reads for the original exact scope, including after later
 device changes. The database rejects rewritten attempts/results/observations,
@@ -113,8 +116,8 @@ not download packages or run a real NetBird installer, daemon or provider.
 
 The native macOS agent implementation verifies installer trust, protected paths,
 receipt identity, complete payload hashes and the vendor CLI link. Physical
-installation/upgrade/reboot acceptance, explicit uncertain-operation recovery,
-automatic dispatch, lifecycle UI, Linux individual enrollment/publisher trust and
+installation/upgrade/reboot acceptance, automatic dispatch, lifecycle UI, Linux
+individual enrollment/publisher trust and
 local removal remain necessary for the complete management workflow.
 
 The focused delivery/observation PostgreSQL race suite passes in 33.892 seconds.

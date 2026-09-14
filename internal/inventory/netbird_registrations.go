@@ -244,7 +244,7 @@ func (s *NetbirdRegistrationStore) Request(parent context.Context, actor string,
 		return nil, err
 	}
 	var pending bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))) OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL))`, device, id).Scan(&pending)
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))) OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))`, device, id).Scan(&pending)
 	if err != nil {
 		return nil, err
 	}

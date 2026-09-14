@@ -746,8 +746,13 @@ support advertise separate installation readiness, recheck native trust and
 protected paths, and invoke the fixed system installer once. Completion requires
 the exact native receipt, every payload file hash and the protected vendor CLI
 link; cancellation and cleanup join before the journal result. Owned fixtures and
-read-only official-package evidence cover this component. Explicit withdrawal/release for uncertain native operations, dispatch, lifecycle
-UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
+read-only official-package evidence cover this component.
+[Reviewed installation resolution](netbird-installation-resolutions.md) now retains
+expiring reviews, current-authority control attempts and exact owned withdrawal or
+release proofs. Lost replies reconcile through read-only queries; further control
+attempts require a new review under the same permanent resolution UUID. Original
+uncertain installation results remain intact and release stays separate from
+completion. Dispatch, lifecycle UI and local removal still need integration. Linux individual enrollment, publisher trust and physical
 installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must

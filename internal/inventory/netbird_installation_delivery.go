@@ -32,6 +32,8 @@ type NetbirdInstallationDelivery struct {
 	RequestID, CommandHash, Outcome            string
 	IssuedAt, ExpiresAt                        time.Time
 	RecordedAt, CompletedAt                    *time.Time
+	ReleasedAt                                 *time.Time
+	ReleasedBy, ResolutionID, OriginalOutcome  string
 	Receipt                                    *netbirdcommand.Receipt
 	ObservationID, ObservedBy, ObservedOutcome string
 	ObservedAt                                 *time.Time
@@ -41,12 +43,12 @@ func readInstallationDelivery(ctx context.Context, tx *sql.Tx, id string) (*Netb
 	var d NetbirdInstallationDelivery
 	var receipt []byte
 	err := tx.QueryRowContext(ctx, `SELECT a.request_id::text,a.command_hash,a.issued_at,a.expires_at,
- CASE WHEN i.completed_at IS NOT NULL THEN 'completed' ELSE coalesce(r.outcome,'pending') END,r.recorded_at,i.completed_at,
+ CASE WHEN i.completed_at IS NOT NULL THEN 'completed' WHEN i.released_at IS NOT NULL THEN 'released' ELSE coalesce(r.outcome,'pending') END,r.recorded_at,i.completed_at,i.released_at,coalesce(i.released_by,''),coalesce(i.resolution_id::text,''),coalesce(r.outcome,'pending'),
  coalesce((SELECT o.response->'receipt' FROM uem_netbird_installation_observations o WHERE o.request_id=i.id AND o.recorded_at=i.completed_at AND o.response->'receipt'->>'status'='completed' LIMIT 1),r.receipt),
  coalesce(o.id::text,''),coalesce(o.actor,''),coalesce(CASE WHEN o.response->>'outcome'='ok' THEN o.response->'receipt'->>'status' ELSE coalesce(o.response->>'outcome','unavailable') END,''),o.recorded_at
  FROM uem_netbird_installation_attempts a JOIN uem_netbird_installations i ON i.id=a.request_id LEFT JOIN uem_netbird_installation_results r USING(request_id)
  LEFT JOIN LATERAL(SELECT * FROM uem_netbird_installation_observations WHERE request_id=a.request_id ORDER BY recorded_at DESC,id DESC LIMIT 1) o ON true
- WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &d.Outcome, &d.RecordedAt, &d.CompletedAt, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
+ WHERE a.request_id=$1`, id).Scan(&d.RequestID, &d.CommandHash, &d.IssuedAt, &d.ExpiresAt, &d.Outcome, &d.RecordedAt, &d.CompletedAt, &d.ReleasedAt, &d.ReleasedBy, &d.ResolutionID, &d.OriginalOutcome, &receipt, &d.ObservationID, &d.ObservedBy, &d.ObservedOutcome, &d.ObservedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +139,7 @@ func (s *NetbirdInstallationStore) admitInstallation(parent context.Context, act
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, err
 	}
-	if r.CancelledAt != nil || r.CompletedAt != nil || !time.Now().Before(r.ExpiresAt) {
+	if r.CancelledAt != nil || r.CompletedAt != nil || r.ReleasedAt != nil || !time.Now().Before(r.ExpiresAt) {
 		return nil, nil, nil, ErrNetbirdOperationConflict
 	}
 	// Reconstruct the original private request rather than trusting a prepared
@@ -224,7 +226,7 @@ func (s *NetbirdInstallationStore) finishInstallation(ctx context.Context, r *Ne
 		return nil, err
 	}
 	if outcome == "completed" {
-		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_installations SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL`, r.ID, recorded); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE uem_netbird_installations SET completed_at=$2 WHERE id=$1 AND completed_at IS NULL AND released_at IS NULL`, r.ID, recorded); err != nil {
 			return nil, err
 		}
 	}

@@ -50,9 +50,9 @@ with exact durable attempt/results and both native capability checks. The
 [native delivery component](netbird-installation-delivery.md) now retains
 fresh command attempts after rechecking approval, target and the complete live
 preparation. It recovers positive completion through read-only receipt queries;
-uncertain withdrawal/release, automatic dispatch and lifecycle UI remain open.
-Native macOS
-prepared-package consumption and installation are now implemented; local removal
+[reviewed withdrawal/release](netbird-installation-resolutions.md) is now available
+in the delivery store. Automatic dispatch and lifecycle UI remain open.
+Native macOS prepared-package consumption and installation are now implemented; local removal
 remains unavailable. Windows retains its software workflow;
 Linux also requires extending the current individual enrollment support.
 
