@@ -61,6 +61,27 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- The [native systemd connection](https://github.com/the-luap/openuem-agent/blob/3627224c95b3cf473f0cdd8fde759b70d88f1694/docs/linux-systemd-connection.md)
+  now pins the private socket namespace and verifies kernel UID 0/PID 1 before
+  EXTERNAL authentication. It uses bounded authentication and calls, redacts
+  peer error bodies and interrupts blocked writes before joining shutdown.
+  Native Unix/D-Bus fixtures cover actual unprivileged peers, changed namespaces,
+  cancellation and concurrent close; the full native unit/transport race suite
+  passes in 7.257 seconds. macOS unit/activation regressions pass in 1.378/4.482
+  seconds, with full Linux/Windows builds and Linux Vet. These owned synthetic
+  peers do not establish live systemd activation or physical installation.
+
+- The [Linux systemd unit contract](https://github.com/the-luap/openuem-agent/blob/8f22f61cc01fe4bde0ea5b32de09db8b27db95f1/docs/linux-service-unit.md)
+  now renders one exact root service with direct literal arguments, explicit
+  shutdown/restart behavior and no shell expansion. Native systemd parsing
+  validates ordinary and special-character paths and rejects missing or foreign
+  startup executables without starting a service. Exact matching rejects added
+  directives. Native races pass in 1.034 seconds, path fuzzing completes 691,399
+  executions, and Linux/Windows builds pass. Agent `8f22f61` passes all thirteen
+  [CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34892530320).
+  Protected publication, effective manager state and activation remain separate
+  integration work.
+
 - [Native Linux readiness](https://github.com/the-luap/openuem-agent/blob/45a6e05ebd305f363899ee6bd617000f1dee2e1c/docs/native-linux-readiness.md)
   now authenticates local initialization with a protected Unix socket, kernel
   root-peer UID/PID and the enrolled device's signed nonce/identity/release proof.
@@ -71,6 +92,8 @@ the table's package summaries do not remove any detail from the roadmap.
   4.145/28.158/3.089/1.028 seconds. Actual encrypted enrollment-to-readiness
   integration, including long identity paths, passes in the full 6.464-second
   enrollment suite. macOS regressions, Linux/Windows builds and Linux Vet pass.
+  Agent `45a6e05` passes all thirteen
+  [CI jobs](https://github.com/the-luap/openuem-agent/actions/runs/34890889990).
   Linux service registration/activation, final distribution and physical
   installation/removal acceptance remain separate requirements.
 
@@ -175,9 +198,11 @@ the table's package summaries do not remove any detail from the roadmap.
   service. Sharing one local database between all four groups exhausted PostgreSQL
   lock memory; separate instances with unchanged defaults resolved that fixture
   failure. Application behavior and the test assertions remain unchanged.
-  Console `c63653f4` passes all eight hosted inventory groups, all four Apple
-  groups, both builds and native Windows bootstrap checks. Its Broker, Gateway
-  and ACME workflows also pass; the longer main console test job remains running.
+  Console `c63653f4` passes the complete sixteen-job
+  [native console workflow](https://github.com/the-luap/openuem-console/actions/runs/34888514904),
+  including all eight inventory groups, all four Apple groups, both builds,
+  native Windows bootstrap and the full general console test job. Its Broker,
+  Gateway and ACME workflows also pass.
 
 - The [Linux native identity backend](https://github.com/the-luap/openuem-agent/blob/149595a4347e9d83ffbaa3af073f41c2c055c0c0/docs/linux-identity-storage.md)
   now implements durable encrypted storage beneath pinned private ancestors.

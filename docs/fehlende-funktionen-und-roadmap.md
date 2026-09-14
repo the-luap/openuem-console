@@ -860,7 +860,15 @@ ancestry, independently signed running images and canceled issuance. All twelve
 CI jobs pass. The [Linux readiness provider](https://github.com/the-luap/openuem-agent/blob/45a6e05ebd305f363899ee6bd617000f1dee2e1c/docs/native-linux-readiness.md)
 also connects successful runtime initialization to kernel-peer and signed device
 identity checks, with bounded native requests and joined shutdown. Linux service
-registration/activation, production publisher provisioning and physical
+readiness passes all thirteen CI jobs. The
+[Linux systemd unit contract](https://github.com/the-luap/openuem-agent/blob/8f22f61cc01fe4bde0ea5b32de09db8b27db95f1/docs/linux-service-unit.md)
+now defines the exact literal root-service invocation and validates it with the
+native systemd parser without starting a unit; all thirteen CI jobs pass.
+The [native systemd connection](https://github.com/the-luap/openuem-agent/blob/3627224c95b3cf473f0cdd8fde759b70d88f1694/docs/linux-systemd-connection.md)
+now verifies the root manager's kernel PID before authentication, retains its
+socket namespace and bounds/cancels calls with joined shutdown. Its native
+synthetic peer tests include actual unprivileged processes and blocked writes.
+Protected service publication/registration/activation, production publisher provisioning and physical
 installation/removal acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
