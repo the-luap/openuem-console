@@ -72,8 +72,13 @@ the table's package summaries do not remove any detail from the roadmap.
   across stable snapshots, with retained handles preventing immediate inode reuse.
   The combined observer now binds actual kernel process generations, dynamic code
   signatures and loaded system launchd ownership through repeated snapshots.
-  Native execution/absence verification, runtime binding and the console lifecycle
-  remain open; owned tests are not physical removal.
+  The [native execution owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
+  now adds paired runtime readiness, admission-bound execution, token-bound stops,
+  exclusive protected staging and repeated native absence verification. It
+  preserves interrupted staging and rejects fresh work until local recovery.
+  Native races, broker/runtime regressions, owned Linux fixtures and all agent
+  builds pass. Console removal and retained-stage recovery remain open; owned
+  tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

@@ -766,9 +766,13 @@ protected receipt/BOM, complete bundle files, publisher signatures, ACLs, CLI li
 and daemon plist across matching snapshots, retaining first-pass file handles.
 The private combined observer now adds kernel audit-token process identity,
 dynamic signature validation and typed loaded-system-job ownership, with two
-matching rounds of file/job/process evidence. Native execution and absence
-verification, observer/runtime binding and console request/dispatch/recovery/UI
-remain to be connected. Linux individual enrollment,
+matching rounds of file/job/process evidence. The [native execution owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
+now binds that inspection to journal admission, audit-token process stops,
+exclusive protected staging, exact file deletion and repeated native absence
+verification. Supported individual macOS services configure inspection and
+execution together; interrupted staging is retained and blocks fresh removal.
+Console request/dispatch/recovery/UI and retained-stage recovery remain open.
+Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.
 

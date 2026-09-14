@@ -30,9 +30,13 @@ Kernel audit tokens, dynamic code validity and repeated process scans bind the
 actual running instances. A typed system-domain launchd enumeration distinguishes
 loaded, unloaded and unavailable evidence, and a running job PID must match the
 root NetBird CLI. Two rounds of file/job/process evidence construct the complete
-source-free descriptor privately. The observer remains unconfigured until native
-execution and verified absence are connected; removal-state is still unavailable
-through deployed services.
+source-free descriptor privately. The [native execution owner](https://github.com/the-luap/openuem-agent/blob/aa1262dd95fa086649d7bc3bdee8beb08b0e13ad/docs/netbird-removal-execution.md)
+now configures removal-state inspection and execution together on supported
+individually enrolled root macOS services. It rechecks reviewed ownership under
+the current journal revision, persists admission before mutation, stops exact
+audit-token processes and the owned loaded job, and removes only verified objects
+through exclusive protected staging. Completion requires repeated native absence.
+Interrupted staging is preserved and prevents fresh preparation until local recovery.
 
 Shared race/fuzz tests, agent journal/command/preparation race tests, owned native
 agent/service/enrollment regressions and all supported consumer builds cover this
@@ -41,8 +45,8 @@ also passes with owned PostgreSQL, and direct publisher tests pass with owned NA
 Existing command bytes and control digests remain stable. Tests do not
 run a real vendor installer, daemon or remover.
 
-Native ownership inspection and removal/result verification must be configured
-before advertising support. The console still needs exact-site software rights,
+Unconfigured services still reject fresh removal before admission. The console
+still needs exact-site software rights,
 fresh reviewed intent, durable request/admission history, common device exclusion,
 one native dispatch per immutable attempt, source-free receipts, explicit recovery and UI for removal.
 Provider peer deletion and credential/configuration cleanup remain separate
@@ -51,4 +55,5 @@ package, interruption, reboot and daemon acceptance also remain open.
 
 The console, agent and worker share immutable protocol revision
 `v0.11.1-0.20260914083905-10ed2cf2ed01`. The removal protocol and guarded native
-admission are present; the native remover and console workflow remain required.
+admission and native remover are present; console and retained-stage recovery
+workflows remain required.
