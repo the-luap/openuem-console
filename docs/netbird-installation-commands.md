@@ -34,14 +34,14 @@ No new broker subjects, stream filters, permissions or automatic retries are add
 
 ## Remaining installation integration
 
-The existing [organization approval workflow](netbird-package-approvals.md) and
-[private native package preparation](netbird-package-preparation.md) still need
-authenticated preparation/delivery, current target and revocation checks held
-through console durable admission, exact prepared-package ownership at the agent
-boundary, fixed native install/remove execution and verified resulting-state
-recovery. An absent NetBird client must be an eligible installation target; the
-existing connection source requires an installed client and cannot be reused
-unchanged. Windows retains its authenticated software catalog workflow.
+The [durable installation request store](netbird-installation-requests.md) now
+authenticates the organization approval and exact individual target, supports an
+absent client, and retains intent/cancellation under the common console barrier.
+The [private native preparation](netbird-package-preparation.md) still needs
+authenticated delivery, a fresh approval/target check at command admission,
+exact prepared-package ownership, fixed native install/remove execution and
+verified resulting-state recovery. Windows retains its software workflow;
+Linux also requires extending the current individual enrollment support.
 
 ## Verification
 

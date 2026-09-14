@@ -201,7 +201,12 @@ func (s *NetbirdPackageStore) Approve(parent context.Context, actor string, scop
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "netbird-package:"+p.ApprovalID); err != nil {
 		return nil, err
 	}
-	current, err := scanNetbirdPackage(tx.QueryRowContext(ctx, `SELECT `+netbirdPackageColumns+netbirdPackageFrom+`WHERE p.id=$1 FOR UPDATE OF p`, p.ApprovalID))
+	// Read revocation only after acquiring the approval lock. A joined read
+	// started before waiting could otherwise return pre-revocation metadata.
+	if _, err = tx.ExecContext(ctx, `SELECT id FROM uem_netbird_packages WHERE id=$1 FOR UPDATE`, p.ApprovalID); err != nil {
+		return nil, err
+	}
+	current, err := scanNetbirdPackage(tx.QueryRowContext(ctx, `SELECT `+netbirdPackageColumns+netbirdPackageFrom+`WHERE p.id=$1`, p.ApprovalID))
 	if err == nil {
 		if current.TenantID != p.TenantID || current.Actor != actor || current.Digest != digest || current.Verification != verification {
 			return nil, ErrNetbirdPackageConflict

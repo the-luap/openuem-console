@@ -81,9 +81,13 @@ the table's package summaries do not remove any detail from the roadmap.
   share connection/registration exclusion and preserve withdrawal/recovery across
   restart and lost replies. New attempts are rejected without a native runner;
   the console connection publisher cannot bypass package-aware admission.
+  [Durable installation requests](netbird-installation-requests.md) now authenticate
+  the encrypted approval and exact individual recipient, support an absent client,
+  share the console request barrier and retain audited pre-delivery cancellation.
+  Concurrent revocation and approval replays use fresh snapshots after row locks.
   This does not enable installation:
   authenticated installer delivery and admission,
-  Linux publisher trust, install/remove execution and resulting-state recovery remain
+  Linux individual enrollment and publisher trust, install/remove execution and resulting-state recovery remain
   required. Shared codec/fuzz, macOS/Linux preparation/command/journal race and
   native service regressions pass. All supported console/agent/worker builds
   pass with the same immutable shared revision.

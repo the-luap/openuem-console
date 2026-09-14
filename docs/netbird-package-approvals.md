@@ -88,6 +88,9 @@ in 1.482 seconds, and the affected administrator/desktop view suites in 1.915 an
 also pass. No package, provider or physical-device execution is part of these checks.
 
 This completes the approval/history workflow, not the installer lifecycle.
+The [durable installation request store](netbird-installation-requests.md) now
+authenticates the private descriptor and recipient under revocation exclusion,
+retains intent in the common console barrier and supports pre-delivery cancellation.
 The [version-three command and agent journal](netbird-installation-commands.md)
 now preserve exact installation intent and share the common uncertainty barrier.
 Authenticated installer capability and command delivery must load and authenticate

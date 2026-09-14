@@ -718,10 +718,14 @@ The [version-three installation command](netbird-installation-commands.md) now
 binds the complete approved package and individual recipient to the common
 durable agent journal. Uncertainty, restart, withdrawal and duplicate/lost delivery
 retain the same operation barrier without persisting private package sources.
+[Durable installation requests](netbird-installation-requests.md) now authenticate
+the encrypted approval and exact individual target, including an absent client,
+and share the console request barrier with immutable cancellation and atomic audit.
+Concurrent revocation and approval replays use a fresh snapshot after row locking.
 Production installation remains disabled until its native runner and package-aware
 console admission are connected. Authenticated installer delivery and admission,
 execution, observation and recovery remain necessary before this preparation
-component can enable installation or local uninstallation; Linux publisher trust
+component can enable installation or local uninstallation; Linux individual enrollment, publisher trust
 and physical installation acceptance remain separate requirements.
 
 **Repositories:** this fork is the console. Complete distribution changes must
