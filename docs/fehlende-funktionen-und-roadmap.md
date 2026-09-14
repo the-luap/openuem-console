@@ -802,7 +802,7 @@ The console has a separate single-delivery publisher and correlated inspection
 transport. The [scoped recovery request store](netbird-removal-recovery-requests.md)
 now validates original owned unconfirmed release proof and fresh individual-agent
 review, retains immutable intent/cancellation and extends the common permanent
-UUID/device barrier to five request families.
+UUID/device barrier.
 [Durable recovery delivery and receipt observation](netbird-removal-recovery-delivery.md)
 now commit one exact version-five attempt before native transport, prevent
 cancellation or redelivery afterward, and preserve the first recovery result and
@@ -818,10 +818,12 @@ resolution. The [independent native current-absence observer](https://github.com
 now binds stable protected ancestry to repeated complete file, receipt, job and
 process checks, including processes from already deleted stage namespaces. The
 original uninstall and manifest continuation use the same stricter final check.
-The [separate verification protocol, agent journal admission and console transport](netbird-removal-absence.md)
+The [separate verification protocol, agent journal admission and complete console lifecycle](netbird-removal-absence.md)
 now preserve original uncertainty while recording a distinct current-state
-result. The console request/delivery/resolution/history/UI lifecycle remains
-open; empty/incomplete stages are preserved and require a distinct reviewed
+result. Scoped review, immutable request/attempt/result storage, one direct
+delivery, retained observations, explicit resolution, joined dispatch and history
+forms are integrated. All six request families share device and permanent UUID
+exclusion. Empty/incomplete stages are preserved and require a distinct reviewed
 cleanup policy.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate

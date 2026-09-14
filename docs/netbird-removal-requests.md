@@ -45,10 +45,11 @@ without contacting the agent. It does not require the current installation,
 certificate or device inventory still to match historical state. Changed actor,
 scope, device, descriptor digest or review revision under the same UUID conflicts.
 
-All five request families, including [manifest recovery](netbird-removal-recovery-requests.md),
+All six request families, including [manifest recovery](netbird-removal-recovery-requests.md)
+and [current absence verification](netbird-removal-absence.md),
 share UUID and device advisory locks and a common conflict query. A database admission trigger also enforces exclusion for direct
 inserts. Pending removal excludes connection, registration, installation and
-manifest recovery; their unresolved requests exclude removal. Cancellation releases the device slot
+manifest recovery and absence verification; their unresolved requests exclude removal. Cancellation releases the device slot
 but never makes its original UUID reusable in another family. Expiry alone does
 not release a pending request.
 

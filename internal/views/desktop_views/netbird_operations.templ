@@ -99,6 +99,7 @@ templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.N
 <a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info,page.Target.ID) }>Installation history</a>
 <a class="uk-button uk-button-default" href={ NetbirdRemovalPath(info,page.Target.ID) }>Removal history</a>
 <a class="uk-button uk-button-default" href={ NetbirdRemovalRecoveryPath(info,page.Target.ID) }>Continuation history</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info,page.Target.ID) }>Absence check history</a>
 }
     if info.Principal.Can(access.AssignSoftware,page.Target.Scope) {
 <a class="uk-button uk-button-primary" href={ NetbirdInstallationPath(info,page.Target.ID)+"/new" }>Install approved NetBird package</a>

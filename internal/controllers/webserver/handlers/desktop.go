@@ -21,9 +21,9 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-absences/:request":
 			return access.ReadSoftware, true
-		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution":
+		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-absences/review", "/computers/:uuid/netbird/removal-absences/:request/resolution":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/installations/new", "/computers/:uuid/netbird/installations/review", "/computers/:uuid/netbird/installations/:request/resolution":
 			return access.AssignSoftware, true
@@ -47,7 +47,7 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 		switch route {
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
 			return access.AssignSoftware, true
-		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile":
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-absences/:request/cancel", "/computers/:uuid/netbird/removal-absences/:request/observe", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile":
 			return access.AssignSoftware, true
 		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request/cancel", "/computers/:uuid/netbird/registrations/:request/cleanup", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request/cancel", "/computers/:uuid/netbird/connect", "/computers/:uuid/netbird/disconnect", "/computers/:uuid/netbird/switchprofile", "/computers/:uuid/netbird/install", "/computers/:uuid/netbird/uninstall", "/computers/:uuid/netbird/register", "/computers/:uuid/netbird/deletepeer":
 			return access.ManageDeviceSecurity, true
@@ -142,6 +142,16 @@ func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	recovery.GET("/:request/resolution", h.NetbirdRemovalRecoveryResolutionReview)
 	recovery.POST("/:request/resolution", h.NetbirdRemovalRecoveryResolve)
 	recovery.POST("/:request/resolution/reconcile", h.NetbirdRemovalRecoveryReconcile)
+	absence := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-absences", h.IsAuthenticated, h.AppleCSRF)
+	absence.GET("", h.NetbirdRemovalAbsenceHistory)
+	absence.GET("/review", h.NetbirdRemovalAbsenceReview)
+	absence.POST("", h.NetbirdRemovalAbsenceRequest)
+	absence.GET("/:request", h.NetbirdRemovalAbsenceReceipt)
+	absence.POST("/:request/cancel", h.NetbirdRemovalAbsenceCancel)
+	absence.POST("/:request/observe", h.NetbirdRemovalAbsenceObserve)
+	absence.GET("/:request/resolution", h.NetbirdRemovalAbsenceResolutionReview)
+	absence.POST("/:request/resolution", h.NetbirdRemovalAbsenceResolve)
+	absence.POST("/:request/resolution/reconcile", h.NetbirdRemovalAbsenceReconcile)
 	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
 	registration.GET("", h.NetbirdRegistrationHistory)
 	registration.GET("/new", h.NetbirdRegistrationChoices)

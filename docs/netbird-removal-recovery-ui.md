@@ -107,8 +107,8 @@ and the Linux console and handler-test builds also passed.
 Manifest-backed macOS continuation is integrated. The [independent native
 current-absence layer](https://github.com/the-luap/openuem-agent/blob/febbc3d1b9e5b7ee39b80e8d0d04a27044952e0a/docs/netbird-removal-current-absence.md)
 now supplies a separate read-only observer. The [remote protocol, agent admission
-and console transport](netbird-removal-absence.md) are integrated, while its
-console verification flow and empty/incomplete-stage cleanup remain open. Linux individual enrollment,
+and complete console verification lifecycle](netbird-removal-absence.md) are
+integrated. Empty/incomplete-stage cleanup remains open. Linux individual enrollment,
 publisher trust and physical installation/removal/reboot acceptance also remain
 open, alongside the rest of the expanded roadmap. Native absence alone never
 rewrites an uncertain outcome.

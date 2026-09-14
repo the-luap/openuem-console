@@ -48,6 +48,7 @@ type Handler struct {
 	NetbirdInstallations     *inventory.NetbirdInstallationStore
 	NetbirdRemovals          *inventory.NetbirdRemovalStore
 	NetbirdRemovalRecoveries *inventory.NetbirdRemovalRecoveryStore
+	NetbirdRemovalAbsences   *inventory.NetbirdRemovalAbsenceStore
 	inventoryPublisher       inventoryPublisher
 	PublicOrigin             string
 	Model                    *models.Model

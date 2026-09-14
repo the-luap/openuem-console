@@ -97,6 +97,9 @@ func scopedFormLimit(path string) int64 {
 	if route == "/computers/:uuid/netbird/removals" || route == "/computers/:uuid/netbird/removals/:request/cancel" || route == "/computers/:uuid/netbird/removals/:request/observe" || route == "/computers/:uuid/netbird/removals/:request/resolution" || route == "/computers/:uuid/netbird/removals/:request/resolution/reconcile" || route == "/computers/:uuid/netbird/removal-recoveries" || route == "/computers/:uuid/netbird/removal-recoveries/:request/cancel" || route == "/computers/:uuid/netbird/removal-recoveries/:request/observe" || route == "/computers/:uuid/netbird/removal-recoveries/:request/resolution" || route == "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile" {
 		return 8192
 	}
+	if route == "/computers/:uuid/netbird/removal-absences" || route == "/computers/:uuid/netbird/removal-absences/:request/cancel" || route == "/computers/:uuid/netbird/removal-absences/:request/observe" || route == "/computers/:uuid/netbird/removal-absences/:request/resolution" || route == "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile" {
+		return 8192
+	}
 	if route == "/netbird/packages" || route == "/netbird/packages/:approval/revoke" {
 		return 16 << 10
 	}

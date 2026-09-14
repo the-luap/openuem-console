@@ -56,17 +56,23 @@ func TestNetbirdInstallationAndRemovalRuntimeBindsStoresAndJoinsWithoutBroker(t 
 	t.Cleanup(w.stopInventoryRefresh)
 	require.NotNil(t, w.Handler.NetbirdInstallations)
 	require.NotNil(t, w.Handler.NetbirdRemovals)
+	require.NotNil(t, w.Handler.NetbirdRemovalRecoveries)
+	require.NotNil(t, w.Handler.NetbirdRemovalAbsences)
+	manifest := w.Handler.NetbirdRemovalRecoveries
+	absence := w.Handler.NetbirdRemovalAbsences
 	installation := w.Handler.NetbirdInstallations
 	removal := w.Handler.NetbirdRemovals
 	require.NoError(t, w.startInventoryRefresh(t.Context()))
 	require.Same(t, installation, w.Handler.NetbirdInstallations)
 	require.Same(t, removal, w.Handler.NetbirdRemovals)
+	require.Same(t, manifest, w.Handler.NetbirdRemovalRecoveries)
+	require.Same(t, absence, w.Handler.NetbirdRemovalAbsences)
 	done := make(chan struct{})
 	go func() { w.stopInventoryRefresh(); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatal("inventory startup did not join installation and removal workers")
+		t.Fatal("inventory startup did not join installation, removal, continuation and absence workers")
 	}
 	select {
 	case <-w.inventoryDone:

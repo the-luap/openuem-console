@@ -180,11 +180,13 @@ templ NetbirdRemovalReceipt(c echo.Context, info *partials.CommonInfo, v *invent
 		}
  if v.CanReviewRecovery && info.Principal.Can(access.AssignSoftware,v.Request.Scope) {
   <a class="uk-button uk-button-primary" href={NetbirdRemovalRecoveryPath(info,v.Request.DeviceID)+"/review?original_id="+url.QueryEscape(v.Request.ID)}>Review continuation of interrupted removal</a>
+  <a class="uk-button uk-button-primary" href={NetbirdRemovalAbsencePath(info,v.Request.DeviceID)+"/review?original_id="+url.QueryEscape(v.Request.ID)}>Review current package absence</a>
  }
 		<div class="netbird-actions">
 			<a class="uk-button uk-button-default" href={ NetbirdRemovalPath(info, v.Request.DeviceID) + "/" + v.Request.ID }>Reload status</a>
 			<a class="uk-button uk-button-default" href={ NetbirdRemovalPath(info, v.Request.DeviceID) }>Removal history</a>
  <a class="uk-button uk-button-default" href={NetbirdRemovalRecoveryPath(info,v.Request.DeviceID)}>Continuation history</a>
+ <a class="uk-button uk-button-default" href={NetbirdRemovalAbsencePath(info,v.Request.DeviceID)}>Absence check history</a>
 		</div>
 	}
 }
