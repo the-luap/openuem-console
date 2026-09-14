@@ -67,8 +67,11 @@ the table's package summaries do not remove any detail from the roadmap.
   native owner and inspected journal revision, preserves lost/cancelled outcomes
   and restart/withdrawal barriers, and rejects unconfigured removal before admission.
   Existing console publishers cannot deliver removal through another command family.
-  Native ownership/removal verification, runtime binding and the console lifecycle
-  remain open; these owned protocol/process/broker tests are not physical removal.
+  The agent's private filesystem inspector now binds protected receipts, complete
+  bundle contents, NetBird publisher signatures, ACLs, CLI link and daemon plist
+  across stable snapshots, with retained handles preventing immediate inode reuse.
+  Actual launchd/process ownership, native removal verification, runtime binding
+  and the console lifecycle remain open; owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.

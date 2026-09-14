@@ -20,6 +20,14 @@ verify present/absent/unavailable results, reject changed hashes/certificates or
 old response versions, and prove that neither existing publisher sends a removal.
 No public removal route or dispatcher is introduced by this protocol integration.
 
+The agent now also has a [private native package ownership inspector](https://github.com/the-luap/openuem-agent/blob/ee54842a8fe8e065ed935742a0d5e349b3421a63/docs/netbird-removal-ownership.md).
+It verifies protected receipt/BOM and bundle objects, exact package file lists,
+NetBird publisher signatures, native ACLs, the CLI link and supported daemon plist
+under matching before/after snapshots. First-pass file handles prevent immediate
+inode reuse from hiding an exchange during verification. This private filesystem
+evidence is not exposed as a complete removal-state response: actual launchd and
+process ownership must still be joined before runtime removal support is enabled.
+
 Shared race/fuzz tests, agent journal/command/preparation race tests, owned native
 agent/service/enrollment regressions and all supported consumer builds cover this
 foundation. On the published protocol pin, the complete NetBird inventory suite
