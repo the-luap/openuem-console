@@ -169,8 +169,8 @@ func (s *NetbirdOperationStore) Request(parent context.Context, actor string, sc
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	var pending bool
-	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM uem_netbird_operations WHERE device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL))) OR EXISTS(SELECT 1 FROM uem_netbird_registrations WHERE id=$2 OR (device_id=$1 AND (status='queued' OR (status='unconfirmed' AND released_at IS NULL)))) OR EXISTS(SELECT 1 FROM uem_netbird_installations WHERE id=$2 OR (device_id=$1 AND cancelled_at IS NULL AND completed_at IS NULL AND released_at IS NULL))`, device, id).Scan(&pending); err != nil {
+	pending, err := netbirdRequestConflict(ctx, tx, device, id)
+	if err != nil {
 		return nil, err
 	}
 	if pending {

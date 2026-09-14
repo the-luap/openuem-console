@@ -18,7 +18,10 @@ The existing direct control publisher transports the inspection response only
 when its complete current recipient, UUID and request hash match. Owned NATS tests
 verify present/absent/unavailable results, reject changed hashes/certificates or
 old response versions, and prove that neither existing publisher sends a removal.
-No public removal route or dispatcher is introduced by this protocol integration.
+The separate [removal request store](netbird-removal-requests.md) now retains
+fresh reviewed native state, exact-site software authority, immutable intent and
+queued cancellation under the common four-family UUID/device barrier. It still
+has no public removal route or dispatcher.
 
 The agent now also has a [private native package ownership inspector](https://github.com/the-luap/openuem-agent/blob/ee54842a8fe8e065ed935742a0d5e349b3421a63/docs/netbird-removal-ownership.md).
 It verifies protected receipt/BOM and bundle objects, exact package file lists,
@@ -46,9 +49,9 @@ Existing command bytes and control digests remain stable. Tests do not
 run a real vendor installer, daemon or remover.
 
 Unconfigured services still reject fresh removal before admission. The console
-still needs exact-site software rights,
-fresh reviewed intent, durable request/admission history, common device exclusion,
-one native dispatch per immutable attempt, source-free receipts, explicit recovery and UI for removal.
+now retains exact-site software rights, fresh reviewed intent, durable request
+history and common device exclusion. It still needs one native dispatch per
+immutable attempt, source-free receipts, explicit recovery and UI for removal.
 Provider peer deletion and credential/configuration cleanup remain separate
 reviewed operations. Linux individual enrollment/publisher trust and physical
 package, interruption, reboot and daemon acceptance also remain open.

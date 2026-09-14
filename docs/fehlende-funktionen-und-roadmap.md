@@ -771,7 +771,10 @@ now binds that inspection to journal admission, audit-token process stops,
 exclusive protected staging, exact file deletion and repeated native absence
 verification. Supported individual macOS services configure inspection and
 execution together; interrupted staging is retained and blocks fresh removal.
-Console request/dispatch/recovery/UI and retained-stage recovery remain open.
+The [console request store](netbird-removal-requests.md) now adds current native
+review, immutable source-free intent, exact-site software rights and queued
+cancellation, sharing the permanent UUID/device barrier with the other command
+families. Console dispatch/receipt recovery/UI and retained-stage recovery remain open.
 Linux individual enrollment,
 publisher trust and physical installation/removal acceptance remain separate
 requirements.

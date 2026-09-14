@@ -77,8 +77,12 @@ the table's package summaries do not remove any detail from the roadmap.
   exclusive protected staging and repeated native absence verification. It
   preserves interrupted staging and rejects fresh work until local recovery.
   Native races, broker/runtime regressions, owned Linux fixtures and all agent
-  builds pass. Console removal and retained-stage recovery remain open; owned
-  tests are not physical removal.
+  builds pass. The [console request store](netbird-removal-requests.md) now adds
+  fresh native review, exact-site software authority, immutable source-free intent
+  and queued cancellation under the common UUID/device barrier. PostgreSQL races
+  cover recipient drift, replay, audit rollback and cross-family exclusion.
+  Console dispatch/receipt recovery/UI and retained-stage recovery remain open;
+  owned tests are not physical removal.
 
 - [Native NetBird device installation UI](netbird-installation-ui.md) now connects
   scoped approved-package choice and exact review to the joined dispatcher.
