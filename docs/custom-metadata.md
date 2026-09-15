@@ -130,4 +130,6 @@ audit, clear/delete ABA changes, stale and expired reviews, exact retries and
 atomic rollback. The real console router covers every alias and rejects legacy
 bypasses, malformed forms and CSRF failures. Forty-five Chromium cases exercise
 catalogs, drafts, blank values, confirmations and long content at
-390/768/1440 pixels, including keyboard submission.
+390/768/1440 pixels, including keyboard submission. The combined browser run
+also checks 36 existing device-details/assignment cases and 12 shared-navigation
+cases across all four roles (93 passing cases total).

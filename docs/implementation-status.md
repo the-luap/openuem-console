@@ -70,7 +70,8 @@ the table's package summaries do not remove any detail from the roadmap.
   mutation handlers are removed. All three schema initializers preserve scoped
   duplicate names and additive objects across restart. Dedicated PostgreSQL race
   tests, the registered router and 45 Chromium cases cover the new boundaries;
-  the browser run also passes 36 existing device-details/assignment cases.
+  the browser run also passes 36 existing device-details/assignment cases and
+  12 shared-navigation cases for all four roles (93 cases total).
   All 465 inventory test/fuzz families pass across eight race-test partitions.
   The full registered router passes in 55.876 seconds, including the new
   scoped-metadata subtest; affected access, audit, model and view regressions,
