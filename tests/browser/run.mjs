@@ -22,6 +22,7 @@ import scopedNetwork from "./desktop-network-scoped.mjs";
 import storage from "./desktop-storage.mjs";
 import peripherals from "./desktop-peripherals.mjs";
 import memory from "./desktop-memory.mjs";
+import notes from "./desktop-notes.mjs";
 import shares from "./desktop-shares.mjs";
 import security from "./desktop-security.mjs";
 import managementNavigation from "./management-navigation.mjs";
@@ -122,6 +123,7 @@ try {
         [storage, 48],
         [peripherals, 48],
         [memory, 24],
+        [notes, 3],
         [shares, 24],
         [security, 36],
         [managementNavigation,12],

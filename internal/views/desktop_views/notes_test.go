@@ -45,7 +45,11 @@ func TestDeviceNotesEscapeDraftAndSanitizeSavedMarkdown(t *testing.T) {
 		require.NotContains(t, html, unsafe)
 	}
 	require.Contains(t, html, `href="https://example.test/reference"`)
-	if dir := os.Getenv("DEVICE_NOTES_TEST_ARTIFACT_DIR"); dir != "" {
+	dir := os.Getenv("APPLE_MDM_UI_ARTIFACTS")
+	if dir == "" {
+		dir = os.Getenv("DEVICE_NOTES_TEST_ARTIFACT_DIR")
+	}
+	if dir != "" {
 		require.NoError(t, os.MkdirAll(dir, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "notes-conflict.html"), out.Bytes(), 0600))
 	}
