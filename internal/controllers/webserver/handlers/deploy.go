@@ -288,7 +288,7 @@ func (h *Handler) DeployPackageToSelectedAgents(c echo.Context) error {
 				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 			}
 
-			if err := h.NATSConnection.Publish("agent.installpackage."+agent, actionBytes); err != nil {
+			if err := h.PublishBroker("agent.installpackage."+agent, actionBytes); err != nil {
 				return RenderError(c, partials.ErrorMessage(err.Error(), true))
 			}
 
@@ -300,7 +300,7 @@ func (h *Handler) DeployPackageToSelectedAgents(c echo.Context) error {
 				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 			}
 
-			if err := h.NATSConnection.Publish("agent.uninstallpackage."+agent, actionBytes); err != nil {
+			if err := h.PublishBroker("agent.uninstallpackage."+agent, actionBytes); err != nil {
 				return RenderError(c, partials.ErrorMessage(err.Error(), true))
 			}
 

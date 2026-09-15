@@ -7,7 +7,6 @@ import (
 	"github.com/open-uem/ent"
 	"github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/views/partials"
-	"strings"
 )
 
 templ Netbird(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, ng []nats.NetBirdGroups, higherReleaseApplied *ent.Release, confirmDelete bool, successMessage string, commonInfo *partials.CommonInfo, currentTenant *ent.Tenant, currentSite *ent.Site, allTenants []*ent.Tenant, allSites []*ent.Site, netbird, offline bool) {
@@ -357,11 +356,7 @@ templ Netbird(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, ng
 								<p class="uk-margin-small-top uk-text-small">{ i18n.T(ctx, "netbird.profiles_description") }</p>
 							</div>
 							<form class="flex gap-4 items-center">
-								<uk-select class="w-1/4" name="profile" placeholder={ i18n.T(ctx, "netbird.profile_select") } searchable uk-cloak>
-									for _, p := range strings.Split(agent.Edges.Netbird.ProfilesAvailable,",") {
-										<option value={ p }>{ p }</option>
-									}
-								</uk-select>
+								@NetbirdProfileSelect(netbirdProfileOptions(agent.Edges.Netbird.ProfilesAvailable))
 								<button
 									id="netbird-register"
 									title={ i18n.T(ctx, "netbird.switch_profile") }

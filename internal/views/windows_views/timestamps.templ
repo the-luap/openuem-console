@@ -1,0 +1,25 @@
+package windows_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"time"
+)
+
+templ ReportTime(value time.Time) {
+	@mdm_views.Timestamp(&value)
+}
+
+templ OptionalReportTime(value *time.Time) {
+	if value == nil {
+		<span>{ i18n.T(ctx,"timestamps.not_received") }</span>
+	} else {
+		@mdm_views.Timestamp(value)
+	}
+}
+
+// Keep scheduling and command evidence at its original subsecond precision.
+templ ScheduleTime(value time.Time) {
+	<time datetime={ value.UTC().Format(time.RFC3339Nano) } lang={ layout.DocumentLanguage(ctx) } data-uem-timestamp data-uem-precision="fraction" title={ value.UTC().Format(time.RFC3339Nano) }>{ scheduleTimestamp(value) }</time>
+}

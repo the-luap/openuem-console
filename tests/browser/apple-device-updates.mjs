@@ -1,0 +1,62 @@
+import {checkDeadline} from './apple-update-deadlines.mjs';
+export default async function run(browser, record) {
+  for (const state of ['required', 'compliant', 'missing-build', 'stale', 'unmanaged', 'error', 'error-limited', 'no-policy', 'viewer', 'long', 'missing', 'deadline-pending', 'deadline-elapsed', 'deadline-stale', 'deadline-future', 'deadline-invalid', 'deadline-gap', 'deadline-fold', 'exception-active', 'exception-expired', 'exception-ended', 'exception-viewer']) {
+    for (const width of [390, 768, 1440]) {
+      await browser.visit('apple-device-update-' + state, width);
+      const view = await browser.evaluate(`(() => {
+        const main = document.querySelector('[data-device-update-assessment]');
+        return {width:document.documentElement.scrollWidth, viewport:innerWidth, text:main.textContent,
+          evidence:main.querySelector('[data-device-update-evidence]').textContent,
+          exception:main.querySelector('[data-update-exception-active]')?.textContent,links:[...main.querySelectorAll('a')].map(a=>({text:a.textContent,href:a.getAttribute('href')})),policy:main.querySelector('[data-device-update-policy]')?.textContent,
+          deadline:main.querySelector('[data-update-deadline]')?{state:main.querySelector('[data-update-deadline]').dataset.updateDeadline,text:main.querySelector('[data-update-deadline]').textContent}:null,
+          scripts:main.querySelectorAll('script').length,
+          forms:[...main.querySelectorAll('form')].map(f=>({action:f.getAttribute('action'),csrf:f.elements.csrf?.value,expected:f.elements.expected_policy?.value,fields:f.querySelectorAll('[name="expected_policy"]').length}))};
+      })()`);
+      browser.check(view.width <= view.viewport + 1, 'Device update assessment overflows viewport');
+      browser.check(!view.evidence.includes('22F999') && !view.evidence.includes('18.5'), 'Update evidence borrowed merged inventory');
+      browser.check(view.evidence.includes('unrelated status messages do not refresh its timestamp'), 'Packet evidence explanation is missing');
+      browser.check(view.scripts === 0, 'Policy error created executable markup');
+      if (state === 'missing') browser.check(view.evidence.includes('No usable OS observation') && !view.evidence.includes('Version recorded:'), 'Missing evidence fell back to inventory');
+      else browser.check(view.evidence.includes('Version recorded:') && view.evidence.includes('Declarative status'), 'OS report time or source is missing');
+      if (state === 'missing-build') browser.check(view.policy.includes('build was not reported together') && !view.evidence.includes('22H100'), 'Missing build was shown as a complete pair');
+      if (state === 'stale') browser.check(view.policy.includes('more than 24 hours old') && !view.policy.includes('Up to date'), 'Stale report counted as current compliance');
+      if (state === 'unmanaged') browser.check(view.policy.includes('inactive or its device identity has expired') && view.forms.length === 0, 'Inactive device has actionable or verified result');
+      if (['compliant','error','error-limited','viewer','long'].includes(state)) browser.check(view.policy.includes('Up to date'), 'Policy state displaced independent reported OS result');
+      if (state === 'error') browser.check(view.policy.includes('Owned <script>policy failure</script>') && view.policy.includes('Failed'), 'Escaped policy error or independent delivery state is missing');
+      if (state === 'error-limited') browser.check(view.policy.includes('exceed the display limit'), 'Oversized error lost its bounded notice');
+      if (state === 'required') browser.check(view.policy.includes('Update required') && view.evidence.includes('18.6.2'), 'Lower reported version lost required result');
+      if (state === 'no-policy') browser.check(!view.policy && view.evidence.includes('18.7.1'), 'Policy removal hid OS evidence');
+      checkDeadline(browser,state,view.deadline,false);
+      if(state.startsWith('exception-'))browser.check(!view.policy&&view.exception.includes('Temporary update exception'),'Exception lost current absence of policy');
+      if(state==='exception-active'||state==='exception-viewer')browser.check(view.exception.includes('New update policy assignments are paused')&&view.forms.length===0,'Active exception offers an update assignment');
+      if(state==='exception-expired')browser.check(view.exception.includes('exception has expired'),'Expired exception hidden');
+      if(state==='exception-ended')browser.check(view.exception.includes('exception was ended'),'Ended exception hidden');
+      if(state.startsWith('exception-')&&state!=='exception-viewer')browser.check(view.links.some(a=>a.text==='Manage update exceptions'&&a.href==='/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update-exceptions/review'),'Exception management link changes scope');
+      if (state === 'viewer'||state==='exception-viewer') browser.check(view.forms.length === 0, 'Read-only viewer can submit update changes');
+      else if (state !== 'unmanaged'&&state!=='exception-active') browser.check(view.forms.length === (state === 'no-policy'||state==='exception-expired'||state==='exception-ended' ? 1 : 2), 'Update action availability changed');
+      browser.check(view.forms.every(f => f.action === '/tenant/1/site/1/ios/10000000-0000-0000-0000-000000000001/update' && f.csrf === 'owned-csrf'), 'Update form lost scope or CSRF');
+      browser.check(view.forms.every(f => f.expected === 'a'.repeat(64) && f.fields === 1), 'Update form lost its exact reviewed configured policy');
+      if (view.forms.length) {
+        await browser.evaluate(`(() => {
+          window.updateSubmissions=[];
+          for(const f of document.querySelectorAll('[data-device-update-assessment] form')) {
+            f.addEventListener('submit',event=>{event.preventDefault();window.updateSubmissions.push(Object.fromEntries(new FormData(f,event.submitter)));});
+            if(f.elements.target_release) f.elements.target_release.value='18.7.1/22H100';
+            if(f.elements.deadline) f.elements.deadline.value='2026-10-01T18:00';
+          }
+        })()`);
+        for (let index=0;index<view.forms.length;index++) {
+          await browser.evaluate(`document.querySelectorAll('[data-device-update-assessment] form')[${index}].querySelector('button[type="submit"]').focus()`);
+          await browser.enter();
+        }
+        const submissions = await browser.evaluate('window.updateSubmissions');
+        browser.check(submissions.length === view.forms.length && submissions.every(f => f.expected_policy === 'a'.repeat(64) && f.csrf === 'owned-csrf'), 'Keyboard submission lost its reviewed policy or CSRF');
+      }
+      if (width === 390) {
+        await browser.evaluate("document.querySelector('[data-device-update-assessment]').scrollIntoView({block:'start'})");
+        await browser.capture('apple-device-update-' + state + '-390');
+      }
+      record({name:'Apple device update ' + state, width, passed:true});
+    }
+  }
+}

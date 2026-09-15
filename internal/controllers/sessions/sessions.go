@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/alexedwards/scs/v2"
@@ -14,23 +14,38 @@ type SessionManager struct {
 	Pool    *pgxpool.Pool
 }
 
-func New(dbUrl string, sessionLifetimeInMinutes int, encryptionMasterKey string) *SessionManager {
+func New(dbUrl string, sessionLifetimeInMinutes int, encryptionMasterKey string) (*SessionManager, error) {
 	var err error
 	sm := SessionManager{}
 
 	sm.Pool, err = pgxpool.New(context.Background(), dbUrl)
 	if err != nil {
-		log.Println("[FATAL]: session manager could not contact the database")
-		log.Fatal(err)
+		return nil, fmt.Errorf("initialize session database: %w", err)
 	}
 
 	sm.Manager = scs.New()
 	sm.Manager.Lifetime = time.Duration(sessionLifetimeInMinutes) * time.Minute
 	sm.Manager.Store = NewPostgresStore(sm.Pool, encryptionMasterKey)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err = sm.Manager.Store.(*PostgresStore).Migrate(ctx); err != nil {
+		sm.Close()
+		return nil, fmt.Errorf("migrate session store: %w", err)
+	}
 	sm.Manager.Cookie.Secure = true
-	return &sm
+	return &sm, nil
 }
 
 func (s *SessionManager) Close() {
-	s.Pool.Close()
+	if s == nil {
+		return
+	}
+	if s.Manager != nil {
+		if store, ok := s.Manager.Store.(*PostgresStore); ok {
+			store.StopCleanup()
+		}
+	}
+	if s.Pool != nil {
+		s.Pool.Close()
+	}
 }

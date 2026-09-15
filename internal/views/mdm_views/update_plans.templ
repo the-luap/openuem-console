@@ -1,0 +1,128 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ appleUpdatePlanForm(info *partials.CommonInfo, plan apple.UpdatePlan) {
+	<form method="post" action={ partials.GetNavigationUrl(info, "/ios/update-plans"+groupSuffix(plan.ID)) } class="grid gap-4" aria-label="Save Apple update plan">
+		@CSRF(info)
+		<input type="hidden" name="expected_revision" value={ Number(plan.Revision) }/>
+		<label>Name<input class="uk-input" name="name" required maxlength="120" value={ plan.Definition.Name }/></label>
+		<label>Description<input class="uk-input" name="description" maxlength="1024" value={ plan.Definition.Description }/></label>
+		<label>
+			Platform
+			<select class="uk-select" name="platform" required>
+				<option value="ios" selected?={ plan.Definition.Platform=="ios" }>iOS</option>
+				<option value="ipados" selected?={ plan.Definition.Platform=="ipados" }>iPadOS</option>
+				<option value="macos" selected?={ plan.Definition.Platform=="macos" }>macOS</option>
+			</select>
+		</label>
+		<label>Target OS version<input class="uk-input" name="target_version" required maxlength="11" placeholder="18.7.1" value={ plan.Definition.TargetVersion }/></label>
+		<label>Target build<input class="uk-input" name="target_build" required maxlength="32" placeholder="22H100" value={ plan.Definition.TargetBuild }/></label>
+		<label>Installation deadline (device local time)<input class="uk-input" type="datetime-local" step="1" name="deadline" required value={ plan.Definition.Deadline }/></label>
+		<label>Update information URL (optional)<input class="uk-input" type="url" name="details_url" maxlength="2048" placeholder="https://" value={ plan.Definition.DetailsURL }/></label>
+		<label><input class="uk-checkbox" type="checkbox" name="archived" value="yes" checked?={ plan.Definition.Archived }/> Archive this plan</label>
+		<p>Saving keeps a new revision. Saving or archiving does not change existing device policies.</p>
+		<button class="uk-button uk-button-primary" type="submit">Save plan revision</button>
+	</form>
+}
+
+templ appleUpdatePlanDefinition(plan apple.UpdatePlan) {
+	<div class="grid gap-3" style="overflow-wrap:anywhere;" data-update-plan-definition>
+		<h2 class="uk-card-title">{ plan.Definition.Name } · Revision { Number(plan.Revision) }</h2>
+		<p>{ plan.Definition.Description }</p>
+		<p>{ groupPlatform(ctx,plan.Definition.Platform)+" · "+plan.Definition.TargetVersion+" · "+plan.Definition.TargetBuild }</p>
+		<p>Device-local deadline: { plan.Definition.Deadline }</p>
+		if plan.Definition.DetailsURL!="" {
+			<p>Update information URL: { plan.Definition.DetailsURL }</p>
+		}
+		if plan.Definition.Archived {
+			<p>Archived</p>
+		} else {
+			<p>Available plan</p>
+		}
+		<p>Saved by { plan.Actor }</p>
+		<p>
+			@Timestamp(&plan.CreatedAt)
+		</p>
+	</div>
+}
+
+templ AppleUpdatePlans(c echo.Context, info *partials.CommonInfo, plans []apple.UpdatePlan, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}}, info)
+		<main id="device-management" data-update-plans="list" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Apple update plans</h1><p>Keep reviewed platform, release and deadline settings for this site. Plans and installed update results are separate records.</p></div>
+			@Navigation(info)
+			for _,plan:=range plans {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4">
+						@appleUpdatePlanDefinition(plan)
+						<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/update-plans/"+plan.ID)) }>Open plan and history</a>
+					</div>
+				</section>
+			}
+			if len(plans)==0 {
+				<p>No Apple update plans in this site.</p>
+			}
+			@GroupPaging(paging, "Apple update plan pages")
+			if info.Can(access.ManageUpdates) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4">
+						<h2 class="uk-card-title">Create an update plan</h2>
+						@appleUpdatePlanForm(info, apple.UpdatePlan{Definition: apple.UpdatePlanDefinition{Platform: "ios"}})
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ AppleUpdatePlan(c echo.Context, info *partials.CommonInfo, plan apple.UpdatePlan, history []apple.UpdatePlan, paging DevicePagination) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Plan and history", Url: partials.GetNavigationUrl(info, "/ios/update-plans/"+plan.ID)}}, info)
+		<main id="device-management" data-update-plans="detail" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Apple update plan</h1><p>Current plan settings and retained revisions. Device compatibility, current release availability and update authorization must be checked when assigning.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					@appleUpdatePlanDefinition(plan)
+				</div>
+			</section>
+			if info.Can(access.ManageUpdates) {
+				<div class="flex flex-wrap gap-4" data-update-plan-group-actions>
+					if !plan.Definition.Archived {
+						<a class="uk-button uk-button-default" href={templ.URL(UpdatePlanGroupChoiceURL(info,plan,""))}>Assign to a dynamic group</a>
+					}
+					<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,UpdatePlanGroupHistoryPath(plan.ID)))}>Group update history</a>
+					<a class="uk-button uk-button-default" href={templ.URL(partials.GetNavigationUrl(info,UpdateSchedulePath(plan.ID)))}>Scheduled activations</a>
+				</div>
+			}
+			if info.Can(access.ManageUpdates) {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4">
+						<h2 class="uk-card-title">Revise this plan</h2>
+						@appleUpdatePlanForm(info, plan)
+					</div>
+				</section>
+			}
+			<section class="grid gap-4" aria-label="Plan revision history">
+				<h2 class="text-xl font-semibold">Retained plan revisions</h2>
+				for _,revision:=range history {
+					<article class="uk-card uk-card-default">
+						<div class="uk-card-body">
+							@appleUpdatePlanDefinition(revision)
+						</div>
+					</article>
+				}
+				@GroupPaging(paging, "Apple update plan revision pages")
+			</section>
+		</main>
+	}
+}

@@ -1,0 +1,10 @@
+.git
+.artifacts
+.playwright-mcp
+certificates
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*

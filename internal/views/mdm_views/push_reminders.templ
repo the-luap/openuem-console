@@ -1,0 +1,46 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/mdm/apple"
+
+templ PushReminderHistory(reminders []apple.PushReminderSummary) {
+	<section class="mt-6" aria-labelledby="push-reminder-title">
+		<h3 id="push-reminder-title" class="text-lg font-semibold">Certificate expiry reminders</h3>
+		<p>OpenUEM emails active administrators with verified addresses at 30, 14, 7 and 1 day before expiry, and once after expiry. Only the most urgent outstanding stage is sent after downtime. The responsible Apple account is not a mailing address.</p>
+		<p>Configure SMTP for this organization in Settings. Failed deliveries retry automatically, from five minutes up to once per day. New certificate administrators are included while a warning remains active.</p>
+		if len(reminders)==0 {
+			<p class="uk-text-muted">No reminder has been recorded yet. The console normally checks every minute, including when the public Apple listener is disabled.</p>
+		} else {
+			<details class="mt-4">
+				<summary>Reminder history (latest 25)</summary>
+				<ul class="grid gap-4 mt-4">
+					for _,r:=range reminders {
+						<li class="uk-card uk-card-default uk-card-body">
+							<h4 class="font-semibold">{ r.Label() } —{ " " }
+								@Timestamp(&r.ExpiresAt)
+							</h4>
+							<p class="break-all">Certificate SHA-256: { r.Fingerprint }</p>
+							<p>Recorded:{ " " }
+								@Timestamp(&r.CreatedAt)
+							</p>
+							<p>Accepted by SMTP: { Number(r.Sent) }; pending: { Number(r.Pending) }; cancelled: { Number(r.Cancelled) }.</p>
+							if r.ResolvedAt!=nil {
+								<p>This reminder was superseded by a certificate change or a different warning stage.</p>
+							} else if r.Pending+r.Sent==0 {
+								<p role="status">No eligible recipient is currently available. Check administrator permissions, account approval and verified email addresses.</p>
+							}
+							if r.Failed>0 {
+								<p role="status">Deliveries awaiting retry: { Number(r.Failed) }. Check this organization's SMTP settings and server connectivity.</p>
+							}
+							if r.NextAttemptAt!=nil {
+								<p>Next attempt no earlier than{ " " }
+									@Timestamp(r.NextAttemptAt)
+								.</p>
+							}
+							<p class="uk-text-muted">SMTP acceptance does not confirm inbox delivery. A crash after acceptance can cause a repeated message.</p>
+							</li>
+						}
+					</ul>
+				</details>
+			}
+		</section>
+}

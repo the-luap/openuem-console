@@ -1,0 +1,21 @@
+package desktop_views
+
+import "github.com/invopop/ctxi18n/i18n"
+
+templ reportedValue(value string) {
+	if value == "" {
+		{ i18n.T(ctx,"inventory_report.not_reported") }
+	} else {
+		{ value }
+	}
+}
+
+templ reportedFlag(value *bool) {
+	if value == nil {
+		{ i18n.T(ctx,"inventory_report.not_reported") }
+	} else if *value {
+		{ i18n.T(ctx,"inventory_report.yes") }
+	} else {
+		{ i18n.T(ctx,"inventory_report.no") }
+	}
+}

@@ -1,0 +1,405 @@
+package handlers
+
+import (
+	"errors"
+	"io"
+	"net/http"
+	"strconv"
+
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/nats/enrollment"
+	"github.com/open-uem/nats/enrollment/registry"
+	"github.com/open-uem/openuem-console/internal/gateway"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/desktop_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+func desktopCapability(method, path string) (access.Capability, bool) {
+	route := appleRoute(path)
+	if method == http.MethodGet {
+		switch route {
+		case "/computers/:uuid/metadata", "/computers/:uuid/metadata/:field":
+			return access.ManageMetadata, true
+		case "/computers/:uuid/details":
+			return access.ManageDeviceDetails, true
+		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
+			return access.ManageDeviceAssignments, true
+		case "/computers/:uuid/notes":
+			return access.ManageDeviceNotes, true
+		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
+			return access.ReadSoftware, true
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request", "/computers/:uuid/netbird/removal-stage-cleanups/:request":
+			return access.ReadSoftware, true
+		case "/computers/:uuid/netbird/removals/review", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/review", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-absences/review", "/computers/:uuid/netbird/removal-stage-cleanups/review", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution":
+			return access.AssignSoftware, true
+		case "/computers/:uuid/netbird/installations/new", "/computers/:uuid/netbird/installations/review", "/computers/:uuid/netbird/installations/:request/resolution":
+			return access.AssignSoftware, true
+		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request", "/computers/:uuid/netbird", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request":
+			return access.ReadDevices, true
+		case "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/new", "/computers/:uuid/netbird/registrations/review", "/computers/:uuid/netbird/operations/review", "/computers/:uuid/netbird/operations/:request/resolution":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/cleanup/review":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer/removal":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/tasks", "/computers/:uuid/execution", "/computers/:uuid/execution/review", "/computers/:uuid/execution/:request":
+			return access.ManageProfiles, true
+		case "/desktop/enrollment", "/computers/:uuid", "/computers/:uuid/overview", "/computers/:uuid/inventory", "/computers/:uuid/inventory/software", "/computers/:uuid/software", "/computers/:uuid/inventory/network", "/computers/:uuid/network-adapters", "/computers/:uuid/inventory/storage", "/computers/:uuid/physical-disks", "/computers/:uuid/logical-disks", "/computers/:uuid/hardware", "/computers/:uuid/os", "/computers/:uuid/inventory/peripherals", "/computers/:uuid/monitors", "/computers/:uuid/printers", "/computers/:uuid/inventory/memory", "/computers/:uuid/inventory/shares", "/computers/:uuid/shares", "/computers/:uuid/inventory/security", "/security/:uuid/updates":
+			return access.ReadDevices, true
+		}
+	}
+	if method == http.MethodPost {
+		switch route {
+		case "/computers/:uuid/metadata/:field", "/computers/:uuid/metadata/:field/clear":
+			return access.ManageMetadata, true
+		case "/computers/:uuid/details":
+			return access.ManageDeviceDetails, true
+		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
+			return access.ManageDeviceAssignments, true
+		case "/computers/:uuid/notes":
+			return access.ManageDeviceNotes, true
+		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
+			return access.AssignSoftware, true
+		case "/computers/:uuid/netbird/removals", "/computers/:uuid/netbird/removals/:request/cancel", "/computers/:uuid/netbird/removals/:request/observe", "/computers/:uuid/netbird/removals/:request/resolution", "/computers/:uuid/netbird/removals/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-recoveries", "/computers/:uuid/netbird/removal-recoveries/:request/cancel", "/computers/:uuid/netbird/removal-recoveries/:request/observe", "/computers/:uuid/netbird/removal-recoveries/:request/resolution", "/computers/:uuid/netbird/removal-recoveries/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-absences", "/computers/:uuid/netbird/removal-stage-cleanups", "/computers/:uuid/netbird/removal-absences/:request/cancel", "/computers/:uuid/netbird/removal-stage-cleanups/:request/cancel", "/computers/:uuid/netbird/removal-absences/:request/observe", "/computers/:uuid/netbird/removal-stage-cleanups/:request/observe", "/computers/:uuid/netbird/removal-absences/:request/resolution", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution", "/computers/:uuid/netbird/removal-absences/:request/resolution/reconcile", "/computers/:uuid/netbird/removal-stage-cleanups/:request/resolution/reconcile":
+			return access.AssignSoftware, true
+		case "/computers/:uuid/netbird/registrations", "/computers/:uuid/netbird/registrations/:request/cancel", "/computers/:uuid/netbird/registrations/:request/cleanup", "/computers/:uuid/netbird/operations", "/computers/:uuid/netbird/operations/:request/cancel", "/computers/:uuid/netbird/connect", "/computers/:uuid/netbird/disconnect", "/computers/:uuid/netbird/switchprofile", "/computers/:uuid/netbird/install", "/computers/:uuid/netbird/uninstall", "/computers/:uuid/netbird/register", "/computers/:uuid/netbird/deletepeer":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/refresh":
+			return access.RefreshDevices, true
+		case "/computers/:uuid/netbird/registrations/:request/cleanup/retry":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer/removal", "/computers/:uuid/netbird/registrations/:request/peer/removal/check":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/peer":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/netbird/registrations/:request/resolution/retry", "/computers/:uuid/netbird/operations/:request/resolution/retry", "/computers/:uuid/netbird/registrations/:request/resolution", "/computers/:uuid/netbird/registrations/:request/resolution/continue", "/computers/:uuid/netbird/registrations/:request/resolution/reconcile", "/computers/:uuid/netbird/operations/:request/resolution", "/computers/:uuid/netbird/operations/:request/resolution/reconcile":
+			return access.ManageDeviceSecurity, true
+		case "/computers/:uuid/execution", "/computers/:uuid/runtask", "/computers/:uuid/runprofile":
+			return access.ManageProfiles, true
+		case "/computers/:uuid/refresh", "/agents/:uuid/forcereport":
+			return access.RefreshDevices, true
+		case "/desktop/setup":
+			return access.ManageCertificates, true
+		case "/desktop/invitations":
+			return access.EnrollDevices, true
+		case "/desktop/invitations/:id/revoke":
+			return access.EnrollDevices, true
+		case "/desktop/identities/:id/revoke":
+			return access.RevokeDevices, true
+		}
+	}
+	return "", false
+}
+
+func (h *Handler) RegisterDesktop(e *echo.Echo) {
+	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
+		g := e.Group(prefix, h.IsAuthenticated, h.AppleCSRF)
+		g.GET("/computers/:uuid/details", h.DesktopDetails)
+		g.POST("/computers/:uuid/details", h.DesktopDetails)
+		g.GET("/computers/:uuid/assignment", h.DesktopAssignment)
+		g.POST("/computers/:uuid/assignment", h.DesktopAssignmentReview)
+		g.GET("/computers/:uuid/assignment/:review", h.DesktopAssignmentReceipt)
+		g.POST("/computers/:uuid/assignment/:review", h.DesktopAssignmentReceipt)
+		g.GET("/computers/:uuid/inventory", h.DesktopInventory)
+		g.GET("/computers/:uuid/inventory/software", h.DesktopSoftware)
+		g.GET("/computers/:uuid/inventory/network", h.DesktopNetwork)
+		g.GET("/computers/:uuid/inventory/storage", h.DesktopStorage)
+		g.GET("/computers/:uuid/inventory/peripherals", h.DesktopPeripherals)
+		g.GET("/computers/:uuid/inventory/memory", h.DesktopMemory)
+		g.GET("/computers/:uuid/inventory/shares", h.DesktopShares)
+		g.GET("/computers/:uuid/inventory/security", h.DesktopSecurity)
+		g.POST("/computers/:uuid/refresh", h.DesktopRefresh)
+		g.GET("/desktop/enrollment", h.DesktopEnrollment)
+		g.POST("/desktop/setup", h.DesktopAuthority)
+		g.POST("/desktop/invitations", h.DesktopCreateInvitation)
+		g.POST("/desktop/invitations/:id/revoke", h.DesktopRevokeInvitation)
+		g.POST("/desktop/identities/:id/revoke", h.DesktopRevokeIdentity)
+	}
+	manual := e.Group("/tenant/:tenant/site/:site/computers/:uuid/execution", h.IsAuthenticated, h.AppleCSRF)
+	manual.GET("", h.DesktopExecutionChoices)
+	manual.GET("/review", h.DesktopExecutionReview)
+	manual.POST("", h.DesktopExecutionRequest)
+	manual.GET("/:request", h.DesktopExecutionReceipt)
+	netbird := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/operations", h.IsAuthenticated, h.AppleCSRF)
+	netbird.GET("", h.NetbirdOperationHistory)
+	netbird.GET("/review", h.NetbirdOperationReview)
+	netbird.POST("", h.NetbirdOperationRequest)
+	netbird.GET("/:request", h.NetbirdOperationReceipt)
+	netbird.POST("/:request/cancel", h.NetbirdOperationCancel)
+	netbird.GET("/:request/resolution", h.NetbirdResolutionReview)
+	netbird.POST("/:request/resolution", h.NetbirdResolutionRequest)
+	netbird.POST("/:request/resolution/reconcile", h.NetbirdResolutionReconcile)
+	netbird.POST("/:request/resolution/retry", h.NetbirdResolutionRetry)
+	installation := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/installations", h.IsAuthenticated, h.AppleCSRF)
+	installation.GET("", h.NetbirdInstallationHistory)
+	installation.GET("/new", h.NetbirdInstallationChoices)
+	installation.GET("/review", h.NetbirdInstallationReview)
+	installation.POST("", h.NetbirdInstallationRequest)
+	installation.GET("/:request", h.NetbirdInstallationReceipt)
+	installation.POST("/:request/cancel", h.NetbirdInstallationCancel)
+	installation.POST("/:request/observe", h.NetbirdInstallationObserve)
+	installation.GET("/:request/resolution", h.NetbirdInstallationResolutionReview)
+	installation.POST("/:request/resolution", h.NetbirdInstallationResolve)
+	installation.POST("/:request/resolution/reconcile", h.NetbirdInstallationReconcile)
+	removal := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removals", h.IsAuthenticated, h.AppleCSRF)
+	removal.GET("", h.NetbirdRemovalHistory)
+	removal.GET("/review", h.NetbirdRemovalReview)
+	removal.POST("", h.NetbirdRemovalRequest)
+	removal.GET("/:request", h.NetbirdRemovalReceipt)
+	removal.POST("/:request/cancel", h.NetbirdRemovalCancel)
+	removal.POST("/:request/observe", h.NetbirdRemovalObserve)
+	removal.GET("/:request/resolution", h.NetbirdRemovalResolutionReview)
+	removal.POST("/:request/resolution", h.NetbirdRemovalResolve)
+	removal.POST("/:request/resolution/reconcile", h.NetbirdRemovalReconcile)
+	recovery := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-recoveries", h.IsAuthenticated, h.AppleCSRF)
+	recovery.GET("", h.NetbirdRemovalRecoveryHistory)
+	recovery.GET("/review", h.NetbirdRemovalRecoveryReview)
+	recovery.POST("", h.NetbirdRemovalRecoveryRequest)
+	recovery.GET("/:request", h.NetbirdRemovalRecoveryReceipt)
+	recovery.POST("/:request/cancel", h.NetbirdRemovalRecoveryCancel)
+	recovery.POST("/:request/observe", h.NetbirdRemovalRecoveryObserve)
+	recovery.GET("/:request/resolution", h.NetbirdRemovalRecoveryResolutionReview)
+	recovery.POST("/:request/resolution", h.NetbirdRemovalRecoveryResolve)
+	recovery.POST("/:request/resolution/reconcile", h.NetbirdRemovalRecoveryReconcile)
+	absence := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-absences", h.IsAuthenticated, h.AppleCSRF)
+	absence.GET("", h.NetbirdRemovalAbsenceHistory)
+	absence.GET("/review", h.NetbirdRemovalAbsenceReview)
+	absence.POST("", h.NetbirdRemovalAbsenceRequest)
+	absence.GET("/:request", h.NetbirdRemovalAbsenceReceipt)
+	absence.POST("/:request/cancel", h.NetbirdRemovalAbsenceCancel)
+	absence.POST("/:request/observe", h.NetbirdRemovalAbsenceObserve)
+	absence.GET("/:request/resolution", h.NetbirdRemovalAbsenceResolutionReview)
+	absence.POST("/:request/resolution", h.NetbirdRemovalAbsenceResolve)
+	absence.POST("/:request/resolution/reconcile", h.NetbirdRemovalAbsenceReconcile)
+	stageCleanup := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/removal-stage-cleanups", h.IsAuthenticated, h.AppleCSRF)
+	stageCleanup.GET("", h.NetbirdRemovalStageCleanupHistory)
+	stageCleanup.GET("/review", h.NetbirdRemovalStageCleanupReview)
+	stageCleanup.POST("", h.NetbirdRemovalStageCleanupRequest)
+	stageCleanup.GET("/:request", h.NetbirdRemovalStageCleanupReceipt)
+	stageCleanup.POST("/:request/cancel", h.NetbirdRemovalStageCleanupCancel)
+	stageCleanup.POST("/:request/observe", h.NetbirdRemovalStageCleanupObserve)
+	stageCleanup.GET("/:request/resolution", h.NetbirdRemovalStageCleanupResolutionReview)
+	stageCleanup.POST("/:request/resolution", h.NetbirdRemovalStageCleanupResolve)
+	stageCleanup.POST("/:request/resolution/reconcile", h.NetbirdRemovalStageCleanupReconcile)
+	registration := e.Group("/tenant/:tenant/site/:site/computers/:uuid/netbird/registrations", h.IsAuthenticated, h.AppleCSRF)
+	registration.GET("", h.NetbirdRegistrationHistory)
+	registration.GET("/new", h.NetbirdRegistrationChoices)
+	registration.GET("/review", h.NetbirdRegistrationReview)
+	registration.POST("", h.NetbirdRegistrationRequest)
+	registration.GET("/:request", h.NetbirdRegistrationReceipt)
+	registration.POST("/:request/cancel", h.NetbirdRegistrationCancel)
+	registration.POST("/:request/cleanup", h.NetbirdRegistrationCleanup)
+	registration.GET("/:request/cleanup/review", h.NetbirdCleanupReview)
+	registration.POST("/:request/cleanup/retry", h.NetbirdCleanupRetry)
+	registration.GET("/:request/peer", h.NetbirdPeerBindingReview)
+	registration.POST("/:request/peer", h.NetbirdPeerBindingRequest)
+	registration.GET("/:request/peer/removal", h.NetbirdPeerRemovalReview)
+	registration.POST("/:request/peer/removal", h.NetbirdPeerRemovalRequest)
+	registration.POST("/:request/peer/removal/check", h.NetbirdPeerRemovalCheck)
+	registration.GET("/:request/resolution", h.NetbirdRegistrationResolutionReview)
+	registration.POST("/:request/resolution", h.NetbirdRegistrationResolutionRequest)
+	registration.POST("/:request/resolution/continue", h.NetbirdRegistrationResolutionContinue)
+	registration.POST("/:request/resolution/reconcile", h.NetbirdRegistrationResolutionReconcile)
+	registration.POST("/:request/resolution/retry", h.NetbirdRegistrationResolutionRetry)
+
+}
+
+func (h *Handler) desktopInfo(c echo.Context) (*partials.CommonInfo, registry.Scope, error) {
+	info, err := h.GetCommonInfo(c)
+	if err != nil {
+		return nil, registry.Scope{}, err
+	}
+	tenant, err := strconv.Atoi(info.TenantID)
+	if err != nil || tenant <= 0 {
+		return nil, registry.Scope{}, echo.NewHTTPError(400, "Select an organization")
+	}
+	site, err := strconv.Atoi(info.SiteID)
+	if err != nil {
+		return nil, registry.Scope{}, echo.NewHTTPError(400, "Select a site")
+	}
+	if site == -1 {
+		site = 0
+	}
+	if site < 0 {
+		return nil, registry.Scope{}, echo.NewHTTPError(404, "Site not found")
+	}
+	if requested := c.Param("tenant"); requested != "" && requested != info.TenantID {
+		return nil, registry.Scope{}, echo.NewHTTPError(404, "Organization not found")
+	}
+	if requested := c.Param("site"); requested != "" && requested != info.SiteID {
+		return nil, registry.Scope{}, echo.NewHTTPError(404, "Site not found")
+	}
+	principal, err := h.currentPrincipal(c)
+	if err != nil {
+		return nil, registry.Scope{}, err
+	}
+	capability, ok := desktopCapability(c.Request().Method, c.Path())
+	requestedScope := access.Scope{TenantID: tenant, SiteID: site}
+	if capability == access.ManageCertificates {
+		requestedScope.SiteID = 0
+	}
+	if !ok || !principal.Can(capability, requestedScope) {
+		return nil, registry.Scope{}, echo.NewHTTPError(403, "Permission denied for this organization or site")
+	}
+	return info, registry.Scope{TenantID: tenant, SiteID: site}, nil
+}
+
+func desktopFailure(err error) error {
+	switch {
+	case errors.Is(err, registry.ErrNotFound):
+		return echo.NewHTTPError(404, "Desktop enrollment resource not found")
+	case errors.Is(err, registry.ErrDenied):
+		return echo.NewHTTPError(403, "This enrollment action is not permitted")
+	case errors.Is(err, registry.ErrInvalid):
+		return echo.NewHTTPError(400, "Invalid enrollment settings or conflicting existing configuration")
+	default:
+		return echo.NewHTTPError(503, "Desktop enrollment is unavailable. Try again later.")
+	}
+}
+
+func (h *Handler) DesktopEnrollment(c echo.Context) error {
+	info, scope, err := h.desktopInfo(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.desktopEnrollmentData(c, info, scope)
+	if err != nil {
+		return err
+	}
+	return renderApple(c, desktop_views.Enrollment(c, info, data))
+}
+
+func (h *Handler) desktopEnrollmentData(c echo.Context, info *partials.CommonInfo, scope registry.Scope) (desktop_views.EnrollmentData, error) {
+	var err error
+	data := desktop_views.EnrollmentData{SetupError: h.DesktopSetupError, PublicOrigin: h.PublicOrigin, InvitationForm: desktop_views.InvitationForm{MaxUses: 1, Hours: 24}}
+	for _, tenant := range info.Tenants {
+		if strconv.Itoa(tenant.ID) == info.TenantID {
+			data.Organization = tenant.Description
+		}
+	}
+	if h.Desktop != nil {
+		actor := h.appleActor(c)
+		data.Authority, err = h.Desktop.Authority(c.Request().Context(), scope, actor)
+		if err != nil && !errors.Is(err, registry.ErrNotFound) {
+			return data, desktopFailure(err)
+		}
+		data.Invitations, err = h.Desktop.Invitations(c.Request().Context(), scope, actor, c.QueryParam("invitations_before"), 25)
+		if err != nil {
+			return data, desktopFailure(err)
+		}
+		data.Identities, err = h.Desktop.Identities(c.Request().Context(), scope, actor, c.QueryParam("identities_before"), 25)
+		if err != nil {
+			return data, desktopFailure(err)
+		}
+	} else if data.SetupError == "" {
+		data.SetupError = "Desktop enrollment is not available. Contact a server administrator."
+	}
+	data.InvitationSetup = "A server administrator must configure approved agent packages and signed enrollment configurations before creating invitations."
+	if h.DesktopCatalog != nil && h.DesktopBootstrapReady {
+		release, releaseErr := h.DesktopCatalog.Current(c.Request().Context())
+		if releaseErr == nil {
+			data.ReleaseDigest, data.ReleaseVersion, data.ReleaseExpires = release.Digest(), release.Manifest().Version, release.Manifest().ExpiresAt
+			for _, artifact := range release.Manifest().Artifacts {
+				if artifact.AgentSize > 0 && artifact.AgentSHA256 != "" {
+					data.Targets = append(data.Targets, artifact)
+				}
+			}
+			if len(data.Targets) != 0 {
+				data.InvitationSetup = ""
+			} else {
+				data.InvitationSetup = "The approved release does not support verified native enrollment. A server administrator must approve a compatible release."
+			}
+		} else {
+			data.InvitationSetup = "No current approved agent release is available. A server administrator must check the release catalog."
+		}
+	}
+	return data, nil
+}
+
+func (h *Handler) DesktopAuthority(c echo.Context) error {
+	defer func() {
+		if c.Request().MultipartForm != nil {
+			_ = c.Request().MultipartForm.RemoveAll()
+		}
+	}()
+	info, scope, err := h.desktopInfo(c)
+	if err != nil {
+		return err
+	}
+	if h.Desktop == nil {
+		return desktopFailure(registry.ErrUnavailable)
+	}
+	origin, err := gateway.ParseOrigin(h.PublicOrigin)
+	if err != nil {
+		return echo.NewHTTPError(503, "A server administrator must configure the public enrollment address before setup.")
+	}
+	source := c.FormValue("authority_source")
+	var certificate, private []byte
+	if source == "enterprise" {
+		read := func(name string, limit int64) ([]byte, error) {
+			file, err := c.FormFile(name)
+			if err != nil || file.Size > limit {
+				return nil, registry.ErrInvalid
+			}
+			content, err := file.Open()
+			if err != nil {
+				return nil, registry.ErrInvalid
+			}
+			defer content.Close()
+			data, err := io.ReadAll(io.LimitReader(content, limit+1))
+			if err != nil || len(data) == 0 || int64(len(data)) > limit {
+				clear(data)
+				return nil, registry.ErrInvalid
+			}
+			return data, nil
+		}
+		certificate, err = read("authority_certificate", 64<<10)
+		if err != nil {
+			return desktopFailure(err)
+		}
+		private, err = read("authority_key", 32<<10)
+		if err != nil {
+			return desktopFailure(err)
+		}
+		defer clear(private)
+	} else if source != "automatic" {
+		return desktopFailure(registry.ErrInvalid)
+	}
+	_, err = h.Desktop.Registry.EnsureAuthority(c.Request().Context(), scope.TenantID, c.FormValue("organization"), origin.String(), h.appleActor(c), certificate, private)
+	if err != nil {
+		return desktopFailure(err)
+	}
+	return appleRedirect(c, info, "/desktop/enrollment")
+}
+
+func (h *Handler) revokeDesktop(c echo.Context, identity bool) error {
+	info, scope, err := h.desktopInfo(c)
+	if err != nil {
+		return err
+	}
+	if h.Desktop == nil {
+		return desktopFailure(registry.ErrUnavailable)
+	}
+	id := c.Param("id")
+	if !enrollment.ValidDeviceID(id) {
+		return desktopFailure(registry.ErrNotFound)
+	}
+	if c.FormValue("confirm_revoke") != "yes" {
+		return echo.NewHTTPError(400, "Confirm revocation before continuing")
+	}
+	if identity {
+		err = h.Desktop.Registry.RevokeIdentity(c.Request().Context(), scope, id, h.appleActor(c))
+	} else {
+		err = h.Desktop.Registry.RevokeInvitation(c.Request().Context(), scope, id, h.appleActor(c))
+	}
+	if err != nil {
+		return desktopFailure(err)
+	}
+	return appleRedirect(c, info, "/desktop/enrollment")
+}
+
+func (h *Handler) DesktopRevokeInvitation(c echo.Context) error { return h.revokeDesktop(c, false) }
+func (h *Handler) DesktopRevokeIdentity(c echo.Context) error   { return h.revokeDesktop(c, true) }

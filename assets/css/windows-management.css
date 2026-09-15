@@ -1,0 +1,64 @@
+/* Native Windows forms and metadata remain contained at narrow viewports. */
+.windows-management {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  color: hsl(var(--foreground));
+}
+
+.windows-management :is(section, div, form, label) {
+  min-width: 0;
+}
+
+.windows-management :is(input, select, textarea, .uk-button) {
+  max-width: 100%;
+}
+
+.windows-management .uk-button {
+  white-space: normal;
+}
+
+.windows-management [role="region"] {
+  overflow-x: auto;
+}
+
+.windows-management table {
+  min-width: 42rem;
+}
+
+.windows-management :is(h1, h2, h3, td, dd, code) {
+  overflow-wrap: anywhere;
+}
+
+.windows-management ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+
+.windows-management ol li + li {
+  margin-top: .5rem;
+}
+
+.windows-management .windows-csp-value {
+  max-width: 100%;
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre;
+}
+
+.windows-management .windows-csp-observation {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 1rem;
+}
+
+.windows-policy-fields {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .windows-policy-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

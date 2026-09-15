@@ -1,0 +1,116 @@
+package profiles_views
+
+import (
+	"fmt"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+)
+
+func profileTagPath(panel *inventory.ProfileTagPanel, info *partials.CommonInfo) string {
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/tags", panel.ProfileID))
+}
+
+func profileTagPagePath(panel *inventory.ProfileTagPanel, info *partials.CommonInfo, page int) string {
+	return profileTagPath(panel, info) + "?" + url.Values{"page": {strconv.Itoa(page)}, "q": {panel.Query.Search}}.Encode()
+}
+
+func profileTagLabel(tag inventory.ProfileTagChoice) string {
+	if tag.TenantID == 0 {
+		return fmt.Sprintf("%s · No organization · Tag %d", tag.Name, tag.ID)
+	}
+	return fmt.Sprintf("%s · %s (organization %d) · Tag %d", tag.Name, tag.Organization, tag.TenantID, tag.ID)
+}
+
+func profileTagAssignment(panel *inventory.ProfileTagPanel) *ent.Profile {
+	profile := &ent.Profile{ID: int(panel.ProfileID), ApplyToAll: panel.ApplyToAll}
+	if panel.Total > 0 {
+		profile.Edges.Tags = []*ent.Tag{{}}
+	}
+	return profile
+}
+
+templ ProfileAssignmentControl(profile *ent.Profile, oob bool) {
+	<div id="profile-assignment-field" if oob {
+	hx-swap-oob="outerHTML"
+}>
+		@ProfileAssignmentField(profile, true)
+	</div>
+}
+
+templ ProfileTagMutation(panel *inventory.ProfileTagPanel, info *partials.CommonInfo, message string) {
+	@ProfileTagPanelView(panel, info, message)
+	@ProfileAssignmentControl(profileTagAssignment(panel), true)
+}
+
+templ ProfileTagPanelView(panel *inventory.ProfileTagPanel, info *partials.CommonInfo, message string) {
+	<section id="profile-tag-panel" class="flex flex-col gap-4 min-w-0" aria-labelledby="profile-tag-heading" hx-history="false" hx-disinherit="hx-include" hx-target="this" hx-swap="outerHTML" hx-sync="#profile-editor:drop" hx-disabled-elt="#profile-editor fieldset">
+		<h4 id="profile-tag-heading" tabindex="-1">{ fmt.Sprintf("Assigned tags (%d)",panel.Total) }</h4>
+		<p class="uk-text-small">Tags apply when this profile uses tag assignment. Adding a tag switches the saved assignment to tags.</p>
+		if message!="" {
+			<p role="status">{ message }</p>
+		}
+		if panel.Total==0 {
+			<p>No tags are assigned.</p>
+		} else {
+			<ul class="profile-applied-tags">
+				for _,tag:=range panel.Applied {
+					<li>
+						<span class="profile-tag-label">{ profileTagLabel(tag) }</span>
+						<form hx-delete={ profileTagPath(panel, info) }>
+							<fieldset>
+								@ProfileTagContext(panel)
+								<input type="hidden" name="tagId" value={ strconv.FormatInt(tag.ID, 10) }/>
+								<button class="uk-button uk-button-default" type="submit" aria-label={ fmt.Sprintf("Remove tag %d", tag.ID) }>Remove</button>
+							</fieldset>
+						</form>
+					</li>
+				}
+			</ul>
+			<nav aria-label="Assigned tag pages" class="flex flex-wrap gap-4">
+				if panel.Query.Page>1 {
+					<a href={ templ.URL(profileTagPagePath(panel, info, panel.Query.Page-1)) } hx-get={ profileTagPagePath(panel, info, panel.Query.Page-1) } hx-params="none" class="uk-button uk-button-default">Previous tags</a>
+				}
+				<span>{ fmt.Sprintf("Page %d of %d",panel.Query.Page,max(1,(panel.Total+inventory.ProfileTagPageSize-1)/inventory.ProfileTagPageSize)) }</span>
+				if panel.Query.Page*inventory.ProfileTagPageSize<panel.Total {
+					<a href={ templ.URL(profileTagPagePath(panel, info, panel.Query.Page+1)) } hx-get={ profileTagPagePath(panel, info, panel.Query.Page+1) } hx-params="none" class="uk-button uk-button-default">Next tags</a>
+				}
+			</nav>
+		}
+		<form id="profile-tag-search" hx-get={ profileTagPath(panel, info) }>
+			<fieldset class="flex flex-col gap-2 min-w-0">
+				<label class="uk-form-label" for="profile-tag-query">Find available tags by name or exact ID</label>
+				<input id="profile-tag-query" class="uk-input" name="q" type="search" maxlength="256" value={ panel.Query.Search }/>
+				<input type="hidden" name="page" value="1"/>
+				<div><button type="submit" class="uk-button uk-button-default">Search tags</button></div>
+			</fieldset>
+		</form>
+		<form id="profile-tag-add" hx-post={ profileTagPath(panel, info) }>
+			<fieldset class="flex flex-col gap-2 min-w-0">
+				@ProfileTagContext(panel)
+				<label for="profile-tag-choice" class="uk-form-label">Available tags</label>
+				<select id="profile-tag-choice" name="tagId" class="uk-select" required disabled?={ len(panel.Available)==0 }>
+					<option value="" selected>Select a tag</option>
+					for _,tag:=range panel.Available {
+						<option value={ strconv.FormatInt(tag.ID, 10) }>{ profileTagLabel(tag) }</option>
+					}
+				</select>
+				if panel.HasMore {
+					<p class="uk-text-small">Showing the first 50 available tags. Refine the search to find another tag.</p>
+				}
+				if len(panel.Available)==0 {
+					<p>No available tags match this search.</p>
+				}
+				<div><button type="submit" class="uk-button uk-button-default" disabled?={ len(panel.Available)==0 }>Add tag</button></div>
+			</fieldset>
+		</form>
+	</section>
+}
+
+templ ProfileTagContext(panel *inventory.ProfileTagPanel) {
+	<input type="hidden" name="agentId" value={ strconv.FormatInt(panel.ProfileID, 10) }/>
+	<input type="hidden" name="page" value={ strconv.Itoa(panel.Query.Page) }/>
+	<input type="hidden" name="q" value={ panel.Query.Search }/>
+}

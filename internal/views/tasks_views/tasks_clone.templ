@@ -4,76 +4,71 @@ import (
 	"fmt"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
-	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
 
-templ CloneTask(c echo.Context, profileID int, t *ent.Task, allProfiles []*ent.Profile, commonInfo *partials.CommonInfo) {
-	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Tasks")}}, commonInfo)
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+templ CloneTask(c echo.Context, review *inventory.TaskCloneReview, info *partials.CommonInfo) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "task_cloning.title")}}, info)
+	<main class="p-4 min-w-0" hx-history="false">
 		<div id="error" class="hidden"></div>
-		<div class="uk-width-1-2@m uk-card uk-card-default">
-			<div class="uk-card-header">
-				<div class="flex justify-between items-center">
-					<div class="flex flex-col my-4 mx-1">
-						<h3 class="uk-card-title">{ i18n.T(ctx, "tasks.clone.title") }</h3>
-						<p class="uk-margin-small-top uk-text-small">
-							{ i18n.T(ctx, "tasks.clone.description") }
-						</p>
-					</div>
-				</div>
-			</div>
-			<div class="uk-card-body">
-				<form
-					class="flex flex-col gap-4 my-6 w-1/2"
-					hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/tasks/%d/clone", t.ID)))) }
-					hx-target="#main"
-					hx-swap="outerHTML"
-					hx-push-url="false"
-				>
-					<div class="w-2/3">
-						<label class="uk-form-label" for="task-description">
-							{ i18n.T(ctx, "tasks.new.name") }
-						</label>
-						<div class="uk-form-controls">
-							<textarea
-								id="task-description"
-								name="task-description"
-								class="uk-textarea"
-								rows="2"
-								placeholder={ i18n.T(ctx, "tasks.new.text") }
-								aria-label="Task description"
-								autocomplete="off"
-								autocorrect="off"
-								autocapitalize="off"
-								spellcheck="false"
-							>
-								{ t.Name }
-							</textarea>
-						</div>
-					</div>
-					<uk-select id="profile-search" class="w-2/3" name="profile" placeholder={ i18n.T(ctx, "agents.select_profile") } searchable uk-cloak>
-						for _, p := range allProfiles {
-							<option value={ fmt.Sprintf("%s***%d", p.Name, p.ID) }>{ p.Name }</option>
-						}
-					</uk-select>
-					<div class="flex gap-4 my-4">
-						<button type="submit" class="uk-button uk-button-primary">
-							{ i18n.T(ctx, "tasks.clone.execute") }
-						</button>
-						<button
-							type="button"
-							class="uk-button uk-button-default"
-							hx-get={ partials.GetCurrentUrl(c, string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d", profileID))))) }
-							hx-push-url="true"
-							hx-target="#main"
-							hx-swap="outerHTML"
-						>
-							{ i18n.T(ctx, "Cancel") }
-						</button>
-					</div>
-				</form>
-			</div>
-		</div>
+		@TaskCloneForm(review, info)
 	</main>
+}
+
+templ TaskCloneForm(review *inventory.TaskCloneReview, info *partials.CommonInfo) {
+	<section class="uk-card uk-card-default p-4 min-w-0" aria-labelledby="task-cloning-title" hx-disinherit="hx-include">
+		<h1 id="task-cloning-title" class="text-xl font-semibold">{ i18n.T(ctx,"task_cloning.title") }</h1>
+		<p class="my-4">{ i18n.T(ctx,"task_cloning.description") }</p>
+		<p class="my-2">{ i18n.T(ctx,"task_cloning.source",review.ID,review.ProfileID) }</p>
+		<form id="task-clone-search" class="uk-form-stacked my-4" hx-get={ partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/clone/targets", review.ID)) } hx-target="#task-clone-targets" hx-swap="outerHTML" hx-include="this" hx-params="source-profile,q" hx-push-url="false" hx-sync="this:replace" hx-disabled-elt="#task-clone-submit" _="on htmx:beforeRequest set #task-clone-target.value to ''">
+			<input type="hidden" name="source-profile" value={ fmt.Sprint(review.ProfileID) }/>
+			<label class="uk-form-label" for="task-clone-query">{ i18n.T(ctx,"task_cloning.search") }</label>
+			<div class="flex flex-wrap gap-2">
+				<input id="task-clone-query" type="search" name="q" maxlength="256" class="uk-input min-w-0 flex-1"/>
+				<button type="submit" class="uk-button uk-button-default">{ i18n.T(ctx,"task_cloning.find") }</button>
+			</div>
+		</form>
+		<form id="task-clone-form" class="uk-form-stacked my-4" hx-post={ partials.GetNavigationUrl(info, fmt.Sprintf("/tasks/%d/clone", review.ID)) } hx-target="this" hx-swap="none" hx-include="this" hx-push-url="false" hx-disabled-elt="find button">
+			<input type="hidden" name="source-profile" value={ fmt.Sprint(review.ProfileID) }/>
+			@TaskCloneTargets(review)
+			<div class="my-4">
+				<label class="uk-form-label" for="task-description">{ i18n.T(ctx,"task_cloning.name") }</label>
+				<textarea id="task-description" name="task-description" class="uk-textarea w-full" required maxlength="2048" rows="2">{ review.Name }</textarea>
+			</div>
+			<div class="flex flex-wrap gap-4 mt-6">
+				<button id="task-clone-submit" type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"task_cloning.clone") }</button>
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d", review.ProfileID))) } hx-get={ partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d", review.ProfileID)) } hx-params="none" hx-target="#main" hx-swap="outerHTML" hx-push-url="true">{ i18n.T(ctx,"Cancel") }</a>
+			</div>
+		</form>
+	</section>
+}
+
+templ TaskCloneTargets(review *inventory.TaskCloneReview) {
+	<div id="task-clone-targets" class="my-4">
+		<label class="uk-form-label" for="task-clone-target">{ i18n.T(ctx,"task_cloning.destination") }</label>
+		<select id="task-clone-target" name="target" class="uk-select w-full" required>
+			<option value="" selected>{ i18n.T(ctx,"task_cloning.choose") }</option>
+			for _, target:=range review.Targets {
+				<option value={ fmt.Sprintf("%d:%d:%d", target.ID, target.Scope.TenantID, target.Scope.SiteID) }>
+					if target.Scope.TenantID==0 {
+						{ i18n.T(ctx,"task_cloning.global") }
+					} else {
+						{ target.Organization }{ fmt.Sprintf(" (#%d)",target.Scope.TenantID) }
+						if target.Scope.SiteID!=0 {
+							{ " / " }{ target.Site }{ fmt.Sprintf(" (#%d)",target.Scope.SiteID) }
+						}
+					}
+					{ " / " }{ target.Name }{ fmt.Sprintf(" (#%d)",target.ID) }
+				</option>
+			}
+		</select>
+		<p role="status" class="mt-2 uk-text-small">
+			if review.HasMore {
+				{ i18n.T(ctx,"task_cloning.more") }
+			} else if len(review.Targets)==0 {
+				{ i18n.T(ctx,"task_cloning.empty") }
+			}
+		</p>
+	</div>
 }

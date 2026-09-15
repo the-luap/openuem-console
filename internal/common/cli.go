@@ -1,14 +1,31 @@
 package common
 
 import (
+	"errors"
+	"os"
+
+	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
+	"github.com/open-uem/openuem-console/internal/setup/administrator"
+	"github.com/open-uem/openuem-console/internal/setup/secrets"
 	"github.com/open-uem/utils"
 	"github.com/urfave/cli/v2"
 )
 
 func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	var err error
+	w.IndividualAgentService, err = consolebroker.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	w.ProtectedAdministrator, err = administrator.FromEnvironment(w.IndividualAgentService != nil || os.Getenv("OPENUEM_INSTALLATION_ID") != "")
+	if err != nil {
+		return err
+	}
 
-	w.DBUrl = cCtx.String("dburl")
+	w.DBUrl, err = secrets.DatabaseURL(cCtx.String("dburl"), cCtx.String("dburl-file"))
+	if err != nil {
+		return err
+	}
 
 	w.CACertPath = cCtx.String("cacert")
 	_, err = utils.ReadPEMCertificate(w.CACertPath)
@@ -28,15 +45,29 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 		return err
 	}
 
-	w.SFTPPrivateKeyPath = cCtx.String("sftpkey")
-	_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
+	w.SFTPPrivateKeyPath = ""
+	if w.IndividualAgentService != nil {
+		w.NATSServers = w.IndividualAgentService.Servers
+	} else {
+		w.SFTPPrivateKeyPath = cCtx.String("sftpkey")
+		_, err = utils.ReadPEMPrivateKey(w.SFTPPrivateKeyPath)
+		if err != nil {
+			return err
+		}
+
+		w.NATSServers = cCtx.String("nats-servers")
+
+		if w.NATSServers == "" {
+			return errors.New("legacy console requires NATS servers")
+		}
+	}
+
+	credentials, err := secrets.Load(secrets.Inputs{Installation: os.Getenv("OPENUEM_INSTALLATION_ID"), JWT: cCtx.String("jwt-key"), Master: cCtx.String("encryption-master-key"), JWTFile: cCtx.String("jwt-key-file"), MasterFile: cCtx.String("encryption-master-key-file"), Required: w.IndividualAgentService != nil})
 	if err != nil {
 		return err
 	}
-
-	w.NATSServers = cCtx.String("nats-servers")
-
-	w.JWTKey = cCtx.String("jwt-key")
+	w.JWTKey, w.EncryptionMasterKey = credentials.JWT, credentials.Master
+	w.InstallationID = credentials.Installation
 
 	w.ConsolePort = cCtx.String("console-port")
 	w.AuthPort = cCtx.String("auth-port")
@@ -53,7 +84,6 @@ func (w *Worker) GenerateConsoleConfigFromCLI(cCtx *cli.Context) error {
 	w.ReenablePasswdAuth = cCtx.Bool("re-enable-passwd-auth")
 	w.ResetOpenUEMUser = cCtx.Bool("reset-openuem-user")
 	w.Version = "0.12.0"
-	w.EncryptionMasterKey = cCtx.String("encryption-master-key")
 
-	return nil
+	return w.validateAdministratorReset()
 }

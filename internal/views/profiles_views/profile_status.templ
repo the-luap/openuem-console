@@ -1,0 +1,43 @@
+package profiles_views
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ProfileStatusAction(profile *ent.Profile, p partials.PaginationAndSort, info *partials.CommonInfo) {
+	<form>
+		<input type="hidden" name="page" value={ strconv.Itoa(p.CurrentPage) }/>
+		<input type="hidden" name="pageSize" value={ strconv.Itoa(p.PageSize) }/>
+		<input type="hidden" name="sortBy" value={ p.SortBy }/>
+		<input type="hidden" name="sortOrder" value={ p.SortOrder }/>
+		<button
+			type="button"
+			class="flex w-full items-center px-4 py-2 text-left"
+			hx-post={ profileStatusPath(profile, info) }
+			hx-target="#main"
+			hx-swap="outerHTML"
+			hx-push-url="false"
+		>
+			if profile.Disabled {
+				<uk-icon hx-history="false" icon="check" custom-class="h-6 w-6 pr-2" uk-cloak></uk-icon>
+				{ i18n.T(ctx, "profiles.enable") }
+			} else {
+				<uk-icon hx-history="false" icon="x" custom-class="h-6 w-6 pr-2" uk-cloak></uk-icon>
+				{ i18n.T(ctx, "profiles.disable") }
+			}
+		</button>
+	</form>
+}
+
+func profileStatusPath(profile *ent.Profile, info *partials.CommonInfo) string {
+	action := "disable"
+	if profile.Disabled {
+		action = "enable"
+	}
+	return partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d/%s", profile.ID, action))
+}

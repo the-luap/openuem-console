@@ -1,0 +1,39 @@
+.netbird-operations { min-width: 0; max-width: 76rem; margin-inline: auto; }
+.netbird-operations .uk-card-body { display: grid; gap: 1.25rem; min-width: 0; }
+.netbird-operations h2 { overflow-wrap: anywhere; min-width: 0; font-size: 1.25rem; font-weight: 600; }
+.netbird-details { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(0, 3fr); gap: .7rem 1.4rem; margin: 0; }
+.netbird-details dt { font-weight: 600; }
+.netbird-details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.netbird-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.netbird-actions > *, .netbird-actions form { min-width: 0; max-width: 100%; }
+.netbird-actions .uk-button, .netbird-confirm .uk-button { white-space: normal; height: auto; min-height: 2.75rem; }
+.netbird-profile, .netbird-confirm { display: grid; gap: .8rem; min-width: 0; max-width: 48rem; }
+.netbird-profile .uk-select { max-width: 100%; min-width: 0; }
+.netbird-checkbox { display: flex; gap: .7rem; align-items: flex-start; }
+.netbird-checkbox input { flex: 0 0 auto; margin-top: .25rem; }
+.netbird-impact { border-inline-start: .25rem solid currentColor; padding-inline-start: 1rem; display: grid; gap: .6rem; }
+.netbird-state { font-weight: 600; }
+#netbird-pending { display: none; }
+.htmx-request #netbird-pending, #netbird-pending.htmx-request { display: inline; }
+.netbird-history { min-width: 0; grid-template-columns: minmax(0, 1fr); list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
+.netbird-history li { min-width: 0; grid-template-columns: minmax(0, 1fr); display: grid; gap: .4rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); padding-bottom: 1rem; }
+.netbird-history a { text-decoration: underline; text-underline-offset: .2em; }
+.netbird-id { overflow-wrap: anywhere; }
+.netbird-operations a:focus-visible, .netbird-operations button:focus-visible, .netbird-operations input:focus-visible, .netbird-operations select:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+@media (max-width: 40rem) {
+ .netbird-details { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
+ .netbird-details dd { margin-bottom: .7rem; }
+ .netbird-actions { align-items: stretch; }
+ .netbird-actions > *, .netbird-actions form .uk-button { width: 100%; }
+}
+.netbird-registration-choices fieldset{min-width:0;border:1px solid currentColor;border-radius:.5rem;padding:1rem;margin:1rem 0}
+.netbird-registration-choices legend{font-weight:600;padding:0 .25rem}
+.netbird-group-list{display:grid;gap:.75rem;max-height:24rem;overflow:auto;padding:.25rem}
+.netbird-group-list .netbird-checkbox{margin:0}
+.netbird-group-list small,.netbird-group-summary .netbird-id{display:block;overflow-wrap:anywhere}
+.netbird-group-summary{margin:0;padding-inline-start:1.25rem}
+.netbird-registration-choices{min-width:0;max-width:100%}
+.netbird-group-list{min-width:0;grid-template-columns:minmax(0,1fr)}
+.netbird-group-list .netbird-checkbox>span{min-width:0;overflow-wrap:anywhere}
+
+.netbird-installation-choice .uk-button { max-width: 100%; overflow-wrap: anywhere; }

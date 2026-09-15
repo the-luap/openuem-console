@@ -1,0 +1,370 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+func NetbirdInstallationPath(info *partials.CommonInfo, device string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(device)+"/netbird/installations")
+}
+func netbirdInstallationLabel(state string) string {
+	switch state {
+	case "queued":
+		return "Queued for preparation"
+	case "preparation_pending":
+		return "Awaiting the preparation result"
+	case "preparation_unconfirmed":
+		return "Package preparation is unconfirmed"
+	case "preparation_rejected":
+		return "Package preparation was not accepted"
+	case "prepared":
+		return "Package prepared; awaiting installation admission"
+	case "delivery_pending":
+		return "Installation dispatched; awaiting its receipt"
+	case "unconfirmed":
+		return "Installation outcome is unconfirmed"
+	case "stopped":
+		return "Stopped before native installation"
+	case "cancelled":
+		return "Cancelled before native installation"
+	case "completed":
+		return "Package installation verified"
+	case "released":
+		return "Reviewed recovery confirmed; original result retained"
+	default:
+		return "Awaiting retained evidence"
+	}
+}
+func netbirdInstallationStop(reason string) string {
+	switch reason {
+	case "expired":
+		return "The request expired before native installation could be admitted."
+	case "not_authorized":
+		return "The original requester no longer has permission to assign software at this site."
+	case "source_changed":
+		return "The approved package, recipient or required agent readiness no longer matches the reviewed request."
+	case "preparation_unconfirmed":
+		return "No confirmed preparation result is available. The download will not be repeated automatically."
+	case "preparation_rejected":
+		return "The agent did not accept the prepared package. No native installer was admitted."
+	default:
+		return "Automatic processing could not continue."
+	}
+}
+
+templ netbirdInstallationPackage(p inventory.NetbirdInstallationPackage) {
+	<dl class="netbird-details">
+		<dt>Version</dt>
+		<dd>{ p.Version }</dd>
+		<dt>Platform / architecture</dt>
+		<dd>{ p.Platform+" / "+p.Architecture }</dd>
+		<dt>Package</dt>
+		<dd>{ p.PackageID+" ("+p.Format+")" }</dd>
+		<dt>Size</dt>
+		<dd>{ fmt.Sprintf("%d bytes",p.Size) }</dd>
+		<dt>SHA-256</dt>
+		<dd>{ p.SHA256 }</dd>
+		<dt>Approval ID</dt>
+		<dd>{ p.ID }</dd>
+	</dl>
+}
+
+templ NetbirdInstallationChoices(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdInstallationChoices) {
+	@netbirdPage(c, info, v.Target.ID, "Choose a NetBird package") {
+		@netbirdTarget(v.Target)
+		<p>Approved packages matching this device's platform and architecture. Reviewing a package checks current device readiness before you can authorize installation.</p>
+		if len(v.Packages)==0 {
+			<p role="status">No matching approved packages are available. An organization software administrator must approve an exact package first.</p>
+		} else {
+			<ul class="netbird-history">
+				for _,p:=range v.Packages {
+					<li>
+						<h2>{ "NetBird "+p.Version }</h2>
+						@netbirdInstallationPackage(p)
+						<form method="get" action={ NetbirdInstallationPath(info, v.Target.ID) + "/review" } class="netbird-confirm netbird-installation-choice">
+							<input type="hidden" name="approval_id" value={ p.ID }/>
+							<input type="hidden" name="approval_digest" value={ p.Digest }/>
+							<button class="uk-button uk-button-primary" type="submit">{ "Review NetBird "+p.Version }</button>
+						</form>
+					</li>
+				}
+			</ul>
+		}
+		<div class="netbird-actions">
+			if v.Next!="" {
+				<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, v.Target.ID) + "/new?after=" + url.QueryEscape(v.Next) }>More approved packages</a>
+			}
+			<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, v.Target.ID) }>Installation history</a>
+		</div>
+	}
+}
+
+templ NetbirdInstallationReview(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdInstallationReview, requestID string) {
+	@netbirdPage(c, info, v.Target.ID, "Review NetBird installation") {
+		@netbirdTarget(v.Target)
+		@netbirdInstallationPackage(v.Approval)
+		<div class="netbird-impact">
+			<p>Confirmation queues this exact package for download, verification and installation on this device. Installation may replace the current NetBird version and interrupt its connection.</p>
+			<p>The agent and console check the approved package and current device state again before installation. An uncertain delivery is not automatically repeated.</p>
+		</div>
+		<form method="post" action={ NetbirdInstallationPath(info, v.Target.ID) } hx-post={ NetbirdInstallationPath(info, v.Target.ID) } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+			@mdm_views.CSRF(info)
+			<input type="hidden" name="request_id" value={ requestID }/>
+			<input type="hidden" name="approval_id" value={ v.Approval.ID }/>
+			<input type="hidden" name="approval_digest" value={ v.Approval.Digest }/>
+			<input type="hidden" name="revision" value={ v.Revision }/>
+			<label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I authorize this package installation or replacement on the reviewed device, including possible interruption of its NetBird connection.</span></label>
+			<button class="uk-button uk-button-primary" id="netbird-submit" type="submit">Queue installation</button>
+			<span class="htmx-indicator" id="netbird-pending" role="status">Queuing installation…</span>
+		</form>
+		<a href={ NetbirdInstallationPath(info, v.Target.ID) + "/new" }>Choose another package</a>
+	}
+}
+
+templ NetbirdInstallationReceipt(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdInstallationStatus, cancellationID string) {
+	@netbirdPage(c, info, v.Request.DeviceID, "NetBird installation") {
+		<p role="status" class="netbird-state">{ netbirdInstallationLabel(v.State()) }</p>
+		if v.DispatchStop!=nil {
+			<p>{ netbirdInstallationStop(v.DispatchStop.Reason) }</p>
+		}
+		if v.State()=="completed" {
+			<p>The package was verified at the recorded completion time. Device inventory and connection state may reflect an older report.</p>
+		} else if v.State()=="released" {
+			<p>Recovery evidence allows new NetBird operations. This does not confirm installation success, rollback or current connectivity.</p>
+		} else if v.Delivery!=nil {
+			<p>Native delivery cannot be cancelled or repeated. Check the retained receipt, or review recovery if the outcome remains unclear.</p>
+		} else if v.Preparation!=nil && v.Preparation.Outcome=="pending" {
+			<p>The download may be running or its response may be missing. This preparation will not be repeated automatically.</p>
+		}
+		<dl class="netbird-details">
+			<dt>Request ID</dt>
+			<dd>{ v.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ v.Request.DeviceID }</dd>
+			<dt>Organization / site</dt>
+			<dd>{ fmt.Sprintf("%d / %d",v.Request.Scope.TenantID,v.Request.Scope.SiteID) }</dd>
+			<dt>Requested by</dt>
+			<dd>{ v.Request.Actor }</dd>
+			<dt>Requested</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.RequestedAt)
+</dd>
+			<dt>Admission deadline</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.ExpiresAt)
+</dd>
+			if v.Preparation!=nil {
+				<dt>Preparation requested</dt>
+				<dd>@mdm_views.Timestamp(&v.Preparation.IssuedAt)
+</dd>
+				<dt>Preparation result retained</dt>
+				<dd>@mdm_views.Timestamp(v.Preparation.RecordedAt)
+</dd>
+			}
+			if v.Delivery!=nil {
+				<dt>Installation dispatched</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.IssuedAt)
+</dd>
+				<dt>Native execution deadline</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.ExpiresAt)
+</dd>
+				<dt>Original delivery outcome</dt>
+				<dd>{ v.Delivery.OriginalOutcome }</dd>
+				<dt>Original result retained</dt>
+				<dd>@mdm_views.Timestamp(v.Delivery.RecordedAt)
+</dd>
+				if v.Delivery.ObservedAt!=nil {
+					<dt>Latest receipt check</dt>
+					<dd>@mdm_views.Timestamp(v.Delivery.ObservedAt)
+</dd>
+					<dt>Observed result</dt>
+					<dd>{ v.Delivery.ObservedOutcome }</dd>
+				}
+			}
+			if v.Request.CompletedAt!=nil {
+				<dt>Installation verified</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CompletedAt)
+</dd>
+			}
+			if v.Request.CancelledAt!=nil {
+				<dt>Cancelled</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CancelledAt)
+</dd>
+				<dt>Cancelled by</dt>
+				<dd>{ v.Request.CancelledBy }</dd>
+			}
+			if v.Request.ReleasedAt!=nil {
+				<dt>Recovery confirmed</dt>
+				<dd>@mdm_views.Timestamp(v.Request.ReleasedAt)
+</dd>
+				<dt>Confirmed by</dt>
+				<dd>{ v.Request.ReleasedBy }</dd>
+			}
+		</dl>
+		<details><summary>Approved package</summary>@netbirdInstallationPackage(v.Package)
+</details>
+		if v.Resolution!=nil {
+			@netbirdInstallationResolutionSummary(v.Resolution)
+		}
+		if v.Request.CancelledAt==nil && v.Request.CompletedAt==nil && v.Request.ReleasedAt==nil && info.Principal.Can(access.AssignSoftware,v.Request.Scope) {
+			if v.Delivery==nil {
+				<p>Cancellation prevents native admission for this request. A package download already in progress may finish.</p>
+				<form method="post" action={ NetbirdInstallationPath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/cancel" } class="netbird-confirm">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="revision" value={ v.Request.Revision }/>
+					<input type="hidden" name="cancellation_id" value={ cancellationID }/>
+					<label class="netbird-checkbox" for="netbird-cancel"><input id="netbird-cancel" type="checkbox" name="confirmed" value="yes" required/><span>Cancel this request if native installation has not been admitted.</span></label>
+					<button class="uk-button uk-button-default" type="submit">Cancel installation request</button>
+				</form>
+			} else {
+				@netbirdInstallationEvidenceForm(info, v.Request, "observe", "", "Check retained receipt")
+				<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/resolution" }>Review installation recovery</a>
+				if v.Resolution!=nil {
+					@netbirdInstallationEvidenceForm(info, v.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile recovery evidence")
+				}
+			}
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, v.Request.DeviceID) + "/" + v.Request.ID }>Reload status</a>
+			<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, v.Request.DeviceID) }>Installation history</a>
+		</div>
+	}
+}
+
+templ netbirdInstallationEvidenceForm(info *partials.CommonInfo, r *inventory.NetbirdInstallation, suffix, resolutionID, label string) {
+	<form method="post" action={ NetbirdInstallationPath(info, r.DeviceID) + "/" + r.ID + "/" + suffix } class="netbird-confirm">
+		@mdm_views.CSRF(info)
+		<input type="hidden" name="confirmed" value="yes"/>
+		<input type="hidden" name="revision" value={ r.Revision }/>
+		if resolutionID!="" {
+			<input type="hidden" name="resolution_id" value={ resolutionID }/>
+		}
+		<button class="uk-button uk-button-default" type="submit">{ label }</button>
+	</form>
+}
+
+templ netbirdInstallationResolutionSummary(d *inventory.NetbirdInstallationResolution) {
+	<dl class="netbird-details">
+		<dt>Recovery ID</dt>
+		<dd>{ d.ID }</dd>
+		<dt>Recovery requested by</dt>
+		<dd>{ d.Actor }</dd>
+		<dt>Recovery requested</dt>
+		<dd>@mdm_views.Timestamp(&d.CreatedAt)
+</dd>
+		if d.LastAttempt!=nil {
+			<dt>Latest recovery attempt</dt>
+			<dd>{ fmt.Sprintf("%d: %s",d.LastAttempt.Sequence,d.LastAttempt.Kind) }</dd>
+			<dt>Attempted by</dt>
+			<dd>{ d.LastAttempt.Actor }</dd>
+			<dt>Attempted</dt>
+			<dd>@mdm_views.Timestamp(&d.LastAttempt.CreatedAt)
+</dd>
+			<dt>Retained outcome</dt>
+			<dd>{ d.LastAttempt.Outcome }</dd>
+		}
+	</dl>
+}
+
+templ NetbirdInstallationResolution(c echo.Context, info *partials.CommonInfo, status *inventory.NetbirdInstallationStatus, v *inventory.NetbirdInstallationResolutionReview) {
+	@netbirdPage(c, info, status.Request.DeviceID, "Review installation recovery") {
+		<dl class="netbird-details">
+			<dt>Original request</dt>
+			<dd>{ status.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ status.Request.DeviceID }</dd>
+			<dt>Agent evidence</dt>
+			<dd>{ netbirdInstallationRecoveryState(v.Outcome) }</dd>
+			if v.ExpiresAt!=nil {
+				<dt>Review expires</dt>
+				<dd>@mdm_views.Timestamp(v.ExpiresAt)
+</dd>
+			}
+		</dl>
+		if v.Resolution!=nil {
+			@netbirdInstallationResolutionSummary(v.Resolution)
+		}
+		if v.Revision!="" && (v.Kind=="withdraw" || v.Kind=="release") {
+			if v.Kind=="withdraw" {
+				<p>Confirmation permanently blocks any later delivery of this original installation request if the agent has not attempted it. New NetBird operations become available only after matching withdrawal proof is retained.</p>
+			} else {
+				<p>The agent permits explicit release of this unconfirmed installation entry. Release allows further NetBird operations after matching proof; it does not confirm installation success, rollback or that an independent process has stopped.</p>
+			}
+			if v.Resolution!=nil {
+				<p>This is an additional explicitly reviewed recovery attempt using the same permanent recovery ID. It does not resend the installer.</p>
+			}
+			<form method="post" action={ NetbirdInstallationPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-post={ NetbirdInstallationPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+				@mdm_views.CSRF(info)
+				<input type="hidden" name="revision" value={ status.Request.Revision }/>
+				<input type="hidden" name="resolution_id" value={ v.ResolutionID }/>
+				<input type="hidden" name="review_revision" value={ v.Revision }/>
+				<label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed this evidence and authorize the described recovery action and further NetBird operations after matching proof.</span></label>
+				<button class="uk-button uk-button-primary" id="netbird-submit" type="submit">{ map[string]string{"withdraw":"Confirm permanent withdrawal","release":"Confirm reviewed release"}[v.Kind] }</button>
+				<span class="htmx-indicator" id="netbird-pending" role="status">Recording recovery attempt…</span>
+			</form>
+			<p>If this review expires or the evidence changes, review again before confirming.</p>
+		} else if v.Outcome!="completed" && v.Outcome!="released" {
+			<p role="status">No new recovery action is currently eligible. Missing or uncertain evidence keeps further NetBird operations blocked.</p>
+		}
+		if v.Resolution!=nil && v.Outcome!="completed" && v.Outcome!="released" {
+			@netbirdInstallationEvidenceForm(info, status.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile recovery evidence")
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" }>Review again</a>
+			<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, status.Request.DeviceID) + "/" + status.Request.ID }>Installation receipt</a>
+		</div>
+	}
+}
+
+func netbirdInstallationRecoveryState(state string) string {
+	switch state {
+	case "not-received":
+		return "No attempt retained; permanent withdrawal is available"
+	case "unconfirmed":
+		return "The exact installation entry is unconfirmed and eligible for release"
+	case "awaiting-confirmation":
+		return "The owned recovery result is visible and awaits reconciliation"
+	case "completed":
+		return "A matching completed installation receipt is retained"
+	case "released":
+		return "Recovery is already confirmed"
+	case "conflict":
+		return "The observed recovery identity conflicts with this request"
+	case "waiting":
+		return "The current journal does not permit recovery"
+	default:
+		return "Matching recovery evidence is currently unavailable"
+	}
+}
+
+templ NetbirdInstallationHistory(c echo.Context, info *partials.CommonInfo, scope access.Scope, device string, page *inventory.NetbirdInstallationHistory) {
+	@netbirdPage(c, info, device, "NetBird installation history") {
+		<p>Retained requests and outcomes for this device at the selected organization and site. Opening history does not contact the agent.</p>
+		if len(page.Requests)==0 {
+			<p role="status">No installation requests are recorded here.</p>
+		} else {
+			<ul class="netbird-history">
+				for _,v:=range page.Requests {
+					<li>
+						<a href={ NetbirdInstallationPath(info, device) + "/" + v.Request.ID } class="netbird-id">{ "NetBird "+v.Package.Version+" · "+v.Request.ID }</a>
+						<span>{ netbirdInstallationLabel(v.State()) }</span>
+						<span>{ "Requested by "+v.Request.Actor }</span>
+						@mdm_views.Timestamp(&v.Request.RequestedAt)
+					</li>
+				}
+			</ul>
+		}
+		<div class="netbird-actions">
+			if page.Next!="" {
+				<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info, device) + "?before=" + url.QueryEscape(page.Next) }>Older requests</a>
+			}
+			if info.Principal.Can(access.AssignSoftware,scope) {
+				<a class="uk-button uk-button-primary" href={ NetbirdInstallationPath(info, device) + "/new" }>Choose a package</a>
+			}
+		</div>
+	}
+}

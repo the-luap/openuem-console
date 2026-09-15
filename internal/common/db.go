@@ -1,8 +1,10 @@
 package common
 
 import (
+	"github.com/open-uem/openuem-console/internal/gateway"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -63,9 +65,8 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Println("[WARN]: could not default nickname to default site")
 		}
 
-		// Create argon2 default password for openuem admin if not exist
-		if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-			log.Println("[WARN]: could not create default openuem password")
+		if err := w.InitializeAdministrator(); err != nil {
+			return err
 		}
 
 		// Encrypt sensitive fields if they're set in clear and we have a master key
@@ -73,7 +74,9 @@ func (w *Worker) StartDBConnectJob() error {
 			log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 		}
 
-		w.StartConsoleService()
+		if err := w.StartConsoleService(); err != nil {
+			return err
+		}
 
 		// Start a job to check latest OpenUEM releases
 		channel, err := w.Model.GetDefaultUpdateChannel()
@@ -154,9 +157,9 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Println("[WARN]: could not default nickname to default site")
 				}
 
-				// Create argon2 default password for openuem admin if not exist
-				if err := w.Model.CreateDefaultAdminPassword(w.ResetOpenUEMUser); err != nil {
-					log.Println("[WARN]: could not create default openuem password")
+				if err := w.InitializeAdministrator(); err != nil {
+					log.Print("[ERROR]: first-administrator startup failed")
+					return
 				}
 
 				// Encrypt sensitive fields if they're set in clear and we have a master key
@@ -164,7 +167,10 @@ func (w *Worker) StartDBConnectJob() error {
 					log.Printf("[WARN]: could not encrypt sensitive fields, reason: %v", err)
 				}
 
-				w.StartConsoleService()
+				if err := w.StartConsoleService(); err != nil {
+					log.Print("[ERROR]: console startup failed")
+					return
+				}
 
 				// Start a job to check latest OpenUEM releases
 				channel, err := w.Model.GetDefaultUpdateChannel()
@@ -194,7 +200,17 @@ func (w *Worker) StartDBConnectJob() error {
 	return nil
 }
 
-func (w *Worker) StartConsoleService() {
+func (w *Worker) StartConsoleService() error {
+	publicOrigin := ""
+	if configured := os.Getenv("OPENUEM_PUBLIC_ORIGIN"); configured != "" {
+		origin, err := gateway.ParseOrigin(configured)
+		if err != nil {
+			log.Printf("[ERROR]: invalid OPENUEM_PUBLIC_ORIGIN: %v", err)
+			return err
+		}
+		publicOrigin = origin.String()
+	}
+
 	// Get port information
 	consolePort := "1323"
 	if w.ConsolePort != "" {
@@ -219,10 +235,23 @@ func (w *Worker) StartConsoleService() {
 		sessionLifetimeInMinutes = 1440
 	}
 
-	w.SessionManager = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	w.SessionManager, err = sessions.New(w.DBUrl, sessionLifetimeInMinutes, w.EncryptionMasterKey)
+	if err != nil {
+		return err
+	}
+
+	// Publish issuer trust before accepting console requests.
+	w.AuthServer = authserver.New(w.Model, w.SessionManager, w.CACertPath, serverName, consolePort, authPort, w.ReverseProxyAuthPort, w.EncryptionMasterKey)
 
 	// HTTPS web server
 	w.WebServer = webserver.New(w.Model, w.NATSServers, w.SessionManager, w.TaskScheduler, w.JWTKey, w.ConsoleCertPath, w.ConsolePrivateKeyPath, w.SFTPPrivateKeyPath, w.CACertPath, serverName, consolePort, authPort, w.DownloadDir, w.Domain, w.OrgName, w.OrgProvince, w.OrgLocality, w.OrgAddress, w.Country, w.ReverseProxyAuthPort, w.ReverseProxyServer, w.ServerReleasesFolder, w.CommonSoftwareDBFolder, w.Version, w.EncryptionMasterKey, w.ReenableCertAuth, w.ReenablePasswdAuth, w.ResetOpenUEMUser, w.AuthLogger)
+	w.WebServer.Handler.IndividualAgentService = w.IndividualAgentService
+	if err := w.WebServer.Handler.StartNATSConnectJob(); err != nil {
+		_ = w.WebServer.Close()
+		w.SessionManager.Close()
+		return err
+	}
+	w.WebServer.Handler.PublicOrigin = publicOrigin
 	go func() {
 		if err := w.WebServer.Serve(":"+consolePort, w.ConsoleCertPath, w.ConsolePrivateKeyPath); err != http.ErrServerClosed {
 			log.Printf("[ERROR]: the server has stopped, reason: %v", err.Error())
@@ -231,13 +260,15 @@ func (w *Worker) StartConsoleService() {
 	log.Println("[INFO]: console is running")
 
 	// HTTPS auth server
-	w.AuthServer = authserver.New(w.Model, w.SessionManager, w.CACertPath, serverName, consolePort, authPort, w.ReverseProxyAuthPort, w.EncryptionMasterKey)
+	w.AuthServer.Handler.PublicOrigin = publicOrigin
+	w.AuthServer.Handler.AuthLogger = w.AuthLogger
 	go func() {
 		if err := w.AuthServer.Serve(":"+authPort, w.ConsoleCertPath, w.ConsolePrivateKeyPath); err != http.ErrServerClosed {
 			log.Printf("[ERROR]: the server has stopped, reason: %v", err.Error())
 		}
 	}()
 	log.Println("[INFO]: auth server is running")
+	return nil
 }
 
 func (w *Worker) EncryptSensitiveFields() error {
@@ -246,15 +277,10 @@ func (w *Worker) EncryptSensitiveFields() error {
 		return nil
 	}
 
-	// 2. Encrypt SMTP password if needed
-	if err := w.EncryptSMTPCredentials(); err != nil {
-		return err
-	}
+	// SMTP secrets migrate in bounded audited transactions before console HTTP
+	// serving. Notification workers read current stored settings for each message.
 
-	// 3. Encrypt NetBird access tokens if needed
-	if err := w.EncryptNetBirdCredentials(); err != nil {
-		return err
-	}
+	// NetBird tokens migrate in bounded audited transactions before console HTTP.
 
 	// 4. Encrypt OIDC key if needed
 	if err := w.EncryptOIDCCredentials(); err != nil {
@@ -266,77 +292,11 @@ func (w *Worker) EncryptSensitiveFields() error {
 		return err
 	}
 
-	// 6. Encrypt Sensitive Task information if needed
-	if err := w.EncryptSentitiveTaskInformation(); err != nil {
-		return err
-	}
+	// Task secrets migrate in bounded audited transactions before inventory
+	// dispatch and the console HTTP server start. Migration errors stop startup.
 
-	// 7. Encrypt Sessions tokens if needed
-	if err := w.EncryptSessionsTokens(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptSMTPCredentials() error {
-	credentials, err := w.Model.GetSMTPPasswords()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range credentials {
-		if c.SMTPPassword != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(c.SMTPPassword, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedPassword, err := utils.EncryptSensitiveField(c.SMTPPassword, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt SMTP password, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateSMTPPassword(c.ID, encryptedPassword); err != nil {
-					log.Printf("[ERROR]: could not save encrypted SMTP password, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptNetBirdCredentials() error {
-	tokens, err := w.Model.GetNetbirdAccessTokens()
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tokens {
-		if t.AccessToken != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(t.AccessToken, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedToken, err := utils.EncryptSensitiveField(t.AccessToken, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt NetBird access token, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateNetbirdAccessToken(t.ID, encryptedToken); err != nil {
-					log.Printf("[ERROR]: could not save encrypted NetBird access token, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
+	// Session tokens migrate with their durable lookup/revocation schema before
+	// either HTTP server starts. That migration also verifies the configured key.
 
 	return nil
 }
@@ -439,68 +399,6 @@ func (w *Worker) EncryptSentitiveUserInformation() error {
 
 				if err := w.Model.UpdateUserNewUserToken(u.ID, encrypted); err != nil {
 					log.Printf("[ERROR]: could not encrypt New User Token, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptSentitiveTaskInformation() error {
-	tasks, err := w.Model.GetTaskSensitiveInformation()
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tasks {
-		if t.LocalUserPassword != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(t.LocalUserPassword, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedKey, err := utils.EncryptSensitiveField(t.LocalUserPassword, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt Local User Password, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateLocalUserPassword(t.ID, encryptedKey); err != nil {
-					log.Printf("[ERROR]: could not encrypt Local User Password, reason: %v", err)
-					continue
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *Worker) EncryptSessionsTokens() error {
-	tokens, err := w.Model.GetSessionsTokens()
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tokens {
-		if t.ID != "" {
-			isEncrypted, err := utils.IsSensitiveFieldEncrypted(t.ID, w.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isEncrypted {
-				encryptedToken, err := utils.EncryptSensitiveField(t.ID, w.EncryptionMasterKey)
-				if err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
-					continue
-				}
-
-				if err := w.Model.UpdateSessionToken(t.ID, encryptedToken); err != nil {
-					log.Printf("[ERROR]: could not encrypt session token, reason: %v", err)
 					continue
 				}
 			}

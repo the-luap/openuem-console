@@ -1,0 +1,62 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"time"
+)
+
+templ MacAppPreviousEnrollments(c echo.Context, info *partials.CommonInfo, d *apple.Device, risk apple.MacAppEnrollmentRisk, items []apple.MacAppPriorAttempt, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: d.Name, Url: partials.GetNavigationUrl(info, "/ios/"+d.ID)}, {Title: "Managed applications", Url: partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications")}}, info)
+		<main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Previous enrollment operations</h1><p class="uk-text-muted mt-2">Unresolved application operations and recorded stopping evidence for earlier enrollments of { d.Name }. Details may include other sites in this organization.</p></div>
+			<p>A new enrollment does not prove an old installer stopped. Elapsed time, unenrollment and a restart alone are insufficient evidence. Recording evidence preserves the old unknown outcome and allows another authorized request for the affected package. An existing ADE application requirement may resume automatically.</p>
+			if risk.ActiveIdentity {
+				<p role="status" class="uk-alert uk-alert-warning">Another enrollment with this Mac identity is still active. Retire the duplicate enrollment before recording stopping evidence or requesting application changes.</p>
+			}
+			if !apple.MacAppManagementReady(*d,time.Now()) {
+				<p role="status" class="uk-alert uk-alert-warning">Recording evidence requires an enrolled Mac with current inventory and a valid management identity.</p>
+			}
+			if len(items)==0 {
+				<p>No unresolved operations or stopping evidence from earlier enrollments.</p>
+			}
+			for _,a:=range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-header"><h2 class="uk-card-title">{ a.Version.Name } · { a.Version.Version }</h2><p>{ a.Operation } · { MacAppPriorState(a) }</p></div>
+					<div class="uk-card-body">
+						<dl class="uk-description-list"><dt>Previous enrollment</dt><dd>{ Show(a.PreviousName) } · { a.PreviousStatus }<br/>{ a.PreviousDeviceID }</dd><dt>Application</dt><dd>{ a.Version.Identifier }</dd><dt>Requested</dt><dd>
+							@Timestamp(&a.CreatedAt)
+						</dd><dt>Sent</dt><dd>
+							@Timestamp(a.DispatchedAt)
+						</dd><dt>Operation identifier</dt><dd>{ a.ID }</dd></dl>
+						if a.Recovery!=nil {
+							<div class="uk-alert mt-4"><h3 class="font-semibold">Stopping evidence recorded</h3><p>{ MacAppEvidenceLabel(a.Recovery.Evidence) } ·{ " " }
+								@Timestamp(&a.Recovery.CreatedAt)
+ { " · " }{ a.Recovery.Actor }</p><p class="mt-2">{ a.Recovery.Reason }</p><p class="mt-2">Recorded for enrollment { a.Recovery.DeviceID }. This is an operator assertion; it does not verify the old installation outcome.</p></div>
+						} else if a.CanRecordEvidence() && !risk.ActiveIdentity && apple.MacAppManagementReady(*d,time.Now()) {
+							<details class="mt-4">
+								<summary>Record stopping evidence for this operation</summary>
+								<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications/previous/"+a.ID+"/resolve") } class="mt-4">
+									@CSRF(info)
+									<label class="block">Observed evidence<select class="uk-select" name="evidence" required><option value="">Select evidence</option><option value="installer_stopped">The earlier installer or removal operation was confirmed stopped</option><option value="device_erased">The Mac was erased after the earlier operation was sent</option></select></label>
+									<label class="block mt-4">Evidence details<textarea class="uk-textarea" name="reason" rows="4" maxlength="1000" required placeholder="Describe what was observed, when, and how it rules out the earlier operation still running."></textarea></label>
+									<label class="block my-4"><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>I verified that this earlier operation can no longer run. I understand this record is permanent and an existing ADE application requirement may resume.</label>
+									<button class="uk-button uk-button-primary" type="submit">Record stopping evidence</button>
+								</form>
+							</details>
+						} else {
+							<p class="uk-alert uk-alert-warning mt-4">This operation cannot be resolved here until its enrollment is retired, its dispatched outcome is unknown, and the current Mac is ready for application management.</p>
+						}
+					</div>
+				</section>
+			}
+			if next!="" {
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+d.ID+"/applications/previous?before="+next)) }>Older operations</a>
+			}
+		</main>
+	}
+}

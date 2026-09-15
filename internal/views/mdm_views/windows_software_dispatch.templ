@@ -1,0 +1,49 @@
+package mdm_views
+
+import (
+ "fmt"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/mdm/apple"
+ "github.com/open-uem/openuem-console/internal/views/layout"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ WindowsSoftwareDispatch(c echo.Context,info *partials.CommonInfo,review apple.WindowsSoftwareDispatchReview,dispatchID string){
+ @layout.Base("devices",info){
+  <link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+  @partials.Header(c,[]partials.Breadcrumb{{Title:"Approved software",Url:partials.GetNavigationUrl(info,"/software/catalog")},{Title:review.Version.Name,Url:partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID)},{Title:"Review Windows execution",Url:""}},info)
+  <main id="device-management" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+   <div><h1 class="text-2xl font-semibold">Review Windows execution</h1>@Navigation(info)</div>
+   <section class="uk-card uk-card-default">
+    <div class="uk-card-header"><h2 class="uk-card-title">{WindowsSoftwareOperation(review.Request.Operation)} · {review.Version.Name}</h2><p>Confirm this device and exact approved revision. Dispatch allows its individual agent to perform the operation before the deadline.</p></div>
+    <div class="uk-card-body">
+     <dl class="uk-description-list">
+      <dt>Target device</dt><dd>{review.TargetName} · {review.Request.AgentID}</dd>
+      <dt>Original site</dt><dd>{fmt.Sprint(review.Request.SiteID)}</dd>
+      <dt>Approved package version</dt><dd>{review.Version.Version} · {review.Version.Architecture}</dd>
+      <dt>Exact observed version required</dt><dd>{review.Version.Windows.Detection.Version}</dd>
+      <dt>Minimum Windows version</dt><dd>{review.Version.MinimumOS}</dd>
+      <dt>Prepared by</dt><dd>{review.Request.Actor} ·{ " " }
+        @Timestamp(&review.Request.CreatedAt)
+      </dd>
+      <dt>Execution deadline</dt><dd>
+        @Timestamp(&review.ExpiresAt)
+      </dd>
+     </dl>
+     if review.Request.Operation=="remove" {
+      <p class="uk-alert uk-alert-warning mt-4">This operation removes the approved version. Application data may be affected. A different observed version will be rejected.</p>
+     }
+     <p class="mt-4">The agent checks compatibility, the approved artifact and native software state. Dispatch is not proof of installation or removal. A restart request or uncertain execution blocks another operation until it is resolved.</p>
+     <p class="mt-4">You can cancel only before delivery. Cancellation cannot stop an installer already received by the agent.</p>
+     <form method="post" class="mt-4" action={partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID+"/windows-requests/"+review.Request.ID+"/dispatch")}>
+      @CSRF(info)
+      <input type="hidden" name="dispatch_id" value={dispatchID}/>
+      <input type="hidden" name="review_hash" value={review.ReviewHash}/>
+      <label><input class="uk-checkbox mr-2" type="checkbox" name="confirmed" value="yes" required/>I authorize this exact operation on this device before the displayed deadline.</label>
+      <div class="flex flex-wrap gap-2 mt-4"><button class="uk-button uk-button-primary" type="submit">Dispatch to this device</button><a class="uk-button uk-button-default" href={partials.GetNavigationUrl(info,"/software/catalog/"+review.Version.ID+"/windows-requests")}>Back to request history</a></div>
+     </form>
+    </div>
+   </section>
+  </main>
+ }
+}

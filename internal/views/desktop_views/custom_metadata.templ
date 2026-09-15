@@ -1,0 +1,228 @@
+package desktop_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+	"time"
+)
+
+func MetadataFieldsPath(info *partials.CommonInfo) string {
+	return "/tenant/" + url.PathEscape(info.TenantID) + "/admin/metadata"
+}
+func metadataDevicePath(info *partials.CommonInfo, id string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/metadata")
+}
+func MetadataValuePath(info *partials.CommonInfo, id string, field int) string {
+	return metadataDevicePath(info, id) + "/" + strconv.Itoa(field)
+}
+func metadataPagePath(path, search string, after int) string {
+	q := url.Values{"q": {search}}
+	if after > 0 {
+		q.Set("after", strconv.Itoa(after))
+	}
+	return path + "?" + q.Encode()
+}
+
+templ metadataHeading(info *partials.CommonInfo, device *inventory.MetadataDevice) {
+	<div class="min-w-0">
+		<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"custom_metadata.title") }</h1>
+		if device!=nil {
+			<p class="break-words">{ device.Name }</p>
+			<p class="break-all">{ device.ID }</p>
+			@InventoryNavigation(info, device.ID, "metadata")
+		}
+		@mdm_views.Navigation(info)
+		<a class="uk-link mt-4" href={ MetadataFieldsPath(info) }>{ i18n.T(ctx,"custom_metadata.catalog") }</a>
+	</div>
+}
+
+templ metadataSearch(path, search string) {
+	<form method="get" action={ path } hx-boost="false" class="flex flex-wrap gap-2 items-end min-w-0">
+		<div class="min-w-0"><label for="metadata-search">{ i18n.T(ctx,"custom_metadata.search") }</label><input id="metadata-search" class="uk-input w-full" type="search" name="q" value={ search } maxlength="256"/></div>
+		<button type="submit" class="uk-button uk-button-default">{ i18n.T(ctx,"custom_metadata.search_button") }</button>
+	</form>
+}
+
+templ metadataPaging(path, search string, after, next int) {
+	<nav aria-label={ i18n.T(ctx, "custom_metadata.pages") } class="flex flex-wrap gap-3">
+		if after>0 {
+			<a class="uk-button uk-button-default" href={ metadataPagePath(path, search, 0) }>{ i18n.T(ctx,"custom_metadata.first") }</a>
+		}
+		if next>0 {
+			<a class="uk-button uk-button-default" href={ metadataPagePath(path, search, next) }>{ i18n.T(ctx,"custom_metadata.next") }</a>
+		}
+	</nav>
+}
+
+templ MetadataFields(c echo.Context, info *partials.CommonInfo, page *inventory.MetadataFieldPage, search string, after int) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Custom fields", Url: MetadataFieldsPath(info)}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			@metadataHeading(info, nil)
+			<p>{ i18n.T(ctx,"custom_metadata.catalog_help") }</p>
+			<div><a class="uk-button uk-button-primary" href={ MetadataFieldsPath(info) + "/new" }>{ i18n.T(ctx,"custom_metadata.create") }</a></div>
+			@metadataSearch(MetadataFieldsPath(info), search)
+			<div class="grid min-w-0 gap-4">
+				if len(page.Fields)==0 {
+					<p>{ i18n.T(ctx,"custom_metadata.no_fields") }</p>
+				}
+				for _,field:=range page.Fields {
+					<article class="uk-card uk-card-body uk-card-default min-w-0">
+						<h2 class="font-semibold break-words"><a class="uk-link" href={ MetadataFieldsPath(info) + "/" + strconv.Itoa(field.ID) }>{ field.Name }</a></h2>
+						<p class="break-words whitespace-pre-wrap mt-2">{ field.Description }</p>
+					</article>
+				}
+			</div>
+			@metadataPaging(MetadataFieldsPath(info), search, after, page.Next)
+		</main>
+	}
+}
+
+templ MetadataField(c echo.Context, info *partials.CommonInfo, data *inventory.MetadataField, draft inventory.MetadataField, message string) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Custom fields", Url: MetadataFieldsPath(info)}, {Title: data.Name}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			@metadataHeading(info, nil)
+			if message!="" {
+				<p role="alert" class="uk-alert uk-alert-warning">{ message }</p>
+			}
+			<section class="uk-card uk-card-body uk-card-default min-w-0">
+				<h2 class="uk-card-title">{ i18n.T(ctx,"custom_metadata.definition") }</h2>
+				<form method="post" action={ MetadataFieldsPath(info) + func() string {
+	if data.ID == 0 {
+		return "/new"
+	}
+	return "/" + strconv.Itoa(data.ID)
+}() } hx-boost="false" class="grid min-w-0 gap-4 mt-4">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="revision" value={ data.Revision }/>
+					<div class="min-w-0"><label for="metadata-name">{ i18n.T(ctx,"custom_metadata.name") }</label><input id="metadata-name" class="uk-input w-full" name="name" value={ draft.Name } maxlength="255" required/></div>
+					<div class="min-w-0"><label for="metadata-description">{ i18n.T(ctx,"custom_metadata.description") }</label><textarea id="metadata-description" class="uk-textarea w-full" name="description" rows="5" maxlength="4096">{ draft.Description }</textarea></div>
+					<p>{ i18n.T(ctx,"custom_metadata.definition_help") }</p>
+					<div><button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"custom_metadata.save_definition") }</button></div>
+				</form>
+			</section>
+			if message!=""&&data.ID>0 {
+				<section class="uk-card uk-card-body uk-card-default min-w-0">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"custom_metadata.current_definition") }</h2>
+					<p class="break-words mt-4">{ data.Name }</p>
+					<p class="break-words whitespace-pre-wrap mt-2">{ data.Description }</p>
+				</section>
+			}
+			if data.ID>0 {
+				<section class="uk-card uk-card-body uk-card-default min-w-0">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"custom_metadata.delete_title") }</h2>
+					<p class="mt-4">{ i18n.T(ctx,"custom_metadata.delete_help") }</p>
+					<form method="post" action={ MetadataFieldsPath(info) + "/" + strconv.Itoa(data.ID) + "/deletion" } hx-boost="false" class="mt-4">
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="revision" value={ data.Revision }/>
+						<button type="submit" class="uk-button uk-button-default">{ i18n.T(ctx,"custom_metadata.review_delete") }</button>
+					</form>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ DeviceMetadata(c echo.Context, info *partials.CommonInfo, page *inventory.DeviceMetadataPage, search string, after int) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: page.Device.Name}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			@metadataHeading(info, &page.Device)
+			@metadataSearch(metadataDevicePath(info, page.Device.ID), search)
+			<div class="grid min-w-0 gap-4">
+				if len(page.Fields)==0 {
+					<p>{ i18n.T(ctx,"custom_metadata.no_fields") }</p>
+				}
+				for _,field:=range page.Fields {
+					<article class="uk-card uk-card-body uk-card-default min-w-0">
+						<h2 class="font-semibold break-words"><a class="uk-link" href={ MetadataValuePath(info, page.Device.ID, field.ID) }>{ field.Name }</a></h2>
+						<p class="break-words whitespace-pre-wrap mt-2">{ field.Description }</p>
+						<p class="mt-2">{ i18n.T(ctx,func()string{if field.Configured{return "custom_metadata.configured"};return "custom_metadata.unset"}()) }</p>
+					</article>
+				}
+			</div>
+			@metadataPaging(metadataDevicePath(info, page.Device.ID), search, after, page.Next)
+		</main>
+	}
+}
+
+templ MetadataValue(c echo.Context, info *partials.CommonInfo, data *inventory.MetadataValue, draft, message string) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: data.Device.Name}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			@metadataHeading(info, &data.Device)
+			if message!="" {
+				<p role="alert" class="uk-alert uk-alert-warning">{ message }</p>
+			}
+			<section class="uk-card uk-card-body uk-card-default min-w-0">
+				<h2 class="uk-card-title break-words">{ data.Field.Name }</h2>
+				<p id="metadata-value-help" class="break-words whitespace-pre-wrap mt-2">{ data.Field.Description }</p>
+				<p class="mt-2">{ i18n.T(ctx,func()string{if data.Present{return "custom_metadata.configured"};return "custom_metadata.unset"}()) }</p>
+				<form method="post" action={ MetadataValuePath(info, data.Device.ID, data.Field.ID) } hx-boost="false" class="grid min-w-0 gap-4 mt-4">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="field_revision" value={ data.Field.Revision }/><input type="hidden" name="revision" value={ data.Revision }/>
+					<div class="min-w-0"><label for="metadata-value">{ i18n.T(ctx,"custom_metadata.value") }</label><textarea id="metadata-value" class="uk-textarea w-full" name="value" rows="8" maxlength="16384" aria-describedby="metadata-value-help metadata-value-limit">{ draft }</textarea></div>
+					<p id="metadata-value-limit">{ i18n.T(ctx,"custom_metadata.value_help") }</p>
+					<div><button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"custom_metadata.save_value") }</button></div>
+				</form>
+			</section>
+			if message!="" {
+				<section class="uk-card uk-card-body uk-card-default min-w-0"><h2 class="uk-card-title">{ i18n.T(ctx,"custom_metadata.current_value") }</h2><p class="break-words whitespace-pre-wrap mt-4">{ data.Value }</p></section>
+			}
+			if data.Present {
+				<section class="uk-card uk-card-body uk-card-default min-w-0">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"custom_metadata.clear_title") }</h2>
+					<p class="mt-4">{ i18n.T(ctx,"custom_metadata.clear_help") }</p>
+					<form method="post" action={ MetadataValuePath(info, data.Device.ID, data.Field.ID) + "/clear" } hx-boost="false" class="mt-4">
+						@mdm_views.CSRF(info)
+						<input type="hidden" name="field_revision" value={ data.Field.Revision }/><input type="hidden" name="revision" value={ data.Revision }/>
+						<label class="flex gap-3 items-start"><input class="uk-checkbox shrink-0 mt-1" type="checkbox" name="confirm" value="clear" required/><span>{ i18n.T(ctx,"custom_metadata.confirm_clear") }</span></label>
+						<button type="submit" class="uk-button uk-button-default mt-4">{ i18n.T(ctx,"custom_metadata.clear") }</button>
+					</form>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ MetadataDeletion(c echo.Context, info *partials.CommonInfo, r *inventory.MetadataDeletion, message string) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Custom fields", Url: MetadataFieldsPath(info)}, {Title: r.Field.Name}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"custom_metadata.delete_title") }</h1>
+			<section class="uk-card uk-card-body uk-card-default min-w-0">
+				<h2 class="uk-card-title break-words">{ r.Field.Name }</h2>
+				<p class="break-words whitespace-pre-wrap mt-2">{ r.Field.Description }</p>
+				<dl class="uk-description-list mt-4"><dt>{ i18n.T(ctx,"custom_metadata.affected") }</dt><dd>{ strconv.FormatInt(r.ValueCount,10) }</dd></dl>
+				if r.CompletedAt!=nil {
+					<p role="status" class="font-semibold mt-4">{ i18n.T(ctx,"custom_metadata.deleted") }</p>
+					@mdm_views.Timestamp(r.CompletedAt)
+					<p class="mt-2">{ i18n.T(ctx,"custom_metadata.receipt_help") }</p>
+				} else if message!="" {
+					<p role="alert" class="uk-alert uk-alert-warning">{ message }</p>
+				} else if !time.Now().Before(r.ExpiresAt) {
+					<p role="status" class="mt-4">{ i18n.T(ctx,"custom_metadata.expired") }</p>
+				} else {
+					<p class="mt-4">{ i18n.T(ctx,"custom_metadata.delete_help") }</p>
+					<p class="mt-2">
+						{ i18n.T(ctx,"custom_metadata.expires") }{ " " }
+						@mdm_views.Timestamp(&r.ExpiresAt)
+					</p>
+					<form method="post" action={ MetadataFieldsPath(info) + "/" + strconv.Itoa(r.Field.ID) + "/deletion/" + r.ID } hx-boost="false" class="mt-4">
+						@mdm_views.CSRF(info)
+						<label class="flex gap-3 items-start"><input class="uk-checkbox shrink-0 mt-1" type="checkbox" name="confirm" value="delete" required/><span>{ i18n.T(ctx,"custom_metadata.confirm_delete") }</span></label>
+						<button type="submit" class="uk-button uk-button-danger mt-4">{ i18n.T(ctx,"custom_metadata.delete") }</button>
+					</form>
+				}
+				<a class="uk-button uk-button-default mt-4" href={ MetadataFieldsPath(info) }>{ i18n.T(ctx,"custom_metadata.back") }</a>
+			</section>
+		</main>
+	}
+}

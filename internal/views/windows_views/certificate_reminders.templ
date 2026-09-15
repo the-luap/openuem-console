@@ -1,0 +1,67 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ CertificateReminders(c echo.Context, info *partials.CommonInfo, history []windows.CertificateReminder, offset int, more bool) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Certificate health", Url: partials.GetNavigationUrl(info, "/windows/certificate-health")}, {Title: "Expiry reminders"}}, info)
+		<main class="windows-management grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows certificate expiry reminders</h1>
+				<p class="mt-2">Reminders cover current device certificates, CA expiry and the earlier end of full-lifetime issuance. Stages are 30, 14, 7 and 1 day before the deadline, then the deadline itself.</p>
+				<p class="uk-text-muted">This is delivery history. Review current certificate health before acting on an earlier reminder. SMTP acceptance does not prove inbox delivery, and a reminder does not renew a certificate.</p>
+				<a class="uk-button uk-button-default mt-3" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/certificate-health")) }>Current certificate health</a>
+			</div>
+			<section class="uk-card uk-card-default" aria-labelledby="windows-reminder-history">
+				<div class="uk-card-body grid gap-4">
+					<h2 id="windows-reminder-history" class="uk-card-title">Reminder history</h2>
+					<p>Verified, approved certificate administrators receive reminders through the organization's SMTP settings. Failed attempts retain their retry schedule across restarts. A confirmed replacement or revoked device access cancels outdated pending work.</p>
+					if len(history)==0 {
+						<p role="status">No certificate reminders in this view.</p>
+					}
+					for _,r:=range history {
+						<article class="windows-csp-observation" aria-label={ certificateReminderKind(r.Kind) }>
+							<h3 class="text-lg font-semibold">{ certificateReminderKind(r.Kind) } · { certificateReminderStage(r.Stage) }</h3>
+							<dl class="uk-description-list"><dt>Deadline (UTC)</dt><dd>
+								@ScheduleTime(r.Deadline)
+							</dd><dt>Reminder created (UTC)</dt><dd>
+								@ScheduleTime(r.CreatedAt)
+							</dd></dl>
+							if r.DeviceID!="" {
+								<a class="underline break-all" href={ templ.URL(fmt.Sprintf("/tenant/%d/site/%d/windows/%s/renewals", r.Scope.TenantID, r.Scope.SiteID, r.DeviceID)) }>Device renewal history: { r.DeviceID }</a>
+							}
+							<dl class="uk-description-list"><dt>SMTP accepted</dt><dd>{ fmt.Sprint(r.Accepted) }</dd><dt>Pending</dt><dd>{ fmt.Sprint(r.Pending) }</dd><dt>Deliveries awaiting retry</dt><dd>{ fmt.Sprint(r.Retrying) }</dd><dt>Canceled</dt><dd>{ fmt.Sprint(r.Canceled) }</dd></dl>
+							if r.SMTPUnavailable>0 {
+								<p>{ certificateReminderSMTPStatus(r.SMTPUnavailable) }</p>
+							}
+							if r.NextAttemptAt!=nil {
+								<p>Next pending attempt:{ " " }
+									@ScheduleTime(*r.NextAttemptAt)
+								</p>
+							}
+							if r.Pending+r.Accepted+r.Canceled==0 {
+								<p>No eligible recipient has been queued for this reminder.</p>
+							}
+							<details><summary class="cursor-pointer">Reminder identity</summary><dl class="uk-description-list"><dt>Reminder ID</dt><dd class="font-mono">{ r.ID }</dd><dt>Certificate SHA-256</dt><dd class="font-mono">{ r.Fingerprint }</dd></dl></details>
+						</article>
+					}
+					<nav class="flex flex-wrap gap-3" aria-label="Reminder history pages">
+						if offset>0 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/certificate-reminders?offset=%d", max(0, offset-25)))) }>Previous reminders</a>
+						}
+						if more&&offset<100000 {
+							<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/certificate-reminders?offset=%d", min(100000, offset+25)))) }>More reminders</a>
+						}
+					</nav>
+				</div>
+			</section>
+		</main>
+	}
+}

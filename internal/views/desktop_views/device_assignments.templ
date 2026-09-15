@@ -1,0 +1,168 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+	"time"
+)
+
+func assignmentURL(info *partials.CommonInfo, id string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/assignment")
+}
+
+templ AssignmentLocation(loc inventory.AssignmentLocation) {
+	<span class="device-assignment-location">{ loc.Organization } / { loc.Site }</span>
+	<span class="device-assignment-location uk-text-muted">{ i18n.T(ctx,"device_assignment.scope_ids") } { inventory.AssignmentLocationID(loc) }</span>
+}
+
+templ AssignmentChoices(c echo.Context, info *partials.CommonInfo, page *inventory.DeviceAssignmentChoices, search string, after int) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/device-assignments.css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: page.DeviceName}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="min-w-0">
+				<h1 class="text-2xl font-semibold break-words">{ page.DeviceName }</h1>
+				<p>{ i18n.T(ctx,"device_assignment.title") }</p>
+				@mdm_views.Navigation(info)
+				@InventoryNavigation(info, page.DeviceID, "assignment")
+			</div>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header">
+					<h2 class="uk-card-title">{ i18n.T(ctx,"device_assignment.source") }</h2>
+				</div>
+				<div class="uk-card-body min-w-0">
+					@AssignmentLocation(page.Source)
+					<p class="break-all">{ i18n.T(ctx,"device_assignment.device_id") } { page.DeviceID }</p>
+				</div>
+			</section>
+			if page.IndividualIdentity {
+				<section class="uk-card uk-card-body uk-card-default min-w-0">
+					<p role="status">{ i18n.T(ctx,"device_assignment.individual") }</p>
+					<a class="uk-button uk-button-default mt-4" href={ partials.GetNavigationUrl(info, "/desktop/enrollment") }>{ i18n.T(ctx,"device_assignment.enrollment") }</a>
+				</section>
+			} else {
+				<section class="uk-card uk-card-default min-w-0">
+					<div class="uk-card-header">
+						<h2 class="uk-card-title">{ i18n.T(ctx,"device_assignment.destination") }</h2>
+					</div>
+					<div class="uk-card-body min-w-0">
+						<form method="get" action={ assignmentURL(info, page.DeviceID) } class="flex flex-wrap gap-2 mb-4">
+							<label for="assignment-search">{ i18n.T(ctx,"device_assignment.search_label") }</label>
+							<input id="assignment-search" class="uk-input" name="q" value={ search } maxlength="256"/>
+							<button class="uk-button uk-button-default" type="submit">{ i18n.T(ctx,"device_assignment.search") }</button>
+						</form>
+						if len(page.Locations)==0 {
+							<p role="status">{ i18n.T(ctx,"device_assignment.empty") }</p>
+						} else {
+							<form method="post" action={ assignmentURL(info, page.DeviceID) } hx-boost="false">
+								@mdm_views.CSRF(info)
+								<fieldset class="min-w-0">
+									<legend class="font-semibold mb-2">{ i18n.T(ctx,"device_assignment.choose") }</legend>
+									for _,loc:=range page.Locations {
+										<label class="flex items-start gap-3 border rounded-lg p-3 mb-2">
+											<input type="radio" class="uk-radio shrink-0 mt-1" name="destination_site" value={ strconv.Itoa(loc.SiteID) } required/>
+											<span class="min-w-0">
+												@AssignmentLocation(loc)
+											</span>
+										</label>
+									}
+								</fieldset>
+								<button type="submit" class="uk-button uk-button-primary mt-4">{ i18n.T(ctx,"device_assignment.review") }</button>
+							</form>
+						}
+						<nav class="flex flex-wrap gap-2 mt-4" aria-label={ i18n.T(ctx, "device_assignment.pages") }>
+							if after>0 {
+								<a class="uk-button uk-button-default" href={ assignmentURL(info, page.DeviceID) + "?q=" + url.QueryEscape(search) }>{ i18n.T(ctx,"device_assignment.first") }</a>
+							}
+							if page.Next>0 {
+								<a class="uk-button uk-button-default" href={ assignmentURL(info, page.DeviceID) + "?q=" + url.QueryEscape(search) + "&after=" + strconv.Itoa(page.Next) }>{ i18n.T(ctx,"device_assignment.next") }</a>
+							}
+						</nav>
+					</div>
+				</section>
+			}
+		</main>
+	}
+}
+
+templ AssignmentReview(c echo.Context, info *partials.CommonInfo, r *inventory.DeviceAssignmentReview) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/device-assignments.css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: r.DeviceName}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="min-w-0">
+				<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"device_assignment.title") }</h1>
+				<p class="break-words">{ r.DeviceName }</p>
+				<p class="break-all">{ i18n.T(ctx,"device_assignment.device_id") } { r.DeviceID }</p>
+			</div>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-body min-w-0">
+					<dl class="uk-description-list">
+						<dt>{ i18n.T(ctx,"device_assignment.source") }</dt>
+						<dd>
+							@AssignmentLocation(r.Source)
+						</dd>
+						<dt>{ i18n.T(ctx,"device_assignment.destination") }</dt>
+						<dd>
+							@AssignmentLocation(r.Target)
+						</dd>
+						<dt>{ i18n.T(ctx,"device_assignment.tags") }</dt>
+						<dd>{ strconv.FormatInt(r.TagCount,10) }</dd>
+						<dt>{ i18n.T(ctx,"device_assignment.metadata") }</dt>
+						<dd>{ strconv.FormatInt(r.MetadataCount,10) }</dd>
+					</dl>
+					if r.CompletedAt!=nil {
+						<p role="status" class="font-semibold mt-4">{ i18n.T(ctx,"device_assignment.completed") }</p>
+						@mdm_views.Timestamp(r.CompletedAt)
+						<p class="mt-2">{ i18n.T(ctx,"device_assignment.historical") }</p>
+						<a class="uk-button uk-button-primary mt-4" href={ fmt.Sprintf("/tenant/%d/site/%d/computers/%s/inventory", r.Target.TenantID, r.Target.SiteID, url.PathEscape(r.DeviceID)) }>{ i18n.T(ctx,"device_assignment.open_device") }</a>
+					} else if !time.Now().Before(r.ExpiresAt) {
+						<p role="status" class="mt-4">{ i18n.T(ctx,"device_assignment.expired") }</p>
+						<a class="uk-button uk-button-default mt-4" href={ assignmentURL(info, r.DeviceID) }>{ i18n.T(ctx,"device_assignment.new_review") }</a>
+					} else {
+						if r.Source.TenantID!=r.Target.TenantID {
+							<p class="mt-4">{ i18n.T(ctx,"device_assignment.remove") }</p>
+						} else {
+							<p class="mt-4">{ i18n.T(ctx,"device_assignment.keep") }</p>
+						}
+						<p class="mt-2">{ i18n.T(ctx,"device_assignment.retained") }</p>
+						<p class="mt-2">
+							{ i18n.T(ctx,"device_assignment.expires") }
+							{ " " }
+							@mdm_views.Timestamp(&r.ExpiresAt)
+						</p>
+						<form method="post" action={ assignmentURL(info, r.DeviceID) + "/" + r.ID } hx-boost="false" class="mt-4">
+							@mdm_views.CSRF(info)
+							<label class="flex gap-3 items-start">
+								<input class="uk-checkbox shrink-0 mt-1" type="checkbox" name="confirm" value="yes" required/>
+								<span>{ i18n.T(ctx,"device_assignment.confirm") }</span>
+							</label>
+							<button type="submit" class="uk-button uk-button-primary mt-4">{ i18n.T(ctx,"device_assignment.move") }</button>
+							<a class="uk-button uk-button-default mt-4" href={ assignmentURL(info, r.DeviceID) }>{ i18n.T(ctx,"device_assignment.cancel") }</a>
+						</form>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ AssignmentConflict(c echo.Context, info *partials.CommonInfo, id, message string) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<section class="uk-card uk-card-body uk-card-default min-w-0">
+				<h1 class="text-2xl font-semibold">{ i18n.T(ctx,"device_assignment.title") }</h1>
+				<p role="alert" class="mt-4">{ message }</p>
+				<a class="uk-button uk-button-default mt-4" href={ assignmentURL(info, id) }>{ i18n.T(ctx,"device_assignment.new_review") }</a>
+			</section>
+		</main>
+	}
+}

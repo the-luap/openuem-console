@@ -1,0 +1,246 @@
+package desktop_views
+
+import (
+ "fmt"
+ "net/url"
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+func NetbirdOperationPath(info *partials.CommonInfo,id string)string {
+ return partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(id)+"/netbird/operations")
+}
+
+func netbirdOperationLabel(operation string)string {
+ switch operation { case "up":return "Connect";case "down":return "Disconnect";case "switchprofile":return "Switch profile";default:return "NetBird command" }
+}
+
+func netbirdCanManage(info *partials.CommonInfo,scope access.Scope)bool {
+ return info.Principal.Can(access.ManageDeviceSecurity,scope)
+}
+
+templ netbirdPage(c echo.Context,info *partials.CommonInfo,id,title string) {
+ @partials.Header(c,[]partials.Breadcrumb{{Title:"Computer inventory",Url:partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(id)+"/inventory")},{Title:title}},info)
+ <section class="netbird-operations uk-card uk-card-default" hx-history="false">
+  <link rel="stylesheet" href="/assets/css/netbird-operations.css"/>
+  <script src="/assets/js/netbird-operations.js" defer></script>
+  <div class="uk-card-header"><h1 class="uk-card-title" id="netbird-operation-heading" tabindex="-1">{ title }</h1></div>
+  <div class="uk-card-body"><div id="error" class="hidden" role="alert"></div>{ children... }</div>
+ </section>
+}
+
+templ netbirdTarget(target inventory.ManualTarget) {
+ <dl class="netbird-details">
+  <dt>Device</dt><dd>{ target.Name }</dd>
+  <dt>Device ID</dt><dd>{ target.ID }</dd>
+  <dt>Organization / site</dt><dd>{ fmt.Sprintf("%d / %d",target.Scope.TenantID,target.Scope.SiteID) }</dd>
+  <dt>Platform</dt><dd>{ target.Platform }</dd>
+ </dl>
+}
+
+templ NetbirdOverview(c echo.Context,info *partials.CommonInfo,page *inventory.NetbirdOverview,refreshID string) {
+ @netbirdPage(c,info,page.Target.ID,"NetBird") {
+  @netbirdTarget(page.Target)
+  <p>Reported device state. Command receipts describe an execution; they do not establish a lasting connection or provider peer ownership.</p>
+  <dl class="netbird-details">
+   <dt>Last device report</dt><dd>@mdm_views.Timestamp(page.LastContact)</dd>
+   <dt>Installation</dt><dd>{ netbirdFlag(page.Installed,"Installed","Not reported as installed") }</dd>
+   <dt>Version</dt><dd>{ page.Version }</dd>
+   <dt>Management connection</dt><dd>{ netbirdFlag(page.ManagementConnected,"Connected","Not connected") }</dd>
+   <dt>Signal connection</dt><dd>{ netbirdFlag(page.SignalConnected,"Connected","Not connected") }</dd>
+   <dt>Profile</dt><dd>{ page.Profile }</dd>
+   <dt>Reported management URL</dt><dd>{ page.ManagementURL }</dd>
+   <dt>Reported IP address</dt><dd>{ page.IP }</dd>
+  </dl>
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,page.Target.ID) }>Command history</a>
+	 if info.Principal.Can(access.ReadSoftware,access.Scope{TenantID:page.Target.Scope.TenantID}) {
+	  <a class="uk-button uk-button-default" href={ "/tenant/"+strconv.Itoa(page.Target.Scope.TenantID)+"/netbird/packages" }>Package approvals</a>
+	 }
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,page.Target.ID) }>Registration history</a>
+   if info.Principal.Can(access.RefreshDevices,page.Target.Scope) {
+    <form method="post" action={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(page.Target.ID)+"/netbird/refresh") }>
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="request_id" value={ refreshID }/>
+     <button class="uk-button uk-button-default" type="submit">Request device inventory</button>
+    </form>
+   }
+  </div>
+  if page.Installed && netbirdCanManage(info,page.Target.Scope) {
+   <div class="netbird-actions"><a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,page.Target.ID)+"/new" }>Register with provider</a></div>
+   <h2>Connection commands</h2>
+   <p>Review the target and impact before submitting. The agent must have a ready execution journal.</p>
+   <div class="netbird-actions">
+    <a class="uk-button uk-button-primary" href={ NetbirdOperationPath(info,page.Target.ID)+"/review?operation=up" }>Review connect</a>
+    <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,page.Target.ID)+"/review?operation=down" }>Review disconnect</a>
+   </div>
+   <form method="get" action={ NetbirdOperationPath(info,page.Target.ID)+"/review" } class="netbird-profile">
+    <input type="hidden" name="operation" value="switchprofile"/>
+    <label for="netbird-profile">NetBird profile</label>
+    <select id="netbird-profile" class="uk-select" name="profile" required disabled?={ len(page.Profiles)==0 }>
+     <option value="" disabled selected>Select a profile</option>
+     for _,profile:=range page.Profiles {
+      <option value={ profile.Handle() }>{ profile.Label() }</option>
+     }
+    </select>
+    <button class="uk-button uk-button-default" type="submit" disabled?={ len(page.Profiles)==0 }>Review profile switch</button>
+   </form>
+   if len(page.Profiles)==0 {
+    <p role="status">No selectable profiles were reported.</p>
+   }
+  }
+  if page.Target.Platform=="macos" || page.Target.Platform=="linux" {
+   <div class="netbird-actions">
+    if info.Principal.Can(access.ReadSoftware,page.Target.Scope) {
+<a class="uk-button uk-button-default" href={ NetbirdInstallationPath(info,page.Target.ID) }>Installation history</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalPath(info,page.Target.ID) }>Removal history</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalRecoveryPath(info,page.Target.ID) }>Continuation history</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info,page.Target.ID) }>Absence check history</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalStageCleanupPath(info,page.Target.ID) }>Staging cleanup history</a>
+}
+    if info.Principal.Can(access.AssignSoftware,page.Target.Scope) {
+<a class="uk-button uk-button-primary" href={ NetbirdInstallationPath(info,page.Target.ID)+"/new" }>Install approved NetBird package</a>
+<a class="uk-button uk-button-default" href={ NetbirdRemovalPath(info,page.Target.ID)+"/review" }>Review local NetBird removal</a>
+}
+   </div>
+   <p>Native installation and removal require a ready, individually enrolled agent. Package ownership and device readiness are checked before confirmation.</p>
+  }
+  <p>Provider peer removal is available through retained registration evidence.</p>
+ }
+}
+
+templ NetbirdReview(c echo.Context,info *partials.CommonInfo,review *inventory.NetbirdOperationReview,requestID string) {
+ @netbirdPage(c,info,review.Target.ID,"Review NetBird command") {
+  @netbirdTarget(review.Target)
+  <dl class="netbird-details">
+   <dt>Command</dt><dd>{ netbirdOperationLabel(review.Operation) }</dd>
+   <dt>Management URL</dt><dd>{ review.ManagementURL }</dd>
+   if review.Operation=="switchprofile" {
+    <dt>Profile</dt><dd>{ review.ProfileName }</dd>
+    <dt>Profile ID</dt><dd>{ review.Profile }</dd>
+   }
+  </dl>
+  <div class="netbird-impact">
+   <p>This command can interrupt access through the device's NetBird network. A profile switch selects the reviewed profile and then connects it.</p>
+   <p>The request expires after two minutes. Delivery is attempted once. An unconfirmed result blocks further commands until it is explicitly resolved.</p>
+  </div>
+  <form method="post" action={ NetbirdOperationPath(info,review.Target.ID) } hx-post={ NetbirdOperationPath(info,review.Target.ID) } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+   @mdm_views.CSRF(info)
+   <input type="hidden" name="request_id" value={ requestID }/>
+   <input type="hidden" name="operation" value={ review.Operation }/>
+   <input type="hidden" name="profile" value={ review.Profile }/>
+   <input type="hidden" name="revision" value={ review.Revision }/>
+   <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed this device, profile and connection impact.</span></label>
+   <div class="netbird-actions">
+    <button class="uk-button uk-button-primary" id="netbird-submit" type="submit">Submit command</button>
+    <span class="htmx-indicator" id="netbird-pending" role="status">Submitting command…</span>
+    <a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(review.Target.ID)+"/netbird") }>Cancel</a>
+   </div>
+  </form>
+ }
+}
+
+templ NetbirdReceipt(c echo.Context,info *partials.CommonInfo,r *inventory.NetbirdOperation) {
+ @netbirdPage(c,info,r.DeviceID,"NetBird command receipt") {
+  <p role="status" class="netbird-state">{ netbirdReceiptState(r) }</p>
+  if r.Reason!="" {
+   <p>{ netbirdReason(r.Reason) }</p>
+  }
+  <dl class="netbird-details">
+   <dt>Request ID</dt><dd>{ r.ID }</dd>
+   <dt>Device ID</dt><dd>{ r.DeviceID }</dd>
+   <dt>Organization / site</dt><dd>{ fmt.Sprintf("%d / %d",r.Scope.TenantID,r.Scope.SiteID) }</dd>
+   <dt>Command</dt><dd>{ netbirdOperationLabel(r.Operation) }</dd>
+   if r.Profile!="" {
+    <dt>Profile ID</dt><dd>{ r.Profile }</dd>
+   }
+   <dt>Requested</dt><dd>@mdm_views.Timestamp(&r.RequestedAt)</dd>
+   <dt>Expires</dt><dd>@mdm_views.Timestamp(&r.ExpiresAt)</dd>
+   <dt>Delivery attempt</dt><dd>@mdm_views.Timestamp(r.AttemptedAt)</dd>
+   <dt>Finished</dt><dd>@mdm_views.Timestamp(r.FinishedAt)</dd>
+   if r.Resolution!=nil {
+    <dt>Resolution ID</dt><dd>{ r.Resolution.ID }</dd>
+    <dt>Resolution requested by</dt><dd>{ r.Resolution.Actor }</dd>
+    <dt>Resolution requested</dt><dd>@mdm_views.Timestamp(&r.Resolution.CreatedAt)</dd>
+    if r.Resolution.ConfirmedAt!=nil {
+     <dt>Evidence confirmed by</dt><dd>{ r.Resolution.ConfirmedBy }</dd>
+    }
+   }
+   if r.ReleasedAt!=nil {
+    <dt>Reviewed release</dt><dd>@mdm_views.Timestamp(r.ReleasedAt)</dd>
+   }
+  </dl>
+  if r.Resolution!=nil {
+   @netbirdResolutionRetrySummary(r.Resolution.LastRetry)
+  }
+  if r.Status=="unconfirmed" {
+   <p>The original outcome remains unconfirmed. Resolution allows further commands only after matching agent evidence is retained.</p>
+   if r.ReleasedAt==nil && netbirdCanManage(info,r.Scope) {
+    <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,r.DeviceID)+"/"+r.ID+"/resolution" }>Review resolution</a>
+   }
+  }
+  if r.Status=="queued" && r.AttemptedAt==nil && netbirdCanManage(info,r.Scope) {
+   <form method="post" action={ NetbirdOperationPath(info,r.DeviceID)+"/"+r.ID+"/cancel" } class="netbird-confirm">
+    @mdm_views.CSRF(info)
+    <label class="netbird-checkbox" for="netbird-cancel"><input type="checkbox" id="netbird-cancel" name="confirmed" value="yes" required/><span>Withdraw this request if delivery has not started.</span></label>
+    <button class="uk-button uk-button-default" type="submit">Cancel queued request</button>
+   </form>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,r.DeviceID)+"/"+r.ID }>Reload receipt</a>
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,r.DeviceID) }>Command history</a>
+   <a class="uk-link" href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(r.DeviceID)+"/netbird") }>Device state</a>
+  </div>
+ }
+}
+
+func netbirdReason(reason string)string {
+ switch reason {
+ case "expired":return "The request expired before delivery."
+ case "mode_changed":return "The agent enrollment mode changed."
+ case "not_authorized":return "The requester no longer has permission."
+ case "source_changed":return "The target, configuration or live journal changed or became unavailable."
+ case "cancelled":return "The request was cancelled before delivery."
+ case "delivery_unconfirmed":return "A matching completed result was not retained. The device may have executed the command."
+ default:return "Command state is unavailable."
+ }
+}
+
+func netbirdFlag(value bool,yes,no string)string { if value { return yes };return no }
+
+func netbirdReceiptState(r *inventory.NetbirdOperation)string {
+ switch r.Status {
+ case "queued":if r.AttemptedAt!=nil { return "Delivery started; awaiting a confirmed result." };return "Queued; execution has not been confirmed."
+ case "completed":return "Command execution confirmed."
+ case "stopped":return "Stopped before delivery."
+ case "unconfirmed":return "Execution is unconfirmed. Do not repeat this command."
+ default:return "Command state is unavailable."
+ }
+}
+
+templ NetbirdHistory(c echo.Context,info *partials.CommonInfo,device string,rows []inventory.NetbirdOperation) {
+ @netbirdPage(c,info,device,"NetBird command history") {
+  <p>Retained requests for this organization and site remain available after a device moves or is removed.</p>
+  <p>Device ID: <span class="netbird-id">{ device }</span></p>
+  if len(rows)==0 {
+   <p role="status">No recorded commands on this page.</p>
+  }
+  <ol class="netbird-history">
+   for _,r:=range rows {
+    <li><a href={ NetbirdOperationPath(info,device)+"/"+r.ID }>{ netbirdOperationLabel(r.Operation) } · { r.Status }</a><span class="netbird-id">{ r.ID }</span>@mdm_views.Timestamp(&r.RequestedAt)</li>
+   }
+  </ol>
+  <div class="netbird-actions">
+   if len(rows)==50 {
+    <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,device)+"?before="+url.QueryEscape(rows[len(rows)-1].ID) }>Older commands</a>
+   }
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,device) }>Latest commands</a>
+   <a class="uk-link" href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(device)+"/netbird") }>Device state</a>
+  </div>
+  <p>{ strconv.Itoa(len(rows)) } recorded requests on this page.</p>
+ }
+}

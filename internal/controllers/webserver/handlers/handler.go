@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -16,11 +17,53 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/controllers/sessions"
+	"github.com/open-uem/openuem-console/internal/desktop"
+	"github.com/open-uem/openuem-console/internal/desktop/consolebroker"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
 	"github.com/open-uem/openuem-console/internal/models"
+	"github.com/open-uem/openuem-console/internal/preferences"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/security/audit"
+	"github.com/open-uem/openuem-console/internal/security/oidcaccounts"
+	consolesettings "github.com/open-uem/openuem-console/internal/settings"
+	"github.com/open-uem/openuem-console/internal/software/winget"
 )
 
 type Handler struct {
-	Model *models.Model
+	smtpTestSender              consolesettings.SMTPTestSender
+	winGetSource                func(context.Context, winget.Coordinate) (*winget.Snapshot, error)
+	IndividualAgentService      *openuem_nats.ServiceConnection
+	IndividualBroker            *consolebroker.Broker
+	Access                      *access.Store
+	OIDCAccounts                *oidcaccounts.Store
+	Preferences                 *preferences.Store
+	Audit                       *audit.Store
+	InventoryRefresh            *inventory.RefreshStore
+	ManualExecution             *inventory.ManualExecutionStore
+	NetbirdOperations           *inventory.NetbirdOperationStore
+	NetbirdResolutions          *inventory.NetbirdResolutionStore
+	NetbirdRegistrations        *inventory.NetbirdRegistrationStore
+	NetbirdInstallations        *inventory.NetbirdInstallationStore
+	NetbirdRemovals             *inventory.NetbirdRemovalStore
+	NetbirdRemovalRecoveries    *inventory.NetbirdRemovalRecoveryStore
+	NetbirdRemovalAbsences      *inventory.NetbirdRemovalAbsenceStore
+	NetbirdRemovalStageCleanups *inventory.NetbirdRemovalStageCleanupStore
+	inventoryPublisher          inventoryPublisher
+	PublicOrigin                string
+	Model                       *models.Model
+	Apple                       *apple.Store
+	AppleSetupError             string
+	Windows                     *windows.Store
+	WindowsOptions              windows.EnrollmentOptions
+	WindowsSetupError           string
+	Desktop                     *desktop.Store
+	DesktopCatalog              *desktop.Catalog
+	DesktopBootstrapReady       bool
+	DesktopSetupError           string
+
+	NetbirdRegistrationResolutions *inventory.NetbirdRegistrationResolutionStore
 
 	SessionManager       *sessions.SessionManager
 	JWTKey               string
@@ -56,9 +99,11 @@ type Handler struct {
 	ReenableCertAuth     bool
 	ReenablePasswdAuth   bool
 	AuthLogger           *log.Logger
-	OIDCRedirectURI      string
+	oidcHTTPTransport    http.RoundTripper
 	CommonAppsJob        gocron.Job
 	EncryptionMasterKey  string
+
+	netbirdHTTPTransport http.RoundTripper
 }
 
 func NewHandler(model *models.Model, natsServers string, s *sessions.SessionManager, ts gocron.Scheduler, jwtKey, certPath, keyPath, sftpKeyPath, caCertPath, server, consolePort, authPort, tmpDownloadDir, domain, orgName, orgProvince, orgLocality, orgAddress, country, reverseProxyAuthPort, reverseProxyServer, serverReleasesFolder, commonFolder, version, encryptionMasterKey string, reEnableCertAuth, reEnablePasswdAuth bool, authLogger *log.Logger) *Handler {
@@ -105,15 +150,21 @@ func NewHandler(model *models.Model, natsServers string, s *sessions.SessionMana
 		EncryptionMasterKey:  encryptionMasterKey,
 	}
 
-	// Try to create the NATS Connection and start a job if it can't be possible to connect
-	if err := h.StartNATSConnectJob(); err != nil {
-		log.Fatalf("[FATAL]: could not start NATS Connect job")
-	}
-
 	return &h
 }
 
 func (h *Handler) StartNATSConnectJob() error {
+	if h.IndividualAgentService != nil {
+		broker, err := consolebroker.Connect(*h.IndividualAgentService)
+		if err != nil {
+			return err
+		}
+		h.IndividualBroker = broker
+		h.NATSConnection, h.JetStream = broker.Connection, broker.JetStream
+		h.setInventoryPublisher(broker.JetStream)
+		return nil
+	}
+
 	var err error
 	var ctx context.Context
 
@@ -121,6 +172,7 @@ func (h *Handler) StartNATSConnectJob() error {
 	if err == nil {
 		h.JetStream, err = jetstream.New(h.NATSConnection)
 		if err == nil {
+			h.setInventoryPublisher(h.JetStream)
 			ctx, h.JetStreamCancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
 
 			agentStreamConfig := jetstream.StreamConfig{
@@ -195,6 +247,7 @@ func (h *Handler) StartNATSConnectJob() error {
 					log.Println("[ERROR]: JetStream could not be instantiated")
 					return
 				}
+				h.setInventoryPublisher(h.JetStream)
 
 				ctx, h.JetStreamCancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
 

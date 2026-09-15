@@ -1,0 +1,35 @@
+package profiles_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"strconv"
+)
+
+templ ProfileDeletion(c echo.Context, review *inventory.ProfileDeletionReview, info *partials.CommonInfo) {
+	@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "Profile Management"), Url: partials.GetNavigationUrl(info, "/profiles")}, {Title: i18n.T(ctx, "profile_deletion.title")}}, info)
+	<main class="p-4" hx-history="false">
+		<div id="error" class="hidden"></div>
+		@ProfileDeletionConfirmation(review, info)
+	</main>
+}
+
+templ ProfileDeletionConfirmation(review *inventory.ProfileDeletionReview, info *partials.CommonInfo) {
+	<section class="uk-card uk-card-default p-4 max-w-full" aria-labelledby="profile-deletion-title">
+		<h1 id="profile-deletion-title" class="text-foreground text-xl font-semibold">{ i18n.T(ctx,"profile_deletion.title") }</h1>
+		<p class="mt-4 break-all">{ review.Name }</p>
+		<p class="mt-2">{ i18n.T(ctx,"profile_deletion.id") }{ strconv.FormatInt(review.ID,10) }</p>
+		if review.NameTruncated {
+			<p class="mt-2">{ i18n.T(ctx,"profile_deletion.truncated") }</p>
+		}
+		<p class="mt-4">{ i18n.T(ctx,"profile_deletion.consequences") }</p>
+		<p class="mt-2">{ i18n.T(ctx,"profile_deletion.device_effects") }</p>
+		<div class="flex flex-wrap gap-4 mt-6">
+			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/profiles")) } hx-get={ partials.GetNavigationUrl(info, "/profiles") } hx-target="#main" hx-swap="outerHTML" hx-push-url="true">{ i18n.T(ctx,"Cancel") }</a>
+			<button type="button" class="uk-button uk-button-danger" hx-delete={ partials.GetNavigationUrl(info, fmt.Sprintf("/profiles/%d", review.ID)) } hx-target="#main" hx-swap="outerHTML">{ i18n.T(ctx,"profile_deletion.delete") }</button>
+		</div>
+	</section>
+}

@@ -1,0 +1,5 @@
+.profile-history { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.profile-history-entry { display: flex; flex-direction: column; gap: .75rem; min-width: 0; padding: 1rem 0; border-bottom: 1px solid var(--border, #d1d5db); }
+.profile-history-output { max-width: 100%; max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: .75rem; font: inherit; border: 1px solid var(--border, #d1d5db); border-radius: .375rem; }
+.profile-history-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.profile-history .uk-button { white-space: normal; }

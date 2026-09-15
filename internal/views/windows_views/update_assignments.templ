@@ -1,0 +1,244 @@
+package windows_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/windows"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"time"
+)
+
+templ assignmentSource(info *partials.CommonInfo, ring windows.UpdateRingRevision) {
+	<h2 class="uk-card-title">{ ring.Name } · Revision { fmt.Sprint(ring.Revision) }</h2>
+	<p class="break-all">{ ring.RingID }</p>
+	<p>State at this revision: { ringState(ring.Enabled) }</p>
+	<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-rings/"+ring.RingID)) }>Review latest ring history</a>
+}
+
+templ UpdateAssignmentForm(c echo.Context, info *partials.CommonInfo, draft UpdateAssignmentDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: assignmentTitle(draft, false)}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">{ assignmentTitle(draft, false) }</h1>@ringNavigation(info)
+			</div>
+			if draft.Error!="" {
+				<div class="uk-alert uk-alert-danger" role="alert">{ draft.Error }</div>
+			}
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					@assignmentSource(info, draft.Ring)
+					@updateGroupPreview(info, draft.Group, draft.Scheduled)
+					<p class="my-3">Select the exact native Windows devices for this revision. The next step checks their site and identity, then shows every selected device for review.</p>
+					if draft.Scheduled {
+						<p>Confirmation saves a future activation plan. The server creates device runs only when the activation window opens and the original source, devices and creator still permit the assignment.</p>
+					} else {
+						<p>No commands are created until you confirm.</p>
+					}
+					<a class="uk-button uk-button-default my-4" href={ templ.URL(updateGroupSelectionURL(info, draft.Ring, draft.Form.Get("mode"), nil, draft.Scheduled)) }>{ i18n.T(ctx,"windows_groups.choose") }</a>
+					<form class="grid gap-4" method="post" action={ partials.GetNavigationUrl(info, assignmentPath(draft)+"/preview") }>
+						@mdm_views.CSRF(info)
+						@updateGroupFields(draft)
+						<input type="hidden" name="ring_revision" value={ draft.Form.Get("ring_revision") }/><input type="hidden" name="request_key" value={ draft.Form.Get("request_key") }/>
+						<label class="grid gap-2">Action<select class="uk-select" name="mode"><option value="apply" selected?={ draft.Form.Get("mode")=="apply" }>Apply selected revision</option><option value="remove" selected?={ draft.Form.Get("mode")=="remove" }>Remove this revision's settings from this management source</option></select></label>
+						<label class="grid gap-2">
+							Native Windows device IDs<textarea class="uk-textarea font-mono" name="devices" readonly?={ draft.Form.Get("group_id")!="" } rows="6" maxlength="4000" required spellcheck="false" autocomplete="off" placeholder="One native Windows device UUID per line">{ draft.Form.Get("devices") }</textarea>
+							<span class="uk-text-muted">
+								if draft.Form.Get("group_id")!="" {
+									{ i18n.T(ctx,"windows_groups.selected_help") }
+								} else {
+									Paste 1–100 distinct IDs, one per line, from native Windows inventory in this site. Agent IDs and reported hardware identifiers are different identities.
+								}
+							</span>
+						</label>
+						if draft.Scheduled {
+							<label class="grid gap-2">Activate no earlier than (UTC)<input class="uk-input" type="datetime-local" name="not_before" step="60" value={ draft.Form.Get("not_before") } required/><span class="uk-text-muted">Enter UTC, not your browser's local time. Choose a time within 90 days.</span></label>
+							<label class="grid gap-2">Activation window (minutes)<input class="uk-input" type="number" name="activation_minutes" min="1" max="10080" step="1" value={ draft.Form.Get("activation_minutes") } required/><span class="uk-text-muted">The server may create the cohort during this window. It is not a Windows installation or restart maintenance window and does not stop later device delivery.</span></label>
+						}
+						<label class="grid gap-2">
+							Admission lifetime (hours)<input class="uk-input" type="number" name="hours" min="1" max="168" step="1" value={ draft.Form.Get("hours") } required/>
+							if draft.Scheduled {
+								<span class="uk-text-muted">Starts separately for each device run when the plan activates. It bounds admission of new steps; it does not set a restart time or remove settings at expiry.</span>
+							} else {
+								<span class="uk-text-muted">Starts when you confirm. It bounds admission of new steps; it does not schedule a restart or remove settings at expiry.</span>
+							}
+						</label>
+						<button class="uk-button uk-button-primary" type="submit">
+							if draft.Scheduled {
+								Review schedule and devices
+							} else {
+								Review revision and devices
+							}
+						</button>
+					</form>
+					<details class="mt-4">
+						<summary>Settings in this revision</summary>@ringPolicyValues(draft.Ring.Policy)
+					</details>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ assignmentDraftFields(draft UpdateAssignmentDraft) {
+	@updateGroupFields(draft)
+	for _,name:=range []string{"ring_revision","request_key","mode","hours","devices"} {
+		<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+	}
+	if draft.Scheduled {
+		for _,name:=range []string{"not_before","activation_minutes"} {
+			<input type="hidden" name={ name } value={ draft.Form.Get(name) }/>
+		}
+	}
+}
+
+templ UpdateAssignmentPreview(c echo.Context, info *partials.CommonInfo, draft UpdateAssignmentDraft) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: assignmentTitle(draft, true)}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">{ assignmentTitle(draft, true) }</h1>@ringNavigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					@assignmentSource(info, draft.Ring)
+					@updateGroupPreview(info, draft.Group, draft.Scheduled)
+					<p class="my-3">Nothing has been queued by this preview. Confirm the exact revision, action and complete device list below.</p>
+					<dl class="uk-description-list"><dt>Action</dt><dd>{ updateMode(draft.Form.Get("mode")) }</dd><dt>Site</dt><dd>{ ringScope(info) }</dd><dt>Selected devices</dt><dd>{ fmt.Sprint(len(draft.Devices)) }</dd><dt>Admission lifetime</dt><dd>{ draft.Form.Get("hours") } hours</dd><dt>Request ID</dt><dd>{ draft.Form.Get("request_key") }</dd></dl>
+					if draft.Scheduled {
+						<dl class="uk-description-list">
+							<dt>Activate no earlier than</dt>
+							<dd>
+								@ScheduleTime(draft.NotBefore)
+							</dd>
+							<dt>Activation window closes</dt>
+							<dd>
+								@ScheduleTime(draft.NotBefore.Add(draft.ActivationWindow))
+							</dd>
+							<dt>Activation window</dt>
+							<dd>{ draft.Form.Get("activation_minutes") } minutes</dd>
+						</dl>
+						<p>Both times above are UTC. This window controls creation of device runs; it does not schedule Windows installation or restart, or cut off subsequent device delivery.</p>
+					}
+					<div class="overflow-x-auto" role="region" aria-label="Reviewed Windows assignment devices" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Every selected device in this assignment</caption>
+							<thead>
+								<tr>
+									<th scope="col">Reported device name</th>
+									<th scope="col">Native device ID</th>
+									<th scope="col">Identity status</th>
+									if draft.Scheduled {
+										<th scope="col">Current certificate expires (UTC)</th>
+									}
+								</tr>
+							</thead>
+							<tbody>
+								for _,device:=range draft.Devices {
+									<tr>
+										<td>{ device.Name }</td>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+device.ID)) }>{ device.ID }</a></td>
+										<td>{ DeviceStatus(device) }</td>
+										if draft.Scheduled {
+											<td>
+												@ScheduleTime(device.CertificateExpiresAt)
+												if !device.CertificateExpiresAt.After(draft.NotBefore) {
+													<p>Current certificate expires before activation.</p>
+												}
+											</td>
+										}
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					@ringPolicyValues(draft.Ring.Policy)
+					if draft.Form.Get("mode")=="remove" {
+						<p>Only the settings selected in this historical revision will be removed from this management source. Their listed values will not be applied. Effective policy from other sources may remain.</p>
+					} else {
+						<p>Windows may restart according to the configured deadlines and grace periods. Active hours do not prevent a forced restart after those limits.</p>
+					}
+					if draft.Scheduled {
+						<p class="my-3">Confirmation saves this immutable plan without creating device commands. The worker rechecks the original creator, ring and devices at activation. Queue capacity is not reserved. Activation creates all selected runs together or creates none; waiting attempts may retry within the window. Each admitted run then has its own lifetime. Applied policy, installed patches and reboot require later device evidence.</p>
+					} else {
+						<p class="my-3">Confirmation creates one immutable policy run per selected device, with platform checks and separate policy read-back. Admission succeeds for the entire selection or creates no runs. Devices must contact the server to receive work. Queue acceptance does not prove installed patches or a reboot.</p>
+					}
+					<form class="grid gap-3" method="post" action={ partials.GetNavigationUrl(info, assignmentPath(draft)+"/create") }>
+						@mdm_views.CSRF(info)
+						@assignmentDraftFields(draft)
+						if draft.Scheduled {
+							<label><input type="checkbox" name="confirm_schedule" value="yes" required/> Save this exact revision, device selection and UTC activation window.</label><button class="uk-button uk-button-primary" type="submit">Confirm and save schedule</button>
+						} else {
+							<label><input type="checkbox" name="confirm_assignment" value="yes" required/> Assign this exact revision and action to every device listed above.</label><button class="uk-button uk-button-primary" type="submit">Confirm and assign revision</button>
+						}
+					</form>
+					<form class="mt-4" method="post" action={ partials.GetNavigationUrl(info, assignmentPath(draft)+"/preview") }>
+						@mdm_views.CSRF(info)
+						@assignmentDraftFields(draft)
+						<button class="uk-button uk-button-default" name="edit_assignment" value="yes" type="submit">Edit selected devices</button>
+					</form>
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ UpdateRollout(c echo.Context, info *partials.CommonInfo, rollout windows.UpdateRollout, rows []UpdateRolloutRow) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/windows-management.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Update rings", Url: partials.GetNavigationUrl(info, "/windows/update-rings")}, {Title: "Assignment history"}}, info)
+		<main class="windows-management grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold">Windows ring assignment history</h1>@ringNavigation(info)
+			</div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body">
+					<p>These are the original device runs and their historical policy evidence. Each device is observed separately. Queue admission and verified policy values do not prove patch installation, reboot or current continuous compliance.</p>
+					<dl class="uk-description-list">
+						<dt>Assignment ID</dt>
+						<dd>{ rollout.ID }</dd>
+						<dt>Source ring / revision</dt>
+						<dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, fmt.Sprintf("/windows/update-rings/%s?before=%d#revision-%d", rollout.RingID, rollout.RingRevision+1, rollout.RingRevision))) }>{ rollout.RingID } · { fmt.Sprint(rollout.RingRevision) }</a></dd>
+						<dt>Action</dt>
+						<dd>{ updateMode(rollout.Mode) }</dd>
+						<dt>Created</dt>
+						<dd>
+							@ReportTime(rollout.CreatedAt)
+						</dd>
+						<dt>Created by</dt>
+						<dd>{ rollout.CreatedBy }</dd>
+						<dt>Per-device admission lifetime</dt>
+						<dd>{ fmt.Sprint(int64(rollout.Lifetime/time.Second)) } seconds</dd>
+					</dl>
+					@updateGroupSource(info, rollout.Group)
+					if rollout.ScheduleID!="" {
+						<dl class="uk-description-list"><dt>Source schedule</dt><dd><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/update-schedules/"+rollout.ScheduleID)) }>{ rollout.ScheduleID }</a></dd></dl>
+					}
+					<div class="overflow-x-auto" role="region" aria-label="Windows ring assignment runs" tabindex="0">
+						<table class="uk-table uk-table-divider">
+							<caption class="sr-only">Original per-device runs in this assignment</caption><thead><tr><th scope="col">Device</th><th scope="col">Policy run</th><th scope="col">Historical evidence</th><th scope="col">Admission expires</th></tr></thead>
+							<tbody>
+								for _,row:=range rows {
+									<tr>
+										<td>{ row.Device.Name }<div>{ row.Device.ID }</div></td>
+										<td><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/windows/"+row.Device.ID+"/updates/"+row.Detail.Run.ID)) }>{ row.Detail.Name }</a><div>{ row.Detail.Run.ID }</div></td>
+										<td>{ updateState(row.Detail.Phase) }</td>
+										<td>
+											@ReportTime(row.Detail.Run.ExpiresAt)
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					<p>Use a device's policy run to inspect its evidence or cancel remaining undelivered steps. Cancellation does not remove already applied settings and cannot stop a sent or uncertain step.</p>
+				</div>
+			</section>
+		</main>
+	}
+}

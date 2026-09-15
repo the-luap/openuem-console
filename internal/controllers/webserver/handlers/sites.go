@@ -323,6 +323,11 @@ func (h *Handler) DeleteSite(c echo.Context) error {
 	}
 
 	// Send a request to uninstall agents associated with this organization
+	if inUse, err := h.appleScopeInUse(c, tenantID, siteID); err != nil {
+		return h.ListSites(c, "", "Could not check Apple management records", false)
+	} else if inUse {
+		return h.ListSites(c, "", "This site contains Apple device records and cannot be deleted.", false)
+	}
 	agents, err := h.Model.GetAgentsBySite(tenantID, siteID)
 	if err != nil {
 		return h.ListSites(c, "", i18n.T(c.Request().Context(), "sites.could_not_get_agents"), false)

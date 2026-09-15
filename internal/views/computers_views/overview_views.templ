@@ -5,9 +5,9 @@ import (
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent"
-	openuem_agent "github.com/open-uem/ent/agent"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 	"golang.org/x/mod/semver"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -39,70 +39,26 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							<tr>
 								<th>{ i18n.T(ctx, "Tenant.one") }</th>
 								<td>
-									<select
-										id="tenant"
-										class="uk-select w-3/4"
-										title={ i18n.T(ctx, "Organization") }
-										hx-post={ fmt.Sprintf("/computers/%s/sites", agent.ID) }
-										hx-include="#tenant,#site"
-										hx-target="#site-selector"
-										hx-swap="outerHTML"
-										hx-trigger="change"
-										hx-push-url="false"
-										name="tenant"
-									>
-										for _, t := range allTenants {
-											<option
-												class="!align-middle"
-												value={ strconv.Itoa(t.ID) }
-												selected?={ currentTenant.ID == t.ID }
-											>
-												if t.Description == "DefaultTenant" {
-													{ i18n.T(ctx,t.Description) }
-												} else {
-													{ t.Description }
-												}
-											</option>
-										}
-									</select>
+									if currentTenant.Description == "DefaultTenant" {
+										{ i18n.T(ctx, currentTenant.Description) }
+									} else {
+										{ currentTenant.Description }
+									}
 								</td>
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "Site.one") }</th>
 								<td>
-									<div id="site-selector">
-										<form class="flex gap-2 items-center" id="sites-dropdown">
-											<select id="site" class="uk-select w-3/4" title={ i18n.T(ctx, "Organization") } name="site">
-												for _, s := range allSites {
-													<option
-														class="!align-middle"
-														value={ strconv.Itoa(s.ID) }
-														selected?={ currentSite.ID == s.ID }
-													>
-														if s.Description == "DefaultSite" {
-															{ i18n.T(ctx,s.Description) }
-														} else {
-															{ s.Description }
-														}
-													</option>
-												}
-											</select>
-											<button
-												id="save-site"
-												class="flex items-center gap-8"
-												type="submit"
-												hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s/overview", agent.ID)))) }
-												hx-include="#tenant"
-												hx-push-url="false"
-												hx-target="#main"
-												hx-swap="outerHTML"
-												htmx-indicator="#save-description"
-											>
-												<uk-icon hx-history="false" icon="save" custom-class="h-6 w-6 text-blue-600" uk-cloack></uk-icon>
-												<uk-icon id="save-description" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-											</button>
-										</form>
-									</div>
+									if currentSite.Description == "DefaultSite" {
+										{ i18n.T(ctx, currentSite.Description) }
+									} else {
+										{ currentSite.Description }
+									}
+								</td>
+							</tr>
+							<tr>
+								<td colspan="2">
+									<a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agent.ID)+"/assignment") }>{ i18n.T(ctx, "device_assignment.title") }</a>
 								</td>
 							</tr>
 							<tr>
@@ -125,7 +81,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "antivirus.enabled") }</th>
-								if agent.Edges.Antivirus.IsActive {
+								if agent.Edges.Antivirus == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Antivirus.IsActive {
 									<td class="!align-middle"><uk-icon hx-history="false" icon="shield-check" custom-class="h-5 w-5 text-green-600" uk-cloack></uk-icon></td>
 								} else {
 									if len(agent.Edges.Antivirus.Name) == 0 {
@@ -137,7 +95,7 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "updates.title") }</th>
-								if len(agent.Edges.Systemupdate.SystemUpdateStatus) == 0 {
+								if agent.Edges.Systemupdate == nil || len(agent.Edges.Systemupdate.SystemUpdateStatus) == 0 {
 									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
 								} else {
 									<td class="!align-middle">{ i18n.T(ctx,agent.Edges.Systemupdate.SystemUpdateStatus) }</td>
@@ -151,50 +109,15 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 						<table class="uk-table uk-table-small uk-table-divider uk-table-justify w-1/2">
 							<tr>
 								<th>{ i18n.T(ctx, "Description") }</th>
-								<td>
-									<form class="flex gap-2 items-center">
-										<input class="uk-input w-3/4" type="text" spellcheck="false" name="endpoint-description" placeholder={ i18n.T(ctx, "agents.overview_description_placeholder") } value={ agent.Description }/>
-										<button
-											class="flex items-center gap-8"
-											type="submit"
-											hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s/overview", agent.ID)))) }
-											hx-push-url="false"
-											hx-target="#main"
-											hx-swap="outerHTML"
-											htmx-indicator="#save-description"
-										>
-											<uk-icon hx-history="false" icon="save" custom-class="h-6 w-6 text-blue-600" uk-cloack></uk-icon>
-											<uk-icon id="save-description" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-										</button>
-									</form>
-								</td>
+								<td class="break-words">{ agent.Description }</td>
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "Type") }</th>
-								<td>
-									<form class="flex gap-2 items-center">
-										<select class="uk-select w-3/4" name="endpoint-type">
-											<option value={ openuem_agent.EndpointTypeDesktopPC } selected?={ agent.EndpointType == openuem_agent.EndpointTypeDesktopPC }>{ i18n.T(ctx,  openuem_agent.EndpointTypeDesktopPC.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeLaptop } selected?={ agent.EndpointType == openuem_agent.EndpointTypeLaptop }>{ i18n.T(ctx, openuem_agent.EndpointTypeLaptop.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeServer } selected?={ agent.EndpointType == openuem_agent.EndpointTypeServer }>{ i18n.T(ctx, openuem_agent.EndpointTypeServer.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeTablet } selected?={ agent.EndpointType == openuem_agent.EndpointTypeTablet }>{ i18n.T(ctx, openuem_agent.EndpointTypeTablet.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeVM } selected?={ agent.EndpointType ==  openuem_agent.EndpointTypeVM }>{ i18n.T(ctx, openuem_agent.EndpointTypeVM.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeAllInOne } selected?={ agent.EndpointType == openuem_agent.EndpointTypeAllInOne }>{ i18n.T(ctx,  openuem_agent.EndpointTypeAllInOne.String()) }</option>
-											<option value={ openuem_agent.EndpointTypeOther } selected?={ agent.EndpointType == openuem_agent.EndpointTypeOther }>{ i18n.T(ctx, openuem_agent.EndpointTypeOther.String()) }</option>
-										</select>
-										<button
-											class="flex items-center gap-8"
-											type="submit"
-											hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s/overview", agent.ID)))) }
-											hx-push-url="false"
-											hx-target="#main"
-											hx-swap="outerHTML"
-											htmx-indicator="#save-description"
-										>
-											<uk-icon hx-history="false" icon="save" custom-class="h-6 w-6 text-blue-600" uk-cloack></uk-icon>
-											<uk-icon id="save-description" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-										</button>
-									</form>
+								<td>{ i18n.T(ctx, string(agent.EndpointType)) }</td>
+							</tr>
+							<tr>
+								<td colspan="2">
+									<a class="uk-button uk-button-default" href={ partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agent.ID)+"/details") }>{ i18n.T(ctx,"device_details.edit") }</a>
 								</td>
 							</tr>
 							<tr>
@@ -217,7 +140,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "antivirus.updated") }</th>
-								if agent.Edges.Antivirus.IsUpdated {
+								if agent.Edges.Antivirus == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Antivirus.IsUpdated {
 									<td class="!align-middle"><uk-icon hx-history="false" icon="shield-check" custom-class="h-5 w-5 text-green-600" uk-cloack></uk-icon></td>
 								} else {
 									if len(agent.Edges.Antivirus.Name) == 0 {
@@ -229,7 +154,9 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 							</tr>
 							<tr>
 								<th>{ i18n.T(ctx, "updates.pending_updates") }</th>
-								if agent.Edges.Systemupdate.PendingUpdates {
+								if agent.Edges.Systemupdate == nil {
+									<td class="!align-middle">{ i18n.T(ctx,"Unknown") }</td>
+								} else if agent.Edges.Systemupdate.PendingUpdates {
 									<td class="!align-middle">
 										<div class="flex gap-1 items-center uk-alert-description">
 											<uk-icon hx-history="false" icon="triangle-alert" custom-class="h-5 w-5 text-red-600" uk-cloack></uk-icon>
@@ -246,7 +173,7 @@ templ Overview(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, h
 									<td class="!align-middle">
 										<div class="flex items-center gap-2">
 											{ agent.Edges.Release.Version }
-											if semver.Compare("v" + agent.Edges.Release.Version, "v"+ higherReleaseApplied.Version) < 0 {
+											if higherReleaseApplied != nil && semver.Compare("v" + agent.Edges.Release.Version, "v"+ higherReleaseApplied.Version) < 0 {
 												@partials.AlertIcon(i18n.T(ctx, "admin.update.agents.outdated"))
 											}
 										</div>

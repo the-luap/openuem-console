@@ -14,12 +14,8 @@ import (
 	"github.com/open-uem/ent/operatingsystem"
 	"github.com/open-uem/ent/predicate"
 	"github.com/open-uem/ent/printer"
-	"github.com/open-uem/ent/profile"
-	"github.com/open-uem/ent/profileissue"
 	"github.com/open-uem/ent/site"
 	"github.com/open-uem/ent/tag"
-	"github.com/open-uem/ent/task"
-	"github.com/open-uem/ent/taskreport"
 	"github.com/open-uem/ent/tenant"
 	"github.com/open-uem/openuem-console/internal/views/filters"
 	"github.com/open-uem/openuem-console/internal/views/partials"
@@ -67,6 +63,7 @@ func (m *Model) CountAllComputers(f filters.AgentFilter, c *partials.CommonInfo)
 	}
 
 	// Apply filters
+	applyComputerScopeUniqueness(query, c)
 	applyComputerFilters(query, f)
 
 	count, err := query.Count(context.Background())
@@ -74,6 +71,16 @@ func (m *Model) CountAllComputers(f filters.AgentFilter, c *partials.CommonInfo)
 		return 0, err
 	}
 	return count, err
+}
+
+func applyComputerScopeUniqueness(query *ent.AgentQuery, info *partials.CommonInfo) {
+	// Count all site edges, including hidden sites. An ambiguous assignment must
+	// not expose inventory to delegated readers; administrators can still repair it.
+	if !info.Principal.IsAdministrator() {
+		query.Where(func(s *sql.Selector) {
+			s.Where(sql.ExprP("(SELECT count(*) FROM site_agents WHERE agent_id = " + s.C(agent.FieldID) + ") = 1"))
+		})
+	}
 }
 
 func mainQuery(s *sql.Selector, p partials.PaginationAndSort) {
@@ -163,6 +170,8 @@ func (m *Model) GetComputersByPage(p partials.PaginationAndSort, f filters.Agent
 
 	// Apply filters
 	applyComputerFilters(query, f)
+
+	applyComputerScopeUniqueness(query, c)
 
 	// Apply sort
 	switch p.SortBy {
@@ -636,27 +645,6 @@ func (m *Model) GetAgentMonitorsInfo(agentId string, c *partials.CommonInfo) (*e
 	}
 }
 
-func (m *Model) SaveNotes(agentId string, notes string, c *partials.CommonInfo) error {
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return err
-	}
-
-	if siteID == -1 {
-		return m.Client.Agent.UpdateOneID(agentId).
-			Where(agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID)))).
-			SetNotes(notes).Exec(context.Background())
-	} else {
-		return m.Client.Agent.UpdateOneID(agentId).
-			Where(agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID)))).
-			SetNotes(notes).Exec(context.Background())
-	}
-}
-
 func (m *Model) GetComputerManufacturers(c *partials.CommonInfo, f filters.AgentFilter) ([]string, error) {
 	var query *ent.ComputerQuery
 
@@ -927,85 +915,4 @@ func (m *Model) GetAgentAppsInfo(agentId string, c *partials.CommonInfo) ([]*ent
 		}
 		return apps, nil
 	}
-}
-
-func (m *Model) TaskReportsByPageInfo(agentId string, c *partials.CommonInfo, p partials.PaginationAndSort) ([]*ent.TaskReport, error) {
-	var query *ent.TaskReportQuery
-
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return nil, err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	query = m.Client.TaskReport.Query().WithTask().WithProfileissue(func(q *ent.ProfileIssueQuery) { q.WithProfile().All(context.Background()) })
-
-	if siteID == -1 {
-		query.Where(taskreport.HasProfileissueWith(profileissue.HasAgentsWith(agent.ID(agentId), agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID))))))
-
-	} else {
-		query.Where(taskreport.HasProfileissueWith(profileissue.HasAgentsWith(agent.ID(agentId), agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID))))))
-	}
-
-	return query.Limit(p.PageSize).Offset((p.CurrentPage - 1) * p.PageSize).Order(taskreport.ByEnd(sql.OrderDesc())).All(context.Background())
-}
-
-func (m *Model) CountTaskReportsByPageInfo(agentId string, c *partials.CommonInfo) (int, error) {
-	var query *ent.TaskReportQuery
-
-	siteID, err := strconv.Atoi(c.SiteID)
-	if err != nil {
-		return 0, err
-	}
-	tenantID, err := strconv.Atoi(c.TenantID)
-	if err != nil {
-		return 0, err
-	}
-
-	if siteID == -1 {
-		query = m.Client.TaskReport.Query().Where(taskreport.HasProfileissueWith(profileissue.HasAgentsWith(agent.ID(agentId), agent.HasSiteWith(site.HasTenantWith(tenant.ID(tenantID))))))
-
-	} else {
-		query = m.Client.TaskReport.Query().Where(taskreport.HasProfileissueWith(profileissue.HasAgentsWith(agent.ID(agentId), agent.HasSiteWith(site.ID(siteID), site.HasTenantWith(tenant.ID(tenantID))))))
-	}
-
-	return query.Count(context.Background())
-}
-
-func (m *Model) GetAvailableTasksForAgent(agentID string) ([]*ent.Task, error) {
-
-	a, err := m.Client.Agent.Get(context.Background(), agentID)
-	if err != nil {
-		return nil, err
-	}
-
-	switch a.Os {
-	case "windows":
-		return m.Client.Task.Query().Where(task.AgentTypeIn(task.AgentTypeWindows)).All(context.Background())
-	case "macos", "macOS":
-		return m.Client.Task.Query().Where(task.AgentTypeIn(task.AgentTypeMacos)).All(context.Background())
-	default:
-		return m.Client.Task.Query().Where(task.AgentTypeIn(task.AgentTypeLinux)).All(context.Background())
-	}
-}
-
-func (m *Model) GetAvailableProfilesForAgent(agentID string) ([]*ent.Profile, error) {
-
-	a, err := m.Client.Agent.Get(context.Background(), agentID)
-	if err != nil {
-		return nil, err
-	}
-
-	switch a.Os {
-	case "windows":
-		return m.Client.Profile.Query().Where(profile.HasTasksWith(task.AgentTypeIn(task.AgentTypeWindows, task.AgentTypeAny))).All(context.Background())
-	case "macos", "macOS":
-		return m.Client.Profile.Query().Where(profile.HasTasksWith(task.AgentTypeIn(task.AgentTypeMacos, task.AgentTypeAny))).All(context.Background())
-	default:
-		return m.Client.Profile.Query().Where(profile.HasTasksWith(task.AgentTypeIn(task.AgentTypeLinux, task.AgentTypeAny))).All(context.Background())
-	}
-
 }

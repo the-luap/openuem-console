@@ -1,0 +1,6 @@
+{
+  "DNSUPDATE_NAMESERVER": "192.0.2.53:53",
+  "DNSUPDATE_TSIG_ALGORITHM": "hmac-sha256.",
+  "DNSUPDATE_TSIG_KEY": "replace-with-the-zone-update-key-name.",
+  "DNSUPDATE_TSIG_SECRET_FILE": "/run/openuem-acme/dns-update-secret"
+}

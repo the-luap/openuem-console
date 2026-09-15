@@ -1,0 +1,125 @@
+package admin_views
+
+import (
+ "fmt"
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+func NetbirdPackageBase(info *partials.CommonInfo) string { return "/tenant/"+info.TenantID+"/netbird/packages" }
+func netbirdPackageManage(info *partials.CommonInfo) bool {
+ tenant,_:=strconv.Atoi(info.TenantID)
+ return info.Principal.Can(access.ManageSoftware,access.Scope{TenantID:tenant})
+}
+
+templ netbirdPackagePage(c echo.Context,info *partials.CommonInfo,title string) {
+ @partials.Header(c,[]partials.Breadcrumb{{Title:"NetBird packages",Url:NetbirdPackageBase(info)},{Title:title}},info)
+ <main id="netbird-packages" class="min-w-0 flex-1 p-4 sm:px-6" hx-history="false">
+  <section class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+   <header><h1 class="text-2xl font-semibold" id="netbird-package-heading" tabindex="-1">{ title }</h1><p class="mt-2 text-sm">Exact NetBird package approvals for this organization.</p></header>
+   <div id="error" class="hidden" role="alert"></div>
+   { children... }
+  </section>
+ </main>
+}
+
+templ NetbirdPackageList(c echo.Context,info *partials.CommonInfo,page *inventory.NetbirdPackagePage) {
+ @netbirdPackagePage(c,info,"NetBird packages") {
+  if netbirdPackageManage(info) {
+   <a id="netbird-package-new" class="uk-button uk-button-primary self-start" href={ NetbirdPackageBase(info)+"/new" }>Approve a package</a>
+  }
+  <p class="text-sm">Approvals record reviewed package bytes. Managed installation is not yet available.</p>
+  if len(page.Approvals)==0 {
+   <p role="status">No package approvals are stored.</p>
+  }
+  for _,p:=range page.Approvals {
+   <article class="min-w-0 rounded-lg border p-4">
+    <h2 class="break-all text-lg font-semibold"><a href={ NetbirdPackageBase(info)+"/"+p.ID }>{ p.PackageID+" "+p.Version }</a></h2>
+    <p class="mt-2 break-all text-sm">{ p.Platform+" / "+p.Architecture+" / "+p.Format }</p>
+    <p class="mt-2 text-sm"><span>Approved </span>@mdm_views.Timestamp(&p.CreatedAt)<span> by </span><span class="break-all">{ p.Actor }</span></p>
+    if p.RevokedAt!=nil {
+     <p class="mt-2 font-semibold">Revoked</p>
+    } else {
+     <p class="mt-2 font-semibold">Approved</p>
+    }
+   </article>
+  }
+  if page.Next!="" {
+   <a id="netbird-package-next" class="uk-button uk-button-default self-start" href={ NetbirdPackageBase(info)+"?after="+page.Next }>Older approvals</a>
+  }
+ }
+}
+
+templ NetbirdPackageNew(c echo.Context,info *partials.CommonInfo,id string) {
+ @netbirdPackagePage(c,info,"Approve a NetBird package") {
+  <p>Approve a specific package after checking its publisher and exact bytes. Each approval is permanent; changes require another approval. Saving does not download or install the package.</p>
+  <form id="netbird-package-form" method="post" action={ NetbirdPackageBase(info) } hx-post={ NetbirdPackageBase(info) } hx-sync="this:drop" hx-disabled-elt="#netbird-package-fields" hx-indicator="#netbird-package-pending">
+   @mdm_views.CSRF(info)
+   <input type="hidden" name="approval_id" value={ id }/>
+   <fieldset id="netbird-package-fields" class="flex min-w-0 flex-col gap-5">
+    <legend class="sr-only">Package approval</legend>
+    <div><label for="netbird-package-target" class="uk-form-label">Package target</label><select id="netbird-package-target" name="target" class="uk-select mt-1 w-full" required>
+     <option value="" disabled selected>Select a platform, architecture and format</option>
+     <option value="linux/amd64/deb">Linux x86_64 — DEB</option><option value="linux/arm64/deb">Linux ARM64 — DEB</option><option value="linux/386/deb">Linux x86 (32-bit) — DEB</option>
+     <option value="linux/amd64/rpm">Linux x86_64 — RPM</option><option value="linux/arm64/rpm">Linux ARM64 — RPM</option><option value="linux/386/rpm">Linux x86 (32-bit) — RPM</option>
+     <option value="macos/amd64/pkg">macOS Intel — PKG</option><option value="macos/arm64/pkg">macOS Apple silicon — PKG</option>
+    </select><p class="mt-1 text-sm">Linux packages must identify as netbird; macOS packages as io.netbird.client. Use the separate architecture PKG for macOS.</p></div>
+    <div><label for="netbird-package-version" class="uk-form-label">Native package version</label><input id="netbird-package-version" name="version" maxlength="128" class="uk-input mt-1 w-full" required autocomplete="off" spellcheck="false"/><p class="mt-1 text-sm">Use the complete package version, including RPM release and any nonzero epoch.</p></div>
+    <div><label for="netbird-package-source" class="uk-form-label">Direct HTTPS download URL</label><input id="netbird-package-source" name="source_url" type="url" maxlength="2048" class="uk-input mt-1 w-full" required autocomplete="off" spellcheck="false"/><p class="mt-1 text-sm">Use an approved direct source ending in .deb, .rpm or .pkg. Redirects are not followed. The stored URL is encrypted and is not shown in approval history.</p></div>
+    <div><label for="netbird-package-size" class="uk-form-label">Exact file size in bytes</label><input id="netbird-package-size" name="size" type="number" min="1" max="536870912" step="1" class="uk-input mt-1 w-full" required/></div>
+    <div><label for="netbird-package-sha256" class="uk-form-label">SHA-256</label><input id="netbird-package-sha256" name="sha256" pattern="[0-9a-f]{64}" minlength="64" maxlength="64" class="uk-input mt-1 w-full" required autocomplete="off" spellcheck="false"/><p class="mt-1 text-sm">Enter the 64-character lowercase digest of the reviewed file.</p></div>
+    <div><label for="netbird-package-verification" class="uk-form-label">Publisher verification reference</label><input id="netbird-package-verification" name="verification" maxlength="512" class="uk-input mt-1 w-full" required autocomplete="off"/><p class="mt-1 text-sm">Record a signing-evidence or review-ticket reference. This reference is visible in this organization's approval history. Do not include credentials.</p></div>
+    <label for="netbird-package-confirm" class="flex items-start gap-3"><input id="netbird-package-confirm" type="checkbox" name="confirmed" value="yes" required class="uk-checkbox mt-1"/><span>I verified the publisher and exact package bytes and approve this package for this organization.</span></label>
+    <button id="netbird-package-submit" type="submit" class="uk-button uk-button-primary self-start">Approve package</button>
+   </fieldset>
+   <p id="netbird-package-pending" class="htmx-indicator mt-3" role="status">Saving approval…</p>
+  </form>
+  <a class="uk-button uk-button-default self-start" href={ NetbirdPackageBase(info) }>Back to package approvals</a>
+ }
+}
+
+templ NetbirdPackageDetail(c echo.Context,info *partials.CommonInfo,p *inventory.NetbirdPackageApproval,requestID string) {
+ @netbirdPackagePage(c,info,"NetBird package approval") {
+  <dl class="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+   <dt class="font-semibold">Approval ID</dt><dd class="break-all">{ p.ID }</dd>
+   <dt class="font-semibold">Package</dt><dd class="break-all">{ p.PackageID }</dd>
+   <dt class="font-semibold">Version</dt><dd class="break-all">{ p.Version }</dd>
+   <dt class="font-semibold">Target</dt><dd class="break-all">{ p.Platform+" / "+p.Architecture+" / "+p.Format }</dd>
+   <dt class="font-semibold">File size</dt><dd>{ fmt.Sprintf("%d bytes",p.Size) }</dd>
+   <dt class="font-semibold">SHA-256</dt><dd class="break-all">{ p.SHA256 }</dd>
+   <dt class="font-semibold">Verification reference</dt><dd class="break-all">{ p.Verification }</dd>
+   <dt class="font-semibold">Approved by</dt><dd class="break-all">{ p.Actor }</dd>
+   <dt class="font-semibold">Approved at</dt><dd>@mdm_views.Timestamp(&p.CreatedAt)</dd>
+   <dt class="font-semibold">Status</dt><dd id="netbird-package-status">
+    if p.RevokedAt!=nil {
+     Revoked
+    } else {
+     Approved
+    }
+   </dd>
+   if p.RevokedAt!=nil {
+    <dt class="font-semibold">Revoked by</dt><dd class="break-all">{ p.RevokedBy }</dd>
+    <dt class="font-semibold">Revoked at</dt><dd>@mdm_views.Timestamp(p.RevokedAt)</dd>
+   }
+  </dl>
+  <p class="text-sm">The source URL is stored privately. This record does not prove installation on a device. Managed installation is not yet available.</p>
+  if p.RevokedAt==nil && netbirdPackageManage(info) {
+   <form id="netbird-package-revoke" method="post" action={ NetbirdPackageBase(info)+"/"+p.ID+"/revoke" } hx-post={ NetbirdPackageBase(info)+"/"+p.ID+"/revoke" } hx-sync="this:drop" hx-disabled-elt="#netbird-package-fields" hx-indicator="#netbird-package-pending">
+    @mdm_views.CSRF(info)
+    <input type="hidden" name="request_id" value={ requestID }/><input type="hidden" name="digest" value={ p.Digest }/>
+    <fieldset id="netbird-package-fields" class="flex flex-col gap-4">
+     <legend class="text-lg font-semibold">Revoke approval</legend>
+     <p>This permanently prevents using this approval for new installation requests. Existing installations and already admitted operations remain separate.</p>
+     <label for="netbird-package-confirm" class="flex items-start gap-3"><input id="netbird-package-confirm" type="checkbox" name="confirmed" value="yes" required class="uk-checkbox mt-1"/><span>I reviewed this exact package and want to revoke its approval.</span></label>
+     <button id="netbird-package-submit" type="submit" class="uk-button uk-button-danger self-start">Revoke approval</button>
+    </fieldset>
+    <p id="netbird-package-pending" class="htmx-indicator mt-3" role="status">Revoking approval…</p>
+   </form>
+  }
+  <a class="uk-button uk-button-default self-start" href={ NetbirdPackageBase(info) }>Back to package approvals</a>
+ }
+}

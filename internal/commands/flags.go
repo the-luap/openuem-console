@@ -29,22 +29,29 @@ func StartConsoleFlags() []cli.Flag {
 			EnvVars: []string{"SFTP_KEY_FILENAME"},
 		},
 		&cli.StringFlag{
-			Name:     "nats-servers",
-			Usage:    "comma-separated list of NATS servers urls e.g (tls://localhost:4433)",
-			EnvVars:  []string{"NATS_SERVERS"},
-			Required: true,
+			Name:    "nats-servers",
+			Usage:   "legacy NATS server URLs; individual mode uses OPENUEM_AGENT_BROKER_URLS",
+			EnvVars: []string{"NATS_SERVERS"},
 		},
 		&cli.StringFlag{
-			Name:     "dburl",
-			Usage:    "the Postgres database connection url e.g (postgres://user:password@host:5432/openuem)",
-			EnvVars:  []string{"DATABASE_URL"},
-			Required: true,
+			Name:    "dburl",
+			Usage:   "the Postgres database connection URL; use dburl-file for a protected credential source",
+			EnvVars: []string{"DATABASE_URL"},
 		},
 		&cli.StringFlag{
-			Name:     "jwt-key",
-			Usage:    "a string signed to use JWT tokens used in email address confirmation",
-			EnvVars:  []string{"JWT_KEY"},
-			Required: true,
+			Name:    "dburl-file",
+			Usage:   "protected file containing the database connection URL; mutually exclusive with dburl",
+			EnvVars: []string{"DATABASE_URL_FILE"},
+		},
+		&cli.StringFlag{
+			Name:    "jwt-key",
+			Usage:   "a string signed to use JWT tokens used in email address confirmation",
+			EnvVars: []string{"JWT_KEY"},
+		},
+		&cli.StringFlag{
+			Name:    "jwt-key-file",
+			Usage:   "protected file containing the JWT signing key; mutually exclusive with jwt-key",
+			EnvVars: []string{"JWT_KEY_FILE"},
 		},
 		&cli.StringFlag{
 			Name:    "server-name",
@@ -128,6 +135,11 @@ func StartConsoleFlags() []cli.Flag {
 			Name:    "encryption-master-key",
 			Usage:   "master key used to encrypt sensitive fields in the database, need to be 32 bytes long (for example 32 ASCII characters)",
 			EnvVars: []string{"ENCRYPTION_MASTER_KEY"},
+		},
+		&cli.StringFlag{
+			Name:    "encryption-master-key-file",
+			Usage:   "protected file containing the actual 32-byte encryption key; mutually exclusive with encryption-master-key",
+			EnvVars: []string{"ENCRYPTION_MASTER_KEY_FILE"},
 		},
 	}
 }

@@ -1,0 +1,107 @@
+package desktop_views
+
+import (
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ Peripherals(c echo.Context, info *partials.CommonInfo, page *inventory.PeripheralsPage, filter inventory.PeripheralsFilter) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: i18n.T(ctx, "peripherals_inventory.devices"), Url: partials.GetNavigationUrl(info, "/devices")}, {Title: page.DeviceName}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" style="grid-template-columns: minmax(0, 1fr);">
+			<div class="min-w-0">
+				<h1 class="text-2xl font-semibold break-words">{ page.DeviceName }</h1>
+				<p class="uk-text-muted mt-2">{ i18n.T(ctx,"peripherals_inventory.reported") }</p>
+				@mdm_views.Navigation(info)
+				@InventoryNavigation(info, page.DeviceID, "peripherals")
+			</div>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">{ i18n.T(ctx,"peripherals_inventory.title") }</h2></div>
+				<div class="uk-card-body min-w-0">
+					<p class="break-words">{ page.Organization } / { page.Site }</p>
+					<p class="uk-text-muted mt-2">
+						{ i18n.T(ctx,"peripherals_inventory.last_report") }{ " " }@mdm_views.Timestamp(page.LastContact)
+					</p>
+					<p class="uk-text-muted mt-2">{ i18n.T(ctx,"peripherals_inventory.evidence") }</p>
+					<nav aria-label={ i18n.T(ctx, "peripherals_inventory.kinds") } class="flex flex-wrap gap-2 mt-4">
+						for _, kind := range []inventory.PeripheralsKind{inventory.MonitorReports, inventory.PrinterReports} {
+							<a class={ inventoryLinkClass(string(filter.Kind), string(kind)) } href={ peripheralsURL(info, page.DeviceID, kind, "", 0) } aria-current={ inventoryCurrent(string(filter.Kind), string(kind)) }>{ i18n.T(ctx,"peripherals_inventory."+string(kind)) }</a>
+						}
+					</nav>
+					<form method="get" action={ inventoryReportURL(info, page.DeviceID, "peripherals", "", 0) } class="mt-4">
+						<input type="hidden" name="kind" value={ string(filter.Kind) }/>
+						<label for="peripherals-search">{ i18n.T(ctx,"peripherals_inventory."+string(filter.Kind)+"_search") }</label>
+						<input class="uk-input mt-2" id="peripherals-search" name="q" value={ filter.Search } maxlength="256" type="search"/>
+						<div class="flex flex-wrap gap-2 mt-2">
+							<button type="submit" class="uk-button uk-button-primary">{ i18n.T(ctx,"peripherals_inventory.search") }</button>
+							<a class="uk-button uk-button-default" href={ peripheralsURL(info, page.DeviceID, filter.Kind, "", 0) }>{ i18n.T(ctx,"peripherals_inventory.clear") }</a>
+						</div>
+					</form>
+					if len(page.Entries) == 0 {
+						<p role="status" class="mt-4">{ i18n.T(ctx,"peripherals_inventory.empty") }</p>
+					} else {
+						<p class="uk-text-muted mt-4">{ i18n.T(ctx,"peripherals_inventory.page_size") }</p>
+						<div aria-label={ i18n.T(ctx, "peripherals_inventory.entries") } style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem;">
+							for _, entry := range page.Entries {
+								<article class="border-t border-border mt-4 pt-4 min-w-0">
+									<h3 class="font-semibold break-all">
+										@reportedValue(entry.Name)
+									</h3>
+									<dl class="uk-description-list break-all">
+										if filter.Kind == inventory.MonitorReports {
+											<dt>{ i18n.T(ctx,"peripherals_inventory.manufacturer") }</dt>
+											<dd>
+												@reportedValue(entry.Manufacturer)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.serial") }</dt>
+											<dd>
+												@reportedValue(entry.Serial)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.week") }</dt>
+											<dd>
+												@reportedValue(entry.Week)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.year") }</dt>
+											<dd>
+												@reportedValue(entry.Year)
+											</dd>
+										} else {
+											<dt>{ i18n.T(ctx,"peripherals_inventory.port") }</dt>
+											<dd>
+												@reportedValue(entry.Port)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.default") }</dt>
+											<dd>
+												@reportedFlag(entry.Default)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.network") }</dt>
+											<dd>
+												@reportedFlag(entry.Network)
+											</dd>
+											<dt>{ i18n.T(ctx,"peripherals_inventory.shared") }</dt>
+											<dd>
+												@reportedFlag(entry.Shared)
+											</dd>
+										}
+									</dl>
+								</article>
+							}
+						</div>
+					}
+					<nav aria-label={ i18n.T(ctx, "peripherals_inventory.pages") } class="flex flex-wrap gap-2 mt-4">
+						if filter.After > 0 {
+							<a class="uk-button uk-button-default" href={ peripheralsURL(info, page.DeviceID, filter.Kind, filter.Search, 0) }>{ i18n.T(ctx,"peripherals_inventory.first") }</a>
+						}
+						if page.Next > 0 {
+							<a class="uk-button uk-button-default" rel="next" href={ peripheralsURL(info, page.DeviceID, filter.Kind, filter.Search, page.Next) }>{ i18n.T(ctx,"peripherals_inventory.next") }</a>
+						}
+					</nav>
+				</div>
+			</section>
+		</main>
+	}
+}

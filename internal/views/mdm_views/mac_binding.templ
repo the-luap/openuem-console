@@ -1,0 +1,110 @@
+package mdm_views
+
+import (
+ "github.com/open-uem/openuem-console/internal/security/access"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ MacBindingPanel(info *partials.CommonInfo, detail Detail) {
+ <section class="uk-card uk-card-default">
+  <div class="uk-card-header"><h2 class="uk-card-title">Agent and MDM channels</h2></div>
+  <div class="uk-card-body">
+   if detail.Mac!=nil {
+    <p>This Mac has one device identity with separately authorized MDM and agent channels.</p>
+    <dl class="uk-description-list mt-4">
+     <dt>Device identity</dt><dd class="break-all">{ detail.Mac.ID }</dd>
+     <dt>MDM channel</dt><dd>{ StateLabel(ctx, detail.Mac.MDMStatus) }</dd>
+     <dt>Agent channel</dt><dd>{ StateLabel(ctx, detail.Mac.AgentStatus)+" · "+Show(detail.Mac.AgentName) }</dd>
+     <dt>Agent report received</dt><dd>
+      @Timestamp(detail.Mac.AgentSeen)
+     </dd>
+     <dt>Agent identity expires</dt><dd>
+      @Timestamp(&detail.Mac.AgentExpiresAt)
+     </dd>
+    </dl>
+    if detail.AgentURL!="" && info.Can(access.ReadDevices) {
+     <a class="uk-button uk-button-default mt-4" href={ templ.URL(detail.AgentURL) }>Open agent inventory</a>
+    }
+    <details class="mt-4">
+     <summary>Management channel history</summary>
+     <ul class="uk-list uk-list-divider mt-4">
+      for _,channel:=range detail.Mac.History {
+       <li>
+        <p><strong>
+         if channel.Kind=="mdm" {
+          MDM
+         } else {
+          Agent
+         }
+        </strong>{ " · "+StateLabel(ctx, channel.Status) }</p>
+        <p class="break-all uk-text-muted mt-2">{ channel.DeviceID }</p>
+        <dl class="uk-description-list mt-2">
+         <dt>Attached</dt><dd>
+          @Timestamp(&channel.AttachedAt)
+         </dd>
+         if channel.RetiredAt==nil {
+          <dt>Enrollment</dt><dd>Current channel</dd>
+         } else {
+          <dt>Replaced</dt><dd>
+            @Timestamp(channel.RetiredAt)
+          </dd>
+         }
+        </dl>
+       </li>
+      }
+     </ul>
+    </details>
+   } else {
+    <p>Verify that this Mac's individual OpenUEM agent and MDM enrollment belong together. Keep the Mac online with both channels enrolled in this organization and site.</p>
+   }
+   if detail.MacBinding!=nil && detail.MacBinding.Status=="conflict" {
+    <p role="status" class="uk-alert uk-alert-warning mt-4">The evidence conflicts with another channel or the recorded hardware. Check both enrollments and revoke any replaced identity before requesting verification again.</p>
+   }
+   if detail.MacBinding!=nil {
+    <dl class="uk-description-list mt-4">
+     <dt>Verification</dt><dd>{ StateLabel(ctx, detail.MacBinding.Status) }</dd>
+     <dt>Expires</dt><dd>
+      @Timestamp(&detail.MacBinding.ExpiresAt)
+     </dd>
+     <dt>MDM profile acknowledged</dt><dd>
+      @Timestamp(detail.MacBinding.InstalledAt)
+     </dd>
+     if detail.MacBinding.CompletedAt!=nil {
+      <dt>Temporary profile cleanup</dt><dd>
+       if detail.MacBinding.CleanupAt!=nil {
+        Complete
+       } else if detail.Device.Status!="enrolled" {
+        Requires removal of the old MDM enrollment on the Mac
+       } else if detail.MacBinding.CleanupRetryable() {
+        Retry required
+       } else {
+        Waiting for the Mac
+       }
+      </dd>
+     }
+    </dl>
+   }
+   if !detail.MacBindingReady {
+    <p role="status" class="uk-text-muted mt-4">Configure individual agent enrollment before requesting verification.</p>
+   } else if detail.Device.Status=="enrolled" && info.Can(access.EnrollDevices) {
+    <div class="flex flex-wrap gap-4 mt-4">
+     if detail.MacBinding!=nil && (detail.MacBinding.Status=="queued" || detail.MacBinding.Status=="installed") {
+      <form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/mac-binding/cancel") }>
+       @CSRF(info)
+       <button class="uk-button uk-button-default" type="submit">Cancel verification</button>
+      </form>
+     } else if detail.MacBinding==nil || detail.MacBinding.CleanupAt!=nil || detail.MacBinding.CleanupRetryable() {
+      <form method="post" action={ partials.GetNavigationUrl(info,"/ios/"+detail.Device.ID+"/mac-binding") }>
+       @CSRF(info)
+       if detail.MacBinding!=nil && detail.MacBinding.CleanupAt==nil {
+        <button class="uk-button uk-button-default" type="submit">Retry profile cleanup</button>
+       } else {
+        <button class="uk-button uk-button-primary" type="submit">Verify management channels</button>
+       }
+      </form>
+     }
+    </div>
+   }
+  </div>
+ </section>
+}

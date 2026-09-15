@@ -17,7 +17,8 @@ type SMTPTestSuite struct {
 }
 
 func (suite *SMTPTestSuite) SetupTest() {
-	client := enttest.Open(suite.t, "sqlite3", "file:ent?mode=memory&_fk=1")
+	client := enttest.Open(suite.T(), "sqlite3", "file:ent?mode=memory&_fk=1")
+	suite.T().Cleanup(func() { client.Close() })
 	suite.model = Model{Client: client}
 
 	settings, err := suite.model.Client.Settings.Create().Save(context.Background())
@@ -25,41 +26,12 @@ func (suite *SMTPTestSuite) SetupTest() {
 	suite.settingsId = settings.ID
 }
 
-func (suite *SMTPTestSuite) TestGetSMTPSettings() {
-	settings, err := suite.model.GetSMTPSettings("-1")
-	assert.NoError(suite.T(), err, "should get default SMTP settings")
-
-	assert.Equal(suite.T(), "", settings.SMTPServer, "server should be empty")
-	assert.Equal(suite.T(), 587, settings.SMTPPort, "port should be 587")
-	assert.Equal(suite.T(), "", settings.SMTPUser, "user should be empty")
-	assert.Equal(suite.T(), "", settings.SMTPPassword, "password should be empty")
-	assert.Equal(suite.T(), "LOGIN", settings.SMTPAuth, "auth should be LOGIN")
-	assert.Equal(suite.T(), "", settings.MessageFrom, "message from should be empty")
-}
-
-func (suite *SMTPTestSuite) TestUpdateSMTPSettings() {
-	newSettings := SMTPSettings{
-		ID:       suite.settingsId,
-		Server:   "smtp.example.com",
-		Auth:     "PLAIN",
-		Port:     465,
-		User:     "test",
-		Password: "test",
-		MailFrom: "test@example.com",
-	}
-
-	err := suite.model.UpdateSMTPSettings(&newSettings)
-	assert.NoError(suite.T(), err, "should update SMTP settings")
-
-	settings, err := suite.model.GetSMTPSettings("-1")
-	assert.NoError(suite.T(), err, "should get updated SMTP settings")
-
-	assert.Equal(suite.T(), "smtp.example.com", settings.SMTPServer, "server should be smtp.example.com")
-	assert.Equal(suite.T(), 465, settings.SMTPPort, "port should be 465")
-	assert.Equal(suite.T(), "test", settings.SMTPUser, "user should be test")
-	assert.Equal(suite.T(), "test", settings.SMTPPassword, "password should be test")
-	assert.Equal(suite.T(), "LOGIN", settings.SMTPAuth, "auth should be PLAIN")
-	assert.Equal(suite.T(), "test@example.com", settings.MessageFrom, "message from should be test@example.com")
+func (suite *SMTPTestSuite) TestIsSMTPConfiguredRequiresOneGlobalSettingsRow() {
+	assert.False(suite.T(), suite.model.IsSMTPConfigured())
+	assert.NoError(suite.T(), suite.model.Client.Settings.UpdateOneID(suite.settingsId).SetSMTPServer("smtp.example.invalid").SetSMTPPort(587).Exec(context.Background()))
+	assert.True(suite.T(), suite.model.IsSMTPConfigured())
+	assert.NoError(suite.T(), suite.model.Client.Settings.Create().SetSMTPServer("second.example.invalid").Exec(context.Background()))
+	assert.False(suite.T(), suite.model.IsSMTPConfigured())
 }
 
 func TestSMTPTestSuite(t *testing.T) {

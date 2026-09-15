@@ -1,0 +1,6 @@
+# Mount the issuer's complete publication directory at the reference public/
+# source. The issuer account and provider configuration are separate inputs and
+# must never be mounted into the gateway. Run initial issuance before startup.
+services:
+  gateway:
+    command: [--listen, ":8443", --public-origin, "${OPENUEM_PUBLIC_ORIGIN:?}", --tls-cert, /run/public/current/fullchain.pem, --tls-key, /run/public/current/private.pem, --tls-reload-interval, "${OPENUEM_PUBLIC_TLS_RELOAD_INTERVAL:-1m}", --gateway-cert, /run/gateway/client.pem, --gateway-key, /run/gateway/client.key, --backend-ca, /run/gateway/backend-ca.pem, --console-url, https://console.internal:8444, --auth-url, https://console.internal:8445, --apple-url, https://console.internal:8446, --desktop-url, https://console.internal:8447, --windows-url, https://console.internal:8448, --agent-url, https://broker.internal:9222, --admin-networks, "${OPENUEM_ADMIN_NETWORKS:?}"]

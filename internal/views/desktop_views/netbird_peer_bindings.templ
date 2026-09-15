@@ -1,0 +1,91 @@
+package desktop_views
+
+import (
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ netbirdPeerBindingSummary(b *inventory.NetbirdPeerBinding) {
+ if b!=nil {
+  <dl class="netbird-details">
+   <dt>Retained provider peer</dt><dd>{ b.Peer.ID }</dd>
+   <dt>Peer name at association</dt><dd>{ b.Peer.Name }</dd>
+   <dt>Original provider</dt><dd>{ b.ManagementURL }</dd>
+   <dt>Provider registration event</dt><dd>{ b.Event.ID }</dd>
+   <dt>Setup key ID</dt><dd>{ b.Event.KeyID }</dd>
+   <dt>Peer created</dt><dd>@mdm_views.Timestamp(&b.Peer.CreatedAt)</dd>
+   <dt>Provider event time</dt><dd>@mdm_views.Timestamp(&b.Event.Timestamp)</dd>
+   <dt>Association ID</dt><dd>{ b.ID }</dd>
+   <dt>Confirmed by</dt><dd>{ b.Actor }</dd>
+   <dt>Association retained</dt><dd>@mdm_views.Timestamp(&b.CreatedAt)</dd>
+  </dl>
+  <p>This permanent association records the provider peer registered with this request's setup key. It does not establish current local WireGuard identity, connectivity or group membership.</p>
+ }
+}
+
+templ NetbirdPeerBindingReview(c echo.Context,info *partials.CommonInfo,v *inventory.NetbirdPeerReview,bindingID string) {
+ @netbirdPage(c,info,v.Registration.DeviceID,"Review NetBird peer association") {
+  @netbirdTarget(v.Target)
+  <dl class="netbird-details">
+   <dt>Original request</dt><dd>{ v.Registration.ID }</dd>
+   <dt>Original outcome</dt><dd>{ v.Registration.Status }</dd>
+   <dt>Association evidence</dt><dd>{ netbirdPeerBindingState(v.State) }</dd>
+  </dl>
+  if v.Registration.PeerBinding!=nil {
+   @netbirdPeerBindingSummary(v.Registration.PeerBinding)
+   @netbirdPeerRemovalSummary(v.Registration)
+   <p><a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal" }>Review provider peer removal</a></p>
+  } else {
+   if v.ManagementURL!="" {
+    <dl class="netbird-details"><dt>Original provider</dt><dd>{ v.ManagementURL }</dd></dl>
+   }
+   if v.Event!=nil {
+    <dl class="netbird-details">
+     <dt>Provider registration event</dt><dd>{ v.Event.ID }</dd>
+     <dt>Setup key ID</dt><dd>{ v.Event.KeyID }</dd>
+     <dt>Provider peer ID</dt><dd>{ v.Event.PeerID }</dd>
+     <dt>Provider event time</dt><dd>@mdm_views.Timestamp(&v.Event.Timestamp)</dd>
+     if v.Peer!=nil {
+      <dt>Peer name</dt><dd>{ v.Peer.Name }</dd>
+      <dt>Peer created</dt><dd>@mdm_views.Timestamp(&v.Peer.CreatedAt)</dd>
+     }
+    </dl>
+   }
+   <p>Association requires the provider's registration event for the exact retained one-use setup key and a matching peer record. Names and IP addresses are not identity evidence. Missing or unavailable events cannot prove that no registration occurred.</p>
+   if v.CanBind {
+    <p>Confirmation permanently records this provider association. It does not delete or modify a peer, send a device command or change the original registration outcome.</p>
+    <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-peer-submit,#netbird-peer-confirm" hx-indicator="#netbird-peer-pending" class="netbird-confirm">
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="binding_id" value={ bindingID }/>
+     <input type="hidden" name="revision" value={ v.Revision }/>
+     <label class="netbird-checkbox" for="netbird-peer-confirm"><input type="checkbox" name="confirmed" value="yes" id="netbird-peer-confirm" required/><span>I reviewed the provider event and exact peer identity and confirm this association with the registration.</span></label>
+     <button type="submit" id="netbird-peer-submit" class="uk-button uk-button-primary">Confirm peer association</button>
+     <span id="netbird-peer-pending" class="htmx-indicator" role="status">Recording peer association…</span>
+    </form>
+   }
+  }
+  if v.Registration.Status=="unconfirmed" && v.Registration.ReleasedAt==nil {
+   <p role="status">Further NetBird commands remain blocked. A provider association cannot replace the separate registration resolution.</p>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer" }>Review again</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID }>Original receipt</a>
+  </div>
+ }
+}
+
+func netbirdPeerBindingState(state string)string {
+ switch state {
+ case "retained":return "Association retained; these are the recorded observations"
+ case "matched":return "The provider event and exact peer record match this registration"
+ case "key-unknown":return "No retained setup-key identity is available"
+ case "not-delivered":return "No device delivery was attempted"
+ case "cleanup-required":return "Retain setup-key absence before associating a provider peer"
+ case "missing":return "No matching registration event was returned; provider history may be incomplete"
+ case "absent":return "The registration event names a peer that is now absent"
+ case "conflict":return "Provider evidence is ambiguous or does not match this registration"
+ default:return "The provider cannot currently confirm the required evidence"
+ }
+}

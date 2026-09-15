@@ -1,0 +1,48 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ SCEPEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a SCEP certificate profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="scep-profile-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="apple-scep"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company client certificate"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.scep"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole device</option><option value="User">Managed Mac user channel</option></select></label>
+			<p>Requires iOS/iPadOS 4 or macOS 10.7 or later. User scope requires a managed Mac user channel. Additional Mac version requirements are shown with each setting.</p>
+			<label>SCEP server URL<input class="uk-input" type="url" name="scep_url" maxlength="2048" required placeholder="https://ca.example.com/scep"/></label>
+			<label>CA instance name (optional)<input class="uk-input" name="ca_name" maxlength="255"/></label>
+			<label>Subject attributes (optional)<textarea class="uk-textarea" name="subject" rows="4" maxlength="16384" placeholder="O=Company&#10;CN=Client certificate"></textarea></label>
+			<p>Enter one attribute=value per line, using C, L, ST, O, OU, CN or a numeric OID. OpenUEM preserves the values you enter. Use subject values and a challenge accepted by your CA for the intended devices or users.</p>
+			<label>CA challenge (optional)<input class="uk-input" type="password" name="challenge" maxlength="8192" autocomplete="new-password"/></label>
+			<p>The challenge is encrypted with the profile and included in downloads available to authorized profile managers. Its validity and permitted reuse are controlled by the CA.</p>
+			<label>RSA key size<select class="uk-select" name="key_size" required><option value="2048">2048 bits</option><option value="4096">4096 bits</option><option value="1024">1024 bits (legacy)</option></select></label>
+			<label>Key usage<select class="uk-select" name="key_usage"><option value="">Keep default</option><option value="1">Digital signature</option><option value="4">Key encryption</option><option value="5">Signature and encryption</option><option value="0">Unspecified usage</option></select></label>
+			<p>Setting key usage requires macOS 10.11 or later on a Mac. Some CAs support only signing or encryption, rather than both.</p>
+			<details>
+				<summary class="cursor-pointer">Alternative names, trust and key access</summary>
+				<div class="grid gap-4 mt-4">
+					<p>Enter one alternative name per line, up to 64 per type. The CA decides which requested names it permits.</p>
+					<label>Email alternative names<textarea class="uk-textarea" name="san_email" rows="2" maxlength="16384"></textarea></label>
+					<label>DNS alternative names<textarea class="uk-textarea" name="san_dns" rows="2" maxlength="16384"></textarea></label>
+					<label>URI alternative names<textarea class="uk-textarea" name="san_uri" rows="2" maxlength="16384"></textarea></label>
+					<label>NT principal alternative names<textarea class="uk-textarea" name="san_principal" rows="2" maxlength="16384"></textarea></label>
+					<label>CA certificate fingerprint<input class="uk-input" name="fingerprint" maxlength="128" spellcheck="false"/></label>
+					<p>HTTP requires the approved CA's fingerprint. Enter a SHA-1 fingerprint (40 hexadecimal characters) or legacy MD5 fingerprint (32), with optional spaces or colons. For HTTPS, this field is optional.</p>
+					<label>Pending-response retries<input class="uk-input" type="number" name="retries" min="0" max="100" placeholder="3"/></label>
+					<label>Retry delay in seconds<input class="uk-input" type="number" name="retry_delay" min="0" max="86400" placeholder="10"/></label>
+					<p>Leave retry values empty to keep defaults. Explicit retry values require macOS 10.10 or later on a Mac.</p>
+					<label>Private key export<select class="uk-select" name="key_extractable"><option value="">Keep default</option><option value="false">Prevent export from the keychain</option><option value="true">Allow export from the keychain</option></select></label>
+					<p>Changing key export requires macOS 10.13.4 or later on a Mac.</p>
+					<label>Private key access for applications<select class="uk-select" name="all_apps_access"><option value="">Keep default</option><option value="false">Keep application access controls</option><option value="true">Allow all applications to access the private key</option></select></label>
+					<p>Changing application access requires macOS 10.10 or later on a Mac.</p>
+				</div>
+			</details>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the CA, challenge, requested identity and key settings.</label>
+			<p>Saving creates a profile without contacting the CA. After assignment, each target requests its certificate. Profile delivery alone does not prove certificate issuance, renewal or application authentication.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create SCEP certificate profile</button>
+		</form>
+	</details>
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "public_origin": "https://uem.example.invalid",
+  "acme_directory_url": "https://acme-staging-v02.api.letsencrypt.org/directory",
+  "email": "operator@example.invalid",
+  "accept_terms": false,
+  "dns_provider": "dnsupdate",
+  "provider_environment_file": "/run/openuem-acme/provider.json",
+  "state_directory": "/var/lib/openuem-acme",
+  "publication_directory": "/var/lib/openuem-public-tls",
+  "check_interval": "6h",
+  "attempt_timeout": "15m"
+}

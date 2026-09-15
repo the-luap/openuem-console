@@ -1,0 +1,33 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ PKCS12Editor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a PKCS12 identity profile</summary>
+		<form method="post" enctype="multipart/form-data" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="apple-pkcs12"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company client identity"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.identity"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole device</option><option value="User">Managed Mac user channel</option></select></label>
+			<p>Whole-device profiles support iPhone and iPad from version 4.0 and Mac from macOS 10.7. User profiles require a managed Mac user channel.</p>
+			<label>Identity archive (PKCS12/PFX, up to 256 KiB)<input class="uk-input" type="file" name="identity" accept=".p12,.pfx" required/></label>
+			<label>Archive password<input class="uk-input" type="password" name="password" maxlength="8192" autocomplete="new-password"/></label>
+			<p>Supply an archive containing one identity and its certificate chain. Leave the password empty only when the archive uses an empty password. OpenUEM checks the archive envelope. The target device checks the password, identity and cryptographic contents during installation.</p>
+			<details>
+				<summary class="cursor-pointer">Mac key access</summary>
+				<div class="grid gap-4 mt-4">
+					<label>Private key export<select class="uk-select" name="key_extractable"><option value="">Keep default</option><option value="false">Prevent export from the keychain</option><option value="true">Allow export from the keychain</option></select></label>
+					<p>Setting key export requires macOS 10.15 or later.</p>
+					<label>Private key access for applications<select class="uk-select" name="all_apps_access"><option value="">Keep default</option><option value="false">Keep application access controls</option><option value="true">Allow all applications to access the private key</option></select></label>
+					<p>Setting application access requires macOS 10.10 or later. Leave both options at their defaults for iPhone and iPad.</p>
+				</div>
+			</details>
+			<p>The archive and password are encrypted in stored profiles and included together in downloads available to authorized profile managers. Assigning this profile to several targets shares the same private identity. SCEP profiles allow targets to generate individual keys.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the identity source, password, target access and sharing of this private identity.</label>
+			<p>Saving creates a versioned profile. Verify installation, certificate validity and intended application authentication on the target; delivery alone does not prove that the identity works.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create PKCS12 identity profile</button>
+		</form>
+	</details>
+}

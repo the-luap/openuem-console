@@ -9,7 +9,6 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	"github.com/open-uem/ent/release"
 	openuem_nats "github.com/open-uem/nats"
-	"github.com/open-uem/utils"
 )
 
 func (w *Worker) StartCheckLatestReleasesJob(channel string) error {
@@ -45,7 +44,7 @@ func (w *Worker) CheckAgentLatestReleases(channel string) error {
 	// Check agent release against our API
 	url := fmt.Sprintf("https://releases.openuem.eu/api?action=latestAgentRelease&channel=%s", channel)
 
-	body, err := utils.QueryReleasesEndpoint(url)
+	body, err := w.queryReleasesEndpoint(url)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func (w *Worker) CheckServerLatestReleases(channel string) error {
 	// Check server release against our API
 	url := fmt.Sprintf("https://releases.openuem.eu/api?action=latestServerRelease&channel=%s", channel)
 
-	body, err := utils.QueryReleasesEndpoint(url)
+	body, err := w.queryReleasesEndpoint(url)
 	if err != nil {
 		return err
 	}

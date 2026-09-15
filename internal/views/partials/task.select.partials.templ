@@ -7,7 +7,7 @@ import (
 	"slices"
 )
 
-templ SelectTaskAgentType(t *ent.Task) {
+templ SelectTaskAgentType(t *ent.Task, base ...string) {
 	<div>
 		<label class="uk-form-label" for="task-agent-type">
 			{ i18n.T(ctx, "tasks.task_agent") }
@@ -17,11 +17,15 @@ templ SelectTaskAgentType(t *ent.Task) {
 			name="task-agent-type"
 			class="uk-select"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			hx-trigger="change"
-			hx-get="/profiles/task-types"
+			hx-get={ taskWizardURL(base,"types") }
 			hx-target="#select-task-type"
 			hx-swap="innerHTML"
-			_="on change      
+			_="on change
+                set #select-task-type.innerHTML to ''
+                set #select-task-subtype.innerHTML to ''
+                set #task-definition.innerHTML to ''
                 add .hidden to #select-task-subtype
                 add .hidden to #task-definition
             end"
@@ -35,7 +39,7 @@ templ SelectTaskAgentType(t *ent.Task) {
 	</div>
 }
 
-templ SelectTaskType(t *ent.Task, agentType string) {
+templ SelectTaskType(t *ent.Task, agentType string, base ...string) {
 	<div>
 		<label class="uk-form-label" for="task-type">
 			{ i18n.T(ctx, "tasks.task_type") }
@@ -45,11 +49,14 @@ templ SelectTaskType(t *ent.Task, agentType string) {
 			name="task-type"
 			class="uk-select"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			hx-trigger="change"
-			hx-get="/profiles/task-subtypes"
+			hx-get={ taskWizardURL(base,"subtypes") }
 			hx-target="#select-task-subtype"
 			hx-swap="innerHTML"
-			_="on change      
+			_="on change
+                set #select-task-subtype.innerHTML to ''
+                set #task-definition.innerHTML to ''
                 if my.value == 'powershell_type' or my.value == 'unix_script_type' then
                     remove .hidden from #task-definition
 					add .hidden to #select-task-subtype
@@ -135,7 +142,7 @@ templ SelectTaskType(t *ent.Task, agentType string) {
 	</div>
 }
 
-templ SelectWinGetPackageTaskSubtype(t *ent.Task) {
+templ SelectWinGetPackageTaskSubtype(t *ent.Task, base ...string) {
 	<div id="package-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -145,10 +152,11 @@ templ SelectWinGetPackageTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -160,7 +168,7 @@ templ SelectWinGetPackageTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectRegistryTaskSubtype(t *ent.Task) {
+templ SelectRegistryTaskSubtype(t *ent.Task, base ...string) {
 	<div id="registry-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -170,10 +178,11 @@ templ SelectRegistryTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -188,7 +197,7 @@ templ SelectRegistryTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectLocalUserTaskSubtype(t *ent.Task) {
+templ SelectLocalUserTaskSubtype(t *ent.Task, base ...string) {
 	<div id="local-user-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -198,10 +207,11 @@ templ SelectLocalUserTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -213,7 +223,7 @@ templ SelectLocalUserTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectWindowsLocalGroupTaskSubtype(t *ent.Task) {
+templ SelectWindowsLocalGroupTaskSubtype(t *ent.Task, base ...string) {
 	<div id="local-group-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -223,10 +233,11 @@ templ SelectWindowsLocalGroupTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -240,7 +251,7 @@ templ SelectWindowsLocalGroupTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectUnixLocalGroupTaskSubtype(t *ent.Task) {
+templ SelectUnixLocalGroupTaskSubtype(t *ent.Task, base ...string) {
 	<div id="local-group-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -250,10 +261,11 @@ templ SelectUnixLocalGroupTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -265,7 +277,7 @@ templ SelectUnixLocalGroupTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectUnixLocalUserTaskSubtype(t *ent.Task) {
+templ SelectUnixLocalUserTaskSubtype(t *ent.Task, base ...string) {
 	<div id="local-user-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -275,10 +287,11 @@ templ SelectUnixLocalUserTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -290,7 +303,7 @@ templ SelectUnixLocalUserTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectMSITaskSubtype(t *ent.Task) {
+templ SelectMSITaskSubtype(t *ent.Task, base ...string) {
 	<div id="msi-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -300,10 +313,11 @@ templ SelectMSITaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -315,7 +329,7 @@ templ SelectMSITaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectFlatpakPackageTaskSubtype(t *ent.Task) {
+templ SelectFlatpakPackageTaskSubtype(t *ent.Task, base ...string) {
 	<div id="flatpak-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -325,10 +339,11 @@ templ SelectFlatpakPackageTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -340,7 +355,7 @@ templ SelectFlatpakPackageTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectHomeBrewFormulaTaskSubtype(t *ent.Task) {
+templ SelectHomeBrewFormulaTaskSubtype(t *ent.Task, base ...string) {
 	<div id="homebrew-formula-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -350,10 +365,11 @@ templ SelectHomeBrewFormulaTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -366,7 +382,7 @@ templ SelectHomeBrewFormulaTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectHomeBrewCaskTaskSubtype(t *ent.Task) {
+templ SelectHomeBrewCaskTaskSubtype(t *ent.Task, base ...string) {
 	<div id="homebrew-cask-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -376,10 +392,11 @@ templ SelectHomeBrewCaskTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -392,7 +409,7 @@ templ SelectHomeBrewCaskTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectAPTTaskSubtype(t *ent.Task) {
+templ SelectAPTTaskSubtype(t *ent.Task, base ...string) {
 	<div id="local-apt-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -402,10 +419,11 @@ templ SelectAPTTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -420,7 +438,7 @@ templ SelectAPTTaskSubtype(t *ent.Task) {
 	</div>
 }
 
-templ SelectNetbirdTaskSubtype(t *ent.Task) {
+templ SelectNetbirdTaskSubtype(t *ent.Task, base ...string) {
 	<div id="netbird-subtask">
 		<label class="uk-form-label" for="task-subtype">
 			{ i18n.T(ctx, "tasks.subtask_type") }
@@ -430,10 +448,11 @@ templ SelectNetbirdTaskSubtype(t *ent.Task) {
 			id="task-subtype"
 			name="task-subtype"
 			hx-trigger="change"
-			hx-get="/profiles/task-definition"
+			hx-get={ taskWizardURL(base,"definition") }
 			hx-target="#task-definition"
 			hx-swap="innerHTML"
 			disabled?={ t != nil }
+			required?={ t == nil }
 			_="on change      
                 remove .hidden from #task-definition
             end"
@@ -515,4 +534,10 @@ func IsAPTTask(t *ent.Task) bool {
 func IsNetbirdTask(t *ent.Task) bool {
 	tasks := []string{string(task.TypeNetbirdInstall), string(task.TypeNetbirdUninstall), string(task.TypeNetbirdRegister)}
 	return t != nil && slices.Contains(tasks, t.Type.String())
+}
+
+func taskWizardURL(base []string, stage string) string {
+ if len(base)==1 && base[0]!="" {return base[0]+"/"+stage}
+ // Existing edit selectors are disabled. Obsolete forms receive a reload error.
+ return "/profiles/task-"+map[string]string{"types":"types","subtypes":"subtypes","definition":"definition"}[stage]
 }

@@ -1,0 +1,72 @@
+package profiles_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/open-uem/ent"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ ProfileNameField(profile *ent.Profile) {
+	<label class="uk-form-label" for="profile-description">
+		{ i18n.T(ctx, "profiles.new.profile") }
+	</label>
+	<div class="uk-form-controls">
+		<textarea
+			id="profile-description"
+			name="profile-description"
+			class="uk-textarea w-full"
+			rows="2"
+			maxlength="2048"
+			required
+			placeholder={ i18n.T(ctx, "profiles.new.text") }
+			aria-label="Profile's description"
+			autocomplete="off"
+			autocorrect="off"
+			autocapitalize="off"
+			spellcheck="false"
+		>
+			{ profile.Name }
+		</textarea>
+	</div>
+}
+
+templ ProfileAssignmentField(profile *ent.Profile, keepTagsVisible ...bool) {
+	<label class="uk-form-label" for="profile-assignment">
+		{ i18n.T(ctx, "profiles.select_assignment") }
+	</label>
+	<div class="uk-form-controls">
+		<select
+			class="uk-select"
+			id="profile-assignment"
+			name="profile-assignment"
+			if len(keepTagsVisible)==0 || !keepTagsVisible[0] {
+				_="
+			on change
+				if my.value is 'dontApplyToAll' then hide #profile-tags with visibility end
+				if my.value is 'applyToAll' then hide #profile-tags with visibility end
+				if my.value is 'useTags' then show #profile-tags with visibility end
+			end
+		"
+			}
+		>
+			<option value={ "dontApplyToAll" } selected?={ !profile.ApplyToAll && len(profile.Edges.Tags) == 0 }>{ i18n.T(ctx, "profiles.dont_assign") }</option>
+			<option value={ "applyToAll" } selected?={ profile.ApplyToAll }>{ i18n.T(ctx, "profiles.assign_all") }</option>
+			<option value={ "useTags" } selected?={ !profile.ApplyToAll && len(profile.Edges.Tags) > 0 }>{ i18n.T(ctx, "profiles.assign_tags") }</option>
+		</select>
+	</div>
+}
+
+templ ProfileMetadataSaveAction(profile *ent.Profile, commonInfo *partials.CommonInfo) {
+	<button
+		type="button"
+		class="uk-button uk-button-primary"
+		hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/profiles/%d", profile.ID)))) }
+		hx-target="#main"
+		hx-swap="outerHTML"
+		hx-push-url="false"
+		hx-include="#profile-description, #profile-assignment"
+	>
+		{ i18n.T(ctx, "profiles.edit.save") }
+	</button>
+}

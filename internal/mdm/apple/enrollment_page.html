@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Device enrollment · OpenUEM</title>
+<style>{{.CSS}}</style>
+</head>
+<body>
+<main>
+<p class="brand">OpenUEM · Device enrollment</p>
+<h1>Set up your Apple device</h1>
+{{if .Organization}}<p class="organization">Managed by <strong>{{.Organization}}</strong></p>{{end}}
+{{if .Error}}<div class="notice error" role="alert">{{.Error}}</div>{{end}}
+{{if eq .State "ready"}}
+<section aria-labelledby="before-heading">
+<h2 id="before-heading">Before you start</h2>
+<p>Open this page in Safari on the iPhone, iPad or Mac you want to enroll. Keep the device connected to the internet. No OpenUEM app is required.</p>
+<p>Your organization will be able to view device information and manage configuration profiles and software update policies. This is device enrollment. It does not use Apple's separate User Enrollment privacy model.</p>
+{{if .DeviceLockAllowed}}<p class="notice">This invitation is for a Mac and also grants device lock and passcode removal rights. These rights allow Recovery Lock password management on supported Macs. A Recovery Lock password protects access to macOS Recovery; it is separate from your login password and FileVault recovery key.</p>{{end}}
+<p>Continue only if you recognize the organization and expect this invitation. Opening or refreshing this page does not use the invitation.</p>
+<p class="muted">Invitation expires {{.ExpiresAt.UTC.Format "2006-01-02 15:04 UTC"}}.</p>
+<form method="post" action="{{.Path}}">
+<input type="hidden" name="action" value="claim">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label for="platform">Device to enroll</label>
+<select id="platform" name="platform" required>
+<option value="" selected disabled>Select your device</option>
+{{if not .DeviceLockAllowed}}<option value="ios">iPhone</option><option value="ipados">iPad</option>{{end}}<option value="macos">Mac</option>
+</select>
+<label class="confirmation"><input type="checkbox" name="confirm" value="yes" required><span>I agree to enroll this device with the organization shown above.</span></label>
+{{if .DeviceLockAllowed}}<label class="confirmation"><input type="checkbox" name="confirm_device_lock" value="yes" required><span>I also agree to Recovery Lock and device lock management for this Mac.</span></label>{{end}}
+<button type="submit">Continue to profile download</button>
+</form>
+</section>
+{{else if eq .State "claimed"}}
+<section aria-labelledby="status-heading">
+<h2 id="status-heading">Finish enrollment on your device</h2>
+<p role="status">Waiting for the device to finish enrollment. A downloaded profile alone does not mean the device is managed.</p>
+{{if eq .Platform "macos"}}
+<ol>
+<li><strong>Download and open the profile.</strong> Open the downloaded .mobileconfig file on this Mac.</li>
+<li><strong>Open System Settings.</strong> Go to General → Device Management, select the downloaded profile and follow the enrollment prompts. If your macOS version uses a different location, search Settings for Profiles. Enter your Mac administrator password only in the macOS prompt.</li>
+<li><strong>Return to this page.</strong> Check the status after installation.</li>
+</ol>
+<p>Install only the profile for your intended organization. Your Mac must finish the enrollment prompts before OpenUEM can manage it.</p>
+{{if .DeviceLockAllowed}}<p>The profile includes device lock and passcode removal rights for Recovery Lock management. Installing it does not itself set a Recovery Lock password.</p>{{end}}
+{{else}}
+<ol>
+<li><strong>Download the profile.</strong> Allow the download when Safari asks.</li>
+<li><strong>Open Settings.</strong> Choose <strong>Profile Downloaded</strong> or <strong>Enroll in [organization name]</strong>, then select <strong>Install</strong> and follow the device prompts. You can also look under General → VPN &amp; Device Management.</li>
+<li><strong>Return to this page.</strong> Check the status after installation.</li>
+</ol>
+<p>Install promptly: Apple removes a downloaded, uninstalled profile after eight minutes. Install only the profile for your intended organization.</p>
+{{end}}
+{{if gt .DownloadsRemaining 0}}
+<form method="post" action="{{.Path}}">
+<input type="hidden" name="action" value="download"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<button type="submit">Download enrollment profile</button>
+<p class="muted">{{.DownloadsRemaining}} download attempts remain in this browser, until {{.ExpiresAt.UTC.Format "15:04 UTC"}}. Each attempt returns the same profile. Downloads stop when the device first contacts OpenUEM.</p>
+</form>
+{{else}}
+<p class="notice">Further downloads are unavailable. If the profile is already installed, wait briefly and check status. Otherwise, ask your administrator to revoke this invitation and issue a new one.</p>
+{{end}}
+<a class="button secondary" href="{{.Path}}">Check enrollment status</a>
+</section>
+{{else if eq .State "enrolled"}}
+<section><h2>Enrollment complete</h2><p role="status">Your device has registered with OpenUEM. You can close this page. Inventory and assigned settings may take a few minutes to appear.</p></section>
+{{else if eq .State "used"}}
+<section><h2>Invitation already used</h2><p>This invitation was claimed in another browser. Continue in the browser used to begin enrollment. If that is not possible, ask your administrator to revoke it and send a new invitation.</p></section>
+{{else if eq .State "expired"}}
+<section><h2>Invitation or status link expired</h2><p>Ask your administrator for help. If enrollment already completed, the device remains managed; this page no longer shows its status.</p></section>
+{{else if eq .State "revoked"}}
+<section><h2>Enrollment revoked</h2><p>Your administrator has disabled this enrollment. It cannot be used to connect this device. Contact them for a new invitation if needed.</p></section>
+{{else if eq .State "unenrolled"}}
+<section><h2>Management profile removed</h2><p>The device has reported that its management profile was removed. Contact your administrator to enroll again.</p></section>
+{{end}}
+<details>
+<summary>Help with enrollment</summary>
+<p><strong>Using Windows or Android?</strong> This invitation supports iPhone, iPad and Mac. Ask your administrator for the correct setup method.</p>
+<p><strong>Download interrupted?</strong> Keep this browser and its cookies. Open the invitation again and retry while a download attempt remains. Another browser cannot retrieve the profile.</p>
+<p><strong>Profile will not install?</strong> Check the organization's name and device prompts. Do not remove existing management without your administrator's guidance. Send them the general error shown in Settings, without sharing this invitation or the downloaded profile.</p>
+<p><strong>Status does not change?</strong> Check your internet connection, complete the Settings prompts and try the status button again. If the problem continues, contact your administrator.</p>
+<p><a href="https://support.apple.com/en-us/102400" target="_blank" rel="noreferrer noopener">Apple's iPhone and iPad profile instructions</a> · <a href="https://support.apple.com/en-gb/guide/mac-help/mh35561/mac" target="_blank" rel="noreferrer noopener">Apple's Mac profile instructions</a></p>
+</details>
+<footer>Keep this invitation and downloaded profile private. This page uses only an enrollment cookie; it has no third-party tracking.</footer>
+</main>
+</body>
+</html>

@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"crypto/x509"
+	"log"
+
+	"github.com/open-uem/openuem-console/internal/security/clientidentity"
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
@@ -10,6 +13,9 @@ import (
 )
 
 type Handler struct {
+	PublicOrigin         string
+	AuthLogger           *log.Logger
+	ClientIdentity       clientidentity.Policy
 	Model                *models.Model
 	SessionManager       *sessions.SessionManager
 	CACert               *x509.Certificate

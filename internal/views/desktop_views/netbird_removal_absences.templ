@@ -1,0 +1,320 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/open-uem/nats/netbirdcommand"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+)
+
+func NetbirdRemovalAbsencePath(info *partials.CommonInfo, device string) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(device)+"/netbird/removal-absences")
+}
+func netbirdRemovalAbsenceLabel(state string) string {
+	switch state {
+	case "queued":
+		return "Queued for removal verification"
+	case "delivery_pending":
+		return "Verification dispatched; awaiting its receipt"
+	case "unconfirmed":
+		return "Verification outcome is unconfirmed"
+	case "stopped":
+		return "Stopped before verification"
+	case "cancelled":
+		return "Cancelled before verification"
+	case "completed":
+		return "Current package absence verified"
+	case "released":
+		return "Reviewed resolution confirmed; verification result retained"
+	default:
+		return "Awaiting retained evidence"
+	}
+}
+func netbirdRemovalAbsenceStop(reason string) string {
+	switch reason {
+	case "expired":
+		return "The request expired before verification could be admitted."
+	case "not_authorized":
+		return "The original requester no longer has permission to assign software at this site."
+	case "source_changed":
+		return "The absence data, original release, recipient or required agent readiness no longer matches the reviewed request."
+	default:
+		return "Automatic processing could not continue."
+	}
+}
+
+templ netbirdRemovalAbsenceDescriptor(p netbirdcommand.RemovalAbsence) {
+ <h3>Original reference and current check</h3>
+ <p>The original uninstall retains its own result. This request checks current absence of the supported macOS package.</p>
+ <dl class="netbird-details">
+  <dt>Original uninstall request</dt><dd>{p.Original.RequestID}</dd>
+  <dt>Original release ID</dt><dd>{p.Original.ReleaseID}</dd>
+  <dt>Verification profile</dt><dd>Official macOS package</dd>
+  <dt>Current absence fingerprint</dt><dd>{p.StateDigest}</dd>
+  <dt>Reviewed journal revision</dt><dd>{p.JournalRevision}</dd>
+ </dl>
+}
+
+templ NetbirdRemovalAbsenceReview(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdRemovalAbsenceReview, requestID string) {
+	@netbirdPage(c, info, v.Target.ID, "Review current NetBird absence") {
+		@netbirdTarget(v.Target)
+ @netbirdRemovalAbsenceDescriptor(v.Absence)
+ <div class="netbird-impact">
+  <p>Confirmation queues a separate check that the supported NetBird package is currently absent. The agent checks package files, installation receipts, the service, running processes and retained removal staging.</p>
+  <p>This check reads the current state. It cannot remove files or stop processes. Its result is recorded separately and does not confirm that the original uninstall succeeded.</p>
+ </div>
+ <form method="post" action={NetbirdRemovalAbsencePath(info,v.Target.ID)} hx-post={NetbirdRemovalAbsencePath(info,v.Target.ID)} hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+  @mdm_views.CSRF(info)
+  <input type="hidden" name="original_id" value={v.Absence.Original.RequestID}/>
+  <input type="hidden" name="request_id" value={requestID}/>
+  <input type="hidden" name="absence_digest" value={v.AbsenceDigest}/>
+  <input type="hidden" name="revision" value={v.Revision}/>
+  <label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the original reference and authorize this separate check of current NetBird absence.</span></label>
+  <button class="uk-button uk-button-primary" id="netbird-submit" type="submit">Queue absence check</button>
+  <span class="htmx-indicator" id="netbird-pending" role="status">Queuing absence check…</span>
+ </form>
+		<a href={ NetbirdRemovalAbsencePath(info, v.Target.ID) }>Verification history</a>
+	}
+}
+
+templ NetbirdRemovalAbsenceReceipt(c echo.Context, info *partials.CommonInfo, v *inventory.NetbirdRemovalAbsenceStatus, cancellationID string) {
+	@netbirdPage(c, info, v.Request.DeviceID, "NetBird absence verification") {
+		<p role="status" class="netbird-state">{ netbirdRemovalAbsenceLabel(v.State()) }</p>
+		if v.DispatchStop!=nil {
+			<p>{ netbirdRemovalAbsenceStop(v.DispatchStop.Reason) }</p>
+		}
+		if v.State()=="completed" {
+			<p>This check verified current absence of the supported NetBird package at the recorded time. The original uninstall retains its own outcome. Later device changes require a new check.</p>
+		} else if v.State()=="released" {
+			<p>Owned resolution evidence allows new NetBird operations. It does not confirm that this verification completed or remove retained local data. The original uninstall remains unchanged.</p>
+		} else if v.Delivery!=nil {
+			<p>Verification cannot be cancelled or repeated. Check its retained receipt or review resolution if the outcome remains unclear.</p>
+
+		}
+		<dl class="netbird-details">
+			<dt>Request ID</dt>
+			<dd>{ v.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ v.Request.DeviceID }</dd>
+			<dt>Organization / site</dt>
+			<dd>{ fmt.Sprintf("%d / %d",v.Request.Scope.TenantID,v.Request.Scope.SiteID) }</dd>
+			<dt>Requested by</dt>
+			<dd>{ v.Request.Actor }</dd>
+			<dt>Requested</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.RequestedAt)
+</dd>
+			<dt>Admission deadline</dt>
+			<dd>@mdm_views.Timestamp(&v.Request.ExpiresAt)
+</dd>
+			if v.DispatchStop!=nil {
+				<dt>Automatic processing stopped</dt>
+				<dd>@mdm_views.Timestamp(&v.DispatchStop.RecordedAt)</dd>
+			}
+			if v.Delivery!=nil {
+				<dt>Verification dispatched</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.IssuedAt)
+</dd>
+				<dt>Verification deadline</dt>
+				<dd>@mdm_views.Timestamp(&v.Delivery.ExpiresAt)
+</dd>
+				<dt>First verification delivery outcome</dt>
+				<dd>{ v.Delivery.OriginalOutcome }</dd>
+				<dt>First verification result retained</dt>
+				<dd>@mdm_views.Timestamp(v.Delivery.RecordedAt)
+</dd>
+				if v.Delivery.ObservedAt!=nil {
+					<dt>Latest receipt check</dt>
+					<dd>@mdm_views.Timestamp(v.Delivery.ObservedAt)
+</dd>
+					<dt>Observed result</dt>
+					<dd>{ v.Delivery.ObservedOutcome }</dd>
+				}
+			}
+			if v.Request.CompletedAt!=nil {
+				<dt>Current absence verified</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CompletedAt)
+</dd>
+			}
+			if v.Request.CancelledAt!=nil {
+				<dt>Cancelled</dt>
+				<dd>@mdm_views.Timestamp(v.Request.CancelledAt)
+</dd>
+				<dt>Cancelled by</dt>
+				<dd>{ v.Request.CancelledBy }</dd>
+			}
+			if v.Request.ReleasedAt!=nil {
+				<dt>Resolution confirmed</dt>
+				<dd>@mdm_views.Timestamp(v.Request.ReleasedAt)
+</dd>
+				<dt>Confirmed by</dt>
+				<dd>{ v.Request.ReleasedBy }</dd>
+			}
+		</dl>
+		<p><a href={NetbirdRemovalPath(info,v.Request.DeviceID)+"/"+v.Request.OriginalID}>Original uninstall receipt</a></p>
+		<details><summary>Reviewed verification and original reference</summary>@netbirdRemovalAbsenceDescriptor(v.Request.Absence)
+</details>
+		if v.Resolution!=nil {
+			@netbirdRemovalAbsenceResolutionSummary(v.Resolution)
+		}
+		if v.Request.CancelledAt==nil && v.Request.CompletedAt==nil && v.Request.ReleasedAt==nil && info.Principal.Can(access.AssignSoftware,v.Request.Scope) {
+			if v.Delivery==nil {
+				<p>Cancellation prevents verification from being admitted for this request.</p>
+				<form method="post" action={ NetbirdRemovalAbsencePath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/cancel" } class="netbird-confirm">
+					@mdm_views.CSRF(info)
+					<input type="hidden" name="revision" value={ v.Request.Revision }/>
+					<input type="hidden" name="cancellation_id" value={ cancellationID }/>
+					<label class="netbird-checkbox" for="netbird-cancel"><input id="netbird-cancel" type="checkbox" name="confirmed" value="yes" required/><span>Cancel this request if verification has not been admitted.</span></label>
+					<button class="uk-button uk-button-default" type="submit">Cancel verification request</button>
+				</form>
+			} else {
+				@netbirdRemovalAbsenceEvidenceForm(info, v.Request, "observe", "", "Check retained receipt")
+				<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, v.Request.DeviceID) + "/" + v.Request.ID + "/resolution" }>Review verification resolution</a>
+				if v.Resolution!=nil {
+					@netbirdRemovalAbsenceEvidenceForm(info, v.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile resolution evidence")
+				}
+			}
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, v.Request.DeviceID) + "/" + v.Request.ID }>Reload status</a>
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, v.Request.DeviceID) }>Verification history</a>
+		</div>
+	}
+}
+
+templ netbirdRemovalAbsenceEvidenceForm(info *partials.CommonInfo, r *inventory.NetbirdRemovalAbsence, suffix, resolutionID, label string) {
+	<form method="post" action={ NetbirdRemovalAbsencePath(info, r.DeviceID) + "/" + r.ID + "/" + suffix } class="netbird-confirm">
+		@mdm_views.CSRF(info)
+		<input type="hidden" name="confirmed" value="yes"/>
+		<input type="hidden" name="revision" value={ r.Revision }/>
+		if resolutionID!="" {
+			<input type="hidden" name="resolution_id" value={ resolutionID }/>
+		}
+		<button class="uk-button uk-button-default" type="submit">{ label }</button>
+	</form>
+}
+
+templ netbirdRemovalAbsenceResolutionSummary(d *inventory.NetbirdRemovalAbsenceResolution) {
+	<dl class="netbird-details">
+		<dt>Resolution ID</dt>
+		<dd>{ d.ID }</dd>
+		<dt>Resolution requested by</dt>
+		<dd>{ d.Actor }</dd>
+		<dt>Resolution requested</dt>
+		<dd>@mdm_views.Timestamp(&d.CreatedAt)
+</dd>
+		if d.LastAttempt!=nil {
+			<dt>Latest resolution attempt</dt>
+			<dd>{ fmt.Sprintf("%d: %s",d.LastAttempt.Sequence,d.LastAttempt.Kind) }</dd>
+			<dt>Attempted by</dt>
+			<dd>{ d.LastAttempt.Actor }</dd>
+			<dt>Attempted</dt>
+			<dd>@mdm_views.Timestamp(&d.LastAttempt.CreatedAt)
+</dd>
+			<dt>Retained outcome</dt>
+			<dd>{ d.LastAttempt.Outcome }</dd>
+		}
+	</dl>
+}
+
+templ NetbirdRemovalAbsenceResolution(c echo.Context, info *partials.CommonInfo, status *inventory.NetbirdRemovalAbsenceStatus, v *inventory.NetbirdRemovalAbsenceResolutionReview) {
+	@netbirdPage(c, info, status.Request.DeviceID, "Review verification resolution") {
+		<dl class="netbird-details">
+			<dt>Verification request</dt>
+			<dd>{ status.Request.ID }</dd>
+			<dt>Device ID</dt>
+			<dd>{ status.Request.DeviceID }</dd>
+			<dt>Agent evidence</dt>
+			<dd>{ netbirdRemovalAbsenceResolutionState(v.Outcome) }</dd>
+			if v.ExpiresAt!=nil {
+				<dt>Review expires</dt>
+				<dd>@mdm_views.Timestamp(v.ExpiresAt)
+</dd>
+			}
+		</dl>
+		if v.Resolution!=nil {
+			@netbirdRemovalAbsenceResolutionSummary(v.Resolution)
+		}
+		if v.Revision!="" && (v.Kind=="withdraw" || v.Kind=="release") {
+			if v.Kind=="withdraw" {
+				<p>Confirmation permanently blocks any later delivery of this verification request if the agent has not attempted it. New NetBird operations become available only after matching withdrawal proof is retained.</p>
+			} else {
+				<p>The agent permits explicit release of this unconfirmed verification entry. Release allows further NetBird operations after matching proof; it does not confirm current absence, stop a process or remove retained local data.</p>
+			}
+			if v.Resolution!=nil {
+				<p>This is an additional explicitly reviewed control using the same permanent resolution ID. It does not resend the verification command.</p>
+			}
+			<form method="post" action={ NetbirdRemovalAbsencePath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-post={ NetbirdRemovalAbsencePath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" } hx-target="#main" hx-swap="outerHTML" hx-sync="closest section:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+				@mdm_views.CSRF(info)
+				<input type="hidden" name="revision" value={ status.Request.Revision }/>
+				<input type="hidden" name="resolution_id" value={ v.ResolutionID }/>
+				<input type="hidden" name="review_revision" value={ v.Revision }/>
+				<label class="netbird-checkbox" for="netbird-confirm"><input id="netbird-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed this evidence and authorize the described resolution action and further NetBird operations after matching proof.</span></label>
+				<button class="uk-button uk-button-primary" id="netbird-submit" type="submit">{ map[string]string{"withdraw":"Confirm permanent withdrawal","release":"Confirm reviewed release"}[v.Kind] }</button>
+				<span class="htmx-indicator" id="netbird-pending" role="status">Recording resolution attempt…</span>
+			</form>
+			<p>If this review expires or the evidence changes, review again before confirming.</p>
+		} else if v.Outcome!="completed" && v.Outcome!="released" {
+			<p role="status">No new resolution action is currently eligible. Missing or uncertain evidence keeps further NetBird operations blocked.</p>
+		}
+		if v.Resolution!=nil && v.Outcome!="completed" && v.Outcome!="released" {
+			@netbirdRemovalAbsenceEvidenceForm(info, status.Request, "resolution/reconcile", v.Resolution.ID, "Reconcile resolution evidence")
+		}
+		<div class="netbird-actions">
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, status.Request.DeviceID) + "/" + status.Request.ID + "/resolution" }>Review again</a>
+			<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, status.Request.DeviceID) + "/" + status.Request.ID }>Verification receipt</a>
+		</div>
+	}
+}
+
+func netbirdRemovalAbsenceResolutionState(state string) string {
+	switch state {
+	case "not-received":
+		return "No attempt retained; permanent withdrawal is available"
+	case "unconfirmed":
+		return "The exact verification entry is unconfirmed and eligible for release"
+	case "awaiting-confirmation":
+		return "The owned resolution result is visible and awaits reconciliation"
+	case "completed":
+		return "A matching completed verification receipt is retained"
+	case "released":
+		return "Resolution is already confirmed"
+	case "conflict":
+		return "The observed resolution identity conflicts with this request"
+	case "waiting":
+		return "The current journal does not permit resolution"
+	default:
+		return "Matching resolution evidence is currently unavailable"
+	}
+}
+
+templ NetbirdRemovalAbsenceHistory(c echo.Context, info *partials.CommonInfo, scope access.Scope, device string, page *inventory.NetbirdRemovalAbsenceHistory) {
+	@netbirdPage(c, info, device, "NetBird absence verification history") {
+		<p>Retained requests and outcomes for this device at the selected organization and site. Opening history does not contact the agent.</p>
+		if len(page.Requests)==0 {
+			<p role="status">No verification requests are recorded here.</p>
+		} else {
+			<ul class="netbird-history">
+				for _,v:=range page.Requests {
+					<li>
+						<a href={ NetbirdRemovalAbsencePath(info, device) + "/" + v.Request.ID } class="netbird-id">{ "Absence check · "+v.Request.ID }</a>
+						<span>{ netbirdRemovalAbsenceLabel(v.State()) }</span>
+						<span>{ "Requested by "+v.Request.Actor }</span>
+						@mdm_views.Timestamp(&v.Request.RequestedAt)
+					</li>
+				}
+			</ul>
+		}
+		<div class="netbird-actions">
+			if page.Next!="" {
+				<a class="uk-button uk-button-default" href={ NetbirdRemovalAbsencePath(info, device) + "?before=" + url.QueryEscape(page.Next) }>Older requests</a>
+			}
+			if info.Principal.Can(access.AssignSoftware,scope) {
+				<a class="uk-button uk-button-primary" href={ NetbirdRemovalPath(info, device) }>Removal history</a>
+			}
+		</div>
+	}
+}

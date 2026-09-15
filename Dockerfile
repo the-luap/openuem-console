@@ -1,15 +1,17 @@
-FROM golang:1.26.1 AS build
-COPY . ./
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001
-RUN templ generate
-RUN CGO_ENABLED=1 go build -o "/bin/openuem-console" .
+FROM golang:1.26.8-bookworm AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go tool templ generate
+RUN CGO_ENABLED=1 go build -trimpath -o /bin/openuem-console .
 
-FROM debian:latest
+FROM debian:bookworm-slim
 COPY --from=build /bin/openuem-console /bin/openuem-console
 COPY ./assets /bin/assets
-RUN apt-get update
-RUN apt install -y ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 EXPOSE 1323
 EXPOSE 1324
+EXPOSE 1325
 WORKDIR /bin
 ENTRYPOINT ["/bin/openuem-console"]

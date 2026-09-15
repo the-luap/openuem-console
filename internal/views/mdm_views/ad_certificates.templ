@@ -1,0 +1,39 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ ADCertificateEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create an Active Directory certificate profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="ad-certificate-editor grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="apple-ad-certificate"/>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company directory certificate"/></label>
+			<label>Profile identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.certificate.ad"/></label>
+			<label>Scope<select class="uk-select" name="payload_scope" required><option value="System">Whole Mac</option><option value="User">Managed Mac user channel</option></select></label>
+			<p>Active Directory certificates require macOS 10.7 or later. The Mac must be able to reach and authenticate to your certificate authority. Confirm directory binding, the intended certificate template and CA permissions before assignment.</p>
+			<label>Certificate server<input class="uk-input" name="certificate_server" maxlength="254" required placeholder="ca.example.com"/></label>
+			<p>Enter the fully qualified DNS name, without a URL scheme, IP address or port. Use ASCII or punycode DNS labels.</p>
+			<label>Certificate template<input class="uk-input" name="certificate_template" maxlength="255" required placeholder="Machine"/></label>
+			<p>Use the exact template approved by your CA administrator. Common defaults are Machine for computer certificates and User for user certificates.</p>
+			<label>Certificate description (optional)<input class="uk-input" name="description" maxlength="1024"/></label>
+			<label>Certificate authority (optional)<textarea class="uk-textarea" name="certificate_authority" maxlength="2048" rows="3" placeholder="CN=Company CA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com"></textarea></label>
+			<label>Acquisition mechanism<select class="uk-select" name="acquisition"><option value="">Omit — use platform behavior</option><option value="RPC">RPC</option><option value="HTTP">HTTP web enrollment</option></select></label>
+			<p>Certificate authority and acquisition options require macOS 10.8 or later. RPC is commonly used; HTTP requires a CA configured for web enrollment.</p>
+			<label>Expiry notification lead time in days (optional)<input class="uk-input" type="number" name="renewal_notice" min="0" max="3650" step="1"/></label>
+			<p>This controls the user's expiry notification, separately from automatic renewal. OpenUEM accepts 0 to 3650 days.</p>
+			<label>RSA key size<select class="uk-select" name="key_size"><option value="">Omit — default 2048 bits</option><option value="2048">2048 bits</option><option value="3072">3072 bits</option><option value="4096">4096 bits</option><option value="8192">8192 bits</option></select></label>
+			<p>An explicit key size requires macOS 10.11 or later. The CA template must support the selected size.</p>
+			<label>Private-key export<select class="uk-select" name="key_extractable"><option value="">Omit — platform default</option><option value="false">Prevent export</option><option value="true">Allow export</option></select></label>
+			<label>Allow all apps to access the private key<select class="uk-select" name="all_apps_access"><option value="">Omit — platform default</option><option value="false">No</option><option value="true">Yes</option></select></label>
+			<p>Either explicit key-access option requires macOS 10.10 or later, including a No or Prevent export setting.</p>
+			<label>Automatic certificate renewal<select class="uk-select" name="auto_renewal"><option value="">Omit — platform default</option><option value="false">Disabled</option><option value="true">Enabled for computer certificates</option></select></label>
+			<p>Explicit automatic-renewal settings require macOS 10.13.4 or later. Renewal can be enabled only for whole-Mac certificates. The issuer must permit renewal; saving this profile does not prove issuance or renewal.</p>
+			<p data-ad-scope-status role="status" aria-live="polite"></p>
+			<p>Interactive credential prompting applies only to manually downloaded user certificates and is omitted for MDM delivery. The server does not contact the CA when you save or assign this profile.</p>
+			<label><input class="uk-checkbox" type="checkbox" name="confirmed" value="yes" required/> I reviewed the Mac scope, CA template, key access and renewal policy.</label>
+			<button class="uk-button uk-button-primary" type="submit">Create Active Directory certificate profile</button>
+		</form>
+	</details>
+	<script src="/assets/js/apple-ad-certificates.js" defer></script>
+}

@@ -202,19 +202,19 @@ func (h *Handler) CheckNATSComponentStatus(data *dashboard_views.DashboardData) 
 		var wg sync.WaitGroup
 
 		wg.Go(func() {
-			if _, err := h.NATSConnection.Request("ping.agentworker", nil, 1*time.Second); err != nil {
+			if _, err := h.RequestBroker("ping.agentworker", nil, 1*time.Second); err != nil {
 				data.AgentWorkerStatus = "down"
 			}
 		})
 
 		wg.Go(func() {
-			if _, err := h.NATSConnection.Request("ping.notificationworker", nil, 1*time.Second); err != nil {
+			if _, err := h.RequestBroker("ping.notificationworker", nil, 1*time.Second); err != nil {
 				data.NotificationWorkerStatus = "down"
 			}
 		})
 
 		wg.Go(func() {
-			if _, err := h.NATSConnection.Request("ping.certmanagerworker", nil, 1*time.Second); err != nil {
+			if _, err := h.RequestBroker("ping.certmanagerworker", nil, 1*time.Second); err != nil {
 				data.CertManagerWorkerStatus = "down"
 			}
 		})

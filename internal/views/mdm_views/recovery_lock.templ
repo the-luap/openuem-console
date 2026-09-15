@@ -1,0 +1,173 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/security/access"
+import "github.com/open-uem/openuem-console/internal/views/partials"
+import "github.com/open-uem/openuem-console/internal/mdm/apple"
+
+templ RecoveryLockPanel(info *partials.CommonInfo, detail Detail) {
+	if r:=detail.RecoveryLock; r!=nil && detail.Device.Family()==apple.PlatformMacOS {
+		<section class="uk-card uk-card-default">
+			<div class="uk-card-header"><h2 class="uk-card-title">Recovery Lock</h2><p>A separate password protecting macOS Recovery on Apple silicon.</p></div>
+			<div class="uk-card-body grid gap-4">
+				<p>{ recoveryLockEvidence(r.Evidence) }</p>
+				if a:=r.Attempt;a!=nil {
+					<p role="status">{ recoveryLockStatus(a.Status) }</p>
+					if a.Error!="" {
+						<p class="uk-text-muted">{ recoveryLockError(a.Error) }</p>
+					}
+					if a.Status=="uncertain" {
+						<p>Another password change remains blocked. Keep the stored passwords until the Mac's result is resolved. A failed password check does not prove that Recovery Lock is disabled.</p>
+						if info.Can(access.ManageDeviceSecurity)&&r.Reason=="" {
+							if a.CandidateKeyID!="" {
+								@RecoveryLockCheckForm(info, detail, "recheck", a.CandidateKeyID, "Check proposed password")
+							}
+							if a.CanCheckPrevious {
+								@RecoveryLockCheckForm(info, detail, "recheck", a.PreviousKeyID, "Check retained previous password")
+							}
+						}
+					}
+				}
+				if r.Reason!="" {
+					<p class="uk-alert uk-alert-warning">{ r.Reason }</p>
+				}
+				if info.Can(access.ManageDeviceSecurity)&&r.Reason==""&&(r.Attempt==nil||!r.Attempt.Active()) {
+					if r.CurrentKeyID=="" {
+						<details>
+							<summary class="font-medium cursor-pointer">Set a Recovery Lock password</summary>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock") } class="grid gap-3 mt-3">
+								@CSRF(info)
+								<input type="hidden" name="operation" value="set"/>
+								<p>OpenUEM generates and securely stores a password, then verifies it on the Mac. If the Mac already has a password, import and verify that password first.</p>
+								<label><input type="checkbox" name="confirm_recovery_lock" value="yes" required/> I understand that the stored password will be needed to enter macOS Recovery.</label>
+								<button class="uk-button uk-button-primary" type="submit">Set and escrow password</button>
+							</form>
+						</details>
+					} else {
+						@RecoveryLockCheckForm(info, detail, "verify", r.CurrentKeyID, "Verify current Recovery Lock password")
+						<details>
+							<summary class="font-medium cursor-pointer">Rotate the Recovery Lock password</summary>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock") } class="grid gap-3 mt-3">
+								@CSRF(info)
+								<input type="hidden" name="operation" value="rotate"/><input type="hidden" name="key_id" value={ r.CurrentKeyID }/>
+								<p>The current password is checked before replacement. Previous passwords remain available in history.</p>
+								<label><input type="checkbox" name="confirm_recovery_lock" value="yes" required/> Replace and securely store this Mac's Recovery Lock password.</label>
+								<button class="uk-button uk-button-primary" type="submit">Rotate Recovery Lock password</button>
+							</form>
+						</details>
+						<details>
+							<summary class="font-medium cursor-pointer">Remove the Recovery Lock password</summary>
+							<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock") } class="grid gap-3 mt-3">
+								@CSRF(info)
+								<input type="hidden" name="operation" value="remove"/><input type="hidden" name="key_id" value={ r.CurrentKeyID }/>
+								<p>The Mac must acknowledge removal. A missing response leaves the result unresolved. Password history is retained.</p>
+								<label><input type="checkbox" name="confirm_recovery_lock" value="yes" required/> Remove this password protection from macOS Recovery.</label>
+								<button class="uk-button uk-button-danger" type="submit">Remove Recovery Lock password</button>
+							</form>
+						</details>
+					}
+					<details>
+						<summary class="font-medium cursor-pointer">Import an existing Recovery Lock password</summary>
+						<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock") } class="grid gap-3 mt-3">
+							@CSRF(info)
+							<input type="hidden" name="operation" value="import"/>
+							<p>The password is encrypted and checked on this Mac before it becomes the current managed password. This does not change the password on the Mac.</p>
+							<label>Existing Recovery Lock password<input class="uk-input" name="password" type="password" autocomplete="off" required maxlength="1024"/></label>
+							<label><input type="checkbox" name="confirm_recovery_lock" value="yes" required/> Store this password and verify it on the Mac.</label>
+							<button class="uk-button uk-button-primary" type="submit">Import and verify password</button>
+						</form>
+					</details>
+				}
+				if info.Can(access.RetrieveRecoveryKeys)&&len(detail.RecoveryLockKeys)>0 {
+					<details>
+						<summary class="font-medium cursor-pointer">Stored Recovery Lock passwords</summary>
+						<div class="grid gap-4 mt-3">
+							for _,key:=range detail.RecoveryLockKeys {
+								<div class="uk-card uk-card-body uk-card-small">
+									<p>{ key.Source } password ·{ " " }
+										@Timestamp(&key.CreatedAt)
+									</p>
+									if key.Current {
+										<p>Current managed password</p>
+									}
+									<p>Last verification requested:{ " " }
+										@Timestamp(key.VerifiedAt)
+									</p>
+									if key.RejectedAt!=nil {
+										<p>Last rejected check requested:{ " " }
+											@Timestamp(key.RejectedAt)
+										</p>
+									}
+									<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock/passwords/"+key.ID+"/reveal") }>
+										@CSRF(info)
+										<button class="uk-button uk-button-default" type="submit">Retrieve Recovery Lock password</button>
+									</form>
+								</div>
+							}
+						</div>
+					</details>
+				}
+			</div>
+		</section>
+	}
+}
+
+templ RecoveryLockCheckForm(info *partials.CommonInfo, detail Detail, operation, key, label string) {
+	<form method="post" action={ partials.GetNavigationUrl(info, "/ios/"+detail.Device.ID+"/recovery-lock") }>
+		@CSRF(info)
+		<input type="hidden" name="operation" value={ operation }/><input type="hidden" name="key_id" value={ key }/>
+		<button class="uk-button uk-button-default" type="submit">{ label }</button>
+	</form>
+}
+
+func recoveryLockEvidence(evidence string) string {
+	switch evidence {
+	case "verified":
+		return "The Mac verified the stored password during its last successful check."
+	case "removal_acknowledged":
+		return "The Mac acknowledged password removal. Absence of a password has not been independently verified."
+	default:
+		return "The current Recovery Lock password state is not verified."
+	}
+}
+
+func recoveryLockStatus(status string) string {
+	switch status {
+	case "checking":
+		return "Waiting for the Mac to verify the current password before changing it."
+	case "queued":
+		return "Waiting to deliver the password change."
+	case "sent":
+		return "Password change delivered; waiting for the Mac's result."
+	case "verifying":
+		return "Waiting for the Mac to check the proposed password."
+	case "uncertain":
+		return "The password operation has an unresolved result."
+	case "verified":
+		return "Stored password verified by the Mac."
+	case "removed":
+		return "Password removal acknowledged by the Mac."
+	case "resolved":
+		return "The previous password was verified after the Mac finished the change request."
+	case "cancelled":
+		return "The operation stopped because enrollment ended. Stored passwords remain available."
+	default:
+		return "The operation did not complete successfully. Stored passwords remain available."
+	}
+}
+
+func recoveryLockError(code string) string {
+	switch code {
+	case "password_not_verified":
+		return "The Mac did not verify the selected password."
+	case "awaiting_removal_result":
+		return "The Mac has not confirmed whether the password was removed."
+	case "current_password_check_expired":
+		return "The current-password check expired before a change could be authorized."
+	case "device_unavailable", "device_or_command_unavailable":
+		return "Current device readiness or the command deadline prevents further progress. Refresh inventory and check the connection."
+	case "enrollment_ended":
+		return "This enrollment can no longer receive password operations."
+	default:
+		return "The Mac could not complete the requested operation. Check its connection and the stored password evidence."
+	}
+}

@@ -4,6 +4,12 @@
 
 The Console is OpenUEM's Web User Interface
 
+This fork adds native iOS/iPadOS enrollment, inventory, configuration profiles
+and declarative OS update policies alongside the existing Windows management.
+See the [Apple management operator guide](docs/native-ios-operations.md) for
+setup, supported workflows, verification and current limitations. The device
+protocol implementation is part of this console; NanoMDM is not a dependency.
+
 ![OpenUEM console](https://github.com/user-attachments/assets/795cf36c-91ed-40e2-8b3a-abcff5d46305)
 
 The console allows you to perform the following actions:

@@ -1,0 +1,266 @@
+# Individual desktop enrollment implementation
+
+This is the active implementation design for ENR-01, the desktop portion of
+ENR-02, and agent transport in NET-01. It is not a delivery or hardware acceptance
+claim. Shared proof, durable registry, broker authorization, gateway transport and
+worker request boundaries, service runtimes, scoped console administration and
+the public HTTPS claim/download protocol now have automated evidence. Protected
+Windows/macOS storage and durable HTTPS claim recovery also pass native CI. The
+console now creates scoped release-bound invitations for the native enrollment
+command and serves administrator-assisted public installation instructions.
+The agent has separate Windows and macOS activation flows for completed protected
+identities. Finished installers, positive signed-release acceptance and production
+deployment wiring remain open.
+
+## Source baselines
+
+The [console invitation form](desktop-console-invitations.md) requires a specific
+authorized site, compatible approved release, configured bootstrap signer and
+explicit confirmation. It rejects stale releases and ambiguous/foreign settings,
+commits the invitation/release/audit atomically and reveals its token only in the
+initial result. PostgreSQL/router tests and a disposable real-browser flow cover
+creation, scope, CSRF, defaults, one-time display and responsive rendering.
+
+The [desktop public protocol](desktop-public-protocol.md) now binds HTTP claims to
+the current approved release, serves read-only invitation metadata and verifies
+package bytes before downloads. It has a separate optional private TLS listener,
+an exact gateway allowlist, bounded bodies/rates/concurrency/deadlines and joined
+shutdown. PostgreSQL/TLS race tests cover scanner safety, strict claims, retries,
+revocation, changed files, source-header trust and public administrator denial.
+The native command integration below connects this configuration protocol to
+protected credentials. [Windows activation](https://github.com/the-luap/openuem-agent/blob/0649326763aa426a8f7cc4505d6a27b7e4b30f19/docs/native-windows-activation.md)
+adds private operational configuration, exact automatic Local System registration
+and local readiness after enrollment. It retains identity state and registration
+on startup failure. The admitted executable hash is stored with the identity and
+checked again by the runtime. [macOS activation](https://github.com/the-luap/openuem-agent/blob/82080f0e34bd93f4d584ff89798ceb88a5be09f1/docs/native-macos-activation.md) validates the installed app seal,
+Developer ID/notarization and native bundle context, registers its bundled daemon,
+reports pending administrator approval and requires an authenticated local readiness
+proof. Unbound-record migration, authorized binary updates, positive signed-release
+Mac acceptance and finished installer integration remain open.
+
+Library commit `d6129ce9fe9b` adds a bounded HTTPS claim client and strict returned
+certificate/key/device/origin validation, with generic errors and no redirects,
+cookies or environment proxy. Its
+[Linux/native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34182431163).
+The console pins the published version and tests that exact client through its
+real gateway/private protocol and PostgreSQL release-bound issuer, including
+same-key recovery and release withdrawal.
+
+Agent commit `bc13982` adds a root System-keychain backend with explicit application
+ACLs, noninteractive access and isolated temporary-keychain tests. It complements
+the Windows DPAPI backend, whose private System/Administrators records work across
+an elevated installer and an actual Local System service. Agent commit `f5a3731`
+adds immutable pending keys before HTTP, exact bootstrap retry binding and a
+validated completed identity bound to those keys. Native Windows/macOS tests
+simulate a committed issuance with a lost HTTPS/HTTP2 response, then recover it
+using the same protected keys. Corruption, competing writers, partial failures and
+shutdown are covered. [All three platform CI jobs passed](https://github.com/the-luap/openuem-agent/actions/runs/34185479070),
+including full agent builds. See [native identity storage](https://github.com/the-luap/openuem-agent/blob/f5a373122a24ab826c9bc8e94852ca30ec6fa2fa/docs/individual-identity-storage.md).
+Agent commit `1345f54` adds opt-in service selection before legacy credential reads,
+protected scope assignment, WSS/NKey connections, all existing scoped worker
+requests, read-only fixed-consumer access and joined transport shutdown. Actual
+`SendReport` and prepared-consumer tests use a real TLS WebSocket broker with device
+permissions; [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34186649018).
+It pins shared-library `2503532eb824`, whose read-only consumer helper also has
+[passing broker/database and Windows CI](https://github.com/the-luap/openuem-nats/actions/runs/34185830066).
+See [runtime configuration and limits](https://github.com/the-luap/openuem-agent/blob/1345f54bd894d4ac0804c31e450b2bcab19103d8/docs/individual-agent-runtime.md).
+Library `d21252be66de` adds separate configuration/release signatures, strict
+configuration verification and immutable origin/target/checkpoint binding;
+[Linux and Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34187288931).
+Agent `e65091e` binds verified scope and release sequence to protected pending
+state, rejects rollback and rechecks configuration expiry after issuance before
+publishing an identity. Its [three-platform CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34187759140).
+The console now signs limited configurations with a dedicated protected key and
+serves an origin key document through the exact public TLS gateway routes.
+Library `126bca15f12f` adds native configuration/package downloads with exact-origin
+paths, bounded streams and post-transfer expiry checks; [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34190387673).
+Console `a52b948` exercises those methods through its actual public gateway and
+PostgreSQL issuer; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34190576115).
+Agent `5076ec5` stages the package privately, checks native Authenticode/notarization,
+rehashes the same opened file and cleans up only owned staging. Its
+[Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34191314823),
+including actual Windows acceptance of a licensed embedded-signature test fixture
+and rejection after byte modification. No fixture package is installed or executed.
+Shared library `92c941119613` adds separate signed installed-executable size/hash
+bindings; [Linux/Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34191669027).
+Agent `6c4bf3c` retains and verifies the actual running executable against these
+bindings; [all native CI platforms passed](https://github.com/the-luap/openuem-agent/actions/runs/34192280621).
+Console `bc76544` preserves the binding through actual TLS gateway configuration
+downloads; [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34192284726).
+
+Agent `8bc63f8` adds the native `enroll` command with explicit origin, organization,
+site and management authorization, protected invitation/release-key input, exact
+requested-token verification, native package checks and installed-executable
+admission before claims and identity publication. Same-key recovery survives a
+failed post-issuance check. Windows CI joins actual executable verification,
+WinTrust, HTTPS issuance and DPAPI storage; retry returns the persisted identity
+without another claim. [Windows/macOS/Linux CI passed](https://github.com/the-luap/openuem-agent/actions/runs/34193859066),
+including full builds and native command help without service startup. Tests never
+install or execute fixture packages. See [command authorization, recovery and limits](https://github.com/the-luap/openuem-agent/blob/8bc63f8ed7272eef1f0414d31449531e637245dc/docs/native-enrollment-command.md).
+
+Automatic installed-service identity renewal, authoritative startup recovery and
+historical FileVault reconciliation are now implemented and tested; see
+[the desktop identity lifecycle](desktop-identity-renewal.md).
+Positive signed-release activation acceptance, guided end-user consent, installer integration,
+signed updater commands, inherited handler execution bounds and reference
+console/deployment wiring remain open.
+
+Local related repositories were checked out from upstream into sibling directories:
+
+| Component | Baseline commit | Relevant finding |
+| --- | --- | --- |
+| Agent | `ee23c21` | Reads an initial `agent.cer`/`agent.key`; uses global request subjects and creates its own JetStream consumer |
+| NATS client library | `98373a4` | Shared connection helper and messages; certificate response includes a private key |
+| Certificate manager | `6b136eb` | Generates common agent keys and a NATS configuration whose agent permissions span device IDs |
+| Worker | `c852d70` | Global `report`, `agentconfig` and deployment subjects trust body identity/scope |
+| Docker deployment | `28ede14` | NATS/public ports and certificate-mounted components need the new reference gateway integration |
+
+The console remains on its native Apple feature branch. Related repositories use
+feature branches named `feature/individual-agent-enrollment`. The NATS library,
+worker, certificate manager and agent are now forked under `the-luap`; Docker
+remains a local upstream checkout. Feature branches are implementation work, not
+signed releases.
+
+Local NATS library commit `0a8ad01` adds the shared endpoint-generated CSR/NKey
+proof, canonical device request parsing, private inbox validation and bounded
+subject policy. Local commit `df18641` adds explicit WSS connections and bounded auth callout
+grants. Real NATS 2.14.6 / Go client 1.53.1 tests cover individual keys, private
+subjects/replies, pre-provisioned JetStream consumers, active-session kicks,
+certificate expiry and authorization outages. Its race tests and full library
+test/build suite pass. Commit `c33596f` adds the durable PostgreSQL registry,
+limited invitations, organization CA creation/import, scoped issuance and atomic
+revocation/session outbox. The combined real-broker/database test passes. The
+worker pins published library commit `2af211c88d57` using the Go module replacement
+`github.com/the-luap/openuem-nats v0.11.1-0.20260907232712-2af211c88d57`.
+[Library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34170105505)
+for that exact commit. Later library commit `7462b7bd9e56` adds the bounded
+authorization service, durable disconnect batches and protected key-file loading.
+Its [CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34171176156),
+including native Windows ACL tests. The console authorization executable was
+introduced with that dependency; later pins are recorded below.
+
+The console now includes the private `openuem-agent-auth` executable with separate
+authorization/revocation NKeys, verified TLS, loopback readiness and graceful
+shutdown. Its real PostgreSQL/TLS broker race test passes locally and covers active
+revocation and broker failure. Its [CI passed](https://github.com/the-luap/openuem-console/actions/runs/34171756069)
+at commit `74ab1b8`. See [service operations](agent-authorization-operations.md).
+Production provisioning and released-agent use remain open.
+
+The console gateway now supports an optional exact native-agent WSS route with
+mutual TLS to the private broker, strict upgrade validation, bounded concurrent
+streams and explicit stream shutdown. Real-broker tests cover TLS, routing,
+private replies and HTTP deadline survival. This is transport evidence; the
+production console and released agent are not integrated yet.
+
+Worker commit `6c7cc1f` adds opt-in versioned subscriptions, private reply validation,
+body/device/scope binding, current revocation checks and profile/task ownership.
+It also fixes targeted profile queries that previously omitted organization/site
+limits. Its actual deployment-exclusion handler was tested through a real broker
+and isolated PostgreSQL schema. The test rejects forged replies, foreign body IDs
+and requests from a revoked but still connected device. Linux/Windows builds pass
+without the temporary local workspace;
+[worker CI passed](https://github.com/the-luap/openuem-worker/actions/runs/34170316983)
+for this exact commit. Startup
+in both console and worker now preserves newer additive columns/indexes.
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34170372575)
+for commit `ffac98f`, including the gateway, access controls and guided Apple portal.
+
+Worker commit `c705189` adds the production TLS/NKey service runtime for CLI and
+installed Linux/Windows services. It requires separate protected environment
+configuration and returns startup or asynchronous broker permission failures.
+It stops accepting work before closing its database. The actual runtime passes
+the deployment-exclusion integration test, including deliberately partial broker
+permissions. [Worker CI passed](https://github.com/the-luap/openuem-worker/actions/runs/34172361553),
+including race tests and Linux/Windows builds. Its shared-library pin is now
+`6940f11772a9`; [library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34172052566)
+with broker restart/reconnection and native Windows ACL tests. Inherited handler
+operations still need a consistent upper time bound.
+
+Certificate Manager commit `a5a15e3` adds the `individual-broker` setup command:
+protected service keys, public broker configuration, partial setup recovery,
+identical retries and explicit conflicts/missing-key failures. Its
+[Linux/Windows CI passed](https://github.com/the-luap/openuem-cert-manager/actions/runs/34173268997).
+The shared library now renders the actual stock NATS account configuration and
+provisions bounded fixed consumers. Its database work queue handles issuance,
+revocation, site moves, expiry, leases, stale completions and periodic recovery.
+[Library CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34173775027)
+at `b46d0913482e`; the console now pins this version. The executable
+`openuem-agent-commands` passes its local PostgreSQL/TLS race test, including
+broker-state repair and revocation deletion. See [command service operations](agent-command-operations.md).
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34174306948)
+for commit `a39a21f`, including both isolated service lifecycles and both platform builds.
+
+The console now initializes the registry and exposes scoped public metadata,
+organization-authority setup/import, invitation revocation and identity revocation
+with confirmation and CSRF. Its real-router PostgreSQL tests and browser fixture
+cover these actions. See [desktop administration](desktop-console.md).
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34176188721)
+for this administration work at `d3030a5`, including route/database race checks
+and Linux/Windows builds. Browser acceptance also caught and fixed the fixture's
+shutdown ordering and the dark-mode heading/header foreground.
+
+Library commit `53e1022ff390` adds authenticated immutable installer manifests,
+strict target/content binding and persistent-checkpoint validation. Its
+[Linux and native Windows CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34176695980).
+The console now pins that version and adds a persisted installer catalog and
+`openuem-agent-releases` administration command. Local PostgreSQL race checks cover
+concurrent admission, rollback/sequence reuse, restart, withdrawal and verified
+file descriptors. See [release admission operations](agent-release-operations.md).
+[Console CI passed](https://github.com/the-luap/openuem-console/actions/runs/34177682716)
+for that catalog and administration command at `9ea4162`.
+
+Library commit `b589b84da570` adds caller-owned invitation/claim transactions while
+retaining the existing convenience APIs and key-proof checks. Its
+[CI passed](https://github.com/the-luap/openuem-nats/actions/runs/34178488009).
+The console pins this version and uses those transactions for exact installer
+release binding and canonical-origin checks. PostgreSQL tests observe actual lock
+dependencies to prove that withdrawal serializes after already authorized issuance
+and prevents later claims. Failed bindings leave no orphan invitations or uses.
+The later console form and public instructions now use these transactions.
+Signed-release macOS registration/approval acceptance and reference deployment wiring remain open.
+
+## Required boundaries
+
+1. A console invitation determines organization, site, platform, architecture,
+   expiry, permitted artifacts and use count. GET instructions/downloads cannot
+   consume it. Issuance requires explicit proof from endpoint-generated keys.
+2. The endpoint generates an RSA certificate key and a separate broker NKey. A
+   broker signature binds the CSR, invitation and target. The server reconstructs
+   the certificate identity and extensions; requested CSR names cannot assign
+   authority. Retries recover only the same key binding, never a second identity.
+3. An individual database record binds the issued device ID, scope, certificate,
+   broker key and lifecycle. The worker resolves this record instead of trusting
+   a report's organization/site. Every body device/resource must match that scope.
+4. Requests use `uem.v1.agent.<id>.request.<operation>` and replies use a private
+   `uem.v1.agent.<id>.reply` prefix. Workers must validate the reply as well as the
+   request: otherwise a forged reply could turn a privileged response into another
+   device's reboot or other command.
+5. Agents cannot create or modify JetStream consumers. A trusted service provisions
+   the consumer and fixed filters before the agent connects. Consumer-name-only
+   permissions are insufficient if the agent can change its filters.
+6. The gateway routes only the exact agent WSS path to private NATS. Agent identity
+   must remain provable through TLS termination; forwarding a certificate header
+   to NATS does not establish that identity. The selected broker integration must
+   validate nonce proof, issue exact subject permissions, enforce expiry and
+   disconnect revoked sessions. NATS auth callout provides the connection-time
+   mechanism; its service must run in an isolated account and remain unavailable
+   to ordinary agents. [NATS auth callout](https://docs.nats.io/learn/security/auth-callout).
+7. Installer bytes stay signed and unchanged. Separate authenticated, signed
+   configuration selects approved artifacts and a limited invitation; neither
+   configuration nor command lines contain shared permanent credentials.
+8. Local key storage, renewal, revocation, process restart and certificate overlap
+   must be implemented across the agent and PKI components. A console-only endpoint
+   or a source package that has not reached the agent release is insufficient.
+
+## Validation still required
+
+Run real NATS integration with multiple synthetic agents and organizations. Prove
+that an agent cannot impersonate another report, change scope in a body, forge a
+worker reply to a command, subscribe to another device/inbox, create a broader
+consumer, replay a nonce or reconnect after revocation. Verify queued commands,
+renewal, broker/worker restart, WSS proxying and concurrent bootstrap claims.
+
+Then build and install versioned Windows/Mac artifacts on physical endpoints,
+verify individual registration and software deployment, and prove the reference
+installation's inbound firewall exposes only TCP 443. Signing/notarization and
+physical endpoint access are outstanding external acceptance inputs.

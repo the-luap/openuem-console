@@ -1,0 +1,146 @@
+package mdm_views
+
+import (
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/mdm/apple"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ AppleUpdateGroupRemovalPreview(c echo.Context, info *partials.CommonInfo, preview apple.UpdateGroupRemovalPreview, requestKey string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Review policy removal", Url: partials.GetNavigationUrl(info, UpdateGroupRemovalPreviewPath(preview.Assignment.Plan.ID, preview.Assignment.ID))}}, info)
+		<main id="device-management" data-update-group-removal="preview" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Review removal of matching update policies</h1><p>Only original enrollments with a currently matching policy are included. Later group members are outside this request.</p><p>Removing a policy stops its server-side enforcement. It does not reverse an installed OS update, and device delivery still requires verification.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdateRemovalPlan(preview.Assignment.Plan)
+					<p>Original assignment: <code>{ preview.Assignment.ID }</code></p>
+					<p>
+						{ "Assessed at: " }
+						@Timestamp(&preview.AssessedAt)
+					</p>
+					<p data-update-removal-count>Matching policies to remove: { Number(updateGroupRemovalCount(preview)) } of { Number(len(preview.Devices)) } original enrollments.</p>
+					<p>Matching values do not prove continuous ownership by this assignment. Confirmation authorizes removal of the values shown now. Other assignments and scheduled actions can subsequently configure another policy.</p>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(preview.Assignment.Plan.ID, preview.Assignment.ID))) }>Previous removal requests</a>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4">
+					<h2 class="uk-card-title">Original enrollments</h2>
+					for _,device := range preview.Devices {
+						<article data-update-removal-device={ device.Selection.DeviceID } class="grid gap-2" style="overflow-wrap:anywhere;">
+							<p class="font-medium">{ Show(device.Name) }</p>
+							<p>Native enrollment: <code>{ device.Selection.DeviceID }</code></p>
+							if device.Reason=="" {
+								<p>Included: the configured policy matches the original assignment.</p>
+								if !device.NotificationAvailable {
+									<p role="status" class="uk-alert uk-alert-warning">This server cannot currently send a declarative notification to this enrollment. Confirmation removes the server policy; device-side removal remains unverified.</p>
+								}
+							} else {
+								<p>Excluded: { updateGroupRemovalReason(device.Reason) }</p>
+							}
+							if device.CurrentPolicy!=nil {
+								<p>Current configured target: { Show(device.CurrentPolicy.TargetVersion) } · { Show(device.CurrentPolicy.TargetBuild) }</p>
+								<p>Current deadline (device local time): { Show(device.CurrentPolicy.Deadline) }</p>
+								<p>Current information URL: { Show(device.CurrentPolicy.DetailsURL) }</p>
+							}
+							if device.Reason!="unavailable" {
+								<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, "/ios/"+device.Selection.DeviceID)) }>Open current device state</a>
+							}
+						</article>
+					}
+				</div>
+			</section>
+			if updateGroupRemovalCount(preview)>0 && info.Can(access.ManageUpdates) {
+				<form method="post" data-update-removal-confirm action={ partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(preview.Assignment.Plan.ID, preview.Assignment.ID)) } class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4">
+						@CSRF(info)
+						<input type="hidden" name="request_key" value={ requestKey }/>
+						<textarea name="devices" hidden readonly>{ updateGroupRemovalFields(preview) }</textarea>
+						<p>The complete selection and current policy values are checked again before any change. A conflict requires a fresh review.</p>
+						<label><input type="checkbox" name="confirmed" value="yes" required/> I authorize removal of all included matching policies.</label>
+						<button class="uk-button uk-button-danger" type="submit">Confirm policy removal</button>
+					</div>
+				</form>
+			} else if updateGroupRemovalCount(preview)==0 {
+				<p role="status">No original device currently has a matching removable policy.</p>
+			}
+		</main>
+	}
+}
+
+templ AppleUpdateGroupRemoval(c echo.Context, info *partials.CommonInfo, removal apple.UpdateGroupRemoval) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Policy removal history", Url: partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(removal.Assignment.Plan.ID, removal.Assignment.ID))}}, info)
+		<main id="device-management" data-update-group-removal="receipt" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Original policy removal request</h1><p>This records server policy removal and its original notifications. It does not establish device-side removal or an OS rollback. Later policy changes do not alter this receipt.</p></div>
+			<section class="uk-card uk-card-default">
+				<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+					@appleUpdateRemovalPlan(removal.Assignment.Plan)
+					<p>Removal ID: { removal.ID }</p>
+					<p>Request ID: { removal.RequestKey }</p>
+					<p>Confirmed by { removal.Actor }</p>
+					<p>
+						{ "Confirmed at: " }
+						@Timestamp(&removal.CreatedAt)
+					</p>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdatePlanGroupHistoryPath(removal.Assignment.Plan.ID)+"/"+removal.Assignment.ID)) }>Open original update assignment</a>
+					<a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupProgressPath(removal.Assignment.Plan.ID, removal.Assignment.ID))) }>Current cohort progress</a>
+					for _,command := range removal.Commands {
+						<article data-update-removal-command={ command.Selection.DeviceID }>
+							<p>Native enrollment: <code>{ command.Selection.DeviceID }</code></p>
+							if command.CommandID!="" {
+								<p>Original removal notification: <code>{ command.CommandID }</code></p>
+							} else {
+								<p>No declarative notification was available at admission. Device-side removal remains unverified.</p>
+							}
+						</article>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}
+
+templ AppleUpdateGroupRemovals(c echo.Context, info *partials.CommonInfo, plan, assignment string, items []apple.UpdateGroupRemoval, next string) {
+	@layout.Base("devices", info) {
+		<link rel="stylesheet" href="/assets/css/apple-device.css" type="text/css"/>
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Apple update plans", Url: partials.GetNavigationUrl(info, "/ios/update-plans")}, {Title: "Policy removal history", Url: partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(plan, assignment))}}, info)
+		<main id="device-management" data-update-group-removal="history" class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div><h1 class="text-2xl font-semibold">Policy removal history</h1><p>These immutable requests concern the original assignment's native enrollments.</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalPreviewPath(plan, assignment))) }>Review current matching policies</a></div>
+			if len(items)==0 {
+				<p>No policy removal requests are recorded on this page.</p>
+			}
+			for _,item := range items {
+				<section class="uk-card uk-card-default">
+					<div class="uk-card-body grid gap-4" style="overflow-wrap:anywhere;">
+						<p>{ Number(len(item.Commands)) } original enrollments · { item.Actor }</p>
+						<p>
+							{ "Confirmed at: " }
+							@Timestamp(&item.CreatedAt)
+						</p><a class="underline" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(plan, assignment)+"/"+item.ID)) }>Open original removal request</a>
+					</div>
+				</section>
+			}
+			<div class="flex flex-wrap gap-4">
+				<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(plan, assignment))) }>Newest removal requests</a>
+				if next!="" {
+					<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, UpdateGroupRemovalHistoryPath(plan, assignment)) + "?before=" + next) }>Older removal requests</a>
+				}
+			</div>
+		</main>
+	}
+}
+
+templ appleUpdateRemovalPlan(plan apple.UpdatePlan) {
+	<h2 class="font-semibold">Original update plan: { plan.Definition.Name }</h2>
+	<p>Original revision: { Number(plan.Revision) } · { groupPlatform(ctx, plan.Definition.Platform) }</p>
+	<p>Original target: { plan.Definition.TargetVersion } · { plan.Definition.TargetBuild }</p>
+	<p>Original deadline (device local time): { plan.Definition.Deadline }</p>
+	<p>Original information URL: { Show(plan.Definition.DetailsURL) }</p>
+	<p>This is the plan definition retained at assignment. Its current revision or archive state may differ.</p>
+}

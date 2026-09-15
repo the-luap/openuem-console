@@ -27,6 +27,9 @@ func main() {
 	log.Println("[INFO]: task scheduler has been started")
 
 	if err := w.GenerateConsoleConfig(); err != nil {
+		if mode := os.Getenv("OPENUEM_INDIVIDUAL_AGENT_MODE"); mode != "" && mode != "false" {
+			log.Fatal("[FATAL]: individual console configuration failed")
+		}
 		log.Printf("[ERROR]: could not generate config for OpenUEM console: %v", err)
 		if err := w.StartGenerateConsoleConfigJob(); err != nil {
 			log.Fatalf("[FATAL]: could not start job to generate config for OpenUEM console: %v", err)

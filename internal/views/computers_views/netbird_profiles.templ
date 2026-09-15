@@ -1,0 +1,18 @@
+package computers_views
+
+import nats "github.com/open-uem/nats"
+
+templ NetbirdProfileSelect(profiles []nats.NetbirdProfile) {
+	<div class="min-w-0 w-full max-w-xl">
+		<label for="netbird-profile" class="block text-sm mb-1">NetBird profile</label>
+		<select id="netbird-profile" name="profile" class="uk-select w-full min-w-0" required disabled?={ len(profiles)==0 }>
+			<option value="" selected disabled>Select a profile</option>
+			for _, profile := range profiles {
+				<option value={ profile.Handle() }>{ profile.Label() }</option>
+			}
+		</select>
+		if len(profiles)==0 {
+			<p class="text-sm mt-2" role="status">No selectable profile information is available. Refresh the device status.</p>
+		}
+	</div>
+}

@@ -38,7 +38,7 @@ templ AddTagButton(p PaginationAndSort, allTags, appliedTags []*ent.Tag, agentId
 						>
 							<div class="flex flex-col text-left p-2 ">
 								<div class="flex gap-1 items-center">
-									<div class={ "rounded-full h-2 w-2 p-2", fmt.Sprintf("bg-%s-500", tag.Color) }></div>
+									<div class="rounded-full h-2 w-2 p-2" style={ TagColorStyle(tag.Color) }></div>
 									{ tag.Tag }
 								</div>
 								<p class="uk-text-muted text-xs">{ tag.Description }</p>

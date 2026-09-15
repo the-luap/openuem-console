@@ -1,214 +1,21 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/open-uem/ent/task"
 	"github.com/open-uem/openuem-console/internal/models"
-	"github.com/open-uem/openuem-console/internal/views/partials"
-	"github.com/open-uem/openuem-console/internal/views/tasks_views"
-	"github.com/open-uem/utils"
 	"github.com/open-uem/wingetcfg/wingetcfg"
 )
-
-func (h *Handler) NewTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	profile := c.Param("profile")
-	if profile == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.empty_profile"), true))
-	}
-
-	profileID, err := strconv.Atoi(profile)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.new.invalid_profile"), true))
-	}
-
-	if c.Request().Method == "POST" {
-		t, err := validateTaskForm(c)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%v", err), true))
-		}
-
-		// encrypt local user password if not empty
-		if h.EncryptionMasterKey != "" && t.LocalUserPassword != "" {
-			t.LocalUserPassword, err = utils.EncryptSensitiveField(t.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_could_not_encrypt"), true))
-			}
-		}
-
-		if err := h.Model.AddTaskToProfile(c, profileID, *t); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.new.could_not_save"), err), true))
-		}
-
-		return h.EditProfile(c, "GET", profile, i18n.T(c.Request().Context(), "tasks.new.saved"))
-	}
-
-	return RenderView(c, tasks_views.TasksIndex("| Tasks", tasks_views.NewTask(c, profileID, commonInfo), commonInfo))
-}
-
-func (h *Handler) EditTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	if c.Request().Method == "POST" {
-		t, err := validateTaskForm(c)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%v", err), true))
-		}
-
-		// encrypt local user password if not empty
-		if h.EncryptionMasterKey != "" && t.LocalUserPassword != "" {
-			isPasswordEncrypted, err := utils.IsSensitiveFieldEncrypted(t.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return err
-			}
-
-			if !isPasswordEncrypted {
-				t.LocalUserPassword, err = utils.EncryptSensitiveField(t.LocalUserPassword, h.EncryptionMasterKey)
-				if err != nil {
-					return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_could_not_encrypt"), true))
-				}
-			}
-		}
-
-		if err := h.Model.UpdateProfileTask(c, taskId, *t); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-		}
-
-		return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
-	}
-
-	if c.Request().Method == "DELETE" {
-		if err := h.Model.DeleteTask(task.Edges.Profile.ID, taskId); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_delete"), err), true))
-		}
-		return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.deleted"))
-	}
-
-	// decrypt local user password
-	if h.EncryptionMasterKey != "" && task.LocalUserPassword != "" {
-		isSecretEncrypted, err := utils.IsSensitiveFieldEncrypted(task.LocalUserPassword, h.EncryptionMasterKey)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_cannot_be_decrypted", err.Error()), true))
-		}
-
-		if isSecretEncrypted {
-			task.LocalUserPassword, err = utils.DecryptSensitiveField(task.LocalUserPassword, h.EncryptionMasterKey)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.local_user_password_cannot_be_decrypted", err.Error()), true))
-			}
-		}
-	}
-
-	return RenderView(c, tasks_views.TasksIndex("| Tasks", tasks_views.EditTask(c, task.Edges.Profile.ID, task, commonInfo), commonInfo))
-}
-
-func (h *Handler) CloneTask(c echo.Context) error {
-	var err error
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskID, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	// TODO-Steve we must filter which profiles are available for a role
-	allProfiles, err := h.Model.GetAllProfiles()
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.clone.all_profiles_error"), err), true))
-	}
-
-	if c.Request().Method == "POST" {
-		taskDescription := c.FormValue("task-description")
-		if taskDescription == "" {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.new.empty"), err), true))
-		}
-
-		profile := c.FormValue("profile")
-		if profile == "" {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.invalid_profile"), err), true))
-		}
-
-		profileSubstrings := strings.Split(profile, "***")
-		if len(profileSubstrings) < 2 {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.invalid_profile"), err), true))
-		}
-
-		profileID, err := strconv.Atoi(profileSubstrings[1])
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.invalid_profile"), err), true))
-		}
-
-		lastTask, err := h.Model.GetLasTaskOrderInProfile(profileID)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.invalid_profile"), err), true))
-		}
-
-		taskOrder := lastTask.Order + 1
-		if err := h.Model.CloneTask(taskID, taskDescription, profileID, taskOrder); err != nil {
-			return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.clone.could_not_clone", err), true))
-		}
-
-		return h.EditProfile(c, "GET", profileSubstrings[1], i18n.T(c.Request().Context(), "tasks.clone.success"))
-	}
-
-	return RenderView(c, tasks_views.TasksIndex("| Tasks", tasks_views.CloneTask(c, task.Edges.Profile.ID, task, allProfiles, commonInfo), commonInfo))
-}
 
 func validateTaskForm(c echo.Context) (*models.TaskConfig, error) {
 	taskType := ""
@@ -999,18 +806,24 @@ func validateNetbird(c echo.Context) (*models.TaskConfig, error) {
 			return nil, errors.New(i18n.T(c.Request().Context(), "netbird.could_not_parse_groups"))
 		}
 
-		groups := ""
 		if len(p["netbird-groups[]"]) > 0 {
-			groupIDs := []string{}
-			for _, g := range p["netbird-groups[]"] {
-				tmp := strings.Split(g, "-")
-				if len(tmp) > 1 {
-					groupIDs = append(groupIDs, fmt.Sprintf(`"%s"`, tmp[1]))
-				}
-			}
-			groups = strings.Join(groupIDs, ",")
-			taskConfig.NetbirdGroups = groups
+			return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.stale"))
 		}
+		groupIDs := p["netbird-group-id"]
+		if len(groupIDs) > 100 {
+			return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.invalid"))
+		}
+		encoded := []string{}
+		seen := map[string]bool{}
+		for _, id := range groupIDs {
+			if id == "" || len(id) > 128 || !utf8.ValidString(id) || strings.ContainsRune(id, 0) || seen[id] {
+				return nil, errors.New(i18n.T(c.Request().Context(), "task_groups.invalid"))
+			}
+			seen[id] = true
+			value, _ := json.Marshal(id)
+			encoded = append(encoded, string(value))
+		}
+		taskConfig.NetbirdGroups = strings.Join(encoded, ",")
 
 		greed := c.FormValue("netbird-allow-extra-dns-labels")
 		if greed == "on" {
@@ -1019,121 +832,4 @@ func validateNetbird(c echo.Context) (*models.TaskConfig, error) {
 	}
 
 	return &taskConfig, nil
-}
-
-func (h *Handler) EnableTask(c echo.Context, enable bool) error {
-	var err error
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskId, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.invalid_task"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskId)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	if err := h.Model.EnableTask(taskId, !enable); err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.could_not_save"), err), true))
-	}
-
-	return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
-
-}
-
-func (h *Handler) MoveTask(c echo.Context, up bool) error {
-	var err error
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskID, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.not_valid"), true))
-	}
-
-	if c.Param("order") == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.order_empty"), true))
-	}
-
-	order, err := strconv.Atoi(c.Param("order"))
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.order_invalid"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.not_valid"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	if up {
-		if err := h.Model.MoveTask(taskID, order, order-1); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.could_not_change_task_order"), err), true))
-		}
-	} else {
-		if err := h.Model.MoveTask(taskID, order, order+1); err != nil {
-			return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.could_not_change_task_order"), err), true))
-		}
-	}
-
-	return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
-}
-
-func (h *Handler) MoveTaskFromTo(c echo.Context) error {
-	var err error
-
-	id := c.Param("id")
-	if id == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.edit.empty_task"), true))
-	}
-
-	taskID, err := strconv.Atoi(id)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.not_valid"), true))
-	}
-
-	if c.Param("from") == "" || c.Param("to") == "" {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.order_empty"), true))
-	}
-
-	from, err := strconv.Atoi(c.Param("from"))
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.order_invalid"), true))
-	}
-
-	to, err := strconv.Atoi(c.Param("to"))
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tasks.order_invalid"), true))
-	}
-
-	task, err := h.Model.GetTasksById(taskID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.not_valid"), err), true))
-	}
-
-	if task.Edges.Profile == nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.edit.no_profile"), err), true))
-	}
-
-	if err := h.Model.MoveTask(taskID, from, to); err != nil {
-		return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s : %v", i18n.T(c.Request().Context(), "tasks.could_not_change_task_order"), err), true))
-	}
-
-	return h.EditProfile(c, "GET", strconv.Itoa(task.Edges.Profile.ID), i18n.T(c.Request().Context(), "tasks.edit.saved"))
 }

@@ -36,6 +36,7 @@ templ Users(c echo.Context, p partials.PaginationAndSort, f filters.UserFilter, 
 						</p>
 					</div>
 					<div class="uk-card-body flex flex-col gap-4">
+						<a class="underline" href="/admin/oidc-accounts">Manage OpenID account identities</a>
 						if warnAboutSTMP {
 							<div class="uk-alert uk-alert-danger mt-4" uk-alert>
 								<div class="flex gap-1 items-center uk-alert-description text-red-600">

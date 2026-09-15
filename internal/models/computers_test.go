@@ -401,16 +401,6 @@ func (suite *ComputersTestSuite) TestGetAgentMonitorsInfo() {
 	assert.Equal(suite.T(), true, openuem_ent.IsNotFound(err), "should raise not found error")
 }
 
-func (suite *ComputersTestSuite) TestSaveNotes() {
-	err := suite.model.SaveNotes("agent1", "notes", suite.commonInfo)
-	assert.NoError(suite.T(), err, "should save notes")
-
-	items, err := suite.model.Client.Agent.Query().Where(agent.ID("agent1")).All(context.Background())
-	assert.NoError(suite.T(), err, "should get computers by page")
-	assert.Equal(suite.T(), 1, len(items), "should get one item")
-	assert.Equal(suite.T(), "notes", items[0].Notes, "should get notes")
-}
-
 func (suite *ComputersTestSuite) TestGetComputerManufacturers() {
 	allManufacturers := []string{"manufacturer0", "manufacturer1", "manufacturer2", "manufacturer3", "manufacturer4", "manufacturer5", "manufacturer6"}
 	items, err := suite.model.GetComputerManufacturers(suite.commonInfo, filters.AgentFilter{})

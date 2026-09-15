@@ -1,0 +1,115 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/security/access"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+	"net/url"
+	"strconv"
+)
+
+func desktopExecutionPath(target inventory.ManualTarget) string {
+	return fmt.Sprintf("/tenant/%d/site/%d/computers/%s/execution", target.Scope.TenantID, target.Scope.SiteID, url.PathEscape(target.ID))
+}
+func desktopTaskHistoryPath(info *partials.CommonInfo, id string, page, size int) string {
+	return partials.GetNavigationUrl(info, "/computers/"+url.PathEscape(id)+"/tasks") + "?" + url.Values{"page": {strconv.Itoa(page)}, "pageSize": {strconv.Itoa(size)}}.Encode()
+}
+func desktopReportProfilePath(scope access.Scope, id int64) string {
+	prefix := ""
+	if scope.TenantID > 0 {
+		prefix = fmt.Sprintf("/tenant/%d", scope.TenantID)
+	}
+	if scope.SiteID > 0 {
+		prefix += fmt.Sprintf("/site/%d", scope.SiteID)
+	}
+	return fmt.Sprintf("%s/profiles/%d/issues", prefix, id)
+}
+
+templ TaskHistory(c echo.Context, info *partials.CommonInfo, page *inventory.DesktopTasksPage) {
+	@manualPage(c, info, page.Target.ID, i18n.T(ctx, "manual_execution.history_title")) {
+		@manualTarget(page.Target)
+		<p>{ i18n.T(ctx,"manual_execution.history_help") }</p>
+		if page.Status!="Disabled" && (page.Target.Platform=="windows" || page.Target.Platform=="linux" || page.Target.Platform=="macos") {
+			<a class="uk-button uk-button-primary" href={ desktopExecutionPath(page.Target) }>{ i18n.T(ctx,"manual_execution.title") }</a>
+		} else {
+			<p>{ i18n.T(ctx,"manual_execution.not_ready") }</p>
+		}
+		if len(page.Reports)==0 {
+			<p role="status">{ i18n.T(ctx,"manual_execution.history_empty") }</p>
+		}
+		for _,report:=range page.Reports {
+			<article class="manual-impact" data-task-report={ strconv.FormatInt(report.ID, 10) }>
+				<h2 class="uk-card-title">{ fmt.Sprintf("%s %d",i18n.T(ctx,"manual_execution.report_id"),report.ID) }</h2>
+				<dl class="manual-details">
+					<dt>{ i18n.T(ctx,"manual_execution.task") }</dt>
+					<dd>
+						if report.TaskID==0 {
+							{ i18n.T(ctx,"manual_execution.definition_missing") }
+						} else {
+							{ fmt.Sprintf("%s · ID %d",report.TaskName,report.TaskID) }
+						}
+					</dd>
+					<dt>{ i18n.T(ctx,"manual_execution.profile") }</dt>
+					<dd>
+						if report.ProfileID==0 {
+							{ i18n.T(ctx,"manual_execution.profile_missing") }
+						} else {
+							<a class="uk-link" href={ desktopReportProfilePath(report.ProfileScope, report.ProfileID) }>{ fmt.Sprintf("%s · ID %d",report.ProfileName,report.ProfileID) }</a>
+						}
+					</dd>
+					<dt>{ i18n.T(ctx,"manual_execution.result") }</dt>
+					<dd>
+						if report.Failed {
+							{ i18n.T(ctx,"manual_execution.failed") }
+						} else {
+							{ i18n.T(ctx,"manual_execution.succeeded") }
+						}
+					</dd>
+					<dt>{ i18n.T(ctx,"manual_execution.reported_end") }</dt>
+					<dd>
+						if report.End!=nil {
+							@mdm_views.Timestamp(report.End)
+						} else if report.RawEnd!="" {
+							{ report.RawEnd }
+						} else {
+							{ i18n.T(ctx,"manual_execution.time_missing") }
+						}
+					</dd>
+				</dl>
+				if report.TaskDisabled {
+					<p>{ i18n.T(ctx,"manual_execution.definition_disabled") }</p>
+				}
+				if report.Output!="" {
+					<h3>{ i18n.T(ctx,"manual_execution.stdout") }</h3>
+					<pre class="manual-output" tabindex="0" aria-label={ i18n.T(ctx, "manual_execution.stdout") }>{ report.Output }</pre>
+					if report.OutputTruncated {
+						<p>{ i18n.T(ctx,"manual_execution.output_truncated") }</p>
+					}
+				}
+				if report.Error!="" {
+					<h3>{ i18n.T(ctx,"manual_execution.stderr") }</h3>
+					<pre class="manual-output" tabindex="0" aria-label={ i18n.T(ctx, "manual_execution.stderr") }>{ report.Error }</pre>
+					if report.ErrorTruncated {
+						<p>{ i18n.T(ctx,"manual_execution.output_truncated") }</p>
+					}
+				}
+				if report.CanReview {
+					<a class="uk-button uk-button-default" href={ fmt.Sprintf("%s/review?kind=task&source_id=%d", desktopExecutionPath(page.Target), report.TaskID) }>{ i18n.T(ctx,"manual_execution.review_again") }</a>
+				}
+			</article>
+		}
+		<nav class="manual-actions" aria-label={ i18n.T(ctx, "manual_execution.history_pages") }>
+			<p>{ i18n.T(ctx,"manual_execution.history_page",page.Page,max(1,(page.Total+page.PageSize-1)/page.PageSize),page.Total) }</p>
+			if page.Page>1 {
+				<a class="uk-button uk-button-default" href={ desktopTaskHistoryPath(info, page.Target.ID, page.Page-1, page.PageSize) } hx-get={ desktopTaskHistoryPath(info, page.Target.ID, page.Page-1, page.PageSize) } hx-target="#main" hx-select="#main" hx-swap="outerHTML" hx-push-url="true">{ i18n.T(ctx,"manual_execution.previous") }</a>
+			}
+			if page.Page*page.PageSize<page.Total {
+				<a class="uk-button uk-button-default" href={ desktopTaskHistoryPath(info, page.Target.ID, page.Page+1, page.PageSize) } hx-get={ desktopTaskHistoryPath(info, page.Target.ID, page.Page+1, page.PageSize) } hx-target="#main" hx-select="#main" hx-swap="outerHTML" hx-push-url="true">{ i18n.T(ctx,"manual_execution.next") }</a>
+			}
+		</nav>
+	}
+}

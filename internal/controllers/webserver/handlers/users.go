@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/validator/v10"
 	"github.com/invopop/ctxi18n/i18n"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/labstack/echo/v4"
 	openuem_ent "github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
@@ -274,7 +277,7 @@ func (h *Handler) SendCertificateRequestToNATS(c echo.Context, user *openuem_ent
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
 
-	if err := h.NATSConnection.Publish("certificates.user", data); err != nil {
+	if err := h.PublishBroker("certificates.user", data); err != nil {
 		return err
 	}
 	return nil
@@ -293,6 +296,10 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 
 	// Delete user
 	if err := h.Model.DeleteUser(uid); err != nil {
+		var constraint *pgconn.PgError
+		if errors.As(err, &constraint) && constraint.Code == "23503" && constraint.ConstraintName == "uem_oidc_accounts_user_id_fkey" {
+			return echo.NewHTTPError(409, "This account has permanent OpenID identity records. Disable its identity links and remove its access permissions instead of deleting it.")
+		}
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
 
@@ -364,7 +371,7 @@ func (h *Handler) RenewUserCertificate(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "nats.not_connected"), false))
 	}
 
-	if err := h.NATSConnection.Publish("certificates.user", data); err != nil {
+	if err := h.PublishBroker("certificates.user", data); err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
 
@@ -383,7 +390,7 @@ func (h *Handler) SetEmailConfirmed(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage("user doesn't exist", false))
 	}
 
-	err = h.Model.Client.User.UpdateOneID(uid).SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_IN_REVIEW).Exec(context.Background())
+	err = h.Model.Client.User.UpdateOneID(uid).SetEmailVerified(true).SetRegister(openuem_nats.REGISTER_IN_REVIEW).SetNewUserToken("").Exec(context.Background())
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(err.Error(), false))
 	}
@@ -402,7 +409,7 @@ func (h *Handler) ApproveAccount(c echo.Context) error {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "users.user_not_found"), true))
 	}
 
-	err = h.Model.Client.User.UpdateOneID(uid).SetRegister(openuem_nats.REGISTER_APPROVED).Exec(context.Background())
+	err = h.Model.Client.User.UpdateOneID(uid).SetRegister(openuem_nats.REGISTER_APPROVED).SetNewUserToken("").Exec(context.Background())
 	if err != nil {
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "users.could_not_update_register", err.Error()), false))
 	}
@@ -444,7 +451,14 @@ func (h *Handler) AskForConfirmation(c echo.Context) error {
 }
 
 func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) error {
-	token, err := h.generateEmailToken(user.ID, "Email Confirmation", 24)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+	current, err := h.Model.PendingEmailConfirmation(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	user = current
+	token, err := h.generateConfirmationToken(user)
 	if err != nil {
 		return err
 	}
@@ -456,7 +470,7 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 		MessageText:      "Please, confirm your email address so that it can be used to receive emails from OpenUEM",
 		MessageGreeting:  fmt.Sprintf("Hi %s", user.Name),
 		MessageAction:    "Confirm email",
-		MessageActionURL: c.Request().Header.Get("Origin") + "/auth/confirm/" + token,
+		MessageActionURL: h.consoleOrigin() + "/auth/confirm/" + token,
 	}
 
 	data, err := json.Marshal(notification)
@@ -467,8 +481,18 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 	if h.NATSConnection == nil || !h.NATSConnection.IsConnected() {
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
+	stored := token
+	if h.EncryptionMasterKey != "" {
+		stored, err = utils.EncryptSensitiveField(token, h.EncryptionMasterKey)
+		if err != nil {
+			return err
+		}
+	}
+	if err = h.Model.StageEmailConfirmation(ctx, user, stored); err != nil {
+		return err
+	}
 
-	if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+	if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 		return err
 	}
 
@@ -476,11 +500,11 @@ func (h *Handler) sendConfirmationEmail(c echo.Context, user *openuem_ent.User) 
 }
 
 func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.User) error {
-	encryptedToken := ""
 	token, err := h.generateEmailToken(user.ID, "New password", 1)
 	if err != nil {
 		return err
 	}
+	encryptedToken := token
 
 	// encrypt the access token if we have the encryption master key
 	if h.EncryptionMasterKey != "" {
@@ -501,7 +525,7 @@ func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.U
 		MessageText:      "You must set a password to log into OpenUEM. Click the link below to set your initial password. NOTE: the following link will only be valid for one hour",
 		MessageGreeting:  fmt.Sprintf("Hi %s, a new OpenUEM account with username %s has been created for you", user.Name, user.ID),
 		MessageAction:    "Generate a password",
-		MessageActionURL: c.Request().Header.Get("Origin") + fmt.Sprintf("/login/new?token=%s", token),
+		MessageActionURL: h.consoleOrigin() + fmt.Sprintf("/login/new?token=%s", token),
 	}
 
 	data, err := json.Marshal(notification)
@@ -513,7 +537,7 @@ func (h *Handler) sendLinkToGeneratePassword(c echo.Context, user *openuem_ent.U
 		return fmt.Errorf("%s", i18n.T(c.Request().Context(), "nats.not_connected"))
 	}
 
-	if err := h.NATSConnection.Publish("notification.confirm_email", data); err != nil {
+	if err := h.PublishBroker("notification.confirm_email", data); err != nil {
 		return err
 	}
 

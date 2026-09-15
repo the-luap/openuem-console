@@ -1,0 +1,36 @@
+/* Bound profile identifiers, application rules and form controls on small screens. */
+#apple-profiles,
+#apple-profiles form {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#apple-profiles > *,
+#apple-profiles .uk-card-body,
+#apple-profiles label,
+#apple-profiles details {
+  min-width: 0;
+}
+
+#apple-profiles p,
+#apple-profiles code,
+#apple-profiles label,
+#apple-profiles h2,
+#apple-profiles summary {
+  overflow-wrap: anywhere;
+}
+
+#apple-profiles input:not([type="checkbox"]),
+#apple-profiles select,
+#apple-profiles textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#apple-profiles .uk-button {
+  height: auto;
+  min-height: 2.25rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  white-space: normal;
+}

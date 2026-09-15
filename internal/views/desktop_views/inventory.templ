@@ -1,0 +1,99 @@
+package desktop_views
+
+import (
+	"fmt"
+	"github.com/invopop/ctxi18n/i18n"
+	"github.com/labstack/echo/v4"
+	"github.com/open-uem/openuem-console/internal/inventory"
+	"github.com/open-uem/openuem-console/internal/views/layout"
+	"github.com/open-uem/openuem-console/internal/views/mdm_views"
+	"github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ Inventory(c echo.Context, info *partials.CommonInfo, device *inventory.Desktop) {
+	@InventoryWithRefresh(c, info, device, RefreshData{})
+}
+
+templ InventoryWithRefresh(c echo.Context, info *partials.CommonInfo, device *inventory.Desktop, refresh RefreshData) {
+	@layout.Base("devices", info) {
+		@partials.Header(c, []partials.Breadcrumb{{Title: "Devices", Url: partials.GetNavigationUrl(info, "/devices")}, {Title: device.Name}}, info)
+		<main class="text-foreground grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+			<div class="min-w-0">
+				<h1 class="text-2xl font-semibold break-words">{ mdm_views.Show(device.Name) }</h1>
+				<p class="uk-text-muted mt-2">Computer inventory</p>
+				@mdm_views.Navigation(info)
+				@InventoryNavigation(info, device.ID, "overview")
+			</div>
+			if refresh.Available || refresh.Request != nil {
+				@InventoryRefresh(info, device, refresh)
+			}
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Device overview</h2></div>
+				<div class="uk-card-body min-w-0">
+					<dl class="uk-description-list break-words">
+						<dt>Organization</dt><dd>{ device.Organization }</dd>
+						<dt>Site</dt><dd>{ device.Site }</dd>
+						<dt>Device ID</dt><dd class="break-all">{ device.ID }</dd>
+						<dt>Hostname</dt><dd>{ mdm_views.Show(device.Hostname) }</dd>
+						<dt>Platform</dt><dd>{ mdm_views.StateLabel(ctx, device.Platform) }</dd>
+						<dt>Device type</dt><dd>{ mdm_views.Show(device.EndpointType) }</dd>
+						<dt>Agent status</dt><dd>{ mdm_views.Show(device.Status) }</dd>
+						<dt>First report</dt><dd>
+							@mdm_views.Timestamp(device.FirstContact)
+						</dd>
+						<dt>Last report</dt><dd>
+							@mdm_views.Timestamp(device.LastContact)
+						</dd>
+						<dt>IP address</dt><dd>{ mdm_views.Show(device.IP) }</dd>
+						<dt>MAC address</dt><dd>{ mdm_views.Show(device.MAC) }</dd>
+					</dl>
+				</div>
+			</section>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Hardware</h2></div>
+				<div class="uk-card-body min-w-0">
+					if device.Hardware == nil {
+						<p role="status">No hardware report received yet.</p>
+					} else {
+						<p class="uk-text-muted mb-4">{ i18n.T(ctx,"inventory_report.hardware_evidence") }</p>
+						<dl class="uk-description-list break-words">
+							<dt>Manufacturer</dt><dd>{ mdm_views.Show(device.Hardware.Manufacturer) }</dd>
+							<dt>Model</dt><dd>{ mdm_views.Show(device.Hardware.Model) }</dd>
+							<dt>Serial number</dt><dd>{ mdm_views.Show(device.Hardware.Serial) }</dd>
+							<dt>Memory</dt><dd>
+								if device.Hardware.Memory == nil {
+									{ i18n.T(ctx,"inventory_report.not_reported") }
+								} else {
+									{ fmt.Sprintf("%.1f GiB", float64(*device.Hardware.Memory)/(1<<30)) }
+								}
+							</dd>
+							<dt>Processor</dt><dd>{ mdm_views.Show(device.Hardware.Processor) }</dd>
+							<dt>Processor cores</dt><dd>
+								if device.Hardware.Cores == nil {
+									{ i18n.T(ctx,"inventory_report.not_reported") }
+								} else {
+									{ fmt.Sprint(*device.Hardware.Cores) }
+								}
+							</dd>
+							<dt>Processor architecture</dt><dd>{ mdm_views.Show(device.Hardware.Architecture) }</dd>
+						</dl>
+					}
+				</div>
+			</section>
+			<section class="uk-card uk-card-default min-w-0">
+				<div class="uk-card-header"><h2 class="uk-card-title">Operating system</h2></div>
+				<div class="uk-card-body min-w-0">
+					if device.OperatingSystem == nil {
+						<p role="status">No operating system report received yet.</p>
+					} else {
+						<dl class="uk-description-list break-words">
+							<dt>Version</dt><dd>{ mdm_views.Show(device.OperatingSystem.Version) }</dd>
+							<dt>Edition</dt><dd>{ mdm_views.Show(device.OperatingSystem.Edition) }</dd>
+							<dt>Architecture</dt><dd>{ mdm_views.Show(device.OperatingSystem.Architecture) }</dd>
+						</dl>
+					}
+				</div>
+			</section>
+		</main>
+	}
+}

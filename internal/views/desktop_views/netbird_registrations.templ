@@ -1,0 +1,238 @@
+package desktop_views
+
+import (
+ "fmt"
+ "net/url"
+ "slices"
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+func NetbirdRegistrationPath(info *partials.CommonInfo,id string)string {
+ return partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(id)+"/netbird/registrations")
+}
+func netbirdRegistrationGroupLabel(review *inventory.NetbirdRegistrationReview,id string)string {
+ for _,group:=range review.GroupChoices {if group.ID==id {return group.Name}}
+ return id
+}
+
+templ NetbirdRegistrationChoices(c echo.Context,info *partials.CommonInfo,review *inventory.NetbirdRegistrationReview) {
+ @netbirdPage(c,info,review.Target.ID,"NetBird registration") {
+  @netbirdTarget(review.Target)
+  <p>Select the provider groups for a new registration, then review the device and impact. Opening this page does not create a key or run a device command.</p>
+  <p>Management URL: <span class="netbird-id">{ review.ManagementURL }</span></p>
+  <form method="get" action={ NetbirdRegistrationPath(info,review.Target.ID)+"/review" } class="netbird-registration-choices">
+   <fieldset>
+    <legend>Provider groups</legend>
+    <p id="netbird-group-help">Choose up to 100 groups. No additional groups are requested when none are selected.</p>
+    if len(review.GroupChoices)==0 {
+<p role="status">No selectable groups were returned by the provider.</p>
+}
+    <div class="netbird-group-list" aria-describedby="netbird-group-help">
+     for index,group:=range review.GroupChoices {
+      <label class="netbird-checkbox" for={ "netbird-group-"+strconv.Itoa(index) }><input id={ "netbird-group-"+strconv.Itoa(index) } type="checkbox" name="group" value={ group.ID }/><span>{ group.Name }<small class="netbird-id">{ group.ID }</small></span></label>
+     }
+    </div>
+   </fieldset>
+   <label class="netbird-checkbox" for="netbird-extra-dns"><input type="checkbox" id="netbird-extra-dns" name="extra_dns" value="yes"/><span>Allow extra DNS labels</span></label>
+   <div class="netbird-actions">
+    <button type="submit" class="uk-button uk-button-primary">Review registration</button>
+    <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,review.Target.ID) }>Registration history</a>
+   </div>
+  </form>
+ }
+}
+
+templ NetbirdRegistrationReview(c echo.Context,info *partials.CommonInfo,review *inventory.NetbirdRegistrationReview,requestID string) {
+ @netbirdPage(c,info,review.Target.ID,"Review NetBird registration") {
+  @netbirdTarget(review.Target)
+  <dl class="netbird-details">
+   <dt>Management URL</dt><dd>{ review.ManagementURL }</dd>
+   <dt>Extra DNS labels</dt><dd>{ netbirdFlag(review.ExtraDNS,"Allowed","Not allowed") }</dd>
+   <dt>Groups for a new registration</dt><dd>
+    if len(review.Groups)==0 {
+<span>No additional groups selected.</span>
+}
+    <ul class="netbird-group-summary">
+     for _,id:=range review.Groups {
+<li>{ netbirdRegistrationGroupLabel(review,id) }<span class="netbird-id">{ id }</span></li>
+}
+    </ul>
+   </dd>
+  </dl>
+  <div class="netbird-impact">
+   <p>This command can interrupt access through the device's NetBird network. It disconnects the client before attempting registration with the reviewed provider.</p>
+   <p>An existing registration may retain its current network identity and group membership. A successful command does not by itself confirm those provider details.</p>
+   <p>The request expires after two minutes. A one-use setup key is created. The console attempts to remove it after delivery. An unconfirmed result blocks further NetBird commands; key removal alone does not release that block.</p>
+  </div>
+  <form method="post" action={ NetbirdRegistrationPath(info,review.Target.ID) } hx-post={ NetbirdRegistrationPath(info,review.Target.ID) } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-submit,#netbird-confirm" hx-indicator="#netbird-pending" class="netbird-confirm">
+   @mdm_views.CSRF(info)
+   <input type="hidden" name="request_id" value={ requestID }/>
+   <input type="hidden" name="revision" value={ review.Revision }/>
+   <input type="hidden" name="extra_dns" value={ netbirdFlag(review.ExtraDNS,"yes","no") }/>
+   for _,id:=range review.Groups {
+<input type="hidden" name="group" value={ id }/>
+}
+   <label class="netbird-checkbox" for="netbird-confirm"><input type="checkbox" id="netbird-confirm" name="confirmed" value="yes" required/><span>I reviewed this device, provider and group selection and accept the possible interruption.</span></label>
+   <div class="netbird-actions">
+    <button type="submit" id="netbird-submit" class="uk-button uk-button-primary">Submit registration</button>
+    <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,review.Target.ID)+"/new" }>Change selection</a>
+    <span id="netbird-pending" class="htmx-indicator" role="status">Recording registration…</span>
+   </div>
+  </form>
+ }
+}
+
+func netbirdRegistrationState(r *inventory.NetbirdRegistration)string {
+ switch r.Status {
+ case "queued":if len(r.Attempts)>0 {return "Registration started; awaiting retained results."};return "Queued; no external step has started."
+ case "completed":return "Command execution and setup-key removal confirmed."
+ case "stopped":return "Stopped before device delivery."
+ case "unconfirmed":return "Registration is unconfirmed. Do not repeat this request."
+ default:return "Registration state is unavailable."
+ }
+}
+func netbirdRegistrationReason(reason string)string {
+ switch reason {
+ case "recovered_without_delivery":return "The retained setup key was removed after recovery. No device delivery was attempted."
+ case "registration_unconfirmed":return "A required provider or device result was not retained."
+ case "expired":return "The request expired before device delivery."
+ default:return netbirdReason(reason)
+ }
+}
+
+templ NetbirdRegistrationReceipt(c echo.Context,info *partials.CommonInfo,r *inventory.NetbirdRegistration) {
+ @netbirdPage(c,info,r.DeviceID,"NetBird registration receipt") {
+  <p class="netbird-status" role="status">{ netbirdRegistrationState(r) }</p>
+  if r.Reason!="" {
+<p>{ netbirdRegistrationReason(r.Reason) }</p>
+}
+  <dl class="netbird-details">
+   <dt>Request</dt><dd>{ r.ID }</dd>
+   <dt>Device ID</dt><dd>{ r.DeviceID }</dd>
+   <dt>Organization / site</dt><dd>{ fmt.Sprintf("%d / %d",r.Scope.TenantID,r.Scope.SiteID) }</dd>
+   <dt>Requested by</dt><dd>{ r.Actor }</dd>
+   <dt>Requested</dt><dd>@mdm_views.Timestamp(&r.RequestedAt)</dd>
+   <dt>Request expiry</dt><dd>@mdm_views.Timestamp(&r.ExpiresAt)</dd>
+   if r.FinishedAt!=nil {
+<dt>Finished</dt><dd>@mdm_views.Timestamp(r.FinishedAt)</dd>
+}
+   <dt>Key creation</dt><dd>
+    if r.Key!=nil {
+<span>Confirmed</span>
+} else if slices.Contains(r.Attempts,"create") {
+<span>Attempted; provider result unconfirmed</span>
+} else {
+<span>Not attempted</span>
+}
+   </dd>
+   <dt>Device execution</dt><dd>
+    if r.Delivered!=nil {
+<span>Command execution confirmed</span>
+} else if slices.Contains(r.Attempts,"deliver") {
+<span>Attempted; execution unconfirmed</span>
+} else {
+<span>Not attempted</span>
+}
+   </dd>
+   <dt>Key removal</dt><dd>
+    if r.KeyAbsent {
+<span>Absence confirmed at the provider</span>
+} else if slices.Contains(r.Attempts,"delete") {
+<span>Attempted; removal unconfirmed</span>
+} else if r.Key!=nil {
+<span>Removal is not confirmed</span>
+} else {
+<span>No retained key identity</span>
+}
+   </dd>
+   if r.Key!=nil {
+    <dt>Provider key ID</dt><dd>{ r.Key.ID }</dd>
+    <dt>Provider key expiry</dt><dd>@mdm_views.Timestamp(&r.Key.ExpiresAt)</dd>
+   }
+  </dl>
+  if r.PeerBinding==nil {
+   <p>This receipt does not establish current connectivity, provider peer identity or group membership. Removing the setup key does not disconnect a peer that already registered with it.</p>
+  } else {
+   @netbirdPeerBindingSummary(r.PeerBinding)
+   @netbirdPeerRemovalSummary(r)
+   <p>Removing the setup key does not disconnect a peer that already registered with it.</p>
+  }
+  @netbirdCleanupRetrySummary(r.LastCleanupRetry)
+  if r.Resolution!=nil {
+   @netbirdResolutionRetrySummary(r.Resolution.LastRetry)
+  }
+  if r.Status=="unconfirmed" && r.ReleasedAt==nil {
+   <p>The original outcome remains unconfirmed. Checking key removal does not repeat registration or release the device's command block.</p>
+   if r.Key!=nil && !r.KeyAbsent && slices.Contains(r.Attempts,"delete") && netbirdCanManage(info,r.Scope) {
+    <p><a class="uk-button uk-button-default" id="netbird-cleanup-review-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup/review" }>Review another key removal attempt</a></p>
+    <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-post={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cleanup" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-cleanup" hx-indicator="#netbird-pending">
+     @mdm_views.CSRF(info)
+     <input type="hidden" name="confirmed" value="yes"/>
+     <button type="submit" id="netbird-cleanup" class="uk-button uk-button-default">Check key removal</button>
+     <span id="netbird-pending" class="htmx-indicator" role="status">Checking key removal…</span>
+    </form>
+   }
+  }
+  if r.ReleasedAt!=nil {
+   <p role="status">Resolution confirmed. Further NetBird commands may be reviewed; the original registration outcome remains unconfirmed.</p>
+   <dl class="netbird-details"><dt>Resolution confirmed</dt><dd>@mdm_views.Timestamp(r.ReleasedAt)</dd><dt>Confirmed by</dt><dd>{ r.ReleasedBy }</dd>
+    if r.Resolution!=nil {
+     <dt>Resolution ID</dt><dd>{ r.Resolution.ID }</dd>
+    }
+   </dl>
+  }
+  if r.Status=="unconfirmed" && netbirdCanManage(info,r.Scope) {
+   <p><a class="uk-button uk-button-default" id="netbird-resolution-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/resolution" }>Review registration resolution</a></p>
+  }
+  if (r.Status=="completed" || r.Status=="unconfirmed") && netbirdCanManage(info,r.Scope) {
+   <p><a class="uk-button uk-button-default" id="netbird-peer-review-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/peer" }>Review provider peer association</a></p>
+   if r.PeerBinding!=nil {
+    <p><a class="uk-button uk-button-default" id="netbird-peer-removal-link" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/peer/removal" }>Review provider peer removal</a></p>
+   }
+  }
+  if r.Status=="queued" && len(r.Attempts)==0 && netbirdCanManage(info,r.Scope) {
+   <form method="post" action={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID+"/cancel" } class="netbird-confirm">
+    @mdm_views.CSRF(info)
+    <label class="netbird-checkbox" for="netbird-cancel"><input type="checkbox" id="netbird-cancel" name="confirmed" value="yes" required/><span>Withdraw this request if no external step has started.</span></label>
+    <button type="submit" class="uk-button uk-button-default">Cancel queued registration</button>
+   </form>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,r.DeviceID)+"/"+r.ID }>Reload receipt</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,r.DeviceID) }>Registration history</a>
+   <a class="uk-link" href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(r.DeviceID)+"/netbird") }>Device state</a>
+  </div>
+ }
+}
+
+templ NetbirdRegistrationHistory(c echo.Context,info *partials.CommonInfo,device string,rows []inventory.NetbirdRegistration) {
+ @netbirdPage(c,info,device,"NetBird registration history") {
+  <p>Retained requests for this organization and site remain available after a device moves or is removed.</p>
+  <p>Device ID: <span class="netbird-id">{ device }</span></p>
+  if len(rows)==0 {
+<p role="status">No recorded registrations on this page.</p>
+}
+  <ol class="netbird-history">
+   for _,r:=range rows {
+<li><a href={ NetbirdRegistrationPath(info,device)+"/"+r.ID }>Registration · { r.Status }
+ if r.ReleasedAt!=nil {
+  <span> · resolution confirmed</span>
+ }
+</a><span class="netbird-id">{ r.ID }</span>@mdm_views.Timestamp(&r.RequestedAt)</li>
+}
+  </ol>
+  <div class="netbird-actions">
+   if len(rows)==50 {
+<a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,device)+"?before="+url.QueryEscape(rows[len(rows)-1].ID) }>Older registrations</a>
+}
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,device) }>Latest registrations</a>
+   <a class="uk-button uk-button-default" href={ NetbirdOperationPath(info,device) }>Command history</a>
+   <a class="uk-link" href={ partials.GetNavigationUrl(info,"/computers/"+url.PathEscape(device)+"/netbird") }>Device state</a>
+  </div>
+  <p>{ strconv.Itoa(len(rows)) } recorded requests on this page.</p>
+ }
+}

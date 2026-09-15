@@ -1,0 +1,72 @@
+FROM --platform=$BUILDPLATFORM golang:1.26.8-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
+WORKDIR /src
+ENV GOTOOLCHAIN=local
+COPY go.mod go.sum ./
+COPY cmd/openuem-installation-secrets ./cmd/openuem-installation-secrets
+COPY cmd/openuem-protocol-keys ./cmd/openuem-protocol-keys
+COPY cmd/openuem-reference-probe ./cmd/openuem-reference-probe
+COPY cmd/openuem-database-credentials ./cmd/openuem-database-credentials
+COPY cmd/openuem-database-bootstrap ./cmd/openuem-database-bootstrap
+COPY internal/setup/secrets ./internal/setup/secrets
+COPY internal/setup/readiness ./internal/setup/readiness
+COPY internal/setup/administrator ./internal/setup/administrator
+COPY internal/security/access ./internal/security/access
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o /out/ \
+      ./cmd/openuem-installation-secrets ./cmd/openuem-protocol-keys ./cmd/openuem-reference-probe ./cmd/openuem-database-credentials ./cmd/openuem-database-bootstrap
+
+FROM build AS test-build
+COPY internal/setup/containertest ./internal/setup/containertest
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go test -mod=readonly -trimpath -buildvcs=false -c -o /out/setup.test ./internal/setup/containertest
+
+FROM scratch AS base
+COPY LICENSE /licenses/openuem-console.LICENSE
+USER 65532:65532
+STOPSIGNAL SIGTERM
+
+FROM base AS installation-secrets
+COPY --from=build /out/openuem-installation-secrets /openuem-installation-secrets
+ENTRYPOINT ["/openuem-installation-secrets"]
+CMD ["--help"]
+
+FROM base AS protocol-keys
+COPY --from=build /out/openuem-protocol-keys /openuem-protocol-keys
+ENTRYPOINT ["/openuem-protocol-keys"]
+CMD ["--help"]
+
+FROM base AS reference-probe
+COPY --from=build /out/openuem-reference-probe /openuem-reference-probe
+ENTRYPOINT ["/openuem-reference-probe"]
+CMD ["--help"]
+
+FROM base AS database-credentials
+COPY --from=build /out/openuem-database-credentials /openuem-database-credentials
+ENTRYPOINT ["/openuem-database-credentials"]
+CMD ["--help"]
+
+FROM base AS database-bootstrap
+COPY --from=build /out/openuem-database-bootstrap /openuem-database-bootstrap
+ENTRYPOINT ["/openuem-database-bootstrap"]
+CMD ["--help"]
+
+# Only the fixture contains all setup commands and the process test executable.
+# Each distribution target above contains one command and its license.
+FROM base AS smoke
+COPY --from=build /out/openuem-reference-probe /openuem-reference-probe
+COPY --from=build /out/openuem-protocol-keys /openuem-protocol-keys
+COPY --from=build /out/openuem-installation-secrets /openuem-installation-secrets
+COPY --from=build /out/openuem-database-credentials /openuem-database-credentials
+COPY --from=build /out/openuem-database-bootstrap /openuem-database-bootstrap
+COPY --from=test-build /out/setup.test /setup.test
+ENV OPENUEM_SETUP_CONTAINER_TEST=1
+ENTRYPOINT ["/setup.test"]
+CMD ["-test.v", "-test.run=^TestSetupContainerCommands$", "-test.timeout=30s"]
+
+FROM database-bootstrap AS final

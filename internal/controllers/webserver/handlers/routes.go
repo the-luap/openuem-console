@@ -1,23 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/open-uem/ent"
 	"github.com/open-uem/openuem-console/internal/views/login_views"
 	"golang.org/x/time/rate"
 )
 
 func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
+	e.Use(h.UserLocale)
+	h.RegisterApple(e)
+	h.RegisterDesktop(e)
+	h.RegisterWindows(e)
+	h.RegisterAccess(e)
+	h.RegisterAudit(e)
 	e.GET("/", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site", h.Dashboard, h.IsAuthenticated)
 
 	e.GET("/auth", h.Auth)
-	e.GET("/auth/confirm/:token", h.ConfirmEmail)
+	// The handler explicitly rejects every method except GET and POST so
+	// unsupported methods cannot fall through to the protected route fallback.
+	e.Any("/auth/confirm/:token", h.ConfirmEmail)
 
 	e.GET("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
 	e.POST("/agents", func(c echo.Context) error { return h.ListAgents(c, "", "", false) }, h.IsAuthenticated)
@@ -114,7 +124,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.DELETE("/admin/tenants/:tenant", h.DeleteTenant, h.IsAuthenticated)
 
 	e.GET("/admin/sessions", func(c echo.Context) error { successMessage := ""; return h.ListSessions(c, successMessage) }, h.IsAuthenticated)
-	e.GET("/admin/sessions/:token/delete", h.SessionDelete)
+	e.GET("/admin/sessions/:token/delete", h.SessionDelete, h.IsAuthenticated)
 	e.DELETE("/admin/sessions/:token", h.SessionConfirmDelete, h.IsAuthenticated)
 	e.GET("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
 	e.POST("/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
@@ -135,13 +145,23 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/admin/rustdesk", h.RustDeskSettings, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/admin", h.TagManager, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/admin", h.TagManager, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/admin", h.TagManager, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/admin/tags", h.TagManager, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/admin/tags", h.TagManager, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/admin/tags", h.TagManager, h.IsAuthenticated, h.AppleCSRF)
 	e.DELETE("/tenant/:tenant/admin/tags", h.TagManager, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/admin/metadata", h.OrgMetadataManager, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/admin/metadata", h.OrgMetadataManager, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/admin/metadata", h.OrgMetadataManager, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/admin/tags/:tag", h.OrganizationTag, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/admin/tags/:tag", h.SaveOrganizationTag, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/tags/:tag/delete", h.DeleteOrganizationTag, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/admin/metadata", h.MetadataFields, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.DELETE("/tenant/:tenant/admin/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/admin/metadata/new", h.MetadataField, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/metadata/new", h.MetadataField, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/admin/metadata/:field", h.MetadataField, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/metadata/:field", h.MetadataField, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/metadata/:field/deletion", h.MetadataDeletionReview, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/admin/metadata/:field/deletion/:review", h.MetadataDeletionReceipt, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/admin/metadata/:field/deletion/:review", h.MetadataDeletionReceipt, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/admin/rustdesk", h.RustDeskSettings, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/admin/rustdesk", h.RustDeskSettings, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/admin/smtp", h.SMTPSettings, h.IsAuthenticated)
@@ -165,6 +185,11 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/admin/rustdesk/inherit", h.ApplyGlobalRustDeskSettings, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/admin/netbird", h.NetbirdSettings, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/admin/netbird", h.NetbirdSettings, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/netbird/packages", h.NetbirdPackages, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/netbird/packages/new", h.NewNetbirdPackage, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/netbird/packages", h.ApproveNetbirdPackage, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/netbird/packages/:approval", h.NetbirdPackage, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/netbird/packages/:approval/revoke", h.RevokeNetbirdPackage, h.IsAuthenticated, h.AppleCSRF)
 
 	e.GET("/dashboard", h.Dashboard, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/dashboard", h.Dashboard, h.IsAuthenticated)
@@ -233,8 +258,8 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/computers/:uuid/remote-assistance", h.RemoteAssistance, h.IsAuthenticated)
 	e.GET("/computers/:uuid/power", h.PowerManagement, h.IsAuthenticated)
 	e.POST("/computers/:uuid/power/:action", h.PowerManagement, h.IsAuthenticated)
-	e.GET("/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
-	e.POST("/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
+	e.GET("/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.POST("/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.GET("/computers/:uuid/deploy/searchinstall", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
@@ -242,9 +267,12 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/computers/:uuid/deploy/install", h.ComputerDeployInstall, h.IsAuthenticated)
 	e.POST("/computers/:uuid/deploy/update", h.ComputerDeployUpdate, h.IsAuthenticated)
 	e.POST("/computers/:uuid/deploy/uninstall", h.ComputerDeployUninstall, h.IsAuthenticated)
-	e.GET("/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.POST("/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.DELETE("/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
+	e.GET("/computers/:uuid/metadata", h.DesktopMetadata, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.DELETE("/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/metadata/:field/clear", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/computers/:uuid/stopvnc", h.ComputerStopVNC, h.IsAuthenticated)
@@ -257,14 +285,14 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/computers/:uuid/startrustdesk", h.RustDeskStart, h.IsAuthenticated)
 	e.POST("/computers/:uuid/stoprustdesk", h.RustDeskStop, h.IsAuthenticated)
 	e.GET("/computers/:uuid/netbird", func(c echo.Context) error { return h.Netbird(c, "") }, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated)
-	e.POST("/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated)
+	e.POST("/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/computers/:uuid/tasks", func(c echo.Context) error { return h.ComputerTasks(c, "") }, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/computers", func(c echo.Context) error { return h.ComputersList(c, "", false) }, h.IsAuthenticated)
@@ -298,8 +326,8 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/tenant/:tenant/computers/:uuid/remote-assistance", h.RemoteAssistance, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/computers/:uuid/power", h.PowerManagement, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/power/:action", h.PowerManagement, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/computers/:uuid/deploy/searchinstall", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
@@ -307,9 +335,12 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/computers/:uuid/deploy/install", h.ComputerDeployInstall, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/deploy/update", h.ComputerDeployUpdate, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/deploy/uninstall", h.ComputerDeployUninstall, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/computers/:uuid/metadata", h.DesktopMetadata, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.DELETE("/tenant/:tenant/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/metadata/:field/clear", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/stopvnc", h.ComputerStopVNC, h.IsAuthenticated)
@@ -321,14 +352,14 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/computers/:uuid/startrustdesk", h.RustDeskStart, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/computers/:uuid/stoprustdesk", h.RustDeskStop, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/computers/:uuid/netbird", func(c echo.Context) error { return h.Netbird(c, "") }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/computers/:uuid/tasks", func(c echo.Context) error { return h.ComputerTasks(c, "") }, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/site/:site/computers", func(c echo.Context) error { return h.ComputersList(c, "", false) }, h.IsAuthenticated)
@@ -362,8 +393,8 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/remote-assistance", h.RemoteAssistance, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/power", h.PowerManagement, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/power/:action", h.PowerManagement, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/site/:site/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/notes", h.Notes, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/notes", h.Notes, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/deploy", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/deploy/searchinstall", func(c echo.Context) error { return h.ComputerDeploy(c, "") }, h.IsAuthenticated)
@@ -371,9 +402,12 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/deploy/install", h.ComputerDeployInstall, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/deploy/update", h.ComputerDeployUpdate, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/deploy/uninstall", h.ComputerDeployUninstall, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.ComputerMetadata, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.DesktopMetadata, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.DELETE("/tenant/:tenant/site/:site/computers/:uuid/metadata", h.MetadataLegacyMutation, h.IsAuthenticated, h.AppleCSRF)
+	e.GET("/tenant/:tenant/site/:site/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/metadata/:field", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/metadata/:field/clear", h.DesktopMetadataValue, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/startvnc", h.ComputerStartVNC, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/stopvnc", h.ComputerStopVNC, h.IsAuthenticated)
@@ -385,14 +419,14 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/startrustdesk", h.RustDeskStart, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/stoprustdesk", h.RustDeskStop, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/netbird", func(c echo.Context) error { return h.Netbird(c, "") }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/install", h.NetbirdInstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/uninstall", h.NetbirdUninstall, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/register", h.NetbirdRegister, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/switchprofile", h.NetbirdSwitchProfile, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/refresh", h.NetbirdRefresh, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/deletepeer", func(c echo.Context) error { return h.NetbirdDeletePeer(c, false) }, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/connect", h.NetbirdConnect, h.IsAuthenticated, h.AppleCSRF)
+	e.POST("/tenant/:tenant/site/:site/computers/:uuid/netbird/disconnect", func(c echo.Context) error { return h.NetbirdDisconnect(c, "") }, h.IsAuthenticated, h.AppleCSRF)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/status", h.AgentStatus, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/computers/:uuid/tasks", func(c echo.Context) error { return h.ComputerTasks(c, "") }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/computers/:uuid/runtask", h.RunTask, h.IsAuthenticated)
@@ -411,57 +445,65 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 
 	e.GET("/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.GET("/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
-	e.POST("/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "POST", "", "") }, h.IsAuthenticated)
-	e.DELETE("/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "DELETE", "", "") }, h.IsAuthenticated)
+	e.POST("/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
+	e.GET("/profiles/:uuid", h.EditProfile, h.IsAuthenticated)
+	e.POST("/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
+	e.DELETE("/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)
+	e.GET("/profiles/:uuid/tags", h.ReadProfileTags, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.DELETE("/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
-	e.GET("/profiles/task-types", h.ProfileTaskTypes)
-	e.GET("/profiles/task-subtypes", h.ProfileTaskSubTypes)
-	e.GET("/profiles/task-definition", h.ProfileTaskDefinition)
+	e.GET("/profiles/:uuid/issues/:issue", h.ProfileIssueReports, h.IsAuthenticated)
+	e.GET("/profiles/task-types", h.RetiredTaskWizard, h.IsAuthenticated)
+	e.GET("/profiles/task-subtypes", h.RetiredTaskWizard, h.IsAuthenticated)
+	e.GET("/profiles/task-definition", h.RetiredTaskWizard, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
-	e.POST("/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "POST", "", "") }, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "DELETE", "", "") }, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/profiles/:uuid", h.EditProfile, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
+	e.DELETE("/tenant/:tenant/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/profiles/:uuid/tags", h.ReadProfileTags, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.DELETE("/tenant/:tenant/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/profiles/:uuid/issues/:issue", h.ProfileIssueReports, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/site/:site/profiles", func(c echo.Context) error { return h.Profiles(c, "") }, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/profiles/new", h.NewProfile, h.IsAuthenticated)
-	e.GET("/tenant/:tenant/site/:site/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "GET", "", "") }, h.IsAuthenticated)
-	e.POST("/tenant/:tenant/site/:site/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "POST", "", "") }, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/site/:site/profiles/:uuid", func(c echo.Context) error { return h.EditProfile(c, "DELETE", "", "") }, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/site/:site/profiles/new", h.CreateLegacyProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/profiles/:uuid", h.EditProfile, h.IsAuthenticated)
+	e.POST("/tenant/:tenant/site/:site/profiles/:uuid", h.SaveProfileMetadata, h.IsAuthenticated)
+	e.DELETE("/tenant/:tenant/site/:site/profiles/:uuid", h.DeleteLegacyProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/tags", h.ReadProfileTags, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.DELETE("/tenant/:tenant/site/:site/profiles/:uuid/tags", h.ProfileTags, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/confirm-delete", h.ConfirmDeleteProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/issues", h.ProfileIssues, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/issues/:issue", h.ProfileIssueReports, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/enable", func(c echo.Context) error { return h.EnableProfile(c, true) }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/disable", func(c echo.Context) error { return h.EnableProfile(c, false) }, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/setglobal", h.SetProfileAsGlobal, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/settenant", h.SetProfileAsTenantProfile, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/profiles/:uuid/tasks", h.ProfileTaskList, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/profiles/:uuid/clone", h.CloneProfile, h.IsAuthenticated)
 
 	e.GET("/register", h.SignIn)
@@ -537,11 +579,13 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/site/:site/software", h.Software, h.IsAuthenticated)
 
 	e.GET("/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tasks/:id", h.EditTask, h.IsAuthenticated)
-	e.DELETE("/tasks/:id", h.EditTask, h.IsAuthenticated)
+	e.DELETE("/tasks/:id", h.DeleteTask, h.IsAuthenticated)
 	e.GET("/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
+	e.GET("/tasks/:id/clone/targets", h.TaskCloneTargets, h.IsAuthenticated)
 	e.POST("/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
 	e.GET("/tasks/:profile/confirm-delete/:task", h.ConfirmDeleteTask, h.IsAuthenticated)
 	e.POST("/tasks/:id/enable", func(c echo.Context) error { return h.EnableTask(c, true) }, h.IsAuthenticated)
@@ -551,11 +595,13 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tasks/:id/movefrom/:from/to/:to", h.MoveTaskFromTo, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:id", h.EditTask, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/tasks/:id", h.EditTask, h.IsAuthenticated)
+	e.DELETE("/tenant/:tenant/tasks/:id", h.DeleteTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/tasks/:id/clone/targets", h.TaskCloneTargets, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/tasks/:profile/confirm-delete/:task", h.ConfirmDeleteTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/tasks/:id/enable", func(c echo.Context) error { return h.EnableTask(c, true) }, h.IsAuthenticated)
@@ -565,11 +611,13 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.POST("/tenant/:tenant/tasks/:id/movefrom/:from/to/:to", h.MoveTaskFromTo, h.IsAuthenticated)
 
 	e.GET("/tenant/:tenant/site/:site/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/tasks/:profile/new/:stage", h.TaskWizard, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:profile/new", h.NewTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/tasks/:id", h.EditTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:id", h.EditTask, h.IsAuthenticated)
-	e.DELETE("/tenant/:tenant/site/:site/tasks/:id", h.EditTask, h.IsAuthenticated)
+	e.DELETE("/tenant/:tenant/site/:site/tasks/:id", h.DeleteTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
+	e.GET("/tenant/:tenant/site/:site/tasks/:id/clone/targets", h.TaskCloneTargets, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:id/clone", h.CloneTask, h.IsAuthenticated)
 	e.GET("/tenant/:tenant/site/:site/tasks/:profile/confirm-delete/:task", h.ConfirmDeleteTask, h.IsAuthenticated)
 	e.POST("/tenant/:tenant/site/:site/tasks/:id/enable", func(c echo.Context) error { return h.EnableTask(c, true) }, h.IsAuthenticated)
@@ -625,6 +673,7 @@ func (h *Handler) Register(e *echo.Echo, registerRateLimit float64) {
 	e.GET("/login/new", h.LoginNewUser)
 
 	e.GET("/myaccount", h.MyAccount, h.IsAuthenticated)
+	e.POST("/myaccount/language", h.UpdateLanguage, h.IsAuthenticated, h.AppleCSRF)
 	e.POST("/myaccount/info", h.UpdatePersonalInfo, h.IsAuthenticated)
 	e.POST("/myaccount/password", h.MyAccountPassword, h.IsAuthenticated)
 	e.POST("/myaccount/enable2fa", h.Enable2FA, h.IsAuthenticated)
@@ -645,15 +694,33 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			return h.Login(c)
 		}
 
-		// get user from database
-		user, err := h.Model.GetUserById(username)
-		if err != nil {
+		// Recovery sessions cannot authorize protected routes.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot") {
 			return h.Login(c)
 		}
 
-		// if sessions includes forgot
-		forgot := h.SessionManager.Manager.GetBool(c.Request().Context(), "forgot")
-		if forgot {
+		// Bound both account lookup and local policy verification. A transient
+		// database failure must not destroy an otherwise valid session.
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+		defer cancel()
+		user, err := h.Model.Client.User.Get(ctx, username)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return h.rejectLocalSession(c)
+			}
+			return echo.NewHTTPError(http.StatusServiceUnavailable, "Session verification is temporarily unavailable.")
+		}
+		if h.SessionManager.Manager.Exists(c.Request().Context(), oidcSessionKey) {
+			if err = h.validateOIDCSession(c, username); err != nil {
+				return err
+			}
+		} else if err = h.validateLocalSession(ctx, c, user); err != nil {
+			return err
+		}
+
+		// A pending first factor cannot silently become a full session if the
+		// account's MFA setting changes while the browser is completing its challenge.
+		if h.SessionManager.Manager.GetBool(c.Request().Context(), "authentication-pending") && (!user.Use2fa || h.SessionManager.Manager.GetBool(c.Request().Context(), "twofa")) {
 			return h.Login(c)
 		}
 
@@ -683,6 +750,6 @@ func (h *Handler) IsAuthenticated(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		return next(c)
+		return h.authorizeConsoleRequest(c, next)
 	}
 }

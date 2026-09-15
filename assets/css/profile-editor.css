@@ -1,0 +1,8 @@
+#profile-editor { width: 100%; min-width: 0; }
+#profile-editor fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+#profile-editor input, #profile-editor select, #profile-editor textarea { max-width: 100%; }
+#profile-editor .profile-name-preview, #profile-editor .profile-tag-label { overflow-wrap: anywhere; min-width: 0; }
+#profile-editor .profile-applied-tags { display: flex; flex-direction: column; gap: .75rem; }
+#profile-editor .profile-applied-tags li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+#profile-editor fieldset:disabled { opacity: .65; }
+@media (max-width: 600px) { #profile-editor .profile-applied-tags li { align-items: flex-start; flex-direction: column; gap: .25rem; } }

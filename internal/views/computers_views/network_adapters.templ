@@ -10,8 +10,8 @@ import (
 
 templ NetworkAdapters(c echo.Context, p partials.PaginationAndSort, agent *ent.Agent, adapters []*ent.NetworkAdapter, confirmDelete bool, itemsPerPage int, commonInfo *partials.CommonInfo, netbird, offline bool) {
 	@partials.ComputerBreadcrumb(c, agent, commonInfo)
-	<main class="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-		<div class="uk-width-1-2@m uk-card uk-card-default">
+	<main class="grid min-w-0 flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8" style="grid-template-columns: minmax(0, 1fr);">
+		<div class="uk-width-1-2@m uk-card uk-card-default min-w-0">
 			<div class="uk-card-body uk-flex uk-flex-column gap-4">
 				@partials.ComputerHeader(p, agent, commonInfo, offline)
 				@ComputersNavbar(agent.ID, "network-adapters", agent.VncProxyPort, confirmDelete, commonInfo, agent.Os, netbird, agent.Edges.Release.Version)
@@ -29,73 +29,80 @@ templ NetworkAdapters(c echo.Context, p partials.PaginationAndSort, agent *ent.A
 						</p>
 					</div>
 				</div>
-				<div class="uk-card uk-card-body uk-card-default">
+				<div class="uk-card uk-card-body uk-card-default min-w-0">
 					if len(adapters) > 0 {
-						<table class="uk-table uk-table-divider uk-table-small uk-table-striped -mt-4">
-							<thead>
-								<tr>
-									<th>{ i18n.T(ctx, "Name") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.mac_address") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.ip_address") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.subnet") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.default_gateway") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.dhcp") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.dns") }</th>
-									<th>{ i18n.T(ctx, "inventory.network_adapters.speed") }</th>
-									if agent.Os != "windows" && agent.Os != "macOS" {
-										<th>{ i18n.T(ctx, "Virtual") }</th>
-									}
-								</tr>
-							</thead>
-							for _, adapter := range adapters {
-								<tr>
-									<td>{ adapter.Name }</td>
-									<td>{ adapter.MACAddress }</td>
-									if adapter.Addresses == "" {
-										<td>-</td>
-									} else {
-										<td>{ adapter.Addresses }</td>
-									}
-									if adapter.Subnet == "" {
-										<td>-</td>
-									} else {
-										<td>{ adapter.Subnet }</td>
-									}
-									if adapter.DefaultGateway == "" {
-										<td>-</td>
-									} else {
-										<td>{ adapter.DefaultGateway }</td>
-									}
-									<td>
-										if adapter.DhcpEnabled {
-											@partials.Checkmark()
-										} else {
-											{ "-" }
+						<p class="uk-text-small uk-text-muted mb-4">{ i18n.T(ctx, "inventory.network_adapters.scroll_report") }</p>
+						<div class="overflow-x-auto" role="region" aria-label={ i18n.T(ctx, "inventory.network_adapters.report_region") } tabindex="0">
+							<table class="uk-table uk-table-divider uk-table-small uk-table-striped" style="min-width: 60rem; table-layout: fixed;">
+								<thead>
+									<tr>
+										<th>{ i18n.T(ctx, "Name") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.mac_address") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.ip_address") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.subnet") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.default_gateway") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.dhcp") }</th>
+										<th style="width: 25%;">{ i18n.T(ctx, "inventory.network_adapters.dns") }</th>
+										<th>{ i18n.T(ctx, "inventory.network_adapters.speed") }</th>
+										if agent.Os != "windows" && agent.Os != "macOS" {
+											<th>{ i18n.T(ctx, "Virtual") }</th>
 										}
-									</td>
-									if adapter.DNSServers != "" {
-										// TODO escape content from the database for tooltip
-										<td
-											uk-tooltip={ fmt.Sprintf("title: DNS Servers: %s<br>Domain: %s; pos: top", adapter.DNSServers, adapter.DNSDomain) }
-										>
-											<uk-icon hx-history="false" icon="book-text" custom-class="h-5 w-5" uk-cloack></uk-icon>
-										</td>
-									} else {
-										<td>-</td>
-									}
-									<td>{ adapter.Speed }</td>
-									if agent.Os != "windows" && agent.Os != "macOS" {
+									</tr>
+								</thead>
+								for _, adapter := range adapters {
+									<tr>
+										<td class="break-all">{ adapter.Name }</td>
+										<td class="break-all">{ adapter.MACAddress }</td>
+										if adapter.Addresses == "" {
+											<td>-</td>
+										} else {
+											<td class="break-all">{ adapter.Addresses }</td>
+										}
+										if adapter.Subnet == "" {
+											<td>-</td>
+										} else {
+											<td class="break-all">{ adapter.Subnet }</td>
+										}
+										if adapter.DefaultGateway == "" {
+											<td>-</td>
+										} else {
+											<td class="break-all">{ adapter.DefaultGateway }</td>
+										}
 										<td>
-											if adapter.Virtual {
+											if adapter.DhcpEnabled {
 												@partials.Checkmark()
 											} else {
 												{ "-" }
 											}
 										</td>
-									}
-								</tr>
-							}
-						</table>
+										if adapter.DNSServers != "" {
+											<td class="break-all">
+												<dl>
+													<dt class="font-semibold">{ i18n.T(ctx, "inventory.network_adapters.dns_servers") }</dt>
+													<dd>{ adapter.DNSServers }</dd>
+													if adapter.DNSDomain != "" {
+														<dt class="font-semibold mt-2">{ i18n.T(ctx, "inventory.network_adapters.dns_domain") }</dt>
+														<dd>{ adapter.DNSDomain }</dd>
+													}
+												</dl>
+											</td>
+										} else {
+											<td>-</td>
+										}
+										<td class="break-all">{ adapter.Speed }</td>
+										if agent.Os != "windows" && agent.Os != "macOS" {
+											<td>
+												if adapter.Virtual {
+													@partials.Checkmark()
+												} else {
+													{ "-" }
+												}
+											</td>
+										}
+									</tr>
+								}
+							</table>
+						</div>
 						@partials.Pagination(c, p, "get", "#main", "outerHTML", string(templ.URL(partials.GetNavigationUrl(commonInfo, fmt.Sprintf("/computers/%s/network-adapters", agent.ID)))), itemsPerPage)
 					} else {
 						<p class="uk-text-small uk-text-muted">

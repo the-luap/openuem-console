@@ -1,0 +1,94 @@
+package desktop_views
+
+import (
+ "strconv"
+ "github.com/labstack/echo/v4"
+ "github.com/open-uem/openuem-console/internal/inventory"
+ "github.com/open-uem/openuem-console/internal/views/mdm_views"
+ "github.com/open-uem/openuem-console/internal/views/partials"
+)
+
+templ netbirdPeerRemovalSummary(r *inventory.NetbirdRegistration) {
+ if r.LastPeerRemoval!=nil {
+  <dl class="netbird-details">
+   <dt>Peer removal attempts</dt><dd>{ strconv.FormatInt(r.LastPeerRemoval.Sequence,10) }</dd>
+   <dt>Latest peer removal attempt</dt><dd>{ r.LastPeerRemoval.ID }</dd>
+   <dt>Removal requested by</dt><dd>{ r.LastPeerRemoval.Actor }</dd>
+   <dt>Removal attempt recorded</dt><dd>@mdm_views.Timestamp(&r.LastPeerRemoval.CreatedAt)</dd>
+  </dl>
+  <p>Each attempt is permanently recorded. A removal attempt alone does not prove peer absence.</p>
+ }
+ if r.PeerAbsence!=nil {
+  <dl class="netbird-details">
+   <dt>Provider peer absence</dt><dd>Confirmed by an exact-ID provider read</dd>
+   <dt>Absence retained by</dt><dd>{ r.PeerAbsence.Actor }</dd>
+   <dt>Absence retained</dt><dd>@mdm_views.Timestamp(&r.PeerAbsence.CreatedAt)</dd>
+  </dl>
+  <p>This is retained absence evidence for the associated provider peer. It does not uninstall NetBird or erase local credentials and does not change the original registration outcome.</p>
+ }
+}
+
+templ NetbirdPeerRemovalReview(c echo.Context,info *partials.CommonInfo,v *inventory.NetbirdPeerRemovalReview,removalID string) {
+ @netbirdPage(c,info,v.Registration.DeviceID,"Review NetBird peer removal") {
+  @netbirdTarget(v.Target)
+  <dl class="netbird-details">
+   <dt>Original request</dt><dd>{ v.Registration.ID }</dd>
+   <dt>Original outcome</dt><dd>{ v.Registration.Status }</dd>
+   <dt>Provider peer</dt><dd>{ netbirdPeerRemovalState(v.State) }</dd>
+  </dl>
+  @netbirdPeerBindingSummary(v.Registration.PeerBinding)
+  @netbirdPeerRemovalSummary(v.Registration)
+  if v.Peer!=nil {
+   <dl class="netbird-details">
+    <dt>Current peer ID</dt><dd>{ v.Peer.ID }</dd>
+    <dt>Current peer name</dt><dd>{ v.Peer.Name }</dd>
+    <dt>Current peer creation time</dt><dd>@mdm_views.Timestamp(&v.Peer.CreatedAt)</dd>
+   </dl>
+  }
+  if v.CanRemove {
+   <p>Confirmation authorizes one removal attempt for this exact associated peer at the original provider. This can interrupt its network access. NetBird installation and local credentials remain on the device; no device command is sent.</p>
+   <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-peer-removal-submit,#netbird-peer-removal-confirm" hx-indicator="#netbird-peer-removal-pending" class="netbird-confirm">
+    @mdm_views.CSRF(info)
+    <input type="hidden" name="removal_id" value={ removalID }/>
+    <input type="hidden" name="revision" value={ v.Revision }/>
+    <label class="netbird-checkbox" for="netbird-peer-removal-confirm"><input id="netbird-peer-removal-confirm" type="checkbox" name="confirmed" value="yes" required/><span>I reviewed the original provider and exact associated peer and authorize one peer removal attempt.</span></label>
+    <button type="submit" id="netbird-peer-removal-submit" class="uk-button uk-button-danger">Confirm peer removal</button>
+    <span id="netbird-peer-removal-pending" class="htmx-indicator" role="status">Attempting peer removal…</span>
+   </form>
+  } else if v.State=="unassociated" {
+   <p>Retain the exact setup-key registration event and peer association before reviewing removal. Names and IP addresses cannot authorize deletion.</p>
+  } else if v.State=="absent" {
+   <p>The provider currently confirms absence. Check peer removal to retain this evidence; no DELETE is needed.</p>
+  } else if v.State!="retained" {
+   <p>Removal is blocked until the exact associated peer and its retained creation identity can be confirmed.</p>
+  }
+  if v.State!="unassociated" && v.State!="retained" {
+   <form method="post" action={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal/check" } hx-post={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal/check" } hx-target="#main" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#netbird-peer-removal-check" hx-indicator="#netbird-peer-check-pending">
+    @mdm_views.CSRF(info)
+    <input type="hidden" name="confirmed" value="yes"/>
+    <button type="submit" id="netbird-peer-removal-check" class="uk-button uk-button-default">Check peer removal</button>
+    <span id="netbird-peer-check-pending" class="htmx-indicator" role="status">Checking peer absence…</span>
+   </form>
+   <p>Checking reads only the exact provider peer ID. It never repeats a removal attempt.</p>
+  }
+  if v.Registration.Status=="unconfirmed" && v.Registration.ReleasedAt==nil {
+   <p role="status">Further NetBird commands remain blocked. Peer absence cannot replace the separate registration resolution.</p>
+  }
+  <div class="netbird-actions">
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer/removal" }>Review again</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID+"/peer" }>Provider peer association</a>
+   <a class="uk-button uk-button-default" href={ NetbirdRegistrationPath(info,v.Registration.DeviceID)+"/"+v.Registration.ID }>Original receipt</a>
+  </div>
+ }
+}
+
+func netbirdPeerRemovalState(state string)string {
+ switch state {
+ case "retained":return "Absence evidence is retained; no new provider read was made"
+ case "present":return "The exact associated peer is present"
+ case "unassociated":return "No provider peer association is retained"
+ case "absent":return "The exact provider peer is currently absent"
+ case "changed":return "The peer creation identity no longer matches the retained association"
+ default:return "The provider cannot currently confirm the associated peer"
+ }
+}

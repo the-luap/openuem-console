@@ -9502,6 +9502,11 @@ th.uk-text-break, td.uk-text-break {
   margin-bottom: 0.5rem;
 }
 
+.my-3 {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .my-4 {
   margin-top: 1rem;
   margin-bottom: 1rem;
@@ -9573,6 +9578,10 @@ th.uk-text-break, td.uk-text-break {
   margin-top: 0.5rem;
 }
 
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
 .mt-4 {
   margin-top: 1rem;
 }
@@ -9589,14 +9598,6 @@ th.uk-text-break, td.uk-text-break {
   margin-top: 2rem;
 }
 
-.ml-4 {
-  margin-left: 1rem;
-}
-
-.ml-8 {
-  margin-left: 2rem;
-}
-
 .inline-block {
   display: inline-block;
 }
@@ -9611,6 +9612,10 @@ th.uk-text-break, td.uk-text-break {
 
 .grid {
   display: grid;
+}
+
+.contents {
+  display: contents;
 }
 
 .hidden {
@@ -9671,6 +9676,10 @@ th.uk-text-break, td.uk-text-break {
 
 .h-9 {
   height: 2.25rem;
+}
+
+.h-auto {
+  height: auto;
 }
 
 .h-full {
@@ -9829,8 +9838,24 @@ th.uk-text-break, td.uk-text-break {
   width: 100vw;
 }
 
+.min-w-0 {
+  min-width: 0px;
+}
+
+.min-w-\[48rem\] {
+  min-width: 48rem;
+}
+
+.max-w-full {
+  max-width: 100%;
+}
+
 .flex-1 {
   flex: 1 1 0%;
+}
+
+.shrink-0 {
+  flex-shrink: 0;
 }
 
 .grow {
@@ -9917,6 +9942,10 @@ th.uk-text-break, td.uk-text-break {
   gap: 0.5rem;
 }
 
+.gap-3 {
+  gap: 0.75rem;
+}
+
 .gap-4 {
   gap: 1rem;
 }
@@ -9935,6 +9964,10 @@ th.uk-text-break, td.uk-text-break {
   margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
 
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
 .overflow-y-auto {
   overflow-y: auto;
 }
@@ -9943,8 +9976,24 @@ th.uk-text-break, td.uk-text-break {
   scroll-behavior: auto;
 }
 
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+}
+
 .text-nowrap {
   text-wrap: nowrap;
+}
+
+.break-words {
+  overflow-wrap: break-word;
+}
+
+.break-all {
+  word-break: break-all;
 }
 
 .rounded-full {
@@ -10207,6 +10256,11 @@ th.uk-text-break, td.uk-text-break {
   padding-bottom: 0.5rem;
 }
 
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
 .py-4 {
   padding-top: 1rem;
   padding-bottom: 1rem;
@@ -10218,6 +10272,10 @@ th.uk-text-break, td.uk-text-break {
 
 .pl-4 {
   padding-left: 1rem;
+}
+
+.pr-10 {
+  padding-right: 2.5rem;
 }
 
 .pr-2 {
@@ -10242,18 +10300,6 @@ th.uk-text-break, td.uk-text-break {
 
 .pt-6 {
   padding-top: 1.5rem;
-}
-
-.pl-2 {
-  padding-left: 0.5rem;
-}
-
-.pl-6 {
-  padding-left: 1.5rem;
-}
-
-.pr-10 {
-  padding-right: 2.5rem;
 }
 
 .text-left {
@@ -10323,6 +10369,14 @@ th.uk-text-break, td.uk-text-break {
   font-weight: 700;
 }
 
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
 .italic {
   font-style: italic;
 }
@@ -10350,6 +10404,10 @@ th.uk-text-break, td.uk-text-break {
 .text-blue-700 {
   --tw-text-opacity: 1;
   color: rgb(29 78 216 / var(--tw-text-opacity));
+}
+
+.text-foreground {
+  color: hsl(var(--foreground));
 }
 
 .text-gray-300 {
@@ -10566,8 +10624,8 @@ th.uk-text-break, td.uk-text-break {
     display: flex;
   }
 
-  .sm\:h-auto {
-    height: auto;
+  .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sm\:gap-4 {

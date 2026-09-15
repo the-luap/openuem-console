@@ -22,36 +22,7 @@ templ NewProfile(c echo.Context, commonInfo *partials.CommonInfo) {
 				</div>
 			</div>
 			<div class="uk-card-body">
-				<form
-					class="uk-form-stacked my-6"
-					hx-post={ string(templ.URL(partials.GetNavigationUrl(commonInfo, "/profiles/new"))) }
-					hx-target="#main"
-					hx-swap="outerHTML"
-					hx-push-url="false"
-				>
-					<label class="uk-form-label" for="profile-description">
-						{ i18n.T(ctx, "profiles.new.profile") }
-					</label>
-					<div class="uk-form-controls">
-						<textarea
-							id="profile-description"
-							name="profile-description"
-							class="uk-textarea w-1/2"
-							rows="2"
-							placeholder={ i18n.T(ctx, "profiles.new.text") }
-							aria-label="Profile's description"
-							autocomplete="off"
-							autocorrect="off"
-							autocapitalize="off"
-							spellcheck="false"
-						></textarea>
-					</div>
-					<div class="uk-form-controls my-4">
-						<button type="submit" class="uk-button uk-button-primary">
-							{ i18n.T(ctx, "profiles.new.create") }
-						</button>
-					</div>
-				</form>
+				@ProfileCreationForm(commonInfo)
 			</div>
 		</div>
 	</main>

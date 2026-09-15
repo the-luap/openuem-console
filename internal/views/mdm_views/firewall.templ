@@ -1,0 +1,28 @@
+package mdm_views
+
+import "github.com/open-uem/openuem-console/internal/views/partials"
+
+templ FirewallEditor(info *partials.CommonInfo) {
+	<details class="mt-6">
+		<summary class="font-medium cursor-pointer">Create a Mac firewall profile</summary>
+		<form method="post" action={ partials.GetNavigationUrl(info, "/ios/configurations") } class="grid gap-4 mt-4">
+			@CSRF(info)
+			<input type="hidden" name="editor" value="macos-firewall"/>
+			<input type="hidden" name="payload_scope" value="System"/>
+			<p>Manage the application firewall on macOS 10.12 or later. This profile applies to the whole Mac. If several firewall profiles are installed, macOS combines their most restrictive settings.</p>
+			<label>Name<input class="uk-input" name="name" maxlength="255" required placeholder="Company Mac firewall"/></label>
+			<label>Identifier<input class="uk-input" name="identifier" maxlength="255" required placeholder="com.company.mac-firewall"/></label>
+			<label>Firewall<select class="uk-select" name="EnableFirewall"><option value="true">Enabled</option><option value="false">Disabled by this profile</option></select></label>
+			<label><input type="checkbox" name="BlockAllIncoming" value="true"/> Block all incoming connections</label>
+			<label><input type="checkbox" name="EnableStealthMode" value="true"/> Enable stealth mode</label>
+			<p class="uk-text-muted">Blocking incoming connections can interrupt remote access and apps that listen for connections. Another installed profile may keep the firewall enabled.</p>
+			<label>Built-in software<select class="uk-select" name="AllowSigned"><option value="">Keep macOS default</option><option value="true">Allow incoming connections</option><option value="false">Do not automatically allow</option></select></label>
+			<label>Downloaded signed software<select class="uk-select" name="AllowSignedApp"><option value="">Keep macOS default</option><option value="true">Allow incoming connections</option><option value="false">Do not automatically allow</option></select></label>
+			<p class="uk-text-muted">Changing either signed software setting requires macOS 12.3 or later.</p>
+			<label>Allowed applications<textarea class="uk-textarea" name="AllowedApplications" rows="3" maxlength="16384" placeholder="com.company.service"></textarea></label>
+			<label>Blocked applications<textarea class="uk-textarea" name="BlockedApplications" rows="3" maxlength="16384" placeholder="com.company.unwanted-app"></textarea></label>
+			<p class="uk-text-muted">Enter one bundle identifier per line, with up to 64 rules in total. Each app can appear once. Saving creates a profile; select Macs below to assign it. Profile confirmation does not prove network behavior.</p>
+			<button class="uk-button uk-button-primary" type="submit">Create Mac firewall profile</button>
+		</form>
+	</details>
+}
