@@ -50,10 +50,19 @@ func (h *Handler) Overview(c echo.Context) error {
 	}
 
 	if c.Request().Method == "POST" {
+		if err := c.Request().ParseForm(); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid overview form")
+		}
 		description := c.FormValue("endpoint-description")
 		endpointType := c.FormValue("endpoint-type")
-		tenant := c.FormValue("tenant")
-		site := c.FormValue("site")
+		// Stale overview forms cannot execute an unreviewed organization move or
+		// partially change other fields before that move has been validated.
+		if _, present := c.Request().Form["tenant"]; present {
+			return c.Redirect(http.StatusSeeOther, partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agentId)+"/assignment"))
+		}
+		if _, present := c.Request().Form["site"]; present {
+			return c.Redirect(http.StatusSeeOther, partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agentId)+"/assignment"))
+		}
 
 		if description != "" {
 			if err := h.Model.SaveEndpointDescription(agentId, description, commonInfo); err != nil {
@@ -72,25 +81,6 @@ func (h *Handler) Overview(c echo.Context) error {
 			successMessage = i18n.T(c.Request().Context(), "agents.overview_endpoint_type_success")
 		}
 
-		if tenant != "" && site != "" {
-			if err := h.Model.AssociateToTenantAndSite(agentId, tenant, site); err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.overview_endpoint_type_could_not_save", err.Error()), true))
-			}
-
-			// Change URL with the new site and organization
-			c.Response().Header().Set("HX-Replace-Url", fmt.Sprintf("/tenant/%s/site/%s/computers/%s/overview", tenant, site, agentId))
-			commonInfo.TenantID = tenant
-			commonInfo.SiteID = site
-			tenantID, err := strconv.Atoi(tenant)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-			}
-			commonInfo.Sites, err = h.Model.GetSites(tenantID)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_sites", err.Error()), true))
-			}
-			successMessage = i18n.T(c.Request().Context(), "agents.association_success")
-		}
 	}
 
 	agent, err := h.Model.GetAgentOverviewById(agentId, commonInfo)

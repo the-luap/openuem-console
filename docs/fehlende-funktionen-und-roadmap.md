@@ -569,6 +569,18 @@ reviews, migration audit visibility and manual payloads. The documented upgrade
 requires compatible workers first; automated version negotiation, wider provider
 secret migration, key rotation/recovery and physical acceptance remain open.
 
+[Desktop organization/site changes](desktop-device-assignment.md) now require an
+actor-bound, expiring review and explicit confirmation. Organization
+administrators can move legacy computers within their organization; only global
+administrators can cross organizations. Current source/destination authority,
+reviewed data impact and immutable completion receipts protect atomic moves,
+including tag/metadata removal and both scope audits. Stale overview forms no
+longer perform direct moves. Existing individual enrollment identities remain
+bound to their original scope. PostgreSQL/race, registered route and responsive
+browser checks cover permissions, changed data, retries and audit rollback.
+Remaining legacy desktop mutations and native identity transfer still require
+their separate implementation and acceptance.
+
 [Desktop device notes](desktop-device-notes.md) now use a dedicated
 organization/server-administrator capability on all read/write aliases. Current
 permission and complete site membership locks remain held through audit commit;

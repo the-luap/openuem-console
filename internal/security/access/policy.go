@@ -15,28 +15,29 @@ const (
 type Capability string
 
 const (
-	ManageDeviceNotes    Capability = "devices.notes.manage"
-	ReadDevices          Capability = "devices.read"
-	ManageDeviceGroups   Capability = "devices.groups.manage"
-	ManageTags           Capability = "tags.manage"
-	RefreshDevices       Capability = "devices.refresh"
-	EnrollDevices        Capability = "devices.enroll"
-	RevokeDevices        Capability = "devices.revoke"
-	ReadProfiles         Capability = "profiles.read"
-	ReadSoftware         Capability = "software.read"
-	ManageSoftware       Capability = "software.manage"
-	AssignSoftware       Capability = "software.assign"
-	ManageProfiles       Capability = "profiles.manage"
-	AssignProfiles       Capability = "profiles.assign"
-	ManageUpdates        Capability = "updates.manage"
-	ManageDeviceSecurity Capability = "devices.security.manage"
-	ManageWindowsCSP     Capability = "windows.csp.manage"
-	RetrieveRecoveryKeys Capability = "devices.recovery.retrieve"
-	ManageCertificates   Capability = "certificates.manage"
-	ReadAudit            Capability = "audit.read"
-	ManageAuditRetention Capability = "audit.retention.manage"
-	ManageSettings       Capability = "settings.manage"
-	ManageAccess         Capability = "access.manage"
+	ManageDeviceAssignments Capability = "devices.assignments.manage"
+	ManageDeviceNotes       Capability = "devices.notes.manage"
+	ReadDevices             Capability = "devices.read"
+	ManageDeviceGroups      Capability = "devices.groups.manage"
+	ManageTags              Capability = "tags.manage"
+	RefreshDevices          Capability = "devices.refresh"
+	EnrollDevices           Capability = "devices.enroll"
+	RevokeDevices           Capability = "devices.revoke"
+	ReadProfiles            Capability = "profiles.read"
+	ReadSoftware            Capability = "software.read"
+	ManageSoftware          Capability = "software.manage"
+	AssignSoftware          Capability = "software.assign"
+	ManageProfiles          Capability = "profiles.manage"
+	AssignProfiles          Capability = "profiles.assign"
+	ManageUpdates           Capability = "updates.manage"
+	ManageDeviceSecurity    Capability = "devices.security.manage"
+	ManageWindowsCSP        Capability = "windows.csp.manage"
+	RetrieveRecoveryKeys    Capability = "devices.recovery.retrieve"
+	ManageCertificates      Capability = "certificates.manage"
+	ReadAudit               Capability = "audit.read"
+	ManageAuditRetention    Capability = "audit.retention.manage"
+	ManageSettings          Capability = "settings.manage"
+	ManageAccess            Capability = "access.manage"
 )
 
 type Scope struct {
@@ -93,7 +94,7 @@ func roleAllows(role Role, capability Capability) bool {
 		return role == Viewer || role == Operator || role == TenantAdmin || role == Administrator
 	case ManageDeviceGroups, RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates, AssignSoftware:
 		return role == Operator || role == TenantAdmin || role == Administrator
-	case ManageDeviceNotes, ManageTags, RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, ManageWindowsCSP, RetrieveRecoveryKeys, ManageSoftware:
+	case ManageDeviceAssignments, ManageDeviceNotes, ManageTags, RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, ManageWindowsCSP, RetrieveRecoveryKeys, ManageSoftware:
 		return role == TenantAdmin || role == Administrator
 	case ManageAccess, ManageSettings:
 		return role == Administrator

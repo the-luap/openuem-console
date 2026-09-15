@@ -114,7 +114,15 @@ access notes in the selected scope. Viewers and operators cannot read them.
 Existing note routes share the same current-grant, single-site, revision and
 transactional audit checks; a conflicting edit preserves the submitted draft.
 
-Server administrators retain the existing desktop overview. Its edits, other
+[Organization/site changes](desktop-device-assignment.md) require
+`devices.assignments.manage`. Organization administrators can move eligible
+legacy computers between their organization's sites; only global server
+administrators can cross organizations. A ten-minute review binds the actor,
+source, destination and data impact. Confirmation rechecks current grants and
+commits the move, any tag/metadata deletion and both scope audits atomically.
+Existing individual enrollment identities cannot be moved through this workflow.
+
+Server administrators retain the existing desktop overview. Its remaining edits, other
 legacy detail routes beyond the scoped projections, software deployment and
 remote actions still require a server administrator. Those individual desktop action permissions remain roadmap
 work. A new route is not implicitly enabled for a scoped role because it shares a

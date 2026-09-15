@@ -19,6 +19,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
+			return access.ManageDeviceAssignments, true
 		case "/computers/:uuid/notes":
 			return access.ManageDeviceNotes, true
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request":
@@ -47,6 +49,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
+			return access.ManageDeviceAssignments, true
 		case "/computers/:uuid/notes":
 			return access.ManageDeviceNotes, true
 		case "/computers/:uuid/netbird/installations", "/computers/:uuid/netbird/installations/:request/cancel", "/computers/:uuid/netbird/installations/:request/observe", "/computers/:uuid/netbird/installations/:request/resolution", "/computers/:uuid/netbird/installations/:request/resolution/reconcile":
@@ -85,6 +89,10 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 func (h *Handler) RegisterDesktop(e *echo.Echo) {
 	for _, prefix := range []string{"", "/tenant/:tenant", "/tenant/:tenant/site/:site"} {
 		g := e.Group(prefix, h.IsAuthenticated, h.AppleCSRF)
+		g.GET("/computers/:uuid/assignment", h.DesktopAssignment)
+		g.POST("/computers/:uuid/assignment", h.DesktopAssignmentReview)
+		g.GET("/computers/:uuid/assignment/:review", h.DesktopAssignmentReceipt)
+		g.POST("/computers/:uuid/assignment/:review", h.DesktopAssignmentReceipt)
 		g.GET("/computers/:uuid/inventory", h.DesktopInventory)
 		g.GET("/computers/:uuid/inventory/software", h.DesktopSoftware)
 		g.GET("/computers/:uuid/inventory/network", h.DesktopNetwork)

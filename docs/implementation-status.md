@@ -61,6 +61,24 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Desktop organization/site changes](desktop-device-assignment.md) now replace
+  the old partially applied direct move with an expiring, actor-bound review and
+  atomic confirmed transfer. Organization administrators can change sites within
+  their organization; only global administrators can cross organizations.
+  Confirmation rechecks current permissions and reviewed membership, names,
+  status, notes, tags and metadata. Cross-organization tag/metadata deletion,
+  source/destination audits and an immutable completion receipt commit together;
+  exact retries never repeat a completed move. Individual enrollment identities,
+  including revoked records, remain in their original scope. PostgreSQL/race and
+  registered route tests cover isolation, changed data, CSRF, strict forms,
+  legacy bypass removal and audit rollback. All 448 inventory tests pass across
+  eight race-test partitions, and the full console route fixture passes in
+  96.580 seconds. All 24 responsive Chromium cases
+  pass, with keyboard selection and mandatory confirmation. The dedicated lock
+  test also passes ten repetitions; full affected access, audit, view and model
+  regressions, the Linux build and Vet pass. Other legacy mutations and native
+  identity transfer remain separate roadmap work.
+
 - Desktop [device notes](desktop-device-notes.md) now require organization or
   server administration for both reads and edits on every existing alias. Current
   permission and complete membership locks survive through audit commit; protected

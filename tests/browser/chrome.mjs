@@ -22,6 +22,7 @@ const assetRoot = realpathSync(
 );
 const fixtures = new Set([
  "notes-conflict",
+ ...["choices","choices-long","individual","review-site","review-organization","completed","expired","conflict"].map(state=>"device-assignment-"+state),
  ...['review','review-long','review-absent','queued','delivery-pending','unconfirmed','viewer','stopped','cancelled','completed','released','history','history-empty','history-full','resolution-withdraw','resolution-release','resolution-retry','resolution-waiting','resolution-conflict','resolution-confirm','resolution-completed','resolution-released','resolution-long'].map(kind=>'netbird-removals-'+kind),
  ...['review','review-long','queued','delivery-pending','unconfirmed','viewer','stopped','cancelled','completed','released','history','history-empty','history-full','resolution-withdraw','resolution-release','resolution-retry','resolution-waiting','resolution-conflict','resolution-confirm','resolution-completed','resolution-released','resolution-long'].map(kind=>'netbird-removal-recoveries-'+kind),
  ...['review','review-long','queued','delivery-pending','unconfirmed','viewer','stopped','cancelled','completed','released','history','history-empty','history-full','resolution-withdraw','resolution-release','resolution-retry','resolution-waiting','resolution-conflict','resolution-confirm','resolution-completed','resolution-released','resolution-long'].map(kind=>'netbird-removal-absences-'+kind),
