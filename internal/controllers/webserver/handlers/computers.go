@@ -53,8 +53,6 @@ func (h *Handler) Overview(c echo.Context) error {
 		if err := c.Request().ParseForm(); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "Invalid overview form")
 		}
-		description := c.FormValue("endpoint-description")
-		endpointType := c.FormValue("endpoint-type")
 		// Stale overview forms cannot execute an unreviewed organization move or
 		// partially change other fields before that move has been validated.
 		if _, present := c.Request().Form["tenant"]; present {
@@ -64,23 +62,7 @@ func (h *Handler) Overview(c echo.Context) error {
 			return c.Redirect(http.StatusSeeOther, partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agentId)+"/assignment"))
 		}
 
-		if description != "" {
-			if err := h.Model.SaveEndpointDescription(agentId, description, commonInfo); err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.overview_description_could_not_save", err.Error()), true))
-			}
-			successMessage = i18n.T(c.Request().Context(), "agents.overview_description_success")
-		}
-
-		if endpointType != "" {
-			if !slices.Contains([]string{"DesktopPC", "Laptop", "Server", "Tablet", "VM", "AllInOne", "Other"}, endpointType) {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.overview_endpoint_type_invalid"), true))
-			}
-			if err := h.Model.SaveEndpointType(agentId, endpointType, commonInfo); err != nil {
-				return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.overview_endpoint_type_could_not_save"), true))
-			}
-			successMessage = i18n.T(c.Request().Context(), "agents.overview_endpoint_type_success")
-		}
-
+		return c.Redirect(http.StatusSeeOther, partials.GetNavigationUrl(commonInfo, "/computers/"+url.PathEscape(agentId)+"/details"))
 	}
 
 	agent, err := h.Model.GetAgentOverviewById(agentId, commonInfo)

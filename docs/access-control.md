@@ -114,6 +114,13 @@ access notes in the selected scope. Viewers and operators cannot read them.
 Existing note routes share the same current-grant, single-site, revision and
 transactional audit checks; a conflicting edit preserves the submitted draft.
 
+[Device details](desktop-device-details.md) use `devices.details.manage` for the
+display-name, description and type editor. Organization and server administrators
+can update all three fields atomically within the selected scope. A protected
+revision detects older writers and concurrent edits; conflicts preserve the
+draft. The legacy overview/nickname POST aliases redirect without writing and
+retain their existing server-administrator boundary.
+
 [Organization/site changes](desktop-device-assignment.md) require
 `devices.assignments.manage`. Organization administrators can move eligible
 legacy computers between their organization's sites; only global server

@@ -15,6 +15,7 @@ const (
 type Capability string
 
 const (
+	ManageDeviceDetails     Capability = "devices.details.manage"
 	ManageDeviceAssignments Capability = "devices.assignments.manage"
 	ManageDeviceNotes       Capability = "devices.notes.manage"
 	ReadDevices             Capability = "devices.read"
@@ -94,7 +95,7 @@ func roleAllows(role Role, capability Capability) bool {
 		return role == Viewer || role == Operator || role == TenantAdmin || role == Administrator
 	case ManageDeviceGroups, RefreshDevices, EnrollDevices, AssignProfiles, ManageUpdates, AssignSoftware:
 		return role == Operator || role == TenantAdmin || role == Administrator
-	case ManageDeviceAssignments, ManageDeviceNotes, ManageTags, RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, ManageWindowsCSP, RetrieveRecoveryKeys, ManageSoftware:
+	case ManageDeviceDetails, ManageDeviceAssignments, ManageDeviceNotes, ManageTags, RevokeDevices, ManageProfiles, ManageCertificates, ReadAudit, ManageAuditRetention, ManageDeviceSecurity, RetrieveRecoveryKeys, ManageWindowsCSP, ManageSoftware:
 		return role == TenantAdmin || role == Administrator
 	case ManageAccess, ManageSettings:
 		return role == Administrator

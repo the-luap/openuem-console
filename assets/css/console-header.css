@@ -1,0 +1,11 @@
+/* Administrative labels may contain a long unbroken device name. */
+#header .uk-breadcrumb {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+#header .uk-breadcrumb > li > a,
+#header .uk-breadcrumb > li > span {
+  display: inline;
+}

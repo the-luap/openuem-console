@@ -38,7 +38,8 @@ native Apple/Windows MDM reassignment.
 
 At confirmation, current source and destination authority is checked again.
 Changes to membership, destination organization, displayed names, status,
-platform, note revision, tags or metadata invalidate the reviewed impact.
+platform, note revision, device-details revision, tags or metadata invalidate the
+reviewed impact.
 The existing permanent device-binding revision also detects moves away and
 back. An expired or changed review returns HTTP 409 with a link to start again;
 it cannot partially remove metadata or move the device.
@@ -85,6 +86,7 @@ stale overview submissions and recovery pages. Browser tests exercise eight
 states at 390, 768 and 1440 pixels, including long destination names, keyboard
 selection, mandatory confirmation, historical receipts and inactive failures.
 
-Description, endpoint type, nickname, custom metadata and other remaining
-legacy desktop mutations still require their individual authorization and
-audit work under SEC-01/SEC-02.
+[Display name, description and type](desktop-device-details.md) now have a
+separate revision-bound editor. Custom metadata and other remaining legacy
+desktop mutations still require their individual authorization and audit work
+under SEC-01/SEC-02.

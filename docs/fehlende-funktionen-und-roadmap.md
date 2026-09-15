@@ -569,6 +569,15 @@ reviews, migration audit visibility and manual payloads. The documented upgrade
 requires compatible workers first; automated version negotiation, wider provider
 secret migration, key rotation/recovery and physical acceptance remain open.
 
+[Desktop device details](desktop-device-details.md) now use an organization/server
+administrator editor with one protected revision for display name, description
+and type. Current authority, complete membership and audit share the transaction;
+concurrent or legacy edits preserve the submitted draft for comparison. Old
+direct forms cannot bypass the editor. Empty names use the reported hostname,
+and long names wrap in the shared header. PostgreSQL/race, route and browser
+fixtures cover isolation, bounds, conflicts, CSRF and rollback. Custom metadata
+and the remaining desktop actions still need their individual authorization work.
+
 [Desktop organization/site changes](desktop-device-assignment.md) now require an
 actor-bound, expiring review and explicit confirmation. Organization
 administrators can move legacy computers within their organization; only global

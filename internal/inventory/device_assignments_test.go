@@ -144,7 +144,7 @@ func TestDeviceAssignmentOrganizationAuthorityAndRetainedSameOrganizationData(t 
 }
 
 func TestDeviceAssignmentReviewRejectsChangedAndHiddenSources(t *testing.T) {
-	for _, change := range []string{"tag", "notes", "scope-away-and-back", "status", "destination", "ambiguous", "orphan", "waiting"} {
+	for _, change := range []string{"tag", "notes", "details", "scope-away-and-back", "status", "destination", "ambiguous", "orphan", "waiting"} {
 		t.Run(change, func(t *testing.T) {
 			f, target := assignmentFixture(t)
 			ctx := t.Context()
@@ -153,6 +153,8 @@ func TestDeviceAssignmentReviewRejectsChangedAndHiddenSources(t *testing.T) {
 			switch change {
 			case "tag":
 				_, err = f.db.ExecContext(ctx, `UPDATE tags SET tag='Changed tag' WHERE id IN (SELECT tag_id FROM agent_tags WHERE agent_id=$1)`, f.id)
+			case "details":
+				err = f.client.Agent.UpdateOneID(f.id).SetDescription("New device details").Exec(ctx)
 			case "notes":
 				err = f.client.Agent.UpdateOneID(f.id).SetNotes("New confidential notes").Exec(ctx)
 			case "scope-away-and-back":

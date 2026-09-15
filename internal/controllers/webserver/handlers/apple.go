@@ -174,6 +174,8 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 		if c.Request().Method == http.MethodPost {
 			limit := int64(4 << 20)
 			switch appleRoute(c.Path()) {
+			case "/computers/:uuid/details":
+				limit = 32 << 10
 			case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
 				limit = 8192
 			case "/computers/:uuid/notes":
@@ -209,7 +211,7 @@ func (h *Handler) AppleCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 				limit = 8192
 			}
 			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, limit)
-			if route := appleRoute(c.Path()); route == "/computers/:uuid/assignment" || route == "/computers/:uuid/assignment/:review" || route == "/computers/:uuid/notes" || route == "/computers/:uuid/netbird/installations" || route == "/computers/:uuid/netbird/installations/:request/cancel" || route == "/computers/:uuid/netbird/installations/:request/observe" || route == "/computers/:uuid/netbird/installations/:request/resolution" || route == "/computers/:uuid/netbird/installations/:request/resolution/reconcile" || route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" {
+			if route := appleRoute(c.Path()); route == "/computers/:uuid/details" || route == "/computers/:uuid/assignment" || route == "/computers/:uuid/assignment/:review" || route == "/computers/:uuid/notes" || route == "/computers/:uuid/netbird/installations" || route == "/computers/:uuid/netbird/installations/:request/cancel" || route == "/computers/:uuid/netbird/installations/:request/observe" || route == "/computers/:uuid/netbird/installations/:request/resolution" || route == "/computers/:uuid/netbird/installations/:request/resolution/reconcile" || route == "/computers/:uuid/execution" || route == "/computers/:uuid/runtask" || route == "/computers/:uuid/runprofile" {
 				if err := c.Request().ParseForm(); err != nil {
 					var oversized *http.MaxBytesError
 					if errors.As(err, &oversized) {

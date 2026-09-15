@@ -123,15 +123,15 @@ func assignmentFingerprint(ctx context.Context, tx *sql.Tx, r *DeviceAssignmentR
 	if err := assignmentHashPart(h, []any{r.DeviceID, r.DeviceName, r.Source, r.Target}); err != nil {
 		return nil, err
 	}
-	var status, platform, notesRevision, binding string
+	var status, platform, notesRevision, detailsRevision, binding string
 	if err := tx.QueryRowContext(ctx, `SELECT revision::text FROM uem_netbird_device_bindings WHERE device_id=$1 FOR SHARE`, r.DeviceID).Scan(&binding); err != nil {
 		return nil, err
 	}
-	err := tx.QueryRowContext(ctx, `SELECT a.agent_status,a.os,a.uem_notes_revision::text,COALESCE(b.revision::text,'') FROM agents a LEFT JOIN uem_netbird_device_bindings b ON b.device_id=a.oid WHERE a.oid=$1`, r.DeviceID).Scan(&status, &platform, &notesRevision, &binding)
+	err := tx.QueryRowContext(ctx, `SELECT a.agent_status,a.os,a.uem_notes_revision::text,a.uem_details_revision::text,COALESCE(b.revision::text,'') FROM agents a LEFT JOIN uem_netbird_device_bindings b ON b.device_id=a.oid WHERE a.oid=$1`, r.DeviceID).Scan(&status, &platform, &notesRevision, &detailsRevision, &binding)
 	if err != nil {
 		return nil, err
 	}
-	if err = assignmentHashPart(h, []string{status, platform, notesRevision, binding}); err != nil {
+	if err = assignmentHashPart(h, []string{status, platform, notesRevision, detailsRevision, binding}); err != nil {
 		return nil, err
 	}
 	// Stream fixed-size digests, never metadata contents or unbounded aggregates.

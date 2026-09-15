@@ -13,6 +13,8 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	if _, err := s.db.Exec(`INSERT INTO uem_inventory_audit(tenant_id,site_id,actor,action,resource_id,created_at) VALUES
  (1,11,'reader','inventory.notes.read','notes-read-old',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.notes.update','notes-update-old',clock_timestamp()-interval '45 days'),
+ (1,11,'reader','inventory.details.read','details-read-old',clock_timestamp()-interval '45 days'),
+ (1,11,'reader','inventory.details.update','details-update-old',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.assignment.depart','b0d98957-988e-4c61-9ce1-30bccb110c13',clock_timestamp()-interval '45 days'),
  (2,21,'reader','inventory.assignment.arrive','b0d98957-988e-4c61-9ce1-30bccb110c13',clock_timestamp()-interval '45 days'),
  (1,11,'reader','inventory.desktop.read','legacy-old',clock_timestamp()-interval '45 days'),
@@ -33,11 +35,13 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var events []Event
-	if err = json.Unmarshal(data, &events); err != nil || len(events) != 11 {
+	if err = json.Unmarshal(data, &events); err != nil || len(events) != 13 {
 		t.Fatal("inventory export lost historical scope", string(data), err)
 	}
 	want := map[string]string{"notes-read-old": "inventory.notes.read", "notes-update-old": "inventory.notes.update", "security-old": "inventory.security.read", "shares-old": "inventory.shares.read", "memory-old": "inventory.memory.read", "peripherals-old": "inventory.peripherals.read", "storage-old": "inventory.storage.read", "legacy-old": "inventory.desktop.read", "network-old": "inventory.network.read", "software-old": "inventory.software.read"}
 	want["b0d98957-988e-4c61-9ce1-30bccb110c13"] = "inventory.assignment.depart"
+	want["details-read-old"] = "inventory.details.read"
+	want["details-update-old"] = "inventory.details.update"
 	for _, event := range events {
 		if event.SiteID != 11 || want[event.Resource] != event.Action {
 			t.Fatal("inventory export lost source action or scope", event)
@@ -49,7 +53,7 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	}
 	scope := access.Scope{TenantID: 1}
 	preview, err := s.PreviewRetention(t.Context(), "organization-admin", scope, 30)
-	if err != nil || preview.Counts["inventory"] != 11 {
+	if err != nil || preview.Counts["inventory"] != 13 {
 		t.Fatal("inventory retention preview is not scoped", preview, err)
 	}
 	if err = s.ApplyRetention(t.Context(), "organization-admin", scope, preview.ID, preview.Token); err != nil {
@@ -68,10 +72,10 @@ func TestInventoryAuditScopeExportAndRetentionWithoutEnrollment(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id='b0d98957-988e-4c61-9ce1-30bccb110c13' AND tenant_id=2 AND site_id=21 AND action='inventory.assignment.arrive'`).Scan(&remaining); err != nil || remaining != 1 {
 		t.Fatal("source retention erased destination assignment evidence", remaining, err)
 	}
-	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id IN ('notes-read-old','notes-update-old','security-old','shares-old','memory-old','peripherals-old','storage-old','legacy-old','network-old','software-old')`).Scan(&remaining); err != nil || remaining != 0 {
+	if err = s.db.QueryRow(`SELECT count(*) FROM uem_inventory_audit WHERE resource_id IN ('details-read-old','details-update-old','notes-read-old','notes-update-old','security-old','shares-old','memory-old','peripherals-old','storage-old','legacy-old','network-old','software-old')`).Scan(&remaining); err != nil || remaining != 0 {
 		t.Fatal("confirmed inventory retention was not applied", remaining, err)
 	}
-	if err = s.db.QueryRow(`SELECT sum(event_count) FROM uem_audit_retention_history WHERE tenant_id=1 AND source='inventory'`).Scan(&history); err != nil || history != 11 {
+	if err = s.db.QueryRow(`SELECT sum(event_count) FROM uem_audit_retention_history WHERE tenant_id=1 AND source='inventory'`).Scan(&history); err != nil || history != 13 {
 		t.Fatal("inventory erasure receipt missing", history, err)
 	}
 }
