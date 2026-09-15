@@ -61,6 +61,25 @@ the table's package summaries do not remove any detail from the roadmap.
 
 ## Current change evidence
 
+- [Custom metadata](custom-metadata.md) now has a separate `metadata.manage`
+  capability, organization-scoped field uniqueness, paged catalogs and protected
+  field/value revisions. Conflicts preserve drafts; clear actions distinguish
+  absent values from configured blank text. Reviewed field deletion checks exact
+  current impact, unambiguous ownership and live permission, then atomically
+  commits the cascade, revision tombstones, receipt and audit. Older direct
+  mutation handlers are removed. All three schema initializers preserve scoped
+  duplicate names and additive objects across restart. Dedicated PostgreSQL race
+  tests, the registered router and 45 Chromium cases cover the new boundaries;
+  the browser run also passes 36 existing device-details/assignment cases.
+  All 465 inventory test/fuzz families pass across eight race-test partitions.
+  The full registered router passes in 55.876 seconds, including the new
+  scoped-metadata subtest; affected access, audit, model and view regressions,
+  Linux builds and Vet also pass. Worker `130cb4a` and certificate manager
+  `731da30` have successful CI runs, including the actual schema restart test.
+  Deploy compatible worker and certificate-manager initializers before the
+  console migration. Further native identity transfer and desktop actions remain
+  separate roadmap work.
+
 - [Desktop device details](desktop-device-details.md) now combine display name,
   description and type in a scoped organization/server-administrator editor.
   A protected shared revision detects concurrent and legacy changes; conflicts
@@ -75,8 +94,8 @@ the table's package summaries do not remove any detail from the roadmap.
   124.960 seconds, including the new device-details subtest. All twelve new
   Chromium cases pass at 390/768/1440 pixels, together with the 27 existing notes
   and assignment cases after the shared header change. Full affected access,
-  audit, model and view regressions, Linux build and Vet pass. Custom metadata
-  and other desktop mutations remain open.
+  audit, model and view regressions, Linux build and Vet pass. Further desktop
+  mutations remain open.
 
 - [Desktop organization/site changes](desktop-device-assignment.md) now replace
   the old partially applied direct move with an expiring, actor-bound review and

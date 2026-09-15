@@ -150,6 +150,9 @@ func (h *Handler) authorizeConsoleRequest(c echo.Context, next echo.HandlerFunc)
 		// reading registry metadata or performing enrollment actions.
 		return next(c)
 	}
+	if _, ok := metadataCapability(c.Request().Method, c.Path()); ok {
+		return next(c)
+	}
 	if _, ok := tagCapability(c.Request().Method, c.Path()); ok {
 		return next(c)
 	}

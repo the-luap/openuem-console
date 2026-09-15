@@ -96,6 +96,10 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		{"uem_device_assignment_reviews", "uem_device_assignment_immutable", 27},
 		{"agents", "uem_device_notes_revision", 23},
 		{"agents", "uem_device_details_revision", 23},
+		{"org_metadata", "uem_metadata_field_revision", 23},
+		{"metadata", "uem_metadata_value_revision", 29},
+		{"uem_metadata_value_revisions", "uem_metadata_value_revision_guard", 31},
+		{"uem_metadata_field_deletions", "uem_metadata_field_deletion_guard", 27},
 		{"agents", "uem_netbird_agent_binding", 21},
 		{"site_agents", "uem_netbird_scope_binding", 29},
 		{"sites", "uem_netbird_site_binding", 17},
@@ -268,6 +272,24 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		if !valid {
 			return errors.New("NetBird operation protection is incomplete")
 		}
+	}
+	var validMetadataIndex bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(
+  SELECT 1 FROM pg_index i JOIN pg_class idx ON idx.oid=i.indexrelid
+  JOIN pg_attribute tenant ON tenant.attrelid=i.indrelid AND tenant.attname='tenant_metadata'
+  JOIN pg_attribute name ON name.attrelid=i.indrelid AND name.attname='name'
+  WHERE i.indrelid='org_metadata'::regclass AND idx.relname='uem_metadata_field_name_tenant'
+   AND i.indisunique AND i.indisvalid AND i.indisready AND i.indnkeyatts=2
+   AND i.indkey[0]=tenant.attnum AND i.indkey[1]=name.attnum AND i.indpred IS NULL AND i.indexprs IS NULL
+ ) AND NOT EXISTS(
+  SELECT 1 FROM pg_index i JOIN pg_attribute name ON name.attrelid=i.indrelid AND name.attname='name'
+  WHERE i.indrelid='org_metadata'::regclass AND i.indisunique AND i.indnkeyatts=1
+   AND i.indkey[0]=name.attnum AND i.indpred IS NULL AND i.indexprs IS NULL
+ )`).Scan(&validMetadataIndex); err != nil {
+		return err
+	}
+	if !validMetadataIndex {
+		return errors.New("custom metadata indexes are missing or inconsistent")
 	}
 	return tx.Commit()
 }

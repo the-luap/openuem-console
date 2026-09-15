@@ -2,6 +2,7 @@ package admin_views
 
 import (
 	"fmt"
+ "github.com/open-uem/openuem-console/internal/security/access"
 	"github.com/invopop/ctxi18n/i18n"
 	"github.com/open-uem/openuem-console/internal/views/partials"
 )
@@ -109,22 +110,11 @@ templ ConfigNavbar(active string, agentsExists, serversExists bool, commonInfo *
 				</a>
 			</li>
 		}
-		if commonInfo.TenantID != "-1" {
-			<li class={ templ.KV("uk-active", active == "metadata") }>
-				<a
-					href={ templ.URL(fmt.Sprintf("/tenant/%s/admin/metadata", commonInfo.TenantID)) }
-					hx-get={ string(templ.URL(fmt.Sprintf("/tenant/%s/admin/metadata", commonInfo.TenantID))) }
-					hx-push-url="true"
-					hx-target="#main"
-					hx-swap="outerHTML"
-					hx-indicator="#admin-metadata-spinner"
-					class="flex items-center gap-1"
-				>
-					<uk-icon id="admin-metadata-spinner" hx-history="false" icon="loader-circle" custom-class="htmx-indicator h-4 w-4 animate-spin" uk-cloack></uk-icon>
-					{ i18n.T(ctx, "Metadata") }
-				</a>
-			</li>
-		}
+  if commonInfo.TenantID!="-1" && commonInfo.Can(access.ManageMetadata) {
+   <li class={ templ.KV("uk-active",active=="metadata") }>
+    <a href={ fmt.Sprintf("/tenant/%s/admin/metadata",commonInfo.TenantID) } hx-boost="false" class="flex items-center gap-1">{ i18n.T(ctx,"custom_metadata.title") }</a>
+   </li>
+  }
 		if commonInfo.TenantID != "-1" {
 			<li class={ templ.KV("uk-active", active == "update-agents") }>
 				<a

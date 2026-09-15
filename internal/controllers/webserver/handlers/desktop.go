@@ -19,6 +19,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	route := appleRoute(path)
 	if method == http.MethodGet {
 		switch route {
+		case "/computers/:uuid/metadata", "/computers/:uuid/metadata/:field":
+			return access.ManageMetadata, true
 		case "/computers/:uuid/details":
 			return access.ManageDeviceDetails, true
 		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":
@@ -51,6 +53,8 @@ func desktopCapability(method, path string) (access.Capability, bool) {
 	}
 	if method == http.MethodPost {
 		switch route {
+		case "/computers/:uuid/metadata/:field", "/computers/:uuid/metadata/:field/clear":
+			return access.ManageMetadata, true
 		case "/computers/:uuid/details":
 			return access.ManageDeviceDetails, true
 		case "/computers/:uuid/assignment", "/computers/:uuid/assignment/:review":

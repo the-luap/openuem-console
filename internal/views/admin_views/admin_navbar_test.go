@@ -1,8 +1,10 @@
 package admin_views
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/open-uem/openuem-console/internal/security/access"
 	"io"
 	"testing"
 
@@ -16,7 +18,7 @@ var globalNavbarTests = []string{"users", "sessions", "smtp", "sessions", "setti
 var tenantNavbarTests = []string{"tags", "metadata", "settings", "update-agents"}
 
 func TestTenantConfigNavbarTabs(t *testing.T) {
-	config := partials.CommonInfo{TenantID: "1"}
+	config := partials.CommonInfo{TenantID: "1", SiteID: "-1", Principal: access.Principal{UserID: "admin", Grants: []access.Grant{{Role: access.TenantAdmin, Scope: access.Scope{TenantID: 1}}}}}
 	for _, test := range tenantNavbarTests {
 		t.Run(test, func(t *testing.T) {
 			// Pipe the rendered template into goquery.
@@ -60,5 +62,26 @@ func TestGlobalConfigNavbarTabs(t *testing.T) {
 			assert.Equal(t, true, exists, "should get href")
 			assert.Equal(t, fmt.Sprintf("/admin/%s", test), val, "should get active tab")
 		})
+	}
+}
+
+func TestMetadataNavbarUsesCurrentCapabilityAndNativeNavigation(t *testing.T) {
+	for _, role := range []access.Role{access.Viewer, access.Operator, access.TenantAdmin, access.Administrator} {
+		scope := access.Scope{TenantID: 1}
+		if role == access.Administrator {
+			scope = access.Scope{}
+		}
+		info := &partials.CommonInfo{TenantID: "1", SiteID: "-1", Principal: access.Principal{UserID: "actor", Grants: []access.Grant{{Role: role, Scope: scope}}}}
+		var out bytes.Buffer
+		assert.NoError(t, ConfigNavbar("metadata", true, true, info).Render(context.Background(), &out))
+		doc, err := goquery.NewDocumentFromReader(&out)
+		assert.NoError(t, err)
+		link := doc.Find(`a[href="/tenant/1/admin/metadata"]`)
+		expected := 0
+		if role == access.TenantAdmin || role == access.Administrator {
+			expected = 1
+		}
+		assert.Equal(t, expected, link.Length())
+		assert.Zero(t, link.Filter("[hx-get]").Length())
 	}
 }

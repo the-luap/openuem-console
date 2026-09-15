@@ -23,6 +23,7 @@ import storage from "./desktop-storage.mjs";
 import peripherals from "./desktop-peripherals.mjs";
 import memory from "./desktop-memory.mjs";
 import notes from "./desktop-notes.mjs";
+import customMetadata from "./custom-metadata.mjs";
 import deviceDetails from "./device-details.mjs";
 import deviceAssignments from "./device-assignments.mjs";
 import shares from "./desktop-shares.mjs";
@@ -126,7 +127,7 @@ try {
         [peripherals, 48],
         [memory, 24],
         [notes, 3],
-        [deviceDetails, 12], [deviceAssignments, 24],
+        [customMetadata,45], [deviceDetails, 12], [deviceAssignments, 24],
         [shares, 24],
         [security, 36],
         [managementNavigation,12],

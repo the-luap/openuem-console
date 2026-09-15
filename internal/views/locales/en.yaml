@@ -2854,3 +2854,51 @@ en:
     denied: "You do not have permission to manage device details in this scope."
     not_found: "The device is not available in this scope."
     unavailable: "Device details are temporarily unavailable. Try again."
+
+  custom_metadata:
+    title: Custom fields
+    catalog: Organization field definitions
+    catalog_help: Define reusable text fields for devices in this organization. Names must be unique within this organization.
+    create: Create field
+    definition: Field definition
+    name: Field name
+    description: Help text
+    definition_help: Names accept up to 255 UTF-8 bytes. Help text accepts up to 4096 bytes and may contain multiple lines. Changes apply to this field on every device in the organization.
+    save_definition: Save definition
+    current_definition: Currently saved definition
+    search: Search field names and help text
+    search_button: Search
+    pages: Field pages
+    first: First page
+    next: Next page
+    no_fields: No fields match this search.
+    configured: A value is configured, including when it is blank.
+    unset: No value is configured.
+    value: Device value
+    value_help: Text accepts up to 16384 UTF-8 bytes, including line breaks. Saving an empty value keeps the field configured with blank text.
+    save_value: Save value
+    current_value: Currently saved value
+    clear_title: Clear device value
+    clear_help: Clearing removes this device's value. The field definition and other devices' values remain available.
+    confirm_clear: Clear this device's currently saved value.
+    clear: Clear value
+    clear_conflict: The field or value changed. Clearing was not applied. Review the current value before confirming again.
+    delete_title: Delete field definition
+    delete_help: Deleting this field also permanently removes every configured value for this field in the organization. Review the affected count before confirming. The receipt retains the field name, help text and affected count.
+    review_delete: Review deletion
+    affected: Devices with a configured value
+    confirm_delete: Permanently delete this field and all of its configured device values.
+    delete: Delete field and values
+    deleted: Field and values deleted.
+    receipt_help: This receipt records the completed deletion. Reopening it does not repeat the action.
+    expires: This review expires at
+    expired: This deletion review has expired. Return to the field catalog and create a new review.
+    deletion_changed: The field or its affected values changed. Nothing was deleted. Return to the field catalog and create a new review.
+    back: Back to field catalog
+    invalid: Invalid custom field, value, revision or request. Check the text limits and reopen the editor if needed.
+    conflict: The field or value changed. Your draft is preserved. Compare it with the currently saved data before saving again.
+    name_unavailable: This field name is already in use in the organization. Your draft is preserved; choose another name.
+    unsafe_references: This field has values whose organization ownership cannot be verified. Nothing was deleted. Resolve the device assignments before creating a new review.
+    denied: You do not have permission to manage custom fields in this organization or site.
+    not_found: The custom field or device is not available in the selected organization or site.
+    unavailable: Custom fields are temporarily unavailable. Try again later.

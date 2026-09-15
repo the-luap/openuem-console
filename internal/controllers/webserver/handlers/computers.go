@@ -19,7 +19,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/linde12/gowol"
 	"github.com/open-uem/ent"
-	openuem_ent "github.com/open-uem/ent"
 	openuem_nats "github.com/open-uem/nats"
 	"github.com/open-uem/openuem-console/internal/inventory"
 	"github.com/open-uem/openuem-console/internal/views/computers_views"
@@ -1394,105 +1393,6 @@ func (h *Handler) PowerManagement(c echo.Context) error {
 	default:
 		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.no_allowed_power_action"), false))
 	}
-}
-
-func (h *Handler) ComputerMetadata(c echo.Context) error {
-	var data []*openuem_ent.Metadata
-
-	commonInfo, err := h.GetCommonInfo(c)
-	if err != nil {
-		return err
-	}
-
-	successMessage := ""
-
-	agentId := c.Param("uuid")
-
-	if agentId == "" {
-		return RenderError(c, partials.ErrorMessage("an error occurred getting uuid param", false))
-	}
-
-	itemsPerPage, err := h.Model.GetDefaultItemsPerPage()
-	if err != nil {
-		log.Println("[ERROR]: could not get items per page from database")
-		itemsPerPage = 5
-	}
-
-	p := partials.NewPaginationAndSort(itemsPerPage)
-	p.GetPaginationAndSortParams(c.FormValue("page"), c.FormValue("pageSize"), c.FormValue("sortBy"), c.FormValue("sortOrder"), c.FormValue("currentSortBy"), itemsPerPage)
-
-	if p.SortBy == "" {
-		p.SortBy = "name"
-		p.SortOrder = "asc"
-	}
-
-	agent, err := h.Model.GetAgentById(agentId, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "agents.could_not_get_agent"), false))
-	}
-
-	confirmDelete := c.QueryParam("delete") != ""
-
-	data, err = h.Model.GetMetadataForAgent(agentId, p, commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	orgMetadata, err := h.Model.GetAllOrgMetadata(commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	p.NItems, err = h.Model.CountAllOrgMetadata(commonInfo)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(err.Error(), false))
-	}
-
-	if c.Request().Method == "POST" {
-		orgMetadataId := c.FormValue("orgMetadataId")
-		name := c.FormValue("name")
-		value := c.FormValue("value")
-
-		id, err := strconv.Atoi(orgMetadataId)
-		if err != nil {
-			return RenderError(c, partials.ErrorMessage(err.Error(), false))
-		}
-
-		if orgMetadataId != "" && name != "" {
-			acceptedMetadata := []int{}
-			for _, data := range orgMetadata {
-				acceptedMetadata = append(acceptedMetadata, data.ID)
-			}
-
-			if !slices.Contains(acceptedMetadata, id) {
-				return RenderError(c, partials.ErrorMessage(fmt.Sprintf("%s is not an accepted metadata", name), false))
-			}
-
-			if err := h.Model.SaveMetadata(agentId, id, value); err != nil {
-				return RenderError(c, partials.ErrorMessage(err.Error(), false))
-			}
-
-			data, err = h.Model.GetMetadataForAgent(agentId, p, commonInfo)
-			if err != nil {
-				return RenderError(c, partials.ErrorMessage(err.Error(), false))
-			}
-
-			successMessage = i18n.T(c.Request().Context(), "agents.metadata_save_success")
-		}
-	}
-
-	tenantID, err := strconv.Atoi(commonInfo.TenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "tenants.could_not_convert_to_int", err.Error()), true))
-	}
-	netbird, err := h.Model.HasNetbirdToken(c.Request().Context(), tenantID)
-	if err != nil {
-		return RenderError(c, partials.ErrorMessage(i18n.T(c.Request().Context(), "netbird.could_not_get_settings", err.Error()), true))
-	}
-
-	offline := h.IsAgentOffline(c)
-
-	return RenderView(c, computers_views.InventoryIndex(" | Deploy SW", computers_views.ComputerMetadata(c, p, agent, data, orgMetadata, confirmDelete, successMessage, itemsPerPage, commonInfo, netbird, offline), commonInfo))
 }
 
 func (h *Handler) ComputerConfirmDelete(c echo.Context) error {

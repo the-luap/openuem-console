@@ -90,3 +90,7 @@ selection, mandatory confirmation, historical receipts and inactive failures.
 separate revision-bound editor. Custom metadata and other remaining legacy
 desktop mutations still require their individual authorization and audit work
 under SEC-01/SEC-02.
+
+Metadata impact also includes protected definition and value revisions. An edit
+away and back invalidates a pending transfer, even when the final text matches.
+See [custom metadata](custom-metadata.md) for the coordinated schema upgrade.

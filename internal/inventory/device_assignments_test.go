@@ -144,13 +144,19 @@ func TestDeviceAssignmentOrganizationAuthorityAndRetainedSameOrganizationData(t 
 }
 
 func TestDeviceAssignmentReviewRejectsChangedAndHiddenSources(t *testing.T) {
-	for _, change := range []string{"tag", "notes", "details", "scope-away-and-back", "status", "destination", "ambiguous", "orphan", "waiting"} {
+	for _, change := range []string{"metadata-away-and-back", "metadata-definition", "tag", "notes", "details", "scope-away-and-back", "status", "destination", "ambiguous", "orphan", "waiting"} {
 		t.Run(change, func(t *testing.T) {
 			f, target := assignmentFixture(t)
 			ctx := t.Context()
 			r, err := inventory.ReviewDeviceAssignment(ctx, f.db, f.permissions, "admin", f.scope, f.id, target.SiteID)
 			require.NoError(t, err)
 			switch change {
+			case "metadata-away-and-back":
+				_, err = f.db.ExecContext(ctx, `UPDATE metadata SET value='Temporary' WHERE agent_metadata=$1`, f.id)
+				require.NoError(t, err)
+				_, err = f.db.ExecContext(ctx, `UPDATE metadata SET value='Private source value' WHERE agent_metadata=$1`, f.id)
+			case "metadata-definition":
+				_, err = f.db.ExecContext(ctx, `UPDATE org_metadata SET name='Changed field meaning' WHERE id IN (SELECT org_metadata_metadata FROM metadata WHERE agent_metadata=$1)`, f.id)
 			case "tag":
 				_, err = f.db.ExecContext(ctx, `UPDATE tags SET tag='Changed tag' WHERE id IN (SELECT tag_id FROM agent_tags WHERE agent_id=$1)`, f.id)
 			case "details":

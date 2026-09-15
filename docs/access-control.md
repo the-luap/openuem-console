@@ -121,6 +121,13 @@ revision detects older writers and concurrent edits; conflicts preserve the
 draft. The legacy overview/nickname POST aliases redirect without writing and
 retain their existing server-administrator boundary.
 
+[Custom fields](custom-metadata.md) require `metadata.manage` for definition and
+value reads as well as writes. Organization and server administrators can manage
+fields in their current organization. Values also require one unambiguous site
+for the admitted computer. Definition and value revisions protect edits; field
+deletion requires an actor-bound impact review and confirmation. Audit commits
+with every read or mutation. Viewers and operators cannot access field contents.
+
 [Organization/site changes](desktop-device-assignment.md) require
 `devices.assignments.manage`. Organization administrators can move eligible
 legacy computers between their organization's sites; only global server

@@ -15,6 +15,9 @@ templ Navigation(info *partials.CommonInfo) {
 			}
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/devices")) }>{ i18n.T(ctx,"management_navigation.devices") }</a>
 			<a class="uk-button uk-button-default" href={ templ.URL(partials.GetNavigationUrl(info, "/device-groups")) }>{ i18n.T(ctx,"mdm.groups.title") }</a>
+   if info.Can(access.ManageMetadata) {
+    <a class="uk-button uk-button-default" href={ "/tenant/"+info.TenantID+"/admin/metadata" }>{ i18n.T(ctx,"custom_metadata.title") }</a>
+   }
 			if organizationTagsVisible(info) {
 				<a class="uk-button uk-button-default" href={ templ.URL(OrganizationTagsPath(info)) }>{ i18n.T(ctx,"organization_tags.title") }</a>
 			}

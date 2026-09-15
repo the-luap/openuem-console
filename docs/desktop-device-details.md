@@ -69,5 +69,6 @@ conflict draft preservation, old-form redirects and audit rollback. Browser
 tests cover editing, conflicts, empty names and long fields at 390/768/1440
 pixels, including the shared breadcrumb header and keyboard submission.
 
-Custom organization metadata, other legacy device mutations, native hostname
+[Custom organization metadata](custom-metadata.md) has its own scoped editor and
+reviewed deletion workflow. Other legacy device mutations, native hostname
 changes and further device action permissions remain separate roadmap work.

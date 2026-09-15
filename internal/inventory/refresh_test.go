@@ -36,6 +36,11 @@ type refreshFixture struct {
 
 func newRefreshFixture(t *testing.T, publish inventory.ReportPublisher) *refreshFixture {
 	t.Helper()
+	return newRefreshFixtureBeforeMigration(t, publish, nil)
+}
+
+func newRefreshFixtureBeforeMigration(t *testing.T, publish inventory.ReportPublisher, before func(*sql.DB, *ent.Client, string, access.Scope)) *refreshFixture {
+	t.Helper()
 	dsn := os.Getenv("APPLE_MDM_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set APPLE_MDM_TEST_DATABASE_URL for inventory refresh integration")
@@ -113,6 +118,9 @@ func newRefreshFixture(t *testing.T, publish inventory.ReportPublisher) *refresh
 	}
 	if publish == nil {
 		publish = func(context.Context, string, string) error { return nil }
+	}
+	if before != nil {
+		before(db, client, id, scope)
 	}
 	store, err := inventory.NewRefreshStore(db, permissions, false, publish)
 	if err != nil {

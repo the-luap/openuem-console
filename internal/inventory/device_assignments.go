@@ -65,7 +65,7 @@ func assignmentTransaction(ctx context.Context, db *sql.DB, permissions *access.
 	}
 	// Freeze the whole edge sets: checking only visible edges misses foreign
 	// associations and permits concurrent inserts to escape the reviewed impact.
-	if _, err = tx.ExecContext(ctx, `LOCK TABLE site_agents,agent_tags,metadata IN `+mode+` MODE`); err != nil {
+	if _, err = tx.ExecContext(ctx, `LOCK TABLE site_agents,agent_tags,metadata,org_metadata IN `+mode+` MODE`); err != nil {
 		tx.Rollback()
 		return nil, false, err
 	}
@@ -157,7 +157,7 @@ func assignmentFingerprint(ctx context.Context, tx *sql.Tx, r *DeviceAssignmentR
 	if err != nil {
 		return nil, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT id,org_metadata_metadata,sha256(convert_to(value,'UTF8')) FROM metadata WHERE agent_metadata=$1 ORDER BY id`, r.DeviceID)
+	rows, err = tx.QueryContext(ctx, `SELECT m.id,m.org_metadata_metadata,sha256(convert_to(m.value,'UTF8')),r.revision::text,f.uem_revision::text FROM metadata m LEFT JOIN uem_metadata_value_revisions r ON r.device_id=m.agent_metadata AND r.field_id=m.org_metadata_metadata LEFT JOIN org_metadata f ON f.id=m.org_metadata_metadata WHERE m.agent_metadata=$1 ORDER BY m.id`, r.DeviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,11 +166,15 @@ func assignmentFingerprint(ctx context.Context, tx *sql.Tx, r *DeviceAssignmentR
 		var id int64
 		var org sql.NullInt64
 		var valueHash []byte
-		if err = rows.Scan(&id, &org, &valueHash); err != nil {
+		var valueRevision, fieldRevision sql.NullString
+		if err = rows.Scan(&id, &org, &valueHash, &valueRevision, &fieldRevision); err != nil {
 			return nil, err
 		}
+		if !valueRevision.Valid || !fieldRevision.Valid {
+			return nil, ErrAssignmentChanged
+		}
 		r.MetadataCount++
-		if err = assignmentHashPart(h, []any{"metadata", id, org, valueHash}); err != nil {
+		if err = assignmentHashPart(h, []any{"metadata", id, org, valueHash, valueRevision.String, fieldRevision.String}); err != nil {
 			return nil, err
 		}
 	}

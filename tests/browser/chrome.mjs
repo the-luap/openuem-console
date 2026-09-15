@@ -22,6 +22,7 @@ const assetRoot = realpathSync(
 );
 const fixtures = new Set([
  "notes-conflict",
+ ...["fields","fields-empty","device","device-empty","definition-new","definition","definition-conflict","value","value-empty","value-conflict","long","deletion","deletion-completed","deletion-expired","deletion-conflict"].map(state=>"custom-metadata-"+state),
  ...["edit","conflict","empty","long"].map(state=>"device-details-"+state),
  ...["choices","choices-long","individual","review-site","review-organization","completed","expired","conflict"].map(state=>"device-assignment-"+state),
  ...['review','review-long','review-absent','queued','delivery-pending','unconfirmed','viewer','stopped','cancelled','completed','released','history','history-empty','history-full','resolution-withdraw','resolution-release','resolution-retry','resolution-waiting','resolution-conflict','resolution-confirm','resolution-completed','resolution-released','resolution-long'].map(kind=>'netbird-removals-'+kind),
